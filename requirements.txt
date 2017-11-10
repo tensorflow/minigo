@@ -1,0 +1,9 @@
+argh
+numpy
+pygtp>=0.4
+sgf==0.5
+tqdm>=4.17
+tensorflow-gpu>=1.2
+protobuf==3.1.0.post1
+six==1.10.0
+petname

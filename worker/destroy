@@ -1,0 +1,9 @@
+#!/bin/sh
+
+source ./common
+
+./cluster-down
+
+gcloud iam service-accounts delete $SERVICE_ACCOUNT_EMAIL
+
+gsutil -m rm -r gs://$BUCKET_NAME

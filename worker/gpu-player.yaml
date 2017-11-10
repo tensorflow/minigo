@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mugo-gpu-player
+spec:
+  parallelism: 45
+  completions: 200000
+  template:
+    metadata:
+      name: gpu-player
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: job-label
+                operator: In
+                values:
+                - mugo-gpu-player
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: player
+        image: gcr.io/tensor-go/mugo-gpu-player:0.2
+        imagePullPolicy: Always
+        resources:
+          limits:
+            alpha.kubernetes.io/nvidia-gpu: 1
+        args:
+        - jacksona-mugo
+        volumeMounts:
+        - name: service-credentials
+          mountPath: /etc/credentials
+        - mountPath: /usr/local/bin/nvidia
+          name: nvidia-debug-tools
+        - mountPath: /usr/local/nvidia/lib64
+          name: nvidia-libraries
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/credentials/service-account.json
+        securityContext:
+          privileged: true
+      volumes:
+      - name: service-credentials
+        secret:
+          secretName: mugo-services-creds
+      - hostPath:
+          path: /home/kubernetes/bin/nvidia/bin
+        name: nvidia-debug-tools
+      - hostPath:
+          path: /home/kubernetes/bin/nvidia/lib
+        name: nvidia-libraries
+      restartPolicy: OnFailure

@@ -1,0 +1,5 @@
+PROJECT=tensor-go
+CLUSTER_NAME=mugo
+BUCKET_NAME=jacksona-mugo
+SERVICE_ACCOUNT=mugo-services
+SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT}@${PROJECT}.iam.gserviceaccount.com

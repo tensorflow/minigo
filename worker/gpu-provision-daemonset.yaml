@@ -1,0 +1,48 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+    name: cos-nvidia-installer
+    namespace: kube-system
+spec:
+  template:
+    metadata:
+      labels:
+        name: cos-nvidia-installer
+    spec:
+      hostNetwork: true
+      hostPID: true
+      volumes:
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: nvidia-overlay
+        hostPath:
+          path: /home/kubernetes/bin/nvidia
+      - name: os-release
+        hostPath:
+          path: /etc/os-release
+      - name: sysrq
+        hostPath:
+          path: /proc/sysrq-trigger
+      containers:
+      - image: gcr.io/google-containers/cos-nvidia-driver-install@sha256:de2d9098df423b064bb2579c4fb114022b2a6b7cc39c677d7ac720c9b75d9eb5
+        command: ["/bin/sh", "-c"]
+        args: ["usr/bin/nvidia-installer.sh && sleep infinity"]
+        name: nvidia-driver-installer
+        resources:
+          requests:
+            cpu: 0.15
+        securityContext:
+          privileged: true
+        env:
+          - name: BASE_DIR
+            value: "/rootfs/nvidia"
+        volumeMounts:
+        - name: nvidia-overlay
+          mountPath: /rootfs/nvidia
+        - name: dev
+          mountPath: /dev
+        - name: os-release
+          mountPath: /rootfs/etc/os-release
+        - name: sysrq
+          mountPath: /sysrq

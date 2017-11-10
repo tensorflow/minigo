@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mugo-player
+spec:
+  parallelism: 255
+  completions: 200000
+  template:
+    metadata:
+      name: player
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: job-label
+                operator: In
+                values:
+                - mugo-player
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: player
+        image: gcr.io/tensor-go/mugo-player:0.2
+        imagePullPolicy: Always
+        args:
+        - jacksona-mugo
+        volumeMounts:
+        - name: service-credentials
+          mountPath: /etc/credentials
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/credentials/service-account.json
+        securityContext:
+          privileged: true
+      volumes:
+      - name: service-credentials
+        secret:
+          secretName: mugo-services-creds
+      restartPolicy: OnFailure
