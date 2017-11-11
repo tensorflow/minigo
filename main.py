@@ -112,8 +112,7 @@ def selfplay(
          readouts: 'How many simulations to run per move'=100,
          games: 'Number of games to play' = 4,
          verbose : '>1 will print debug info, >2 will print boards' = 1,
-         use_cpu: 'passed to the network initializer'=False,
-         save_stats=False):
+         use_cpu: 'passed to the network initializer'=False):
 
     print ("Initializing network...", flush=True)
     network = DualNetwork(use_cpu=use_cpu)

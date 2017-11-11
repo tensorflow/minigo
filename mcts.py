@@ -9,7 +9,7 @@ import math
 # All terminology here (Q, U, N, p_UCT) uses the same notation as in the
 # AlphaGo paper.
 # Exploration constant
-c_PUCT = 5
+c_PUCT = 2.5
 # Dirichlet noise, as a function of go.N
 D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
 
@@ -125,7 +125,7 @@ class MCTSNode():
         sort_order.sort(key=lambda i: self.child_N[i], reverse=True)
         # Dump out some statistics
         print("To play: ", self.position.to_play, file=target)
-        print("== Top N:   Sc,    Q,    U,    P,    N == ", file=sys.stderr)
+        print("== Top N:   Sc,    Q,    U,    P,    N == ", file=target)
         print("\n".join(["{!s:9}: {:.2f}, {:.2f}, {:.2f}, {:.2f}, {}".format(
                 utils.to_human_coord(utils.unflatten_coords(key)),
                 self.child_action_score[key],
@@ -133,4 +133,4 @@ class MCTSNode():
                 self.child_U[key],
                 self.child_prior[key],
                 self.child_N[key])
-                for key in sort_order if self.child_N[key] > 0]), file=target)
+                for key in sort_order if self.child_N[key] > 0][:20]), file=target)

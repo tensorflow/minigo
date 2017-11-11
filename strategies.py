@@ -21,7 +21,7 @@ class MCTSPlayerMixin:
         self.verbosity = verbosity
         self.two_player_mode = two_player_mode
         if two_player_mode:
-            self.temp_threshold = 0
+            self.temp_threshold = -1
         else:
             self.temp_threshold = ((go.N * go.N) / 10) + 3
         self.searches_pi = []

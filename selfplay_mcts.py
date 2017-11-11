@@ -48,7 +48,7 @@ def play(network, games, readouts, verbosity=0):
 
         for player in players:
             # First, check the roots for hopeless games.
-            if player.should_resign(): # Force resign
+            if player.should_resign(): # Force resign, causes 'is_done' to be true.
                 continue
             move = player.pick_move()
             player.play_move(move)
