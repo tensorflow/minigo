@@ -40,13 +40,13 @@ The reinforcement pipeline consists of four commands:
         -- chunks_to_make: how many times to repeat the sampling process
 
     We assume the directory given has beneath it the directories of the form
-        
+
         `$MODEL/$POD/...`
 
     Given a directory, it...
 
         -- finds all the .meta files (described in selfplay, above.)
-        -- sorts them -- $MODEL is alpha-orderable, so sorting the full path 
+        -- sorts them -- $MODEL is alpha-orderable, so sorting the full path
             should give a list of the most recent games.
         -- adds up the numbers therein until it has a total above 'max_positions'
         -- then, for as many chunks_to_make:
@@ -54,11 +54,11 @@ The reinforcement pipeline consists of four commands:
                 -- pick a random number in the range of max_positions
                 -- figure out which game that is by search the cumulative sum of moves.
                 -- make a note of the filepath:movenum pair.
-            then, sort the list of filepath:movenum pairs, and for each filepath, 
-            pick out the movenums, slap 'em in a dataset, shuffle the whole thing, and 
+            then, sort the list of filepath:movenum pairs, and for each filepath,
+            pick out the movenums, slap 'em in a dataset, shuffle the whole thing, and
             write it out to output_directory
 
-    Phew.  
+    Phew.
 
   * train
 
@@ -74,8 +74,8 @@ The reinforcement pipeline consists of four commands:
 
   * evaluate
 
-        -- champion: "The path to the current best"
-        -- challenger: "the path to the freshly trained model to be tested"
+        -- black_model -- a path to a model,
+        -- white_model -- ditto
         -- games: 'Number of games to play' = 400,
         -- readouts: 'How many simulations to run per move'=800,
         -- threshold: 'percent of games challenger must win' = 0.55,
@@ -83,6 +83,8 @@ The reinforcement pipeline consists of four commands:
 
   The evaluator plays two models against each other, the champ and the
   challenger, writing the games out to the directory at `sgf_output`.
+  Note the 'threshold' is not arbitrary -- its arrived at by modelling the
+  series of games as a bernoulli process and doing MATH.
 
   Open Questions:
     * How should it communicate the winner?  Re-symlinking the `best_model`
@@ -92,7 +94,7 @@ The reinforcement pipeline consists of four commands:
       runs?
 
 
-So, the overall structure of data for MuGo is ...
+So, the overall structure of data for MuGo on the training box is ...
   * `./data/self_play/`
   The datasets for individual games, `$model_name-$playouts-$timestamp.gz`
   * `./data/training_data/`
@@ -102,4 +104,19 @@ So, the overall structure of data for MuGo is ...
   The different models
 
 
-These four stages of the pipeline are controlled by...uh... hangon...
+... and the jobs within the pipeline are
+
+1. The self-play workers, creating new games with the latest version of the
+   model.
+2. A data preprocessor, that builds data chunks out of the recent games.
+3. A trainer, which produces new candidate models.
+4. An evaluator, which determines which new candidate model should be
+   distributed to the self-play workers for step #1.
+
+These four stages of the pipeline are independent; Kubernetes orchestrates the
+jobs on a cluster.  The trainer and preprocessor are run via the `rl_loop`
+script, and the self-play workers are treated as a kubernetes Job.  Evaluator
+TBD and how it would control things, ditto overall pipeline metrics.
+
+
+
