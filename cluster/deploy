@@ -5,7 +5,7 @@ set -e
 source ./common
 
 # Create a GCS bucket for data storage
-#gsutil mb gs://$BUCKET_NAME
+gsutil mb gs://$BUCKET_NAME
 
 # Make a service account for our containers
 gcloud iam service-accounts create $SERVICE_ACCOUNT

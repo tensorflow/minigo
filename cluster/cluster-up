@@ -5,8 +5,8 @@ source ./common
 set -e
 
 # Create a Kubernetes cluster
-gcloud container clusters create \
-  --num-nodes 64 \
+gcloud beta container clusters create \
+  --num-nodes 4 \
   --machine-type n1-standard-8 \
   --min-cpu-platform "Intel Broadwell" \
   --disk-size 30 \

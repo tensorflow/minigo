@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: mugo-player
 spec:
-  parallelism: 255
+  parallelism: 63
   completions: 200000
   template:
     metadata:
