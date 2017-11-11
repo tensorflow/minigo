@@ -1,5 +1,5 @@
 #!/bin/sh
 
-source ./worker/common
+source ./cluster/common
 
 gsutil -m acl -r ch -u ${SERVICE_ACCOUNT_EMAIL}:R gs://$BUCKET_NAME/models 2> .acl_log
