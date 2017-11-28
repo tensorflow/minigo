@@ -130,17 +130,22 @@ def selfplay(
     with timer("%d games" % games):
         players = selfplay_mcts.play(network, games, readouts, verbose)
 
+    ds = None
     for idx,p in enumerate(players):
         try:
             pwcs, pis, results = p.to_dataset()
-            ds = DataSetV2.from_positions_w_context(pwcs, pis, results)
+            if idx == 0:
+                ds = DataSetV2.from_positions_w_context(pwcs, pis, results)
+            ds.extend(DataSetV2.from_positions_w_context(pwcs, pis, results))
             fname ="{:d}-{:d}".format(int(time.time()), idx)
-            ds.write(os.path.join(output_dir, fname + '.gz'))
-            ds.write_meta(os.path.join(output_dir, fname +'.meta'))
             with open(os.path.join(output_sgf, fname + '.sgf'), 'w') as f:
                 f.write(p.to_sgf())
         except IllegalMove:
             print("player #%d played an illegal move!" % idx)
+
+    fname ="{:d}".format(int(time.time()))
+    ds.write(os.path.join(output_dir, fname + '.gz'))
+    ds.write_meta(os.path.join(output_dir, fname +'.meta'))
 
 def gather(
         input_directory: 'where to look for games'='data/selfplay/',

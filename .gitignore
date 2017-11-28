@@ -5,4 +5,5 @@ data
 *__pycache__
 pip-selfcheck.json
 *.pyc
+sgf
 
