@@ -125,6 +125,7 @@ parser = argparse.ArgumentParser()
 argh.add_commands(parser, [train_loop, gather_loop, rsync_loop])
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     try:
         client = glog.Client('tensor-go')
         client.setup_logging(logging.INFO)
