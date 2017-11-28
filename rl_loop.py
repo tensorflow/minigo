@@ -21,6 +21,7 @@ import go
 
 BUCKET = os.environ['BUCKET_NAME'] # Did this die?  Set your bucket!
 GAMES_BUCKET = "gs://%s/games/" % BUCKET
+MODELS_BUCKET = "gs://%s/models/" % BUCKET
 MODEL_NUM_REGEX = "\d{6}"
 GAME_DIRECTORY = "./data/selfplay/"
 MODEL_DIRECTORY = "./saved_models"
@@ -36,9 +37,9 @@ def bootstrap(filename):
 def push_model(model_num, name):
     for f in os.listdir(MODEL_DIRECTORY):
         if f.startswith("{0:06d}".format(model_num)):
-            arg =  'gsutil cp %s/%s gs://%s/models/%06d-%s.%s' % (
+            arg =  'gsutil cp %s/%s %s/%06d-%s.%s' % (
                     MODEL_DIRECTORY,
-                    f, BUCKET, model_num, name, f.split('.')[1])
+                    f, MODELS_BUCKET, model_num, name, f.split('.')[1])
             subprocess.call(arg.split())
 
 def dir_model_num(dir_path):
