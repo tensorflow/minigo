@@ -235,3 +235,48 @@ TODO:
   - building and deploying new containers
   - updating the cluster workers.
   - digging through the games.
+
+
+Preflight checks for a training run.
+====================================
+
+
+Setting up the selfplay cluster
+-------------------------------
+
+* Check the project name, cluster name, & bucket name variables in the
+  `cluster/common` script.  Did you change things?
+  * If Yes: Grep for the original string.  Depending on what you changed, you may
+    need to change the yaml files for the selfplay workers.
+* Create the service account and bucket, if needed, by running `cluster/deploy`,
+  or the relevant lines therein.
+* Check the number of machines and machine types in the `cluster/cluster-up`
+   script.
+* Set up the cluster as above and start the nvidia driver installation daemon
+* While the nvidia drivers are getting installed on the fleet, check the
+  various hyperparameters and operating parameters:
+  * `go.py`, check the board size
+  * `dual_net.py`, check the `get_default_hyperparams` function
+  * `player_wrapper.sh`, the invocation of `main.py selfplay` has the readout
+    depth, game parallelism, etc.
+  * `strategies.py`, check the (currently static) resign threshold and the move
+    threshold for switching between unity temperature and an infinitesimal.
+  * `main.py`, check the default params on 'gather'
+  * `mcts.py`, check the noise density and the tree branching factor (lol good
+    luck)
+  * `rl_loop.py`, check the cluster name, directory for tensorflow logs, and
+    constants at the top of the file.
+* Seed the model directory with a randomly initialized model. (`python
+  rl_loop.py bootstrap /path/to/where/you/want/new/model`)
+* Copy the model to the GCS bucket. (`gsutil cp /path/to/model*
+  gs://bucket/model...` etc)
+
+* Build your docker images with the latest version of the code, optionally
+  bumping the version number in the Makefile.
+* Don't forget to push the images!
+
+* Now you can launch your job on the cluster -- check the parallelism in the
+  spec! -- per the instructions above.  You've got about a half-hour before
+  games start to finish up.
+
+
