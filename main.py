@@ -136,6 +136,7 @@ def selfplay(
             pwcs, pis, results = p.to_dataset()
             if idx == 0:
                 ds = DataSetV2.from_positions_w_context(pwcs, pis, results)
+            #TODO: this does a lot of needless copying (O(n^2))... fix eventually
             ds.extend(DataSetV2.from_positions_w_context(pwcs, pis, results))
             fname ="{:d}-{:d}".format(int(time.time()), idx)
             with open(os.path.join(output_sgf, fname + '.sgf'), 'w') as f:
