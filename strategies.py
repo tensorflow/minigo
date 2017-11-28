@@ -12,6 +12,8 @@ from mcts import MCTSNode
 import go
 import utils
 
+MAX_GAME_DEPTH = int(go.N * go.N * 1.5)
+
 class MCTSPlayerMixin:
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
                  resign_threshold=-0.999, verbosity=0, two_player_mode=False):
@@ -111,7 +113,7 @@ class MCTSPlayerMixin:
         if self.root.position.is_game_over():
             return True
 
-        if self.root.position.n >= (go.N * go.N * 2):
+        if self.root.position.n >= MAX_GAME_DEPTH:
             return True
         return False
 
