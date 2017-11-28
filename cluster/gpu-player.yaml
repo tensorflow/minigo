@@ -27,7 +27,7 @@ spec:
           limits:
             alpha.kubernetes.io/nvidia-gpu: 1
         args:
-        - mugozero-v1
+        - $BUCKET_NAME
         volumeMounts:
         - name: service-credentials
           mountPath: /etc/credentials
