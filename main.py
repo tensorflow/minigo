@@ -14,7 +14,7 @@ from gtp_wrapper import make_gtp_instance, MCTSPlayer
 from load_data_sets import DataSetV2
 from dual_net import DualNetwork
 import selfplay_mcts
-from utils import timer
+from utils import logged_timer as timer
 import ds_wrangler
 import evaluation
 import sgf_wrapper

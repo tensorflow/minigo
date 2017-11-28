@@ -1,3 +1,5 @@
+import argparse
+import argh
 import subprocess
 import os
 import time
@@ -5,7 +7,9 @@ import sys
 import petname
 import shipname
 import re
-from utils import timer
+import google.cloud.logging as glog
+import logging
+from utils import logged_timer as timer
 import go
 
 GAMES_BUCKET = "gs://jacksona-mugo/games/"
@@ -51,34 +55,38 @@ def smart_rsync(from_model_num):
 def find_largest_modelnum(directory):
     return max([dir_model_num(f) or 0 for f in os.listdir(directory) ])
 
-def bg_chunk_runner():
+def gather_loop():
     # Check how many chunks there are.  Run rsync.  If there are no
     # chunks, run gather, else wait a bit, and repeat.
     while True:
         while True:
-            num_chunks = sum([1 if p.endswith('.gz') else 0 for p in os.listdir('data/training_chunks')])
-            print('found ', num_chunks, ' num_chunks')
-            maxnum = find_largest_modelnum(MODEL_DIRECTORY)
-            print ("Oldest model: ", maxnum)
-            with timer("=== Rsync new games"):
-                smart_rsync(maxnum-6)
-            if num_chunks == 0:
-                break
-            time.sleep(30)
+           num_chunks = sum([1 if p.endswith('.gz') else 0 for p in os.listdir('data/training_chunks')])
+           if num_chunks == 0:
+               break
+           print('Found ', num_chunks, ' chunks.  Waiting for training job to use them.')
+           time.sleep(30)
 
-        # Create training chunks
-        failball = subprocess.call( ('python main.py gather').split())
-        if failball:
-            print(failball)
-            sys.exit(1)
+        # Create training chunks, do something with the data...
+        with timer("=== Gather & write out chunks: "):
+            failball = subprocess.call( ('python main.py gather').split())
+            if failball:
+                print(failball)
+                sys.exit(1)
 
-if __name__ == '__main__':
+def rsync_loop():
+    while True:
+        maxnum = find_largest_modelnum(MODEL_DIRECTORY)
+        print ("Oldest model: ", maxnum)
+        with timer("=== Rsync new games"):
+            smart_rsync(maxnum-6)
+        logging.info("Rsync finished")
+        time.sleep(300)
+
+def train_loop():
     model_num = find_largest_modelnum(MODEL_DIRECTORY) or 0
     train_cmd = 'python main.py train --load-file saved_models/{0:06d} -s saved_models/{1:06d}' + \
                     ' --logdir logs/rl_loop_9 data/training_chunks/'
 
-    bg_chunk_proc = multiprocessing.Process(target=bg_chunk_runner, name="bg_chunk_runner")
-    bg_chunk_proc.start()
     while True:
         print(" ====== Model %d ======" % (model_num))
 
@@ -87,7 +95,7 @@ if __name__ == '__main__':
             num_chunks = sum([1 if fname.endswith('.gz') else 0 for fname in os.listdir(TRAINING_DIRECTORY)])
             if num_chunks != 0:
                 break
-            time.sleep(10)
+            time.sleep(15)
 
         # Take a training step.
         bigarg = train_cmd.format(model_num, model_num+1)
@@ -112,3 +120,16 @@ if __name__ == '__main__':
         push_model(model_num, new_name)
         subprocess.call('./update-acls')
         model_num+=1
+
+parser = argparse.ArgumentParser()
+argh.add_commands(parser, [train_loop, gather_loop, rsync_loop])
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    try:
+        client = glog.Client('tensor-go')
+        client.setup_logging(logging.INFO)
+    except:
+        print('!! Cloud logging disabled')
+
+    argh.dispatch(parser)
