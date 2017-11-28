@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import functools
 import itertools
 import operator
+import logging
 import random
 import re
 import time
@@ -110,3 +111,11 @@ def timer(message):
     yield
     tock = time.time()
     print("%s: %.3f seconds" % (message, (tock - tick)))
+
+@contextmanager
+def logged_timer(message):
+    tick = time.time()
+    yield
+    tock = time.time()
+    print("%s: %.3f seconds" % (message, (tock - tick)))
+    logging.info("%s: %.3f seconds" % (message, (tock - tick)))
