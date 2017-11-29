@@ -198,6 +198,13 @@ Bringing up a cluster
 kubectl apply -f gpu-provision-daemonset.yaml
 ```
 
+
+5. Resizing your cluster.
+
+  ```
+  gcloud alpha container clusters resize mugozero --size=8
+  ```
+
 Launching selfplay workers on a cluster
 ---------------------------------------
 
