@@ -5,6 +5,8 @@ import random
 import re
 import sys
 import time
+import logging
+import google.cloud.logging as glog
 from tqdm import tqdm
 import gzip
 import numpy as np
@@ -191,4 +193,10 @@ parser = argparse.ArgumentParser()
 argh.add_commands(parser, [gtp, train, selfplay, gather, evaluate])
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    try:
+        client = glog.Client('tensor-go')
+        client.setup_logging(logging.INFO)
+    except:
+        print('!! Cloud logging disabled')
     argh.dispatch(parser)
