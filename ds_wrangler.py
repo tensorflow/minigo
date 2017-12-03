@@ -97,7 +97,6 @@ def gather_moves_and_write(
             c['results'].append(ds.results.take(moves, axis=0))
             chunks[n] = c
 
-    pdb.set_trace()
     for n, c in tqdm(chunks.items()):
         combined = DataSetV2(
                 np.concatenate([p for p in c['pos_features']]),
