@@ -286,7 +286,32 @@ Setting up the selfplay cluster
 * Don't forget to push the images!
 
 * Now you can launch your job on the cluster -- check the parallelism in the
-  spec! -- per the instructions above.  You've got about a half-hour before
-  games start to finish up.
+  spec! -- per the instructions above.  You should let the selfplay cluster
+  finish up a bunch of games before you need to start running the training job,
+  so now's a good time to make sure things are going well.
 
+Useful things for the selfplay cluster
+--------------------------------------
+
+Setting up logging via stackdriver, plus metrics, bla bla.
+
+If you've run rsync and collected a set of SGF files, here are some handy
+bashisms to run on them:
+
+* Find the proportion of games won by one color:
+  ```
+  grep "B+" **/*.sgf | wc -l
+  ```
+* A histogram of game lengths (uses the 'ministat' package)
+  ```
+  find . -name "*.sgf" -exec /bin/sh -c 'tr -cd \; < {} | wc -c' \; | ministats
+  ```
+
+etc...
+
+
+Setting up the training job
+---------------------------
+
+TBD 
 
