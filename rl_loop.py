@@ -21,7 +21,7 @@ import go
 
 BUCKET = os.environ['BUCKET_NAME'] # Did this die?  Set your bucket!
 GAMES_BUCKET = "gs://%s/games/" % BUCKET
-MODELS_BUCKET = "gs://%s/models/" % BUCKET
+MODELS_BUCKET = "gs://%s/models" % BUCKET
 MODEL_NUM_REGEX = "\d{6}"
 GAME_DIRECTORY = "./data/selfplay/"
 MODEL_DIRECTORY = "./saved_models"
