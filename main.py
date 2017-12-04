@@ -5,6 +5,8 @@ import random
 import re
 import sys
 import time
+import logging
+import google.cloud.logging as glog
 from tqdm import tqdm
 import gzip
 import numpy as np
@@ -57,11 +59,13 @@ def train(processed_dir, load_file=None, save_file=None,
     with timer("Training"):
         for i in range(epochs):
             random.shuffle(train_chunk_files)
-            for file in tqdm(train_chunk_files):
-                train_dataset = DataSetV2.read(file)
+            for i, file_ in enumerate(tqdm(train_chunk_files)):
+                train_dataset = DataSetV2.read(file_)
                 train_dataset.shuffle()
                 n.train(train_dataset, batch_size)
-                n.save_variables(save_file)
+                if i % 10 == 0:
+                    n.save_variables(save_file)
+            n.save_variables(save_file)
 
 def evaluate(
         black_model: 'The path to the model to play black',
@@ -191,4 +195,10 @@ parser = argparse.ArgumentParser()
 argh.add_commands(parser, [gtp, train, selfplay, gather, evaluate])
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    try:
+        client = glog.Client('tensor-go')
+        client.setup_logging(logging.INFO)
+    except:
+        print('!! Cloud logging disabled')
     argh.dispatch(parser)

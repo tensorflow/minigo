@@ -198,6 +198,13 @@ Bringing up a cluster
 kubectl apply -f gpu-provision-daemonset.yaml
 ```
 
+
+5. Resizing your cluster.
+
+  ```
+  gcloud alpha container clusters resize mugozero --size=8
+  ```
+
 Launching selfplay workers on a cluster
 ---------------------------------------
 
@@ -208,9 +215,10 @@ field.  This is how many pods will try to run at once: if you can run multiple
 pods per node (CPU nodes), you can set it accordingly.  For GPUs, which don't
 share as well, limit the parallelism to the number of nodes available.
 
-Now launch the job via
+Now launch the job via the launcher.  (it just subs in the environment variable
+for the bucket name, neat!)
 ```
-kubectl apply -f cluster/player.yaml
+cluster/launch-gpu-player.sh
 ```
 
 Once you've done this, you can verify they're running via
@@ -235,3 +243,75 @@ TODO:
   - building and deploying new containers
   - updating the cluster workers.
   - digging through the games.
+
+
+Preflight checks for a training run.
+====================================
+
+
+Setting up the selfplay cluster
+-------------------------------
+
+* Check your gcloud -- authorized?  Correct default zone settings?
+* Check the project name, cluster name, & bucket name variables in the
+  `cluster/common` script.  Did you change things?
+  * If Yes: Grep for the original string.  Depending on what you changed, you may
+    need to change the yaml files for the selfplay workers.
+* Create the service account and bucket, if needed, by running `cluster/deploy`,
+  or the relevant lines therein.
+* Check the number of machines and machine types in the `cluster/cluster-up`
+   script.
+* Set up the cluster as above and start the nvidia driver installation daemonset
+* While the nvidia drivers are getting installed on the fleet, check the
+  various hyperparameters and operating parameters:
+  * `go.py`, check the board size
+  * `dual_net.py`, check the `get_default_hyperparams` function
+  * `player_wrapper.sh`, the invocation of `main.py selfplay` has the readout
+    depth, game parallelism, etc.
+  * `strategies.py`, check the (currently static) resign threshold, the move
+    threshold for move 'temperature' (affects deterministic play), and the max
+    game depth.
+  * `main.py`, check the default params on 'gather'
+  * `mcts.py`, check the noise density and the tree branching factor (lol good
+    luck)
+  * `rl_loop.py`, check the cluster name, directory for tensorflow logs, and
+    constants at the top of the file.
+* Seed the model directory with a randomly initialized model. (`python
+  rl_loop.py bootstrap /path/to/where/you/want/new/model`)
+* Copy the model to the GCS bucket. (`gsutil cp /path/to/model*
+  gs://bucket/model/path...` etc)
+
+* Build your docker images with the latest version of the code, optionally
+  bumping the version number in the Makefile.
+* Don't forget to push the images!
+
+* Now you can launch your job on the cluster -- check the parallelism in the
+  spec! -- per the instructions above.  You should let the selfplay cluster
+  finish up a bunch of games before you need to start running the training job,
+  so now's a good time to make sure things are going well.
+
+Useful things for the selfplay cluster
+--------------------------------------
+
+Setting up logging via stackdriver, plus metrics, bla bla.
+
+If you've run rsync and collected a set of SGF files, here are some handy
+bashisms to run on them:
+
+* Find the proportion of games won by one color:
+  ```
+  grep "B+" **/*.sgf | wc -l
+  ```
+* A histogram of game lengths (uses the 'ministat' package)
+  ```
+  find . -name "*.sgf" -exec /bin/sh -c 'tr -cd \; < {} | wc -c' \; | ministats
+  ```
+
+etc...
+
+
+Setting up the training job
+---------------------------
+
+TBD 
+

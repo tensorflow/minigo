@@ -81,26 +81,27 @@ def gather_moves_and_write(
     fname_to_dataset = {}
 
     # Pre-open all the files we'll need and load them as DataSets
-    for filename in paths_to_moves_by_chunk:
-        if paths_to_moves_by_chunk[filename]:
-            fname_to_dataset[filename] = DataSetV2.read(filename)
-    print ("Loaded %d files" % len(fname_to_dataset))
+    chunks = {}
+    for filename, moves_sets in tqdm(paths_to_moves_by_chunk.items()):
+        if not moves_sets:
+            continue
+        ds = DataSetV2.read(filename)
+        for n in range(chunks_to_make):
+            c = chunks.get(n, {'pos_features': [], 'next_moves': [], 'results':[]})
 
-    for n in tqdm(range(chunks_to_make)):
-        pos_features,next_moves,results = [], [], []
-        for filename, moves_sets in paths_to_moves_by_chunk.items():
             if not n in moves_sets:
                 continue # This file not referenced by chunk number n.
             moves = sorted(list(moves_sets[n])) # `np.take` requires a list.
-            ds = fname_to_dataset[filename]
-            pos_features.append(ds.pos_features.take(moves, axis=0))
-            next_moves.append(ds.next_moves.take(moves, axis=0))
-            results.append(ds.results.take(moves, axis=0))
+            c['pos_features'].append(ds.pos_features.take(moves, axis=0))
+            c['next_moves'].append(ds.next_moves.take(moves, axis=0))
+            c['results'].append(ds.results.take(moves, axis=0))
+            chunks[n] = c
 
+    for n, c in tqdm(chunks.items()):
         combined = DataSetV2(
-                np.concatenate([p for p in pos_features]),
-                np.concatenate([nm for nm in next_moves]),
-                np.concatenate([r for r in results]))
+                np.concatenate([p for p in c['pos_features']]),
+                np.concatenate([nm for nm in c['next_moves']]),
+                np.concatenate([r for r in c['results']]))
 
         fname = os.path.join(output_directory, "training-{:d}.gz".format(n))
         combined.write(fname)

@@ -24,8 +24,8 @@ MODEL=${MODEL%.meta}
 
 echo $MODEL
 
-READOUTS=400
-# Do adaptive readout stuff here.
+READOUTS=1200
+# Do adaptive readout based on MODEL number here.
 
 echo Copying model files...
 cp -v $DATA_DIR/models/$MODEL.* .
@@ -40,5 +40,5 @@ echo Playing a game using model $MODEL...
 echo ...writing out game results to $OUT_DIR
 echo ...and sgfs to $SGF_DIR
 
-python3 main.py selfplay $MODEL --output-dir=$OUT_DIR --output-sgf=$SGF_DIR -r $READOUTS -v 2 -g 16
+python3 main.py selfplay $MODEL --output-dir=$OUT_DIR --output-sgf=$SGF_DIR -r $READOUTS -v 2 -g 8
 echo Finished a set of games!

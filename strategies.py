@@ -12,6 +12,10 @@ from mcts import MCTSNode
 import go
 import utils
 
+MAX_GAME_DEPTH = int(go.N * go.N * 1.5)
+# When to do deterministic move selection.  ~40 moves on a 19x19, ~12 on 9x9
+TEMPERATURE_CUTOFF = ((go.N * go.N) / 10) + 3
+
 class MCTSPlayerMixin:
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
                  resign_threshold=-0.999, verbosity=0, two_player_mode=False):
@@ -23,7 +27,7 @@ class MCTSPlayerMixin:
         if two_player_mode:
             self.temp_threshold = -1
         else:
-            self.temp_threshold = ((go.N * go.N) / 10) + 3
+            self.temp_threshold = TEMPERATURE_CUTOFF
         self.searches_pi = []
         self.root = None
         self.result = 0
@@ -103,7 +107,7 @@ class MCTSPlayerMixin:
 
     def is_done(self):
         '''True if the last two moves were Pass or if the position is at a move
-        greater than (go.N^^2)*3.  False otherwise.
+        greater than the max depth.  False otherwise.
         '''
         if self.result != 0: #Someone's twiddled our result bit!
             return True
@@ -111,7 +115,7 @@ class MCTSPlayerMixin:
         if self.root.position.is_game_over():
             return True
 
-        if self.root.position.n >= (go.N * go.N * 2):
+        if self.root.position.n >= MAX_GAME_DEPTH:
             return True
         return False
 

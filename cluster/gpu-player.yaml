@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: mugo-gpu-player
 spec:
-  parallelism: 45
+  parallelism: 640
   completions: 200000
   template:
     metadata:
@@ -21,13 +21,13 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: player
-        image: gcr.io/tensor-go/mugo-gpu-player:0.2
+        image: gcr.io/tensor-go/mugo-gpu-player:0.3
         imagePullPolicy: Always
         resources:
           limits:
             alpha.kubernetes.io/nvidia-gpu: 1
         args:
-        - jacksona-mugo
+        - $BUCKET_NAME
         volumeMounts:
         - name: service-credentials
           mountPath: /etc/credentials

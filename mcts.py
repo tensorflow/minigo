@@ -9,7 +9,7 @@ import math
 # All terminology here (Q, U, N, p_UCT) uses the same notation as in the
 # AlphaGo paper.
 # Exploration constant
-c_PUCT = 2.5
+c_PUCT = 1.5
 # Dirichlet noise, as a function of go.N
 D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
 
@@ -62,7 +62,7 @@ class MCTSNode():
                 # do not attempt to explore children of a finished game position
                 return current
             possible_choices = current.child_action_score
-            if self.position.n < go.N * 8:
+            if self.position.n < go.N * 6:
                 # Exclude passing from consideration at the start of game
                 possible_choices = possible_choices[:-1]
             decide_func = np.argmax if current.position.to_play == go.BLACK else np.argmin

@@ -1,4 +1,10 @@
 import argparse
+"""
+A bunch of scripty glue for running the training jobs in a loop.
+
+This should mostly be reworked when we move to tf.Estimator's and a proper
+dataset queue.
+"""
 import argh
 import subprocess
 import os
@@ -12,22 +18,28 @@ import logging
 from utils import logged_timer as timer
 import go
 
-GAMES_BUCKET = "gs://jacksona-mugo/games/"
+
+BUCKET = os.environ['BUCKET_NAME'] # Did this die?  Set your bucket!
+GAMES_BUCKET = "gs://%s/games/" % BUCKET
+MODELS_BUCKET = "gs://%s/models" % BUCKET
 MODEL_NUM_REGEX = "\d{6}"
 GAME_DIRECTORY = "./data/selfplay/"
 MODEL_DIRECTORY = "./saved_models"
 TRAINING_DIRECTORY = "data/training_chunks"
+TF_LOG_DIR = "logs/%s" % BUCKET
 
-def bootstrap():
+def bootstrap(filename):
     import dual_net
-    n = dual_network
-
+    n = dual_net.DualNetwork()
+    n.initialize_variables()
+    n.save_variables(filename)
 
 def push_model(model_num, name):
-    for f in os.listdir('saved_models'):
+    for f in os.listdir(MODEL_DIRECTORY):
         if f.startswith("{0:06d}".format(model_num)):
-            arg =  'gsutil cp saved_models/%s gs://jacksona-mugo/models/%06d-%s.%s' % (
-                    f, model_num, name, f.split('.')[1])
+            arg =  'gsutil cp %s/%s %s/%06d-%s.%s' % (
+                    MODEL_DIRECTORY,
+                    f, MODELS_BUCKET, model_num, name, f.split('.')[1])
             subprocess.call(arg.split())
 
 def dir_model_num(dir_path):
@@ -60,7 +72,7 @@ def gather_loop():
     # chunks, run gather, else wait a bit, and repeat.
     while True:
         while True:
-           num_chunks = sum([1 if p.endswith('.gz') else 0 for p in os.listdir('data/training_chunks')])
+           num_chunks = sum([1 if p.endswith('.gz') else 0 for p in os.listdir(TRAINING_DIRECTORY)])
            if num_chunks == 0:
                break
            print('Found ', num_chunks, ' chunks.  Waiting for training job to use them.')
@@ -84,8 +96,8 @@ def rsync_loop():
 
 def train_loop():
     model_num = find_largest_modelnum(MODEL_DIRECTORY) or 0
-    train_cmd = 'python main.py train --load-file saved_models/{0:06d} -s saved_models/{1:06d}' + \
-                    ' --logdir logs/rl_loop_9 data/training_chunks/'
+    train_cmd = 'python main.py train --load-file {2}/{0:06d} -s {2}/{1:06d}' + \
+                ' --logdir {3} {4}'
 
     while True:
         print(" ====== Model %d ======" % (model_num))
@@ -98,7 +110,7 @@ def train_loop():
             time.sleep(15)
 
         # Take a training step.
-        bigarg = train_cmd.format(model_num, model_num+1)
+        bigarg = train_cmd.format(model_num, model_num+1, MODEL_DIRECTORY, TF_LOG_DIR, TRAINING_DIRECTORY)
         print("RUNNING '%s'" % bigarg)
         failball = subprocess.call(bigarg.split())
         if failball:
@@ -106,9 +118,9 @@ def train_loop():
             sys.exit(1)
 
         # Wipe the training chunks.
-        for p in os.listdir('data/training_chunks'):
+        for p in os.listdir(TRAINING_DIRECTORY):
             if p.endswith('.gz'):
-                os.remove(os.path.join('data/training_chunks/', p))
+                os.remove(os.path.join(TRAINING_DIRECTORY, p))
 
         # For now, always promote our new model.
         if go.N == 19:
@@ -122,7 +134,7 @@ def train_loop():
         model_num+=1
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train_loop, gather_loop, rsync_loop])
+argh.add_commands(parser, [train_loop, gather_loop, rsync_loop, bootstrap])
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

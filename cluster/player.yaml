@@ -24,7 +24,7 @@ spec:
         image: gcr.io/tensor-go/mugo-player:0.2
         imagePullPolicy: Always
         args:
-        - jacksona-mugo
+        - mugozero-v1
         volumeMounts:
         - name: service-credentials
           mountPath: /etc/credentials
