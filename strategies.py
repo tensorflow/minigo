@@ -28,6 +28,7 @@ class MCTSPlayerMixin:
             self.temp_threshold = -1
         else:
             self.temp_threshold = TEMPERATURE_CUTOFF
+        self.qs = []
         self.searches_pi = []
         self.root = None
         self.result = 0
@@ -80,6 +81,7 @@ class MCTSPlayerMixin:
         if not self.two_player_mode:
             self.searches_pi.append(
                 self.root.children_as_pi(self.root.position.n > self.temp_threshold))
+        self.qs.append(self.root.Q) # Save our resulting Q.
         self.root = self.root.add_child(utils.flatten_coords(coords))
         self.position = self.root.position # for showboard
         del self.root.parent.children
@@ -150,7 +152,7 @@ class MCTSPlayerMixin:
         res = self.make_result_string(pos)
         return sgf_wrapper.make_sgf(pos.recent, res,
                                     white_name=self.network.name or "Unknown",
-                                    black_name=self.network.name or "Unknown")
+                                    black_name=self.network.name or "Unknown", self.qs)
 
     def to_dataset(self):
         assert len(self.searches_pi) == self.root.position.n
