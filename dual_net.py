@@ -58,18 +58,21 @@ class DualNetwork(object):
         # the result of the game. +1 = black wins -1 = white wins
         self.outcome = outcome = tf.placeholder(tf.float32, [None])
 
+        my_batchn = functools.partial(tf.layers.batch_normalization,
+                                      center=True, scale=True, training=True) 
+        # TODO: extract training to phase param for feed dict.
+
         my_conv2d = functools.partial(tf.layers.conv2d,
             filters=self.k, kernel_size=[3, 3], padding="same")
 
         def my_res_layer(inputs):
-            int_layer1 = tf.layers.batch_normalization(my_conv2d(inputs))
+            int_layer1 = my_batchn.layers.batch_normalization(my_conv2d(inputs))
             initial_output = tf.nn.relu(int_layer1)
-            int_layer2 = tf.layers.batch_normalization(my_conv2d(initial_output))
+            int_layer2 = my_batchn(my_conv2d(initial_output))
             output = tf.nn.relu(inputs + int_layer2)
             return output
 
-        initial_output = tf.nn.relu(tf.layers.batch_normalization(
-            my_conv2d(x)))
+        initial_output = tf.nn.relu(my_batchn( my_conv2d(x)))
 
         # the shared stack
         shared_output = initial_output
@@ -77,7 +80,7 @@ class DualNetwork(object):
             shared_output = my_res_layer(shared_output)
 
         # policy head
-        policy_conv = tf.nn.relu(tf.layers.batch_normalization(
+        policy_conv = tf.nn.relu(my_batchn(
             my_conv2d(shared_output, filters=2, kernel_size=[1, 1])))
         logits = tf.layers.dense(
             tf.reshape(policy_conv, [-1, go.N * go.N * 2]),
@@ -86,7 +89,7 @@ class DualNetwork(object):
         self.policy_output = tf.nn.softmax(logits)
 
         # value head
-        value_conv = tf.nn.relu(tf.layers.batch_normalization(
+        value_conv = tf.nn.relu(my_batchn(
             my_conv2d(shared_output, filters=1, kernel_size=[1, 1])))
         value_fc_hidden = tf.nn.relu(tf.layers.dense(
             tf.reshape(value_conv, [-1, go.N * go.N]),
