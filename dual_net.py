@@ -59,7 +59,7 @@ class DualNetwork(object):
         self.outcome = outcome = tf.placeholder(tf.float32, [None])
 
         my_conv2d = functools.partial(tf.layers.conv2d,
-            filters=self.k, kernel_size=[3, 3], padding="same", use_bias=False)
+            filters=self.k, kernel_size=[3, 3], padding="same")
 
         def my_res_layer(inputs):
             int_layer1 = tf.layers.batch_normalization(my_conv2d(inputs))
@@ -69,7 +69,7 @@ class DualNetwork(object):
             return output
 
         initial_output = tf.nn.relu(tf.layers.batch_normalization(
-            my_conv2d(x), renorm=True))
+            my_conv2d(x)))
 
         # the shared stack
         shared_output = initial_output
@@ -105,8 +105,10 @@ class DualNetwork(object):
         # Combined loss + regularization
         self.dual_cost = self.mse_cost + self.log_likelihood_cost + self.l2_cost
         learning_rate = tf.train.exponential_decay(1e-2, global_step, 10 ** 6, 0.5)
-        self.dual_train_step = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(
-                          self.dual_cost, global_step=global_step)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            self.dual_train_step = tf.train.MomentumOptimizer(
+                learning_rate, 0.9).minimize(self.dual_cost, global_step=global_step)
 
         # misc ops
         self.weight_summaries = tf.summary.merge([
