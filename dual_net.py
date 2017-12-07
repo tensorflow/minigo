@@ -57,16 +57,18 @@ class DualNetwork(object):
             [None, (go.N * go.N) + 1])
         # the result of the game. +1 = black wins -1 = white wins
         self.outcome = outcome = tf.placeholder(tf.float32, [None])
+        self.train_mode = train_mode = tf.placeholder(tf.bool, name='train_mode')
+
 
         my_batchn = functools.partial(tf.layers.batch_normalization,
-                                      center=True, scale=True, training=True) 
+                                      center=True, scale=True, training=train_mode) 
         # TODO: extract training to phase param for feed dict.
 
         my_conv2d = functools.partial(tf.layers.conv2d,
             filters=self.k, kernel_size=[3, 3], padding="same")
 
         def my_res_layer(inputs):
-            int_layer1 = my_batchn.layers.batch_normalization(my_conv2d(inputs))
+            int_layer1 = my_batchn(my_conv2d(inputs))
             initial_output = tf.nn.relu(int_layer1)
             int_layer2 = my_batchn(my_conv2d(initial_output))
             output = tf.nn.relu(inputs + int_layer2)
@@ -168,7 +170,8 @@ class DualNetwork(object):
                  self.mse_cost, self.l2_cost, self.dual_cost],
                 feed_dict={self.x: batch_x,
                            self.pi: batch_pi,
-                           self.outcome: batch_res})
+                           self.outcome: batch_res,
+                           train_mode: True,})
             self.training_stats.report(policy_err, value_err, reg_err, cost)
             #print("%d: %.3f, %.3f %.3f" % (i, policy_err, value_err, reg_err))
 
@@ -187,7 +190,7 @@ class DualNetwork(object):
     def run(self, position):
         processed_position = features.extract_features(position, features=features.NEW_FEATURES)
         probabilities, value = self.session.run([self.policy_output, self.value_output],
-                                         feed_dict={self.x: processed_position[None, :]})
+                                         feed_dict={self.x: processed_position[None, :], self.train_mode:False})
         return probabilities[0], value[0]
 
     def run_many(self, positions, use_random_symmetry=True):
@@ -197,7 +200,8 @@ class DualNetwork(object):
             syms_used, processed = features.randomize_symmetries_feat(processed)
         probabilities, value = self.session.run(
             [self.policy_output, self.value_output],
-            feed_dict={self.x: processed})
+            feed_dict={self.x: processed,
+                       self.train_mode: False})
         if use_random_symmetry:
             probabilities = features.invert_symmetries_pi(syms_used, probabilities)
         return probabilities, value
