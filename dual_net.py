@@ -61,8 +61,7 @@ class DualNetwork(object):
 
 
         my_batchn = functools.partial(tf.layers.batch_normalization,
-                                      center=True, scale=True, training=train_mode) 
-        # TODO: extract training to phase param for feed dict.
+                                      training=train_mode)
 
         my_conv2d = functools.partial(tf.layers.conv2d,
             filters=self.k, kernel_size=[3, 3], padding="same")
