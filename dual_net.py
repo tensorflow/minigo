@@ -61,7 +61,7 @@ class DualNetwork(object):
 
 
         my_batchn = functools.partial(tf.layers.batch_normalization,
-                                      training=train_mode)
+                                      scale=False, training=train_mode)
 
         my_conv2d = functools.partial(tf.layers.conv2d,
             filters=self.k, kernel_size=[3, 3], padding="same")
@@ -170,7 +170,7 @@ class DualNetwork(object):
                 feed_dict={self.x: batch_x,
                            self.pi: batch_pi,
                            self.outcome: batch_res,
-                           train_mode: True,})
+                           self.train_mode: True,})
             self.training_stats.report(policy_err, value_err, reg_err, cost)
             #print("%d: %.3f, %.3f %.3f" % (i, policy_err, value_err, reg_err))
 
