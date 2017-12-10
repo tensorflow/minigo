@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in `ls sgf19 | tail`;
+for i in `ls $1 | tail`;
   do
   echo $i
   find sgf19/$i/ -name "*.sgf" | wc -l;
