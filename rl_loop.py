@@ -118,7 +118,12 @@ def train_loop():
             print(failball)
             sys.exit(1)
 
-        # Wipe the training chunks.
+        # Back up the chunks
+        subprocess.call("gsutil cp {dirname}/*.gz gs://{bucket}/old_chunks/{num}/".format(
+                {dirname: TRAINING_DIRECTORY,
+                 bucket: BUCKET,
+                 num: model_num}).split())
+        # Wipe the training directory.
         for p in os.listdir(TRAINING_DIRECTORY):
             if p.endswith('.gz'):
                 os.remove(os.path.join(TRAINING_DIRECTORY, p))
