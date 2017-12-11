@@ -14,7 +14,6 @@ import numpy as np
 from go import IllegalMove, replay_position
 from gtp_wrapper import make_gtp_instance, MCTSPlayer
 from load_data_sets import DataSetV2
-from dual_net import DualNetwork
 import selfplay_mcts
 from utils import logged_timer as timer
 import ds_wrangler
@@ -42,6 +41,7 @@ def gtp(load_file: "The path to the network model files",
 
 def train(processed_dir, load_file=None, save_file=None,
           epochs=1, logdir=None, batch_size=64):
+    from dual_net import DualNetwork
     train_chunk_files = [os.path.join(processed_dir, fname)
                          for fname in os.listdir(processed_dir)
                          if fname.endswith('.gz')]
@@ -75,6 +75,7 @@ def evaluate(
         games: 'the number of games to play'=16,
         use_cpu: 'passed to the network initializer'=False,
         verbose: 'How verbose the players should be (see selfplay)' = 1):
+    from dual_net import DualNetwork
 
     black_model = os.path.join(os.getcwd(), os.path.abspath(black_model))
     white_model = os.path.join(os.getcwd(), os.path.abspath(white_model))
@@ -118,6 +119,7 @@ def selfplay(
          verbose : '>1 will print debug info, >2 will print boards' = 1,
          use_cpu: 'passed to the network initializer'=False):
 
+    from dual_net import DualNetwork
     print ("Initializing network...", flush=True)
     network = DualNetwork(use_cpu=use_cpu)
 
