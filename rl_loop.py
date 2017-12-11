@@ -9,9 +9,11 @@ import argparse
 import subprocess
 import os
 import time
+from tqdm import tqdm
 import sys
 import petname
 import shipname
+from load_data_sets import DataSetV2
 import re
 import google.cloud.logging as glog
 import logging
@@ -139,14 +141,58 @@ def train_loop():
         subprocess.call('./update-acls')
         model_num+=1
 
+def consolidate(
+        input_directory: 'where to look for games'='data/selfplay/',
+        max_positions: 'how many positions before discarding games'= 2500000,
+        before_model: 'consolidate games only for models before this.'=1):
+
+    import ds_wrangler, numpy as np
+    paths = [(root, dirs, files) for root, dirs, files in os.walk(input_directory) 
+             if dir_model_num(root) is not None and dir_model_num(root) < before_model]
+
+    for model, _, _ in paths:
+        metas = []
+        for player, _, files in os.walk(model):
+            for f in files:
+                if f.endswith('.meta'):
+                    metas.append(os.path.join(player, f))
+        bigchunks = []
+        current = []
+        counter = 0
+        for m in tqdm(metas):
+            sz,err = ds_wrangler._read_meta(m)
+            if err:
+                print('Invalid:', m)
+                continue
+            counter += sz
+            current.append(m)
+            if counter > max_positions:
+                print("%d positions in %d files" % (counter, len(current)))
+                bigchunks.append(current)
+                current = []
+                counter = 0
+
+        bigchunks.append(current)
+
+        for idx, c in enumerate(bigchunks):
+            datasets = [DataSetV2.read(filename.replace('.meta','.gz')) for filename in c]
+            combined = DataSetV2(
+                np.concatenate([d.pos_features for d in datasets]),
+                np.concatenate([d.next_moves for d in datasets]),
+                np.concatenate([d.results for d in datasets]))
+            combined.write(os.path.join(model, "combined-%d.gz" % idx))
+            print("%s: Wrote %d consolidated positions" % (model, combined.data_size)) 
+
+
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train_loop, gather_loop, rsync_loop, bootstrap, smart_rsync])
+argh.add_commands(parser, [train_loop, gather_loop, rsync_loop, bootstrap, smart_rsync, consolidate])
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     try:
-        client = glog.Client('tensor-go')
-        client.setup_logging(logging.INFO)
+        pass
+        #client = glog.Client('tensor-go')
+        #client.setup_logging(logging.INFO)
     except:
         print('!! Cloud logging disabled')
 
