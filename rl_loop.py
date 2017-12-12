@@ -143,7 +143,7 @@ def train_loop():
 
 def consolidate(
         input_directory: 'where to look for games'='data/selfplay/',
-        max_positions: 'how many positions before discarding games'= 2500000,
+        max_positions: 'how many positions before discarding games'= 250000,
         before_model: 'consolidate games only for models before this.'=1):
 
     import ds_wrangler, numpy as np
@@ -174,14 +174,13 @@ def consolidate(
 
         bigchunks.append(current)
 
-        for idx, c in enumerate(bigchunks):
+        for idx, c in enumerate(tqdm(bigchunks)):
             datasets = [DataSetV2.read(filename.replace('.meta','.gz')) for filename in c]
             combined = DataSetV2(
                 np.concatenate([d.pos_features for d in datasets]),
                 np.concatenate([d.next_moves for d in datasets]),
                 np.concatenate([d.results for d in datasets]))
-            combined.write(os.path.join(model, "combined-%d.gz" % idx))
-            print("%s: Wrote %d consolidated positions" % (model, combined.data_size)) 
+            combined.write(os.path.join(model, "%s-combined-%d.gz" % (os.path.basename(model), idx)))
 
 
 parser = argparse.ArgumentParser()
