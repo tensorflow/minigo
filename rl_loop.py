@@ -189,9 +189,8 @@ argh.add_commands(parser, [train_loop, gather_loop, rsync_loop, bootstrap, smart
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     try:
-        pass
-        #client = glog.Client('tensor-go')
-        #client.setup_logging(logging.INFO)
+        client = glog.Client('tensor-go')
+        client.setup_logging(logging.INFO)
     except:
         print('!! Cloud logging disabled')
 
