@@ -18,13 +18,15 @@ import re
 import google.cloud.logging as glog
 import logging
 from utils import logged_timer as timer
+import ds_wrangler
+import numpy as np
 import go
 
 
 BUCKET = os.environ['BUCKET_NAME'] # Did this die?  Set your bucket!
 GAMES_BUCKET = "gs://%s/games/" % BUCKET
 MODELS_BUCKET = "gs://%s/models" % BUCKET
-MODEL_NUM_REGEX = "\d{6}"
+MODEL_NUM_REGEX = "^\d{6}"
 GAME_DIRECTORY = "./data/selfplay/"
 MODEL_DIRECTORY = "./saved_models"
 TRAINING_DIRECTORY = "data/training_chunks"
@@ -146,7 +148,6 @@ def consolidate(
         max_positions: 'how many positions before discarding games'= 250000,
         before_model: 'consolidate games only for models before this.'=1):
 
-    import ds_wrangler, numpy as np
     paths = [(root, dirs, files) for root, dirs, files in os.walk(input_directory) 
              if dir_model_num(root) is not None and dir_model_num(root) < before_model]
 
@@ -159,6 +160,7 @@ def consolidate(
         bigchunks = []
         current = []
         counter = 0
+        print("Consolidating for model: ", model)
         for m in tqdm(metas):
             sz,err = ds_wrangler._read_meta(m)
             if err:
