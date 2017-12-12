@@ -49,8 +49,7 @@ def dir_model_num(dir_path):
     return int(re.match(MODEL_NUM_REGEX, os.path.basename(dir_path)).group())
 
 
-def smart_rsync(from_model_num=0, source_dir=GAMES_BUCKET, game_dir=None):
-    game_dir = game_dir or GAME_DIRECTORY
+def smart_rsync(from_model_num=0, source_dir=GAMES_BUCKET, game_dir=GAME_DIRECTORY):
     from_model_num = 0 if from_model_num < 0 else from_model_num
     seen_dirs = subprocess.check_output(('gsutil ls -d %s*' % source_dir).split()).split()
     seen_dirs = list(map(lambda d: d.decode('UTF-8').strip('/'), seen_dirs))
