@@ -21,10 +21,9 @@ SZ[{boardsize}]KM[{komi}]PW[{white_name}]PB[{black_name}]RE[{result}]
 
 PROGRAM_IDENTIFIER = "MuGo"
 
-def translate_sgf_move_qs(player_move_qs):
+def translate_sgf_move_qs(player_move,q):
   return "{move}C[{q:.4f}]".format(
-      move=translate_sgf_move(player_move_qs[0]),
-      q=player_move_qs[1])
+      move=translate_sgf_move(player_move), q=q)
 
 def translate_sgf_move(player_move):
     if player_move.color not in (go.BLACK, go.WHITE):
@@ -48,7 +47,7 @@ def make_sgf(
     Doesn't handle handicap games or positions with incomplete history.
     '''
     if qs:
-      game_moves = ''.join(map(translate_sgf_move_qs, zip(move_history, qs)))
+      game_moves = ''.join(map(translate_sgf_move_qs, move_history, qs))
     else:
       game_moves = ''.join(map(translate_sgf_move, move_history))
     result = result_string
