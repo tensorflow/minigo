@@ -21,6 +21,10 @@ SZ[{boardsize}]KM[{komi}]PW[{white_name}]PB[{black_name}]RE[{result}]
 
 PROGRAM_IDENTIFIER = "MuGo"
 
+def translate_sgf_move_qs(player_move,q):
+  return "{move}C[{q:.4f}]".format(
+      move=translate_sgf_move(player_move), q=q)
+
 def translate_sgf_move(player_move):
     if player_move.color not in (go.BLACK, go.WHITE):
         raise ValueError("Can't translate color %s to sgf" % player_move.color)
@@ -36,12 +40,16 @@ def make_sgf(
     komi=7.5,
     white_name=PROGRAM_IDENTIFIER,
     black_name=PROGRAM_IDENTIFIER,
+    qs=None
     ):
     '''Turn a game into SGF.
 
     Doesn't handle handicap games or positions with incomplete history.
     '''
-    game_moves = ''.join(map(translate_sgf_move, move_history))
+    if qs:
+      game_moves = ''.join(map(translate_sgf_move_qs, move_history, qs))
+    else:
+      game_moves = ''.join(map(translate_sgf_move, move_history))
     result = result_string
     return SGF_TEMPLATE.format(**locals()) 
 

@@ -1,4 +1,3 @@
-import argparse
 """
 A bunch of scripty glue for running the training jobs in a loop.
 
@@ -6,6 +5,7 @@ This should mostly be reworked when we move to tf.Estimator's and a proper
 dataset queue.
 """
 import argh
+import argparse
 import subprocess
 import os
 import time
@@ -49,19 +49,19 @@ def dir_model_num(dir_path):
     return int(re.match(MODEL_NUM_REGEX, os.path.basename(dir_path)).group())
 
 
-def smart_rsync(from_model_num):
+def smart_rsync(from_model_num=0, source_dir=GAMES_BUCKET, game_dir=GAME_DIRECTORY):
     from_model_num = 0 if from_model_num < 0 else from_model_num
-    seen_dirs = subprocess.check_output(('gsutil ls -d %s*' % GAMES_BUCKET).split()).split()
+    seen_dirs = subprocess.check_output(('gsutil ls -d %s*' % source_dir).split()).split()
     seen_dirs = list(map(lambda d: d.decode('UTF-8').strip('/'), seen_dirs))
     model_dirs = [d for d in seen_dirs
             if dir_model_num(d) is not None and dir_model_num(d) >= from_model_num ]
     print("model_dirs:", model_dirs)
     for d in model_dirs:
         basename = os.path.basename(d)
-        if not os.path.isdir(os.path.join(GAME_DIRECTORY, basename)):
-            os.mkdir(os.path.join(GAME_DIRECTORY, basename))
-        subprocess.call('gsutil -m rsync -r -c {0}{2} {1}{2}'.format(
-                    GAMES_BUCKET, GAME_DIRECTORY, basename).split(),
+        if not os.path.isdir(os.path.join(game_dir, basename)):
+            os.mkdir(os.path.join(game_dir, basename))
+        subprocess.call('gsutil -m rsync -r -c {0}{2} {1}{2}/'.format(
+                    source_dir, game_dir, basename).split(),
                     stderr=open('.rsync_log', 'ab'))
 
 def find_largest_modelnum(directory):
@@ -134,7 +134,7 @@ def train_loop():
         model_num+=1
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train_loop, gather_loop, rsync_loop, bootstrap])
+argh.add_commands(parser, [train_loop, gather_loop, rsync_loop, bootstrap, smart_rsync])
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

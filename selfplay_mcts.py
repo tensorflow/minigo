@@ -37,9 +37,9 @@ def play(network, games, readouts, verbosity=0):
 
 
         # print some stats on the search
-        if (global_n % 10) == 9 and verbosity >= 1:
+        if ((global_n % 10) == 9 and verbosity >= 1) or (verbosity > 2):
             qs = [p.root.Q for p in players]
-            print ("Max/min Q: %.3f / %.3f" % (max(qs), min(qs)), flush=True)
+            print ("Max/min Q: %.4f / %.4f" % (max(qs), min(qs)), flush=True)
             print ("std: %.3f" % np.std(qs), flush=True)
 
         if (verbosity >= 3):

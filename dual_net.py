@@ -23,7 +23,7 @@ def get_default_hyperparams():
     k = round_power_of_two(go.N ** 2 / 3) # width of each layer
     fc_width = k * 2
     num_shared_layers = go.N
-    l2_strength = 1e-4
+    l2_strength = 2e-5
     return locals()
 
 
@@ -61,6 +61,8 @@ class DualNetwork(object):
 
 
         my_batchn = functools.partial(tf.layers.batch_normalization,
+                                      momentum=.997, epsilon=1e-5,
+                                      fused=True, center=True, scale=True,
                                       training=train_mode)
 
         my_conv2d = functools.partial(tf.layers.conv2d,
@@ -91,7 +93,8 @@ class DualNetwork(object):
 
         # value head
         value_conv = tf.nn.relu(my_batchn(
-            my_conv2d(shared_output, filters=1, kernel_size=[1, 1])))
+                my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
+            center=False, scale=False))
         value_fc_hidden = tf.nn.relu(tf.layers.dense(
             tf.reshape(value_conv, [-1, go.N * go.N]),
             self.fc_width))
@@ -108,7 +111,7 @@ class DualNetwork(object):
 
         # Combined loss + regularization
         self.dual_cost = self.mse_cost + self.log_likelihood_cost + self.l2_cost
-        learning_rate = tf.train.exponential_decay(1e-2, global_step, 10 ** 6, 0.5)
+        learning_rate = tf.train.exponential_decay(1e-2, global_step, 10 ** 7, 0.5)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             self.dual_train_step = tf.train.MomentumOptimizer(
@@ -170,7 +173,7 @@ class DualNetwork(object):
                 feed_dict={self.x: batch_x,
                            self.pi: batch_pi,
                            self.outcome: batch_res,
-                           train_mode: True,})
+                           self.train_mode: True,})
             self.training_stats.report(policy_err, value_err, reg_err, cost)
             #print("%d: %.3f, %.3f %.3f" % (i, policy_err, value_err, reg_err))
 
