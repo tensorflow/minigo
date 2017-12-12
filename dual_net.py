@@ -84,7 +84,8 @@ class DualNetwork(object):
 
         # policy head
         policy_conv = tf.nn.relu(my_batchn(
-            my_conv2d(shared_output, filters=2, kernel_size=[1, 1])))
+                my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
+            center=False, scale=False))
         logits = tf.layers.dense(
             tf.reshape(policy_conv, [-1, go.N * go.N * 2]),
             go.N * go.N + 1)
