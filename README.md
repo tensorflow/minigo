@@ -25,14 +25,14 @@ Install Tensorflow
 Start by installing Tensorflow and the dependencies, optionally into a
 virtualenv if you so choose.  This should be as simple as
 
-```python
-pip install -r requirements.txt
+```
+pip3 install -r requirements.txt
 ``` 
 
 Running unit tests
 ------------------
-```python
-python -m unittest discover tests
+```
+python3 -m unittest discover tests
 ```
 
 
@@ -47,7 +47,7 @@ Selfplay
 To watch MuGo Zero play a game: 
 
 ```
-python main.py selfplay path/to/model -r READOUTS -g GAMES -v 3
+python3 main.py selfplay path/to/model -r READOUTS -g GAMES -v 3
 ``` 
 where `READOUTS` is how many searches to make per move, and `GAMES` is how
 many games to play simultaneously.  Timing information and statistics will be
@@ -56,7 +56,7 @@ printed at each move.  Setting verbosity to 3 or higher will print a board at ea
 
 MuGo Zero uses the GTP protocol, and you can use any gtp-compliant program with it.
 ```
-python main.py gtp path/to/model -r READOUTS -v 3
+python3 main.py gtp path/to/model -r READOUTS -v 3
 ```
 
 (If no model is provided, it will initialize one with random values)
@@ -72,13 +72,13 @@ showboard                   # Asks the engine to print the board.
 
 One way to play via GTP is to use gogui-display (which implements a UI that speaks GTP.) You can download the gogui set of tools at [http://gogui.sourceforge.net/](http://gogui.sourceforge.net/). See also [documentation on interesting ways to use GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
 ```
-gogui-twogtp -black 'python main.py gtp policy --read-file=saved_models/20170718' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
+gogui-twogtp -black 'python3 main.py gtp policy --read-file=saved_models/20170718' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
 ```
 
 Another way to play via GTP is to play against GnuGo, while spectating the games
 ```
 BLACK="gnugo --mode gtp"
-WHITE="python main.py gtp path/to/model"
+WHITE="python3 main.py gtp path/to/model"
 TWOGTP="gogui-twogtp -black \"$BLACK\" -white \"$WHITE\" -games 10 \
   -size 19 -alternate -sgffile gnugo"
 gogui -size 19 -program "$TWOGTP" -computer-both -auto
@@ -93,13 +93,13 @@ Training Mugo Zero
 
 Generate training chunks:
 ```
-python main.py gather 
+python3 main.py gather 
 ```
 This will look in `data/selfplay` for games and write chunks to `data/training_chunks`.  See main.py for description of the other arguments 
 
 Run the training job:
 ```
-python main.py train train training_data_dir \
+python3 main.py train train training_data_dir \
     --load-file=path/to/model \
     --save-file=where/to/save/model \
     --logdir=path/to/tensorboard/logs
@@ -276,7 +276,7 @@ Setting up the selfplay cluster
     luck)
   * `rl_loop.py`, check the cluster name, directory for tensorflow logs, and
     constants at the top of the file.
-* Seed the model directory with a randomly initialized model. (`python
+* Seed the model directory with a randomly initialized model. (`python3
   rl_loop.py bootstrap /path/to/where/you/want/new/model`)
 * Copy the model to the GCS bucket. (`gsutil cp /path/to/model*
   gs://bucket/model/path...` etc)
