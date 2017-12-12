@@ -12,13 +12,13 @@ from mcts import MCTSNode
 import go
 import utils
 
-MAX_GAME_DEPTH = int(go.N * go.N * 1.5)
+MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 # When to do deterministic move selection.  ~40 moves on a 19x19, ~12 on 9x9
 TEMPERATURE_CUTOFF = ((go.N * go.N) / 10) + 3
 
 class MCTSPlayerMixin:
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
-                 resign_threshold=-0.999, verbosity=0, two_player_mode=False):
+                 resign_threshold=-0.95, verbosity=0, two_player_mode=False):
         self.network = network
         self.seconds_per_move = seconds_per_move
         self.simulations_per_move = simulations_per_move
