@@ -49,6 +49,12 @@ MuGo Zero: Selfplay, or GTP
 
 If you just want to get MuGo Zero working, you can download the latest model at... (TODO)
 
+Or build a random model with:
+
+```
+BUCKET_NAME=foobar python3 rl_loop.py bootstrap models/random_model
+```
+
 
 Selfplay
 --------
