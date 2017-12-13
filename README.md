@@ -238,13 +238,6 @@ kubectl logs -f <name of pod>
 ``` 
 
 
-
-TODO:
-  - building and deploying new containers
-  - updating the cluster workers.
-  - digging through the games.
-
-
 Preflight checks for a training run.
 ====================================
 
@@ -293,25 +286,55 @@ Setting up the selfplay cluster
 Useful things for the selfplay cluster
 --------------------------------------
 
+* Getting a list of the selfplay games ordered by most recent start
+  ```
+  kubectl get po --sort-by=.status.startTime
+  ```
+
+* Attaching to a running pod (to check e.g. cpu utilization, what actual code is
+  in your container, etc)
+  ```
+  kubectlc exec -it <pod id> /bin/bash
+  ```
+
+* Monitoring how long it's taking the daemonset to install the nvidia driver on
+  your nodes
+  ```
+  kubectl get no -w -o yaml | grep -E 'hostname:|nvidia-gpu'
+  ```
+
+
 Setting up logging via stackdriver, plus metrics, bla bla.
 
-If you've run rsync and collected a set of SGF files, here are some handy
+
+If you've run rsync to collect a set of SGF files (cheatsheet: `python
+rl_loop.py smart-rsync --source-dir="gs://$BUCKET_NAME/sgf/" --from-model-num 0
+--game-dir=sgf/`), here are some handy
 bashisms to run on them:
 
 * Find the proportion of games won by one color:
   ```
   grep "B+" **/*.sgf | wc -l
   ```
+  or e.g. "B+R", etc to search for how many by resign etc.
+
 * A histogram of game lengths (uses the 'ministat' package)
   ```
   find . -name "*.sgf" -exec /bin/sh -c 'tr -cd \; < {} | wc -c' \; | ministats
   ```
 
+* Get output of the most frequent first moves
+  ```
+  grep -oh '^;B\[[a-s]*\]' **/*.sgf | sort | uniq -c | sort -n
+  ```
+
+* Distribution of game-winning margin (ministat, again):
+  ```
+  find . -name "*.sgf" -exec /bin/sh -c 'grep -o "W+[[:digit:]]*" < {} | cut -c3-'
+  \; | ministat
+  ```
+
+
 etc...
 
-
-Setting up the training job
----------------------------
-
-TBD 
 
