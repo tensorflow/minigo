@@ -23,11 +23,19 @@ Getting Started
 Install Tensorflow
 ------------------
 Start by installing Tensorflow and the dependencies, optionally into a
-virtualenv if you so choose.  This should be as simple as
+virtualenv if you so choose. First:
 
 ```
 pip3 install -r requirements.txt
-``` 
+```
+
+Then, you must either install CUDA 8.0 (See Tensorflow documentation) or downgrade
+to non-gpu tensorflow. To downgrade:
+
+```
+pip3 uninstall tensorflow-gpu
+pip3 install tensorflow
+```
 
 Running unit tests
 ------------------
