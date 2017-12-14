@@ -24,7 +24,7 @@ MODEL=${MODEL%.meta}
 
 echo $MODEL
 
-READOUTS=1200
+READOUTS=900
 # Do adaptive readout based on MODEL number here.
 
 echo Copying model files...
