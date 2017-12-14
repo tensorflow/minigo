@@ -9,6 +9,7 @@ Most of the complexity here is dealing with two features of SGF:
 '''
 from collections import namedtuple
 import numpy as np
+import itertools
 
 import go
 from go import Position, GameMetadata, PositionWithContext
@@ -25,12 +26,17 @@ def translate_sgf_move_qs(player_move,q):
   return "{move}C[{q:.4f}]".format(
       move=translate_sgf_move(player_move), q=q)
 
-def translate_sgf_move(player_move):
+def translate_sgf_move(player_move, comment):
     if player_move.color not in (go.BLACK, go.WHITE):
         raise ValueError("Can't translate color %s to sgf" % player_move.color)
     coords = upc(player_move.move)
     color = 'B' if player_move.color == go.BLACK else 'W'
-    return ";{color}[{coords}]".format(color=color, coords=coords)
+    if comment is not None:
+        comment_node = "C[{}]".format(comment)
+    else:
+        comment_node = ""
+    return ";{color}[{coords}]{comment_node}".format(
+        color=color, coords=coords, comment_node=comment_node)
 
 def make_sgf(
     move_history,
@@ -40,16 +46,19 @@ def make_sgf(
     komi=7.5,
     white_name=PROGRAM_IDENTIFIER,
     black_name=PROGRAM_IDENTIFIER,
-    qs=None
+    comments=[]
     ):
     '''Turn a game into SGF.
 
     Doesn't handle handicap games or positions with incomplete history.
+
+    Args:
+        move_history: iterable of PlayerMoves
+        result_string: "B+R", "W+0.5", etc.
+        comments: iterable of string/None. Will be zipped with move_history.
     '''
-    if qs:
-      game_moves = ''.join(map(translate_sgf_move_qs, move_history, qs))
-    else:
-      game_moves = ''.join(map(translate_sgf_move, move_history))
+    game_moves = ''.join(translate_sgf_move(*z)
+        for z in itertools.zip_longest(move_history, comments))
     result = result_string
     return SGF_TEMPLATE.format(**locals()) 
 

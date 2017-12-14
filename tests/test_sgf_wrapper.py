@@ -15,13 +15,16 @@ class TestSgfGeneration(GoPositionTestCase):
     def test_translate_sgf_move(self):
         self.assertEqual(
             ";B[db]",
-            translate_sgf_move(go.PlayerMove(go.BLACK, (1, 3))))
+            translate_sgf_move(go.PlayerMove(go.BLACK, (1, 3)), None))
         self.assertEqual(
             ";W[aa]",
-            translate_sgf_move(go.PlayerMove(go.WHITE, (0, 0))))
+            translate_sgf_move(go.PlayerMove(go.WHITE, (0, 0)), None))
         self.assertEqual(
             ";W[]",
-            translate_sgf_move(go.PlayerMove(go.WHITE, None)))
+            translate_sgf_move(go.PlayerMove(go.WHITE, None), None))
+        self.assertEqual(
+            ";B[db]C[comment]",
+            translate_sgf_move(go.PlayerMove(go.BLACK, (1, 3)), "comment"))
 
     def test_make_sgf(self):
         all_positions = list(replay_sgf(NO_HANDICAP_SGF))

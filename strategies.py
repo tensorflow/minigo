@@ -147,12 +147,14 @@ class MCTSPlayerMixin:
             res = pos.result()
         return res
 
-    def to_sgf(self): 
+    def to_sgf(self):
         pos = self.root.position
         res = self.make_result_string(pos)
+        comments = ["{q:.4f}".format(q=q) for q in self.qs]
         return sgf_wrapper.make_sgf(pos.recent, res,
                                     white_name=self.network.name or "Unknown",
-                                    black_name=self.network.name or "Unknown", qs=self.qs)
+                                    black_name=self.network.name or "Unknown",
+                                    comments=comments)
 
     def to_dataset(self):
         assert len(self.searches_pi) == self.root.position.n
