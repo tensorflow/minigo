@@ -10,8 +10,10 @@ gcloud alpha container clusters create \
   --num-nodes 40 \
   --accelerator type=nvidia-tesla-k80,count=1 \
   --machine-type n1-standard-2 \
-  --disk-size 30 \
+  --disk-size 20 \
   --preemptible \
+  --cluster-ipv4-cidr=10.0.0.0/10 \
+  --zone=asia-east1-a --node-locations asia-east1-a,asia-east1-b \
   $CLUSTER_NAME
 
 # Fetch its credentials so we can use kubectl locally
