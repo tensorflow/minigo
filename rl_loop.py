@@ -154,8 +154,11 @@ def consolidate(
         metas = []
         for player, _, files in os.walk(model):
             for f in files:
-                if f.endswith('.meta'):
+                if f.endswith('.meta') and f.find('combined') == -1:
                     metas.append(os.path.join(player, f))
+        if not metas:
+            print("Skipping model", model)
+			continue
         bigchunks = []
         current = []
         counter = 0
