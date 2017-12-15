@@ -117,6 +117,7 @@ def selfplay(
          readouts: 'How many simulations to run per move'=100,
          games: 'Number of games to play' = 4,
          verbose : '>1 will print debug info, >2 will print boards' = 1,
+         resign_threshold : 'absolute value of threshold to resign at' = 0.95,
          use_cpu: 'passed to the network initializer'=False):
 
     from dual_net import DualNetwork
@@ -134,7 +135,7 @@ def selfplay(
         network.initialize_variables(None)
 
     with timer("%d games" % games):
-        players = selfplay_mcts.play(network, games, readouts, verbose)
+        players = selfplay_mcts.play(network, games, readouts, resign_threshold, verbose)
 
     ds = None
     for idx,p in enumerate(players):

@@ -135,8 +135,8 @@ class MCTSPlayerMixin:
             self.result = self.root.position.to_play * -2 # use 2 & -2 as "+resign"
             if self.verbosity > 1:
                 res = "B+" if self.result is 2 else "W+"
-                print("%sResign: %.3f" % (res, self.root.Q))
-                print(self.root.position, self.root.position.score())
+                print("%sResign: %.3f" % (res, self.root.Q), file=sys.stderr)
+                print(self.root.position, self.root.position.score(), file=sys.stderr)
             return True
         return False
 
