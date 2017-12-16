@@ -32,6 +32,7 @@ def translate_sgf_move(player_move, comment):
     coords = upc(player_move.move)
     color = 'B' if player_move.color == go.BLACK else 'W'
     if comment is not None:
+        comment = comment.replace(']', r'\]')
         comment_node = "C[{}]".format(comment)
     else:
         comment_node = ""
