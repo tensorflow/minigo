@@ -88,6 +88,7 @@ def gather_loop():
             if failball:
                 print(failball)
                 sys.exit(1)
+            time.sleep(60*60*3)
 
 def rsync_loop():
     while True:
@@ -111,7 +112,7 @@ def train_loop():
             num_chunks = sum([1 if fname.endswith('.gz') else 0 for fname in os.listdir(TRAINING_DIRECTORY)])
             if num_chunks != 0:
                 break
-            time.sleep(15)
+            time.sleep(300)
 
         # Take a training step.
         bigarg = train_cmd.format(model_num, model_num+1, MODEL_DIRECTORY, TF_LOG_DIR, TRAINING_DIRECTORY)
