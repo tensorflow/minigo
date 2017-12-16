@@ -127,6 +127,10 @@ def train_loop():
                 dirname= TRAINING_DIRECTORY,
                  bucket= BUCKET,
                  num= model_num).split())
+        subprocess.call("gsutil -m cp {dirname}/*.meta gs://{bucket}/old_chunks/{num}/".format(
+                dirname= TRAINING_DIRECTORY,
+                 bucket= BUCKET,
+                 num= model_num).split())
         # Wipe the training directory.
         for p in os.listdir(TRAINING_DIRECTORY):
             if p.endswith('.gz'):
@@ -138,10 +142,10 @@ def train_loop():
         else:
             new_name = petname.generate()
         print("A new champion! ", new_name)
+        model_num+=1
         print("Pushing %06d-%s to saved_models" % (model_num, new_name))
         push_model(model_num, new_name)
         subprocess.call('./update-acls')
-        model_num+=1
 
 def consolidate(
         input_directory: 'where to look for games'='data/selfplay/',
