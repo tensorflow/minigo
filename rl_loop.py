@@ -122,10 +122,10 @@ def train_loop():
             sys.exit(1)
 
         # Back up the chunks
-        subprocess.call("gsutil cp {dirname}/*.gz gs://{bucket}/old_chunks/{num}/".format(
-                {dirname: TRAINING_DIRECTORY,
-                 bucket: BUCKET,
-                 num: model_num}).split())
+        subprocess.call("gsutil -m cp {dirname}/*.gz gs://{bucket}/old_chunks/{num}/".format(
+                dirname= TRAINING_DIRECTORY,
+                 bucket= BUCKET,
+                 num= model_num).split())
         # Wipe the training directory.
         for p in os.listdir(TRAINING_DIRECTORY):
             if p.endswith('.gz'):
@@ -158,7 +158,7 @@ def consolidate(
                     metas.append(os.path.join(player, f))
         if not metas:
             print("Skipping model", model)
-			continue
+            continue
         bigchunks = []
         current = []
         counter = 0
