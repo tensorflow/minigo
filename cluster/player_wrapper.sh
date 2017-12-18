@@ -40,5 +40,5 @@ echo Playing a game using model $MODEL...
 echo ...writing out game results to $OUT_DIR
 echo ...and sgfs to $SGF_DIR
 
-python3 main.py selfplay $MODEL --output-dir=$OUT_DIR --output-sgf=$SGF_DIR -r $READOUTS -v 2 -g 8
+python3 main.py selfplay $MODEL --output-dir=$OUT_DIR --output-sgf=$SGF_DIR --readouts $READOUTS -v 2 -g 8 --resign-threshold 0.95
 echo Finished a set of games!

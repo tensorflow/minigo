@@ -29,6 +29,7 @@ class MCTSPlayerMixin:
         else:
             self.temp_threshold = TEMPERATURE_CUTOFF
         self.qs = []
+        self.comments = []
         self.searches_pi = []
         self.root = None
         self.result = 0
@@ -64,7 +65,7 @@ class MCTSPlayerMixin:
 
         #print some stats on anything with probability > 1%
         if self.verbosity > 2:
-            self.root.print_stats(sys.stderr)
+            print(self.root.describe(), file=sys.stderr)
             print('\n\n', file=sys.stderr)
             print(self.root.position, file=sys.stderr)
 
@@ -82,6 +83,7 @@ class MCTSPlayerMixin:
             self.searches_pi.append(
                 self.root.children_as_pi(self.root.position.n > self.temp_threshold))
         self.qs.append(self.root.Q) # Save our resulting Q.
+        self.comments.append(self.root.describe())
         self.root = self.root.add_child(utils.flatten_coords(coords))
         self.position = self.root.position # for showboard
         del self.root.parent.children
@@ -135,8 +137,8 @@ class MCTSPlayerMixin:
             self.result = self.root.position.to_play * -2 # use 2 & -2 as "+resign"
             if self.verbosity > 1:
                 res = "B+" if self.result is 2 else "W+"
-                print("%sResign: %.3f" % (res, self.root.Q))
-                print(self.root.position, self.root.position.score())
+                print("%sResign: %.3f" % (res, self.root.Q), file=sys.stderr)
+                print(self.root.position, self.root.position.score(), file=sys.stderr)
             return True
         return False
 
@@ -147,12 +149,13 @@ class MCTSPlayerMixin:
             res = pos.result()
         return res
 
-    def to_sgf(self): 
+    def to_sgf(self):
         pos = self.root.position
         res = self.make_result_string(pos)
         return sgf_wrapper.make_sgf(pos.recent, res,
                                     white_name=self.network.name or "Unknown",
-                                    black_name=self.network.name or "Unknown", qs=self.qs)
+                                    black_name=self.network.name or "Unknown",
+                                    comments=self.comments)
 
     def to_dataset(self):
         assert len(self.searches_pi) == self.root.position.n

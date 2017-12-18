@@ -30,12 +30,13 @@ class MCTSNode():
         # duplication allows vectorized computation of action score.
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_Q = np.zeros([go.N * go.N + 1], dtype=np.float32)
+        self.original_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.children = {} # map of flattened moves to resulting MCTSNode
 
     def __repr__(self):
         return "<MCTSNode move=%s, N=%s, to_play=%s>" % (
-            self.position.recent[-1:], np.sum(self.child_N), self.position.to_play)
+            self.position.recent[-1:], self.N, self.position.to_play)
 
     @property
     def child_action_score(self):
@@ -84,6 +85,7 @@ class MCTSNode():
         # if game is over, override the value estimate with the true score
         if self.position.is_game_over():
             value = 1 if self.position.score() > 0 else -1
+        self.original_prior = move_probabilities
         # heavily downweight illegal moves so they never pop up.
         illegal_moves = 1 - self.position.all_legal_moves()
         self.child_prior = move_probabilities - illegal_moves * 10
@@ -112,7 +114,6 @@ class MCTSNode():
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))
         new_prior = self.child_prior * 0.80 + dirch * 0.20
-        self.incorporate_results(new_prior, 0, up_to=self)
 
     def children_as_pi(self, stretch=False):
         probs = self.child_N
@@ -120,17 +121,20 @@ class MCTSNode():
             probs = probs ** 8
         return probs / np.sum(probs)
 
-    def print_stats(self, target=sys.stdout):
+    def describe(self):
         sort_order = list(range(go.N * go.N + 1))
         sort_order.sort(key=lambda i: self.child_N[i], reverse=True)
         # Dump out some statistics
-        print("To play: ", self.position.to_play, file=target)
-        print("== Top N:   Sc,    Q,    U,    P,    N == ", file=target)
-        print("\n".join(["{!s:9}: {:.2f}, {:.2f}, {:.2f}, {:.2f}, {}".format(
+        output = []
+        output.append("{q:.4f}\n".format(q=self.Q))
+        output.append("move: action     Q      U      P    P-dnoise     N\n")
+        output.append("\n".join(["{!s:6}: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {}".format(
                 utils.to_human_coord(utils.unflatten_coords(key)),
                 self.child_action_score[key],
                 self.child_Q[key],
                 self.child_U[key],
                 self.child_prior[key],
-                self.child_N[key])
-                for key in sort_order if self.child_N[key] > 0][:20]), file=target)
+                self.original_prior[key],
+                int(self.child_N[key]))
+                for key in sort_order if self.child_N[key] > 0][:20]))
+        return ''.join(output)

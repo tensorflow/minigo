@@ -6,13 +6,15 @@ import numpy as np
 from dual_net import DualNetwork
 from gtp_wrapper import MCTSPlayer
 
-def play(network, games, readouts, verbosity=0):
+def play(network, games, readouts, resign_threshold, verbosity=0):
     ''' Plays out a self-play match, returning
     - the final position
     - the n x 362 tensor of floats representing the mcts search probabilities
     - the n-ary tensor of floats representing the original value-net estimate
     where n is the number of moves in the game'''
-    players = [MCTSPlayer(network, verbosity=verbosity) for i in range(games)]
+    players = [MCTSPlayer(network,
+                          resign_threshold=resign_threshold,
+                          verbosity=verbosity) for i in range(games)]
     done_players = []
     global_n = 0
 
@@ -43,8 +45,8 @@ def play(network, games, readouts, verbosity=0):
             print ("std: %.3f" % np.std(qs), flush=True)
 
         if (verbosity >= 3):
-            players[0].root.print_stats()
             print(players[0].root.position)
+            print(players[0].root.describe())
 
         for player in players:
             # First, check the roots for hopeless games.
