@@ -111,8 +111,9 @@ def train_loop():
         while True:
             num_chunks = sum([1 if fname.endswith('.gz') else 0 for fname in os.listdir(TRAINING_DIRECTORY)])
             if num_chunks != 0:
+                time.sleep(300)
                 break
-            time.sleep(300)
+            time.sleep(120)
 
         # Take a training step.
         bigarg = train_cmd.format(model_num, model_num+1, MODEL_DIRECTORY, TF_LOG_DIR, TRAINING_DIRECTORY)
