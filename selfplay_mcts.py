@@ -45,8 +45,8 @@ def play(network, games, readouts, resign_threshold, verbosity=0):
             print ("std: %.3f" % np.std(qs), flush=True)
 
         if (verbosity >= 3):
-            players[0].root.print_stats()
             print(players[0].root.position)
+            print(players[0].root.describe())
 
         for player in players:
             # First, check the roots for hopeless games.

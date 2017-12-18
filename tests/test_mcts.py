@@ -185,4 +185,4 @@ class TestMctsNodes(GoPositionTestCase):
         # passing should be ineffective.
         self.assertLess(root.child_Q[-1], 0)
         # uncomment to debug this test
-        # root.print_stats()
+        # print(root.describe())
