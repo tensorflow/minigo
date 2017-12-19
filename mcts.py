@@ -93,7 +93,7 @@ class MCTSNode():
         # if B is winning, then B will only ever explore 1 move, because the Q
         # estimation will be so much larger than the 0 of the other moves. 
         #
-        # Conversely, if W is winning, then W will explore all 362 moves before
+        # Conversely, if W is winning, then B will explore all 362 moves before
         # continuing to explore the most favorable move. This is a waste of search.
         #
         # The first time the child is actually selected and explored,
