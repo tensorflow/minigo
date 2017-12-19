@@ -9,7 +9,7 @@ import math
 # All terminology here (Q, U, N, p_UCT) uses the same notation as in the
 # AlphaGo paper.
 # Exploration constant
-c_PUCT = 1.18
+c_PUCT = 1.08
 # Dirichlet noise, as a function of go.N
 D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
 
@@ -113,7 +113,7 @@ class MCTSNode():
 
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))
-        new_prior = self.child_prior * 0.80 + dirch * 0.20
+        self.child_prior = self.child_prior * 0.80 + dirch * 0.20
 
     def children_as_pi(self, stretch=False):
         probs = self.child_N
