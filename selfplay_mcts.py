@@ -61,7 +61,7 @@ def play(network, games, readouts, resign_threshold, verbosity=0):
         global_n += 1
         if (verbosity > 1) or (verbosity == 1 and global_n % 10 == 9):
             if verbosity > 2:
-                print("Played >> ",
+                print("Played >>",
                       utils.to_human_coord(utils.unflatten_coords(players[0].root.fmove)))
             print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (global_n,
                    readouts * len(players), dur / (readouts*len(players) / 100.0), dur), flush=True)

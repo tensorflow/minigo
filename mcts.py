@@ -132,14 +132,28 @@ class MCTSNode():
             probs = probs ** 8
         return probs / np.sum(probs)
 
+    def most_visited_path(self):
+        node = self
+        output = []
+        while node.children:
+            next_kid = np.argmax(node.child_N)
+            node = node.children[next_kid]
+            output.append("%s (%d) ==> " % (utils.to_human_coord(
+                                            utils.unflatten_coords(node.fmove)),
+                                            node.N))
+        output.append("Q: {:.5f}\n".format(node.Q))
+        return ''.join(output)
+
+
     def describe(self):
         sort_order = list(range(go.N * go.N + 1))
         sort_order.sort(key=lambda i: self.child_N[i], reverse=True)
         # Dump out some statistics
         output = []
         output.append("{q:.4f}\n".format(q=self.Q))
-        output.append("move: action     Q      U      P    P-dnoise     N\n")
-        output.append("\n".join(["{!s:6}: {:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f}, {}".format(
+        output.append(self.most_visited_path())
+        output.append("move:  action      Q      U      P     P-d   N\n")
+        output.append("\n".join(["{!s:6}: {: .3f}, {: .3f}, {:.3f}, {:.3f}, {:.3f}, {}".format(
                 utils.to_human_coord(utils.unflatten_coords(key)),
                 self.child_action_score[key],
                 self.child_Q[key],
