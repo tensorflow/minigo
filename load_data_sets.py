@@ -20,13 +20,6 @@ CHUNK_HEADER_SIZE = struct.calcsize(CHUNK_HEADER_FORMAT)
 
 DEBUG = False
 
-def make_onehot(coords):
-    num_positions = len(coords)
-    output = np.zeros([num_positions, go.N ** 2], dtype=np.uint8)
-    for i, coord in enumerate(coords):
-        output[i, utils.flatten_coords(coord)] = 1
-    return output
-
 def find_sgf_files(*dataset_dirs):
     for dataset_dir in dataset_dirs:
         full_dir = os.path.join(os.getcwd(), dataset_dir)
@@ -190,12 +183,3 @@ class DataSetV2(object):
     def size(self):
         return self.pos_features.shape[0]
 
-
-def parse_data_sets(*data_sets):
-    sgf_files = list(find_sgf_files(*data_sets))
-    print("%s sgfs found." % len(sgf_files), file=sys.stderr)
-    est_num_positions = len(sgf_files) * 200 # about 200 moves per game
-    positions_w_context = itertools.chain(*map(get_positions_from_sgf, sgf_files))
-
-    test_chunk, training_chunks = split_test_training(positions_w_context, est_num_positions)
-    return test_chunk, training_chunks
