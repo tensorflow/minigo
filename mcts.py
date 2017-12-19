@@ -89,6 +89,17 @@ class MCTSNode():
         # heavily downweight illegal moves so they never pop up.
         illegal_moves = 1 - self.position.all_legal_moves()
         self.child_prior = move_probabilities - illegal_moves * 10
+        # initialize child Q as current node's value, to prevent dynamics where
+        # if B is winning, then B will only ever explore 1 move, because the Q
+        # estimation will be so much larger than the 0 of the other moves. 
+        #
+        # Conversely, if W is winning, then W will explore all 362 moves before
+        # continuing to explore the most favorable move. This is a waste of search.
+        #
+        # The first time the child is actually selected and explored,
+        # backup_value will actually replace this default value with the actual
+        # value.
+        self.child_Q = np.ones([go.N * go.N + 1], dtype=np.float32) * value
         self.backup_value(value, up_to=up_to)
 
     def backup_value(self, value, up_to=None):
