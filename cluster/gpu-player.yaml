@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: mugo-gpu-player
 spec:
-  parallelism: 640
+  parallelism: 1380
   completions: 200000
   template:
     metadata:

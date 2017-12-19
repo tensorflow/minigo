@@ -88,6 +88,7 @@ def gather_loop():
             if failball:
                 print(failball)
                 sys.exit(1)
+            time.sleep(60*60*3)
 
 def rsync_loop():
     while True:
@@ -110,8 +111,9 @@ def train_loop():
         while True:
             num_chunks = sum([1 if fname.endswith('.gz') else 0 for fname in os.listdir(TRAINING_DIRECTORY)])
             if num_chunks != 0:
+                time.sleep(300)
                 break
-            time.sleep(15)
+            time.sleep(120)
 
         # Take a training step.
         bigarg = train_cmd.format(model_num, model_num+1, MODEL_DIRECTORY, TF_LOG_DIR, TRAINING_DIRECTORY)
@@ -122,10 +124,14 @@ def train_loop():
             sys.exit(1)
 
         # Back up the chunks
-        subprocess.call("gsutil cp {dirname}/*.gz gs://{bucket}/old_chunks/{num}/".format(
-                {dirname: TRAINING_DIRECTORY,
-                 bucket: BUCKET,
-                 num: model_num}).split())
+        subprocess.call("gsutil -m cp {dirname}/*.gz gs://{bucket}/old_chunks/{num}/".format(
+                dirname= TRAINING_DIRECTORY,
+                 bucket= BUCKET,
+                 num= model_num).split())
+        subprocess.call("gsutil -m cp {dirname}/*.meta gs://{bucket}/old_chunks/{num}/".format(
+                dirname= TRAINING_DIRECTORY,
+                 bucket= BUCKET,
+                 num= model_num).split())
         # Wipe the training directory.
         for p in os.listdir(TRAINING_DIRECTORY):
             if p.endswith('.gz'):
@@ -137,10 +143,10 @@ def train_loop():
         else:
             new_name = petname.generate()
         print("A new champion! ", new_name)
+        model_num+=1
         print("Pushing %06d-%s to saved_models" % (model_num, new_name))
         push_model(model_num, new_name)
         subprocess.call('./update-acls')
-        model_num+=1
 
 def consolidate(
         input_directory: 'where to look for games'='data/selfplay/',
@@ -154,8 +160,11 @@ def consolidate(
         metas = []
         for player, _, files in os.walk(model):
             for f in files:
-                if f.endswith('.meta'):
+                if f.endswith('.meta') and f.find('combined') == -1:
                     metas.append(os.path.join(player, f))
+        if not metas:
+            print("Skipping model", model)
+            continue
         bigchunks = []
         current = []
         counter = 0
