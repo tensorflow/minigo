@@ -4,6 +4,7 @@ import go
 import random
 import utils
 import sys
+import os
 from dual_net import DualNetwork
 from strategies import MCTSPlayerMixin
 
@@ -92,5 +93,6 @@ def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1):
     except:
         n.initialize_variables()
     instance = MCTSPlayer(n, simulations_per_move=readouts_per_move, verbosity=verbosity, two_player_mode=True)
-    gtp_engine = gtp.Engine(instance)
+    name ="MuGoZero-" + os.path.basename(read_file)
+    gtp_engine = gtp.Engine(instance, name=name)
     return gtp_engine

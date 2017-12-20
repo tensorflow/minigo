@@ -67,6 +67,7 @@ class MCTSPlayerMixin:
         if self.verbosity > 2:
             print(self.root.describe(), file=sys.stderr)
             print('\n\n', file=sys.stderr)
+        if self.verbosity > 3:
             print(self.root.position, file=sys.stderr)
 
         return self.pick_move()
