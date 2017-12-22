@@ -87,7 +87,7 @@ class GtpInterface(object):
 class MCTSPlayer(MCTSPlayerMixin, GtpInterface): pass
 
 def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1):
-    n = DualNetwork(use_cpu=True)
+    n = DualNetwork()
     try:
         n.initialize_variables(read_file)
     except:
