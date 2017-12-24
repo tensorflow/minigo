@@ -33,7 +33,6 @@ class GtpInterface(object):
         self.position.komi = komi
 
     def clear(self):
-        # figure this out later... incompatible with MCTS player atm.
         self.position = go.Position(komi=self.komi)
         self.initialize_game()
 
@@ -81,6 +80,9 @@ class GtpInterface(object):
         raise NotImplementedError
 
     def initialize_game(self):
+        raise NotImplementedError
+
+    def chat(self, msg_type, sender, text):
         raise NotImplementedError
 
 

@@ -166,3 +166,21 @@ class MCTSPlayerMixin:
             results *= -1
         return (pwcs, self.searches_pi, results)
 
+    def chat(self, msg_type, sender, text):
+        default_response = "Supported commands are 'winrate', 'nextplay', 'fortune', and 'help'."
+        if self.root is None or self.root.position.n == 0:
+            return "I'm not playing right now.  " + default_response
+
+        if text.lower().find('winrate') != -1:
+            wr = (abs(self.root.Q) + 1.0) / 2.0
+            color = "Black" if self.root.Q > 0 else "White"
+            return  "{:s} {:.2f}%".format(color, wr * 100.0)
+        elif text.lower().find('nextplay') != -1:
+            return "I'm thinking... " + self.root.most_visited_path()
+        elif text.lower().find('fortune') != -1:
+            return "You're feeling lucky!"
+        elif text.lower().find('help') != -1:
+            return "I can't help much with go -- try ladders!  Otherwise: " + default_response
+        else:
+            return default_response
+
