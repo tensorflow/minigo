@@ -171,15 +171,15 @@ class MCTSPlayerMixin:
         if self.root is None or self.root.position.n == 0:
             return "I'm not playing right now.  " + default_response
 
-        if 'winrate' in text.lower() != -1:
+        if 'winrate' in text.lower():
             wr = (abs(self.root.Q) + 1.0) / 2.0
             color = "Black" if self.root.Q > 0 else "White"
             return  "{:s} {:.2f}%".format(color, wr * 100.0)
-        elif 'nextplay' in text.lower() != -1:
+        elif 'nextplay' in text.lower():
             return "I'm thinking... " + self.root.most_visited_path()
-        elif 'fortune' in text.lower() != -1:
+        elif 'fortune' in text.lower():
             return "You're feeling lucky!"
-        elif 'help' in text.lower() != -1:
+        elif 'help' in text.lower():
             return "I can't help much with go -- try ladders!  Otherwise: " + default_response
         else:
             return default_response
