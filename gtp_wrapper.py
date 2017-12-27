@@ -1,9 +1,11 @@
 import gtp
+import gtp_extensions
 
 import go
 import random
 import utils
 import sys
+import os
 from dual_net import DualNetwork
 from strategies import MCTSPlayerMixin
 
@@ -32,7 +34,6 @@ class GtpInterface(object):
         self.position.komi = komi
 
     def clear(self):
-        # figure this out later... incompatible with MCTS player atm.
         self.position = go.Position(komi=self.komi)
         self.initialize_game()
 
@@ -82,15 +83,19 @@ class GtpInterface(object):
     def initialize_game(self):
         raise NotImplementedError
 
+    def chat(self, msg_type, sender, text):
+        raise NotImplementedError
+
 
 class MCTSPlayer(MCTSPlayerMixin, GtpInterface): pass
 
 def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1):
-    n = DualNetwork(use_cpu=True)
+    n = DualNetwork()
     try:
         n.initialize_variables(read_file)
     except:
         n.initialize_variables()
     instance = MCTSPlayer(n, simulations_per_move=readouts_per_move, verbosity=verbosity, two_player_mode=True)
-    gtp_engine = gtp.Engine(instance)
+    name ="Somebot-" + os.path.basename(read_file)
+    gtp_engine = gtp_extensions.KgsExtensionsMixin(instance, name=name)
     return gtp_engine

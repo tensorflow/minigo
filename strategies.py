@@ -13,8 +13,8 @@ import go
 import utils
 
 MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
-# When to do deterministic move selection.  ~40 moves on a 19x19, ~12 on 9x9
-TEMPERATURE_CUTOFF = ((go.N * go.N) / 10) + 3
+# When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
+TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
 class MCTSPlayerMixin:
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
@@ -67,6 +67,7 @@ class MCTSPlayerMixin:
         if self.verbosity > 2:
             print(self.root.describe(), file=sys.stderr)
             print('\n\n', file=sys.stderr)
+        if self.verbosity > 3:
             print(self.root.position, file=sys.stderr)
 
         return self.pick_move()
@@ -164,4 +165,22 @@ class MCTSPlayerMixin:
         if self.result < 0:
             results *= -1
         return (pwcs, self.searches_pi, results)
+
+    def chat(self, msg_type, sender, text):
+        default_response = "Supported commands are 'winrate', 'nextplay', 'fortune', and 'help'."
+        if self.root is None or self.root.position.n == 0:
+            return "I'm not playing right now.  " + default_response
+
+        if 'winrate' in text.lower() != -1:
+            wr = (abs(self.root.Q) + 1.0) / 2.0
+            color = "Black" if self.root.Q > 0 else "White"
+            return  "{:s} {:.2f}%".format(color, wr * 100.0)
+        elif 'nextplay' in text.lower() != -1:
+            return "I'm thinking... " + self.root.most_visited_path()
+        elif 'fortune' in text.lower() != -1:
+            return "You're feeling lucky!"
+        elif 'help' in text.lower() != -1:
+            return "I can't help much with go -- try ladders!  Otherwise: " + default_response
+        else:
+            return default_response
 
