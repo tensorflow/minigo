@@ -1,9 +1,10 @@
 # extends gtp.py
 
-import sys 
+import gtp
+import sys
 
 def parse_message(message):
-    message = pre_engine(message).strip()
+    message = gtp.pre_engine(message).strip()
     first, rest = (message.split(" ", 1) + [None])[:2]
     if first.isdigit():
         message_id = int(first)
@@ -30,13 +31,13 @@ class KgsExtensionsMixin(gtp.Engine):
         if command in self.known_commands:
             try:
                 retval = getattr(self, "cmd_" + command)(arguments)
-                response = format_success(message_id, retval)
+                response = gtp.format_success(message_id, retval)
                 sys.stderr.flush()
                 return response
             except ValueError as exception:
-                return format_error(message_id, exception.args[0])
+                return gtp.format_error(message_id, exception.args[0])
         else:
-            return format_error(message_id, "unknown command: " + command)
+            return gtp.format_error(message_id, "unknown command: " + command)
 
     # Nice to implement this, as KGS sends it each move.
     def cmd_time_left(self, arguments):
@@ -44,7 +45,8 @@ class KgsExtensionsMixin(gtp.Engine):
 
     def cmd_kgs_chat(self, arguments):
         try:
-            msg_type, sender, text = arguments.split()
+            msg_type, sender, *text = arguments.split()
+            text = " ".join(text)
         except ValueError:
             return "Unparseable message, args: %r" % arguments
         return self._game.chat(msg_type, sender, text)

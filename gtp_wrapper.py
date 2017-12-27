@@ -1,4 +1,5 @@
 import gtp
+import gtp_extensions
 
 import go
 import random
@@ -95,6 +96,6 @@ def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1):
     except:
         n.initialize_variables()
     instance = MCTSPlayer(n, simulations_per_move=readouts_per_move, verbosity=verbosity, two_player_mode=True)
-    name ="MuGoZero-" + os.path.basename(read_file)
-    gtp_engine = gtp.Engine(instance, name=name)
+    name ="Somebot-" + os.path.basename(read_file)
+    gtp_engine = gtp_extensions.KgsExtensionsMixin(instance, name=name)
     return gtp_engine
