@@ -216,8 +216,33 @@ kubectl apply -f gpu-provision-daemonset.yaml
 5. Resizing your cluster.
 
   ```
-  gcloud alpha container clusters resize mugozero --size=8
+  gcloud alpha container clusters resize $CLUSTER_NAME --zone=$ZONE --size=8
   ```
+  
+Create Docker image
+-------------------
+
+You will need a Docker image in order to initialize the pods.
+
+First you need to update the param in the `Makefile`:
+
+```
+source common
+sed -i "s/tensor-go/$PROJECT/" Makefile
+```
+
+Then `make` will produce and push the image!
+
+CPU worker:
+```
+make push
+```
+
+GPU worker:
+
+```
+make gpu-push
+```
 
 Launching selfplay workers on a cluster
 ---------------------------------------
@@ -232,7 +257,8 @@ share as well, limit the parallelism to the number of nodes available.
 Now launch the job via the launcher.  (it just subs in the environment variable
 for the bucket name, neat!)
 ```
-cluster/launch-gpu-player.sh
+source common
+envsubst < player.yaml | kubectl apply -f -
 ```
 
 Once you've done this, you can verify they're running via
@@ -286,7 +312,7 @@ Setting up the selfplay cluster
 * Seed the model directory with a randomly initialized model. (`python3
   rl_loop.py bootstrap /path/to/where/you/want/new/model`)
 * Copy the model to the GCS bucket. (`gsutil cp /path/to/model*
-  gs://bucket/model/path...` etc)
+  gs://bucket/models/` etc)
 
 * Build your docker images with the latest version of the code, optionally
   bumping the version number in the Makefile.

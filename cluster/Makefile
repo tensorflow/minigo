@@ -3,6 +3,7 @@ PROJECT=tensor-go
 
 
 make gpu-image:
+		mkdir -p staging/
 		cp ../*.py staging/
 		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
@@ -12,6 +13,7 @@ make gpu-image:
 		rm staging/player_wrapper.sh
 
 image:
+		mkdir -p staging/
 		cp ../*.py staging/
 		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
@@ -21,6 +23,7 @@ image:
 		rm staging/player_wrapper.sh
 
 image-clean:
+		mkdir -p staging/
 		cp ../*.py staging/
 		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/

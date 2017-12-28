@@ -73,10 +73,12 @@ RUN curl -v -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/downlo
     dpkg -i gcsfuse_0.23.0_amd64.deb || echo fixing dependencies && \
         apt-get update && apt-get install -f -y uuid-runtime
 
+ADD staging/requirements.txt /app/requirements.txt
+
+RUN pip3 install --upgrade pip
+RUN pip3 install -r /app/requirements.txt
 
 ADD staging/ /app
-
-RUN pip3 install -r /app/requirements.txt
 
 WORKDIR /app
 
