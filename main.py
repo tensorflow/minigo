@@ -22,8 +22,12 @@ import sgf_wrapper
 
 def gtp(load_file: "The path to the network model files",
         readouts: 'How many simulations to run per move'=100,
+        cgos_mode: 'Whether to use CGOS time constraints'=False,
         verbose=1):
-    engine = make_gtp_instance(load_file, readouts, verbose)
+    engine = make_gtp_instance(load_file,
+                               readouts_per_move=readouts,
+                               verbosity=verbose,
+                               cgos_mode=cgos_mode)
     sys.stderr.write("GTP engine ready\n")
     sys.stderr.flush()
     while not engine.disconnect:

@@ -17,6 +17,8 @@ MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
 class MCTSPlayerMixin:
+    # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
+    # Otherwise, it uses 'seconds_per_move' of wall time'
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
                  resign_threshold=-0.92, verbosity=0, two_player_mode=False):
         self.network = network
@@ -171,16 +173,24 @@ class MCTSPlayerMixin:
         if self.root is None or self.root.position.n == 0:
             return "I'm not playing right now.  " + default_response
 
-        if 'winrate' in text.lower() != -1:
+        if 'winrate' in text.lower():
             wr = (abs(self.root.Q) + 1.0) / 2.0
             color = "Black" if self.root.Q > 0 else "White"
             return  "{:s} {:.2f}%".format(color, wr * 100.0)
-        elif 'nextplay' in text.lower() != -1:
+        elif 'nextplay' in text.lower():
             return "I'm thinking... " + self.root.most_visited_path()
-        elif 'fortune' in text.lower() != -1:
+        elif 'fortune' in text.lower():
             return "You're feeling lucky!"
-        elif 'help' in text.lower() != -1:
+        elif 'help' in text.lower():
+
             return "I can't help much with go -- try ladders!  Otherwise: " + default_response
         else:
             return default_response
 
+class CGOSPlayerMixin(MCTSPlayerMixin):
+    def suggest_move(self, position):
+        if position.n < 300:
+            self.seconds_per_move = 5
+        else:
+            self.seconds_per_move = 1
+        return super().suggest_move(position)
