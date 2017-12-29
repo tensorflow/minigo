@@ -21,7 +21,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: player
-        image: gcr.io/tensor-go/mugo-gpu-player:0.3
+        image: gcr.io/$PROJECT/mugo-gpu-player:0.3
         imagePullPolicy: Always
         resources:
           limits:
@@ -43,7 +43,7 @@ spec:
       volumes:
       - name: service-credentials
         secret:
-          secretName: mugo-services-creds
+          secretName: $SERVICE_ACCOUNT-creds
       - hostPath:
           path: /home/kubernetes/bin/nvidia/bin
         name: nvidia-debug-tools
