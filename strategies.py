@@ -17,6 +17,8 @@ MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
 class MCTSPlayerMixin:
+    # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
+    # Otherwise, it uses 'seconds_per_move' of wall time'
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
                  resign_threshold=-0.92, verbosity=0, two_player_mode=False):
         self.network = network
@@ -184,3 +186,10 @@ class MCTSPlayerMixin:
         else:
             return default_response
 
+class CGOSPlayerMixin(MCTSPlayerMixin):
+    def suggest_move(self, position):
+        if position.n < 300:
+            self.seconds_per_move = 5
+        else:
+            self.seconds_per_move = 1
+        return super().suggest_move(position)
