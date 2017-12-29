@@ -191,5 +191,5 @@ class CGOSPlayerMixin(MCTSPlayerMixin):
         if position.n < 300:
             self.seconds_per_move = 5
         else:
-            self.seconds_per_move = 1
+            self.seconds_per_move = 2
         return super().suggest_move(position)
