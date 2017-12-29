@@ -1,6 +1,7 @@
 import gtp
 import gtp_extensions
 
+import datetime
 import go
 import random
 import utils
@@ -22,7 +23,6 @@ class GtpInterface(object):
         self.size = 9
         self.position = None
         self.komi = 6.5
-        self.clear()
 
     def set_size(self, n):
         self.size = n
@@ -34,6 +34,15 @@ class GtpInterface(object):
         self.position.komi = komi
 
     def clear(self):
+        if self.position and len(self.position.recent) > 1:
+            try:
+                sgf = self.to_sgf()
+                with open(datetime.datetime.now().strftime("%Y-%m-%d-%H:%M.sgf"), 'w') as f:
+                        f.write(sgf)
+            except NotImplementedError:
+                pass
+            except:
+                print("Error saving sgf", file=sys.stderr, flush=True)
         self.position = go.Position(komi=self.komi)
         self.initialize_game()
 
@@ -63,6 +72,7 @@ class GtpInterface(object):
 
     def showboard(self):
         print('\n\n' + str(self.position) + '\n\n', file=sys.stderr)
+        return True
 
     def should_resign(self):
         raise NotImplementedError
@@ -84,6 +94,9 @@ class GtpInterface(object):
         raise NotImplementedError
 
     def chat(self, msg_type, sender, text):
+        raise NotImplementedError
+
+    def to_sgf(self):
         raise NotImplementedError
 
 
