@@ -235,12 +235,14 @@ Then `make` will produce and push the image!
 
 CPU worker:
 ```
+make image
 make push
 ```
 
 GPU worker:
 
 ```
+make gpu-image
 make gpu-push
 ```
 
