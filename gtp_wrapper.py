@@ -61,9 +61,6 @@ class GtpInterface(object):
         if self.should_resign():
             return gtp.RESIGN
 
-        if self.should_pass(self.position):
-            return gtp.PASS
-
         move = self.suggest_move(self.position)
         return utils.unparse_pygtp_coords(move)
 
