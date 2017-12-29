@@ -77,10 +77,6 @@ class GtpInterface(object):
     def should_resign(self):
         raise NotImplementedError
 
-    def should_pass(self, position):
-        # Pass if the opponent passes
-        return position.n > 100 and position.recent and position.recent[-1].move == None
-
     def get_score(self):
         return self.position.result()
 
