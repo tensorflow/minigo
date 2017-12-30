@@ -3,3 +3,4 @@ CLUSTER_NAME=mugozero
 BUCKET_NAME=mugozero-v1
 SERVICE_ACCOUNT=mugo-services
 SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT}@${PROJECT}.iam.gserviceaccount.com
+ZONE=us-west1-c

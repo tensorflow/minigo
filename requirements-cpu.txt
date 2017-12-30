@@ -3,7 +3,7 @@ numpy
 pygtp>=0.4
 sgf==0.5
 tqdm>=4.17
-tensorflow-gpu>=1.4
+tensorflow>=1.4
 protobuf
 six
 petname

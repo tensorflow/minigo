@@ -21,10 +21,10 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: player
-        image: gcr.io/tensor-go/mugo-player:0.2
+        image: gcr.io/$PROJECT/mugo-player:0.3
         imagePullPolicy: Always
         args:
-        - mugozero-v1
+        - $BUCKET_NAME
         volumeMounts:
         - name: service-credentials
           mountPath: /etc/credentials
@@ -36,5 +36,5 @@ spec:
       volumes:
       - name: service-credentials
         secret:
-          secretName: mugo-services-creds
+          secretName: $SERVICE_ACCOUNT-creds
       restartPolicy: OnFailure

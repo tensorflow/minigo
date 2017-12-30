@@ -43,6 +43,9 @@ class KgsExtensionsMixin(gtp.Engine):
     def cmd_time_left(self, arguments):
         pass
 
+    def cmd_showboard(self, arguments):
+        return self._game.showboard()
+
     def cmd_kgs_chat(self, arguments):
         try:
             msg_type, sender, *text = arguments.split()

@@ -54,6 +54,7 @@ class MCTSNode():
 
     def select_leaf(self):
         current = self
+        pass_move = go.N * go.N
         while True:
             # if a node has never been evaluated, we have no basis to select a child.
             # this conveniently handles the root-node base case, too.
@@ -62,10 +63,12 @@ class MCTSNode():
             if current.position.is_game_over():
                 # do not attempt to explore children of a finished game position
                 return current
+
+            # If this move is a pass, and the 2nd pass is a leaf, open it first!
+            if current.position.recent and current.position.recent[-1].move is None and current.child_N[pass_move] == 0:
+                return current.add_child(pass_move)
+
             possible_choices = current.child_action_score
-            if self.position.n < go.N * 6:
-                # Exclude passing from consideration at the start of game
-                possible_choices = possible_choices[:-1]
             decide_func = np.argmax if current.position.to_play == go.BLACK else np.argmin
             best_move = decide_func(possible_choices)
             if best_move in current.children:

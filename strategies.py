@@ -41,6 +41,9 @@ class MCTSPlayerMixin:
     def initialize_game(self):
         self.root = MCTSNode(go.Position())
         self.result = 0
+        self.comments = []
+        self.searches_pi = []
+        self.qs = []
 
     def suggest_move(self, position):
         ''' Used for playing a single game.
