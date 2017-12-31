@@ -20,7 +20,7 @@ class MCTSPlayerMixin:
     # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
     # Otherwise, it uses 'seconds_per_move' of wall time'
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
-                 resign_threshold=-0.92, verbosity=0, two_player_mode=False):
+                 resign_threshold=-0.90, verbosity=0, two_player_mode=False):
         self.network = network
         self.seconds_per_move = seconds_per_move
         self.simulations_per_move = simulations_per_move

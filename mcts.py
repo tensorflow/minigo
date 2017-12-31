@@ -9,7 +9,7 @@ import math
 # All terminology here (Q, U, N, p_UCT) uses the same notation as in the
 # AlphaGo paper.
 # Exploration constant
-c_PUCT = 1.38
+c_PUCT = 1.18
 # Dirichlet noise, as a function of go.N
 D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
 
