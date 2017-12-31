@@ -88,7 +88,7 @@ def gather_loop():
             if failball:
                 print(failball)
                 sys.exit(1)
-            time.sleep(60*60*3)
+            time.sleep(60*60*1)
 
 def rsync_loop():
     while True:
@@ -110,8 +110,11 @@ def train_loop():
         print("Waiting for training chunks...")
         while True:
             num_chunks = sum([1 if fname.endswith('.gz') else 0 for fname in os.listdir(TRAINING_DIRECTORY)])
+            if num_chunks == 600:
+                break
             if num_chunks != 0:
-                time.sleep(300)
+                print("Found", num_chunks, ". Waiting for them to finish writing"
+                time.sleep(210)
                 break
             time.sleep(120)
 
