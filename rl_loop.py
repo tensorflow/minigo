@@ -113,7 +113,7 @@ def train_loop():
             if num_chunks == 600:
                 break
             if num_chunks != 0:
-                print("Found", num_chunks, ". Waiting for them to finish writing"
+                print("Found", num_chunks, ". Waiting for them to finish writing")
                 time.sleep(210)
                 break
             time.sleep(120)
