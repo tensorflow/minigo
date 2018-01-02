@@ -158,6 +158,8 @@ class MCTSPlayerMixin:
     def to_sgf(self):
         pos = self.root.position
         res = self.make_result_string(pos)
+        if self.comments:
+            self.comments[0] = ("Resign Threshold: %0.3f\n" % self.resign_threshold) + self.comments[0]
         return sgf_wrapper.make_sgf(pos.recent, res,
                                     white_name=self.network.name or "Unknown",
                                     black_name=self.network.name or "Unknown",

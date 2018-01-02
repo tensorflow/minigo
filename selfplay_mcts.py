@@ -2,6 +2,7 @@ import go
 import utils
 import time
 import numpy as np
+import random
 
 from dual_net import DualNetwork
 from gtp_wrapper import MCTSPlayer
@@ -17,6 +18,11 @@ def play(network, games, readouts, resign_threshold, verbosity=0):
                           verbosity=verbosity) for i in range(games)]
     done_players = []
     global_n = 0
+
+    # Disable resign in 5% of games
+    if random.random() < 0.05:
+      for player in players:
+          player.resign_threshold = -0.9999
 
     for player in players:
         player.initialize_game()
