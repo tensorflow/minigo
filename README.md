@@ -20,6 +20,17 @@ in the service of the secondary goal above :)
 Getting Started
 ===============
 
+This assumes you're using virtualenv, virtualenvwrapper, and Python3.5+. The
+[hitchhiker's guide to
+python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
+intro on both of these. The instructions after this point haven't been tested
+in environments that are not using virtualenv.
+
+```shell
+pip3 install virtualenv
+pip3 install virtualenvwrapper
+```
+
 Install Tensorflow
 ------------------
 Start by installing Tensorflow and the dependencies, optionally into a
@@ -29,13 +40,21 @@ virtualenv if you so choose. First:
 pip3 install -r requirements.txt
 ```
 
-Then, you must either install CUDA 8.0 (See Tensorflow documentation) or downgrade
-to non-gpu tensorflow. To downgrade:
+Then, you must either install CUDA 8.0 (See Tensorflow documentation).
+
+If you don't have a GPU, you can downgrade
 
 ```
 pip3 uninstall tensorflow-gpu
 pip3 install tensorflow
 ```
+
+or just install the cpu-requirements.
+
+```
+pip3 install -r requirements-cpu.txt
+```
+
 
 Running unit tests
 ------------------
@@ -47,9 +66,34 @@ python3 -m unittest discover tests
 MuGo Zero: Selfplay, or GTP
 ===========================
 
-If you just want to get MuGo Zero working, you can download the latest model at... (TODO)
+You'll need to install
+[gsutil](https://cloud.google.com/storage/docs/gsutil_install) before
+proceeding.
 
-Or build a random model with:
+If you just want to get MuGo Zero working, you can download the latest model at
+from `gs://mugozero-v1/models`. The model comes in 3 parts; if you want to see
+the latest, you can run
+
+```shell
+gsutil ls gs://mugozero-v1/models | tail -3
+```
+
+Which might look like
+
+```
+gs://mugozero-v1/models/000193-trusty.data-00000-of-00001
+gs://mugozero-v1/models/000193-trusty.index
+gs://mugozero-v1/models/000193-trusty.meta
+```
+
+You'll need to copy them to your local disk:
+
+```shell
+MUGO_MODELS=$HOME/mugo-models
+gsutil ls gs://mugozero-v1/models | tail -3 | xargs -I{} gsutil cp "{}" $MUGO_MODELS
+```
+
+Or, you can build a random model with:
 
 ```
 BUCKET_NAME=foobar python3 rl_loop.py bootstrap models/random_model
@@ -58,19 +102,32 @@ BUCKET_NAME=foobar python3 rl_loop.py bootstrap models/random_model
 
 Selfplay
 --------
-To watch MuGo Zero play a game: 
+To watch MuGo Zero play a game, you need to specify a model. Here's an example
+to play using the latest model you've downloaded
 
+```shell
+MUGO_MODELS=$HOME/mugo-models
+
+# How many searches to make per move
+READOUTS=100
+
+# How many games to play simultaneously
+GAMES=5
+
+# Latest model should look like: /path/to/models/000123-something
+LATEST_MODEL=$(ls -d $MUGO_MODELS/* | tail -1 | cut -f 1 -d '.')
+
+python3 main.py selfplay $LATEST_MODEL --readouts $READOUTS -g $GAMES -v 3
 ```
-python3 main.py selfplay path/to/model -r READOUTS -g GAMES -v 3
-``` 
-where `READOUTS` is how many searches to make per move, and `GAMES` is how
-many games to play simultaneously.  Timing information and statistics will be
-printed at each move.  Setting verbosity to 3 or higher will print a board at each move. 
+
+Timing information and statistics will be printed at each move.  Setting
+verbosity to 3 or higher will print a board at each move. 
 
 
 MuGo Zero uses the GTP protocol, and you can use any gtp-compliant program with it.
+
 ```
-python3 main.py gtp path/to/model -r READOUTS -v 3
+python3 main.py gtp $LATEST_MODEL -r $READOUTS -v 3
 ```
 
 (If no model is provided, it will initialize one with random values)
@@ -84,8 +141,13 @@ play [color] [coordinate]   # Tells the engine that a move should be played for 
 showboard                   # Asks the engine to print the board.
 ```
 
-One way to play via GTP is to use gogui-display (which implements a UI that speaks GTP.) You can download the gogui set of tools at [http://gogui.sourceforge.net/](http://gogui.sourceforge.net/). See also [documentation on interesting ways to use GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
-```
+One way to play via GTP is to use gogui-display (which implements a UI that
+speaks GTP.) You can download the gogui set of tools at
+[http://gogui.sourceforge.net/](http://gogui.sourceforge.net/). See also
+[documentation on interesting ways to use
+GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
+
+```shell
 gogui-twogtp -black 'python3 main.py gtp policy --read-file=saved_models/20170718' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
 ```
 
@@ -106,13 +168,17 @@ Training Mugo Zero
 ==================
 
 Generate training chunks:
+
 ```
 python3 main.py gather 
 ```
-This will look in `data/selfplay` for games and write chunks to `data/training_chunks`.  See main.py for description of the other arguments 
+
+This will look in `data/selfplay` for games and write chunks to
+`data/training_chunks`.  See main.py for description of the other arguments 
 
 Run the training job:
-```
+
+```shell
 python3 main.py train train training_data_dir \
     --load-file=path/to/model \
     --save-file=where/to/save/model \
@@ -127,6 +193,7 @@ python3 main.py train train training_data_dir \
 As the network is trained, the current model will be saved at `--save-file`. If you reexecute the same command, the network will pick up training where it left off.
 
 Additionally, you can follow along with the training progress with TensorBoard - if you give each run a different name (`logs/my_training_run`, `logs/my_training_run2`), you can overlay the runs on top of each other.
+
 ```
 tensorboard --logdir=path/to/tensorboard/logs/
 ```
