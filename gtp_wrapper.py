@@ -58,10 +58,9 @@ class GtpInterface(object):
 
     def get_move(self, color):
         self.accomodate_out_of_turn(color)
+        move = self.suggest_move(self.position)
         if self.should_resign():
             return gtp.RESIGN
-
-        move = self.suggest_move(self.position)
         return utils.unparse_pygtp_coords(move)
 
     def final_score(self):
