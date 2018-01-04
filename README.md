@@ -107,20 +107,27 @@ to play using the latest model you've downloaded
 
 ```shell
 MUGO_MODELS=$HOME/mugo-models
+
+# How many searches to make per move
+READOUTS=100
+
+# How many games to play simultaneously
+GAMES=5
+
+# Latest model should look like: /path/to/models/000123-something
 LATEST_MODEL=$(ls -d $MUGO_MODELS/* | tail -1 | cut -f 1 -d '.')
 
-# At this point, latest model should look like, /path/to/mugo-models/000193-trusty
-python3 main.py selfplay $LATEST_MODEL -r READOUTS -g GAMES -v 3
+python3 main.py selfplay $LATEST_MODEL --readouts $READOUTS -g $GAMES -v 3
 ```
 
-where `READOUTS` is how many searches to make per move, and `GAMES` is how
-many games to play simultaneously.  Timing information and statistics will be
-printed at each move.  Setting verbosity to 3 or higher will print a board at each move. 
+Timing information and statistics will be printed at each move.  Setting
+verbosity to 3 or higher will print a board at each move. 
 
 
 MuGo Zero uses the GTP protocol, and you can use any gtp-compliant program with it.
+
 ```
-python3 main.py gtp $LATEST_MODEL -r READOUTS -v 3
+python3 main.py gtp $LATEST_MODEL -r $READOUTS -v 3
 ```
 
 (If no model is provided, it will initialize one with random values)
