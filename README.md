@@ -423,7 +423,7 @@ bashisms to run on them:
 
 * Find the proportion of games won by one color:
   ```
-  grep "B+" **/*.sgf | wc -l
+  grep -m 1 "B+" **/*.sgf | wc -l
   ```
   or e.g. "B+R", etc to search for how many by resign etc.
 
@@ -434,12 +434,12 @@ bashisms to run on them:
 
 * Get output of the most frequent first moves
   ```
-  grep -oh '^;B\[[a-s]*\]' **/*.sgf | sort | uniq -c | sort -n
+  grep -oh -m 1 '^;B\[[a-s]*\]' **/*.sgf | sort | uniq -c | sort -n
   ```
 
 * Distribution of game-winning margin (ministat, again):
   ```
-  find . -name "*.sgf" -exec /bin/sh -c 'grep -o "W+[[:digit:]]*" < {} | cut -c3-'
+  find . -name "*.sgf" -exec /bin/sh -c 'grep -o -m 1 "W+[[:digit:]]*" < {} | cut -c3-'
   \; | ministat
   ```
 
