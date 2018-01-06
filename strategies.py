@@ -51,9 +51,10 @@ class MCTSPlayerMixin:
         incorporate_results, and pick_move
         '''
         start = time.time()
-        move_probs, value = self.network.run(position)
-        self.root = MCTSNode(position)
-        self.root.incorporate_results(move_probs, value)
+        if not self.root:
+            move_probs, value = self.network.run(position)
+            self.root = MCTSNode(position)
+            self.root.incorporate_results(move_probs, value)
         if not self.two_player_mode:
             self.root.inject_noise()
 
