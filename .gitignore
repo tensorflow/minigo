@@ -7,3 +7,10 @@ pip-selfcheck.json
 *.pyc
 sgf
 
+
+# Vim temp files
+*.swp
+*.swo
+*~
+
+.mypy_cache

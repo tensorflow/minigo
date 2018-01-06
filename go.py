@@ -12,6 +12,8 @@ import itertools
 
 import numpy as np
 
+from typing import Dict, List, Tuple
+
 # Represent a board as a numpy array, with 0 empty, 1 is black, -1 is white.
 # This means that swapping colors is as simple as multiplying array by -1.
 WHITE, EMPTY, BLACK, FILL, KO, UNKNOWN = range(-1, 5)

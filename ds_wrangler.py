@@ -1,18 +1,18 @@
-'''
-Operations for wrangling datasets.
+"""Operations for wrangling datasets.
 
 Used by the `gather` command, mostly.
-'''
+"""
 
-from load_data_sets import DataSetV2
 import collections
 import numpy as np
 import os
 import random
+from load_data_sets import DataSetV2
 from tqdm import tqdm
+from typing import Dict, List, Tuple
 
 # Separate function for ease of testing.
-def _read_meta(meta_path):
+def _read_meta(meta_path: str) -> Tuple[int, bool]:
     try:
         if not os.path.exists(meta_path.replace('.meta', '.gz')):
             return 0, True
@@ -23,12 +23,12 @@ def _read_meta(meta_path):
         print("Error reading metadata for %s" % meta_path)
         return 0, True
 
-def get_paths_to_num_positions(meta_paths, max_positions):
-    '''
+def get_paths_to_num_positions(meta_paths: List[str], max_positions: int) -> Dict:
+    """
     Takes a list of paths to .meta files, and the total number of positions needed
 
     Returns a dict of { cumulative_total : path }
-    '''
+    """
 
     # Just read as many .meta files as we need to reach our total...
     paths_to_sizes = {}
@@ -45,12 +45,12 @@ def get_paths_to_num_positions(meta_paths, max_positions):
     return paths_to_sizes
 
 def choose_moves_for_chunks(
-        cumulative_moves, # [130, 280, 345, ...]
-        reversed_paths, # [path_to_game_with_130, path_to_game_with_150...]
-        chunks_to_make,
-        positions_per_chunk):
-    paths_to_moves_by_chunk = collections.defaultdict(lambda:
-            collections.defaultdict(set))
+        cumulative_moves: np.ndarray, # [130, 280, 345, ...]
+        reversed_paths: List[int], # [path_to_game_with_130, path_to_game_with_150...]
+        chunks_to_make: int,
+        positions_per_chunk: int) -> Dict:
+    paths_to_moves_by_chunk: collections.defaultdict = \
+            collections.defaultdict(lambda: collections.defaultdict(set))
     for n in range(chunks_to_make):
         picked = 0
         while picked != positions_per_chunk:
@@ -70,18 +70,26 @@ def choose_moves_for_chunks(
                 picked += 1
     return paths_to_moves_by_chunk
 
-# paths_to_moves_by_chunk is a mapping from each path to a dictionary, which in
-# turn maps each numbered chunk to a set of moves to extract from the path.
-# E.g.
-#    'filename1': { 0: set([..moves..]), 1: set([...])},
-#    'filename2': { 0:  ... },
-# Let's open them up and pull out the training tuples. 
 def gather_moves_and_write(
-        paths_to_moves_by_chunk, chunks_to_make, output_directory):
-    fname_to_dataset = {}
+        paths_to_moves_by_chunk: Dict,
+        chunks_to_make: int,
+        output_directory: str) -> None:
+    """Gather the moves and write the Datasets
+
+    paths_to_moves_by_chunk is a mapping from each path to a dictionary, which in
+    turn maps each numbered chunk to a set of moves to extract from the path.
+
+    E.g.
+       'filename1': { 0: set([..moves..]), 1: set([...])},
+       'filename2': { 0:  ... },
+
+    Let's open them up and pull out the training tuples.
+    """
+
+    fname_to_dataset: Dict = {}
 
     # Pre-open all the files we'll need and load them as DataSets
-    chunks = {}
+    chunks: Dict = {}
     for filename, moves_sets in tqdm(paths_to_moves_by_chunk.items()):
         if not moves_sets:
             continue
