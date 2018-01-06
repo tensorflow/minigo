@@ -20,7 +20,7 @@ class MCTSPlayerMixin:
     # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
     # Otherwise, it uses 'seconds_per_move' of wall time'
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
-                 resign_threshold=-0.92, verbosity=0, two_player_mode=False):
+                 resign_threshold=-0.90, verbosity=0, two_player_mode=False):
         self.network = network
         self.seconds_per_move = seconds_per_move
         self.simulations_per_move = simulations_per_move
@@ -51,9 +51,10 @@ class MCTSPlayerMixin:
         incorporate_results, and pick_move
         '''
         start = time.time()
-        move_probs, value = self.network.run(position)
-        self.root = MCTSNode(position)
-        self.root.incorporate_results(move_probs, value)
+        if not self.root:
+            move_probs, value = self.network.run(position)
+            self.root = MCTSNode(position)
+            self.root.incorporate_results(move_probs, value)
         if not self.two_player_mode:
             self.root.inject_noise()
 
@@ -158,6 +159,8 @@ class MCTSPlayerMixin:
     def to_sgf(self):
         pos = self.root.position
         res = self.make_result_string(pos)
+        if self.comments:
+            self.comments[0] = ("Resign Threshold: %0.3f\n" % self.resign_threshold) + self.comments[0]
         return sgf_wrapper.make_sgf(pos.recent, res,
                                     white_name=self.network.name or "Unknown",
                                     black_name=self.network.name or "Unknown",
@@ -185,7 +188,6 @@ class MCTSPlayerMixin:
         elif 'fortune' in text.lower():
             return "You're feeling lucky!"
         elif 'help' in text.lower():
-
             return "I can't help much with go -- try ladders!  Otherwise: " + default_response
         else:
             return default_response
@@ -195,5 +197,5 @@ class CGOSPlayerMixin(MCTSPlayerMixin):
         if position.n < 300:
             self.seconds_per_move = 5
         else:
-            self.seconds_per_move = 1
+            self.seconds_per_move = 2
         return super().suggest_move(position)

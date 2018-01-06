@@ -163,9 +163,9 @@ def selfplay(
 def gather(
         input_directory: 'where to look for games'='data/selfplay/',
         output_directory: 'where to put collected games'='data/training_chunks/',
-        max_positions: 'how many positions before discarding games'= 2500000,
+        max_positions: 'how many positions before discarding games'= 125000000,
         positions_per_chunk: 'how many positions (samples) to collect per chunk.'=2048,
-        chunks_to_make: 'how many chunks to create thru repeated sampling'=190):
+        chunks_to_make: 'how many chunks to create thru repeated sampling'=600):
     paths = [(root, dirs, files) for root, dirs, files in os.walk(input_directory)]
 
     meta_paths = []

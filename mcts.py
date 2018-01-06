@@ -127,7 +127,7 @@ class MCTSNode():
 
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))
-        self.child_prior = self.child_prior * 0.80 + dirch * 0.20
+        self.child_prior = self.child_prior * 0.75 + dirch * 0.25
 
     def children_as_pi(self, stretch=False):
         probs = self.child_N
