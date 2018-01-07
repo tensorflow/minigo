@@ -20,11 +20,15 @@ in the service of the secondary goal above :)
 Getting Started
 ===============
 
-This assumes you're using virtualenv, virtualenvwrapper, and Python3.5+. The
-[hitchhiker's guide to
+This project assumes you're using:
+
+- virtualenv / virtualenvwrapper
+- Python 3.6+
+
+The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
-intro on both of these. The instructions after this point haven't been tested
-in environments that are not using virtualenv.
+intro to python development and virtualenv usage. The instructions after this
+point haven't been tested in environments that are not using virtualenv.
 
 ```shell
 pip3 install virtualenv
