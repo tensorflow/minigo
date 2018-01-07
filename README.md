@@ -20,7 +20,12 @@ in the service of the secondary goal above :)
 Getting Started
 ===============
 
-This assumes you're using virtualenv, virtualenvwrapper, and Python3.5+. The
+This assumes you're using
+
+- virtualenv
+- virtualenvwrapper
+- Python 3.6+
+
 [hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
 intro on both of these. The instructions after this point haven't been tested
