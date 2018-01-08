@@ -32,12 +32,13 @@ def get_default_hyperparams() -> Dict:
 
     In other words, returns a dict whose paramaters come from the AGZ paper:
     {
-        k: number of filters (AlphaGoZero used 256)
-        fc_width: ???
+        k: number of filters (AlphaGoZero used 256). We use 128 by default for
+            a 19x19 go board.
+        fc_width: Dimensionality of the fully connected linear layer
         num_shared_layers: number of shared residual blocks. AGZ used both 19
             and 39. Here we use 19 because it's faster to train.
         l2_strength: The L2 regularization parameter. Note AGZ paper has this
-        set to 10^-4 for self-play learning.
+            set to 10^-4 for self-play learning.
     }
     """
     k = round_power_of_two(go.N ** 2 / 3) # width of each layer
@@ -60,8 +61,7 @@ class DualNetwork(object):
         self.session = tf.Session()
         self.name = None
         if use_cpu:
-            # TODO(jhoak): Why is this here? tf.device should only be for
-            # graphing.
+            # Set up the computation-graph context to use CPU context
             with tf.device("/cpu:0"):
                 self.set_up_network()
         else:
