@@ -101,6 +101,8 @@ class DualNetwork(object):
             output = tf.nn.relu(inputs + int_layer2)
             return output
 
+        initial_output = tf.nn.relu(my_batchn( my_conv2d(x)))
+
         # the shared stack
         shared_output = initial_output
         for i in range(self.num_shared_layers):
