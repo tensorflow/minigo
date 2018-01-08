@@ -1,8 +1,8 @@
-'''
+"""
 The policy and value networks share a majority of their architecture.
-This helps the intermediate layers extract concepts that are relevant to both 
+This helps the intermediate layers extract concepts that are relevant to both
 move prediction and score estimation.
-'''
+"""
 
 import functools
 import math
@@ -10,16 +10,35 @@ import os.path
 import sys
 import tensorflow as tf
 from tqdm import tqdm
+from typing import Dict
 
 import features
 import go
 
-EPSILON = 1e-35
+# Momentum comes from the AGZ paper. Set at 0.9.
+MOMENTUM = 0.9
+EPSILON = 1e-5
 
-def round_power_of_two(n):
+def round_power_of_two(n: float) -> int:
+    """Finds the nearest powero f 2 to a number.
+
+    Thus, 84 -> 64, 120 -> 128, etc.
+    """
     return 2 ** int(round(math.log(n, 2)))
 
-def get_default_hyperparams():
+
+def get_default_hyperparams() -> Dict:
+    """Returns the hyperparams for the neural net.
+
+    In other words, returns a dict whose paramaters come from the AGZ paper:
+    {
+        k: ???
+        fc_width: ???
+        num_shared_layers: ???
+        l2_strength: The L2 regularization parameter. Note AGZ paper has this
+        set to 10^-4 for self-play learning.
+    }
+    """
     k = round_power_of_two(go.N ** 2 / 3) # width of each layer
     fc_width = k * 2
     num_shared_layers = go.N
@@ -28,10 +47,10 @@ def get_default_hyperparams():
 
 
 class DualNetwork(object):
-    def __init__(self, use_cpu=False, **kwargs):
+    """Using TensorFlow, set up the neural network."""
+    def __init__(self, use_cpu=False):
         self.num_input_planes = sum(f.planes for f in features.NEW_FEATURES)
         hyperparams = get_default_hyperparams()
-        hyperparams.update(**kwargs)
         for name, param in hyperparams.items():
             setattr(self, name, param)
         self.test_summary_writer = None
@@ -40,28 +59,34 @@ class DualNetwork(object):
         self.session = tf.Session()
         self.name = None
         if use_cpu:
+            # TODO(jhoak): Why is this here? tf.device should only be for
+            # graphing.
             with tf.device("/cpu:0"):
                 self.set_up_network()
         else:
             self.set_up_network()
 
     def set_up_network(self):
-        # a global_step variable allows epoch counts to persist through multiple training sessions
+        # a global_step variable allows epoch counts to persist through
+        # multiple training sessions
         self.global_step = global_step = tf.Variable(
             0, name="global_step", trainable=False)
+
         # the board input features
         self.x = x = tf.placeholder(tf.float32,
             [None, go.N, go.N, self.num_input_planes])
+
         # the move probabilities to be predicted
         self.pi = pi = tf.placeholder(tf.float32,
             [None, (go.N * go.N) + 1])
+
         # the result of the game. +1 = black wins -1 = white wins
         self.outcome = outcome = tf.placeholder(tf.float32, [None])
-        self.train_mode = train_mode = tf.placeholder(tf.bool, name='train_mode')
-
+        self.train_mode = train_mode = tf.placeholder(
+                tf.bool, name='train_mode')
 
         my_batchn = functools.partial(tf.layers.batch_normalization,
-                                      momentum=.997, epsilon=1e-5,
+                                      momentum=.997, epsilon=EPSILON,
                                       fused=True, center=True, scale=True,
                                       training=train_mode)
 
@@ -71,11 +96,9 @@ class DualNetwork(object):
         def my_res_layer(inputs):
             int_layer1 = my_batchn(my_conv2d(inputs))
             initial_output = tf.nn.relu(int_layer1)
-            int_layer2 = my_batchn(my_conv2d(initial_output))
-            output = tf.nn.relu(inputs + int_layer2)
             return output
 
-        initial_output = tf.nn.relu(my_batchn( my_conv2d(x)))
+        initial_output = tf.nn.relu(my_batchn(my_conv2d(x)))
 
         # the shared stack
         shared_output = initial_output
@@ -116,7 +139,7 @@ class DualNetwork(object):
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             self.dual_train_step = tf.train.MomentumOptimizer(
-                learning_rate, 0.9).minimize(self.dual_cost, global_step=global_step)
+                learning_rate, MOMENTUM).minimize(self.dual_cost, global_step=global_step)
 
         # misc ops
         self.weight_summaries = tf.summary.merge([
@@ -128,7 +151,9 @@ class DualNetwork(object):
         self.saver = tf.train.Saver()
 
     def initialize_logging(self, tensorboard_logdir):
-        self.summary_writer = tf.summary.FileWriter(os.path.join(tensorboard_logdir, "training"), self.session.graph)
+        """Initializes a logging-summary writer"""
+        self.summary_writer = tf.summary.FileWriter(os.path.join(
+                tensorboard_logdir, "training"), self.session.graph)
 
     def initialize_variables(self, save_file=None):
         self.session.run(tf.global_variables_initializer())
@@ -164,7 +189,7 @@ class DualNetwork(object):
             self.saver.save(self.session, save_file)
 
     def train(self, training_data, batch_size=32):
-        'training_data is instanceof our custom DataSet'
+        """training_data is instanceof our custom DataSet"""
         num_minibatches = training_data.data_size // batch_size
         for i in range(num_minibatches):
             batch_x, batch_pi, batch_res = training_data.get_batch(batch_size)
@@ -212,14 +237,16 @@ class DualNetwork(object):
 
 
 class StatisticsCollector(object):
-    '''
+    """Collect statistics on the runs and create graphs.
+
     Accuracy and cost cannot be calculated with the full test dataset
     in one pass, so they must be computed in batches. Unfortunately,
     the built-in TF summary nodes cannot be told to aggregate multiple
     executions. Therefore, we aggregate the accuracy/cost ourselves at
     the python level, and then shove it through the accuracy/cost summary
     nodes to generate the appropriate summary protobufs for writing.
-    '''
+    """
+    # TODO(kashomon): move to class-local parameters.
     graph = tf.Graph()
     with tf.device("/cpu:0"), graph.as_default():
         policy_error = tf.placeholder(tf.float32, [])

@@ -4,8 +4,15 @@ MuGo Zero: A minimalist Go engine modeled after AlphaGo Zero, built on MuGo
 This is a pure Python implementation of a neural-network based Go AI, using TensorFlow.
 
 This is based off of Brian Lee's "MuGo" -- a pure Python implementation of the
-first AlphaGo paper published in Nature, adapted and extended to the
-architecture described in the second.
+first AlphaGo paper ["Mastering the Game of Go with Deep Neural Networks and
+Tree Search"](https://www.nature.com/articles/nature16961) published in
+*Nature*. This implementation adds features and archicture changes present in
+the more recent Alpha Go Zero paper, ["Mastering the Game of Go without Human
+Knowledge"](https://www.nature.com/articles/nature24270). More recently, this
+was archicture was extended for Chess and Shogi in ["Mastering Chess and Shogi
+by Self-Play with a General Reinforcement Learning
+Algorithm"](https://arxiv.org/abs/1712.01815).  These papers will often be
+abridged as *AG (AlphaGo)*, *AGZ (AlphaGo Zero)*, and *AZ (AlphaZero)*
 
 The goal of this project is to reproduce the results of the original paper
 through an open-source implementation using the Google Cloud Platform and
