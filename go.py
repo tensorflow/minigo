@@ -11,7 +11,6 @@ import copy
 import itertools
 
 import numpy as np
-
 from typing import Dict, List, Tuple
 
 # Represent a board as a numpy array, with 0 empty, 1 is black, -1 is white.
