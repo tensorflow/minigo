@@ -12,7 +12,8 @@ Knowledge"](https://www.nature.com/articles/nature24270). More recently, this
 was archicture was extended for Chess and Shogi in ["Mastering Chess and Shogi
 by Self-Play with a General Reinforcement Learning
 Algorithm"](https://arxiv.org/abs/1712.01815).  These papers will often be
-abridged as *AG (AlphaGo)*, *AGZ (AlphaGo Zero)*, and *AZ (AlphaZero)*
+abridged in documentation as *AG* (for AlphaGo), *AGZ* (for AlphaGo Zero), and
+*AZ* (for AlphaZero) respectively
 
 The goal of this project is to reproduce the results of the original paper
 through an open-source implementation using the Google Cloud Platform and
