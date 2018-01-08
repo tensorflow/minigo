@@ -32,9 +32,10 @@ def get_default_hyperparams() -> Dict:
 
     In other words, returns a dict whose paramaters come from the AGZ paper:
     {
-        k: ???
+        k: number of filters (AlphaGoZero used 256)
         fc_width: ???
-        num_shared_layers: ???
+        num_shared_layers: number of shared residual blocks. AGZ used both 19
+            and 39. Here we use 19 because it's faster to train.
         l2_strength: The L2 regularization parameter. Note AGZ paper has this
         set to 10^-4 for self-play learning.
     }
@@ -96,9 +97,9 @@ class DualNetwork(object):
         def my_res_layer(inputs):
             int_layer1 = my_batchn(my_conv2d(inputs))
             initial_output = tf.nn.relu(int_layer1)
+            int_layer2 = my_batchn(my_conv2d(initial_output))
+            output = tf.nn.relu(inputs + int_layer2)
             return output
-
-        initial_output = tf.nn.relu(my_batchn(my_conv2d(x)))
 
         # the shared stack
         shared_output = initial_output
@@ -151,7 +152,11 @@ class DualNetwork(object):
         self.saver = tf.train.Saver()
 
     def initialize_logging(self, tensorboard_logdir):
-        """Initializes a logging-summary writer"""
+        """Initializes a logging-summary writer.
+
+        This method initializes a writer to write for writing stats to
+        tensorboard.
+        """
         self.summary_writer = tf.summary.FileWriter(os.path.join(
                 tensorboard_logdir, "training"), self.session.graph)
 
