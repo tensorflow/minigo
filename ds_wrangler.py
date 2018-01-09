@@ -12,7 +12,7 @@ from tqdm import tqdm
 from typing import Dict, List, Tuple
 
 # Separate function for ease of testing.
-def _read_meta(meta_path: str) -> Tuple[int, bool]:
+def _read_meta(meta_path):
     try:
         if not os.path.exists(meta_path.replace('.meta', '.gz')):
             return 0, True
@@ -23,7 +23,7 @@ def _read_meta(meta_path: str) -> Tuple[int, bool]:
         print("Error reading metadata for %s" % meta_path)
         return 0, True
 
-def get_paths_to_num_positions(meta_paths: List[str], max_positions: int) -> Dict:
+def get_paths_to_num_positions(meta_paths, max_positions):
     """
     Takes a list of paths to .meta files, and the total number of positions needed
 
@@ -45,10 +45,10 @@ def get_paths_to_num_positions(meta_paths: List[str], max_positions: int) -> Dic
     return paths_to_sizes
 
 def choose_moves_for_chunks(
-        cumulative_moves: np.ndarray, # [130, 280, 345, ...]
-        reversed_paths: List[int], # [path_to_game_with_130, path_to_game_with_150...]
-        chunks_to_make: int,
-        positions_per_chunk: int) -> Dict:
+        cumulative_moves, # [130, 280, 345, ...]
+        reversed_paths, # [path_to_game_with_130, path_to_game_with_150...]
+        chunks_to_make,
+        positions_per_chunk):
     paths_to_moves_by_chunk: collections.defaultdict = \
             collections.defaultdict(lambda: collections.defaultdict(set))
     for n in range(chunks_to_make):
@@ -71,9 +71,9 @@ def choose_moves_for_chunks(
     return paths_to_moves_by_chunk
 
 def gather_moves_and_write(
-        paths_to_moves_by_chunk: Dict,
-        chunks_to_make: int,
-        output_directory: str) -> None:
+        paths_to_moves_by_chunk,
+        chunks_to_make,
+        output_directory):
     """Gather the moves and write the Datasets
 
     paths_to_moves_by_chunk is a mapping from each path to a dictionary, which in
@@ -86,10 +86,10 @@ def gather_moves_and_write(
     Let's open them up and pull out the training tuples.
     """
 
-    fname_to_dataset: Dict = {}
+    fname_to_dataset = {}
 
     # Pre-open all the files we'll need and load them as DataSets
-    chunks: Dict = {}
+    chunks = {}
     for filename, moves_sets in tqdm(paths_to_moves_by_chunk.items()):
         if not moves_sets:
             continue

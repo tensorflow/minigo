@@ -19,7 +19,7 @@ import go
 MOMENTUM = 0.9
 EPSILON = 1e-5
 
-def round_power_of_two(n: float) -> int:
+def round_power_of_two(n):
     """Finds the nearest powero f 2 to a number.
 
     Thus, 84 -> 64, 120 -> 128, etc.
@@ -27,7 +27,7 @@ def round_power_of_two(n: float) -> int:
     return 2 ** int(round(math.log(n, 2)))
 
 
-def get_default_hyperparams() -> Dict:
+def get_default_hyperparams():
     """Returns the hyperparams for the neural net.
 
     In other words, returns a dict whose paramaters come from the AGZ paper:
@@ -253,7 +253,6 @@ class StatisticsCollector(object):
     the python level, and then shove it through the accuracy/cost summary
     nodes to generate the appropriate summary protobufs for writing.
     """
-    # TODO(kashomon): move to class-local parameters.
     graph = tf.Graph()
     with tf.device("/cpu:0"), graph.as_default():
         policy_error = tf.placeholder(tf.float32, [])
