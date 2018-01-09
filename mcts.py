@@ -161,18 +161,24 @@ class MCTSNode():
     def describe(self):
         sort_order = list(range(go.N * go.N + 1))
         sort_order.sort(key=lambda i: self.child_N[i], reverse=True)
+        soft_n = self.child_N / sum(self.child_N)
+        p_delta = soft_n - self.child_prior
+        p_rel = p_delta / soft_n
         # Dump out some statistics
         output = []
         output.append("{q:.4f}\n".format(q=self.Q))
         output.append(self.most_visited_path())
-        output.append("move:  action      Q      U      P     P-d   N\n")
-        output.append("\n".join(["{!s:6}: {: .3f}, {: .3f}, {:.3f}, {:.3f}, {:.3f}, {}".format(
+        output.append("move:  action      Q      U      P    P-Dir    N  soft-N  p-delta  p-rel\n")
+        output.append("\n".join(["{!s:6}: {: .3f}, {: .3f}, {:.3f}, {:.3f}, {:.3f}, {:4d} {:.4f} {: .5f} {: .2f}".format(
                 utils.to_human_coord(utils.unflatten_coords(key)),
                 self.child_action_score[key],
                 self.child_Q[key],
                 self.child_U[key],
                 self.child_prior[key],
                 self.original_prior[key],
-                int(self.child_N[key]))
-                for key in sort_order if self.child_N[key] > 0][:20]))
+                int(self.child_N[key]),
+                soft_n[key],
+                p_delta[key],
+                p_rel[key])
+                for key in sort_order if self.child_N[key] > 0][:15]))
         return ''.join(output)
