@@ -107,5 +107,5 @@ def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1, cgos_mode=F
         instance = MCTSPlayer(n, simulations_per_move=readouts_per_move,
                               verbosity=verbosity, two_player_mode=True)
     name ="Somebot-" + os.path.basename(read_file)
-    gtp_engine = gtp_extensions.KgsExtensionsMixin(instance, name=name)
+    gtp_engine = gtp_extensions.GTPDeluxe(instance, name=name)
     return gtp_engine

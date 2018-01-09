@@ -78,6 +78,7 @@ class MCTSNode():
                 return current.add_child(best_move)
 
     def add_child(self, fcoord):
+        """ Adds child node for fcoord if it doesn't already exist, and returns it. """
         if fcoord not in self.children:
             new_position = self.position.play_move(utils.unflatten_coords(fcoord))
             self.children[fcoord] = MCTSNode(new_position, fcoord, self)
@@ -94,7 +95,7 @@ class MCTSNode():
         self.child_prior = move_probabilities - illegal_moves * 10
         # initialize child Q as current node's value, to prevent dynamics where
         # if B is winning, then B will only ever explore 1 move, because the Q
-        # estimation will be so much larger than the 0 of the other moves. 
+        # estimation will be so much larger than the 0 of the other moves.
         #
         # Conversely, if W is winning, then B will explore all 362 moves before
         # continuing to explore the most favorable move. This is a waste of search.
@@ -147,6 +148,15 @@ class MCTSNode():
         output.append("Q: {:.5f}\n".format(node.Q))
         return ''.join(output)
 
+    def mvp_gg(self):
+        """ Returns most visited path in go-gui VAR format e.g. 'b r3 w c17..."""
+        node = self
+        output = []
+        while node.children and max(node.child_N) > 1:
+            next_kid = np.argmax(node.child_N)
+            node = node.children[next_kid]
+            output.append("%s" % utils.to_human_coord(utils.unflatten_coords(node.fmove)))
+        return ' '.join(output)
 
     def describe(self):
         sort_order = list(range(go.N * go.N + 1))

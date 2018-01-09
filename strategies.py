@@ -91,12 +91,11 @@ class MCTSPlayerMixin:
             while time.time() - start < self.seconds_per_move:
                 self.tree_search()
         else:
-            while self.root.N < self.simulations_per_move:
+            for i in range(self.simulations_per_move):
                 self.tree_search()
-
-        if self.verbosity > 0:
-            print("%d: Searched %d times in %s seconds\n\n" % (
-                self.root.position.n, self.root.N, time.time() - start), file=sys.stderr)
+            if self.verbosity > 0:
+                print("%d: Searched %d times in %s seconds\n\n" % (
+                    self.simulations_per_move, self.root.N, time.time() - start), file=sys.stderr)
 
         #print some stats on anything with probability > 1%
         if self.verbosity > 2:
@@ -123,6 +122,7 @@ class MCTSPlayerMixin:
         self.root = self.root.add_child(utils.flatten_coords(coords))
         self.position = self.root.position # for showboard
         del self.root.parent.children
+        print("visits at root:", self.root.N, file=sys.stderr, flush=True)
         return True # GTP requires positive result.
 
     def pick_move(self):
