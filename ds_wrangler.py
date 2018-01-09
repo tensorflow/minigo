@@ -49,8 +49,7 @@ def choose_moves_for_chunks(
         reversed_paths, # [path_to_game_with_130, path_to_game_with_150...]
         chunks_to_make,
         positions_per_chunk):
-    paths_to_moves_by_chunk: collections.defaultdict = \
-            collections.defaultdict(lambda: collections.defaultdict(set))
+    paths_to_moves_by_chunk = collections.defaultdict(lambda: collections.defaultdict(set))
     for n in range(chunks_to_make):
         picked = 0
         while picked != positions_per_chunk:

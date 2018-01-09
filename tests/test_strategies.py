@@ -10,7 +10,7 @@ from utils import parse_kgs_coords as pc
 from utils import to_human_coord as un_pc
 import utils
 from mcts import MCTSNode
-from strategies import MCTSPlayerMixin
+from strategies import MCTSPlayerMixin, time_recommendation
 
 class DummyNet():
     def run(self, position):
@@ -22,6 +22,19 @@ class TestMCTSPlayerMixin(GoPositionTestCase):
         self.player.initialize_game()
         self.player.root.incorporate_results(
             *self.player.network.run(self.player.root.position))
+
+    def test_time_controls(self):
+        secs_per_move = 5
+        for time_limit in (10, 100, 1000):
+            # in the worst case imaginable, let's say a game goes 1000 moves long
+            move_numbers = range(0, 1000, 2)
+            total_time_spent = sum(
+                time_recommendation(move_num, secs_per_move, time_limit=time_limit)
+                for move_num in move_numbers)
+            # we should not exceed available game time
+            self.assertLess(total_time_spent, time_limit)
+            # but we should have used at least 95% of our time by the end.
+            self.assertGreater(total_time_spent, time_limit * 0.95)
 
     def test_inject_noise(self):
         player = self.player

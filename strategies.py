@@ -16,6 +16,39 @@ MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 # When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
+def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
+                        decay_factor=0.98):
+    '''Given current move number and "desired" seconds per move,
+    return how much time should actually be used. To be used specifically
+    for CGOS time controls, which are absolute 15 minute time.
+
+    The strategy is to spend the maximum time possible using seconds_per_move,
+    and then switch to an exponentially decaying time usage, calibrated so that
+    we have enough time for an infinite number of moves.'''
+
+    # divide by two since you only play half the moves in a game.
+    player_move_num = move_num / 2
+
+    # sum of geometric series maxes out at endgame_time seconds.
+    endgame_time = seconds_per_move / (1 - decay_factor)
+
+    if endgame_time > time_limit:
+        # there is so little main time that we're already in "endgame" mode.
+        base_time = time_limit * (1 - decay_factor)
+        return base_time * decay_factor ** player_move_num
+
+    # leave over endgame_time seconds for the end, and play at seconds_per_move
+    # for as long as possible
+    core_time = time_limit - endgame_time
+    core_moves = core_time / seconds_per_move
+
+    if player_move_num < core_moves:
+        return seconds_per_move
+    else:
+        return seconds_per_move * decay_factor ** (player_move_num - core_moves)
+
+
+
 class MCTSPlayerMixin:
     # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
     # Otherwise, it uses 'seconds_per_move' of wall time'
@@ -52,11 +85,7 @@ class MCTSPlayerMixin:
         '''
         start = time.time()
         if not self.root:
-            move_probs, value = self.network.run(position)
             self.root = MCTSNode(position)
-            self.root.incorporate_results(move_probs, value)
-        if not self.two_player_mode:
-            self.root.inject_noise()
 
         if self.simulations_per_move == 0 :
             while time.time() - start < self.seconds_per_move:
@@ -194,8 +223,5 @@ class MCTSPlayerMixin:
 
 class CGOSPlayerMixin(MCTSPlayerMixin):
     def suggest_move(self, position):
-        if position.n < 300:
-            self.seconds_per_move = 5
-        else:
-            self.seconds_per_move = 2
+        self.seconds_per_move = time_recommendation(position.n)
         return super().suggest_move(position)
