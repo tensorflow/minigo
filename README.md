@@ -6,14 +6,14 @@ This is a pure Python implementation of a neural-network based Go AI, using Tens
 This is based off of Brian Lee's "MuGo" -- a pure Python implementation of the
 first AlphaGo paper ["Mastering the Game of Go with Deep Neural Networks and
 Tree Search"](https://www.nature.com/articles/nature16961) published in
-*Nature*. This implementation adds features and archicture changes present in
-the more recent Alpha Go Zero paper, ["Mastering the Game of Go without Human
+*Nature*. This implementation adds features and architecture changes present in
+the more recent AlphaGo Zero paper, ["Mastering the Game of Go without Human
 Knowledge"](https://www.nature.com/articles/nature24270). More recently, this
-was archicture was extended for Chess and Shogi in ["Mastering Chess and Shogi
-by Self-Play with a General Reinforcement Learning
+architecture was extended for Chess and Shogi in ["Mastering Chess and Shogi by
+Self-Play with a General Reinforcement Learning
 Algorithm"](https://arxiv.org/abs/1712.01815).  These papers will often be
 abridged in documentation as *AG* (for AlphaGo), *AGZ* (for AlphaGo Zero), and
-*AZ* (for AlphaZero) respectively
+*AZ* (for AlphaZero) respectively.
 
 The goal of this project is to reproduce the results of the original paper
 through an open-source implementation using the Google Cloud Platform and
@@ -43,25 +43,26 @@ pip3 install virtualenv
 pip3 install virtualenvwrapper
 ```
 
-Install Tensorflow
+Install TensorFlow
 ------------------
-Start by installing Tensorflow and the dependencies, optionally into a
-virtualenv if you so choose. First:
+First set up and enter your virtualenv. Then start by installing TensorFlow and
+the dependencies:
 
 ```
 pip3 install -r requirements.txt
 ```
 
-Then, you must either install CUDA 8.0 (See Tensorflow documentation).
+If you wish to run on GPU you must install CUDA 8.0 or later (see TensorFlow
+documentation).
 
-If you don't have a GPU, you can downgrade
+If you don't want to run on GPU or don't have one, you can downgrade:
 
 ```
 pip3 uninstall tensorflow-gpu
 pip3 install tensorflow
 ```
 
-or just install the cpu-requirements.
+Or just install the CPU requirements:
 
 ```
 pip3 install -r requirements-cpu.txt
@@ -102,6 +103,7 @@ You'll need to copy them to your local disk:
 
 ```shell
 MUGO_MODELS=$HOME/mugo-models
+mkdir -p $MUGO_MODELS
 gsutil ls gs://mugozero-v1/models | tail -3 | xargs -I{} gsutil cp "{}" $MUGO_MODELS
 ```
 
@@ -133,7 +135,7 @@ python3 main.py selfplay $LATEST_MODEL --readouts $READOUTS -g $GAMES -v 3
 ```
 
 Timing information and statistics will be printed at each move.  Setting
-verbosity to 3 or higher will print a board at each move. 
+verbosity to 3 or higher will print a board at each move.
 
 
 MuGo Zero uses the GTP protocol, and you can use any gtp-compliant program with it.
@@ -172,9 +174,9 @@ TWOGTP="gogui-twogtp -black \"$BLACK\" -white \"$WHITE\" -games 10 \
 gogui -size 19 -program "$TWOGTP" -computer-both -auto
 ```
 
-Another way to play via GTP is to connect to CGOS, the [Computer Go Online Server](http://yss-aya.com/cgos/). The CGOS server hosted by boardspace.net is actually abandoned; you'll want to connect to the CGOS server at yss-aya.com. 
+Another way to play via GTP is to connect to CGOS, the [Computer Go Online Server](http://yss-aya.com/cgos/). The CGOS server hosted by boardspace.net is actually abandoned; you'll want to connect to the CGOS server at yss-aya.com.
 
-After configuring your cgos.config file, you can connect to CGOS with `cgosGtp -c cgos.config` and spectate your own game with `cgosView yss-aya.com 6819` 
+After configuring your cgos.config file, you can connect to CGOS with `cgosGtp -c cgos.config` and spectate your own game with `cgosView yss-aya.com 6819`
 
 Training Mugo Zero
 ==================
@@ -182,11 +184,11 @@ Training Mugo Zero
 Generate training chunks:
 
 ```
-python3 main.py gather 
+python3 main.py gather
 ```
 
 This will look in `data/selfplay` for games and write chunks to
-`data/training_chunks`.  See main.py for description of the other arguments 
+`data/training_chunks`.  See main.py for description of the other arguments
 
 Run the training job:
 
@@ -255,7 +257,7 @@ The training job will collect games from that directory and turn it into
 chunks, which it will use to play a new model.
 
 the evaluation job will collect the new model, evaluate it against the old one,
-and bless it into the directory of models if it meets expectations.  
+and bless it into the directory of models if it meets expectations.
 
 
 Bringing up a cluster
@@ -270,9 +272,9 @@ Bringing up a cluster
   d. Fetch the keys.
   If any of the above have already been done, the script will fail.  At a minimum, run step 'd' to create the keyfile.
 3. Run `cluster-up` or (`cluster-up-gpu`), which will:
-  a. Create a Google Container Engine cluster with some number of VMs 
+  a. Create a Google Container Engine cluster with some number of VMs
   b. Load its credentials locally
-  c. Load those credentials into our `kubectl` environment, which will let us control the cluster from the command line.  
+  c. Load those credentials into our `kubectl` environment, which will let us control the cluster from the command line.
 
     Creating the cluster might take a while... Once its done, you should be able to see something like this:
 
@@ -297,7 +299,7 @@ kubectl apply -f gpu-provision-daemonset.yaml
   ```
   gcloud alpha container clusters resize $CLUSTER_NAME --zone=$ZONE --size=8
   ```
-  
+
 Create Docker image
 -------------------
 
@@ -356,7 +358,7 @@ kubectl get pods
 Tail the logs of an instance:
 ```
 kubectl logs -f <name of pod>
-``` 
+```
 
 
 Preflight checks for a training run.
