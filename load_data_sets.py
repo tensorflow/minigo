@@ -83,6 +83,8 @@ class DataSetV2(object):
                          is_test=is_test)
 
     def write_meta(self, filename):
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
         with open(filename, 'w') as f:
             f.write("%d" % self.data_size)
 
@@ -91,6 +93,8 @@ class DataSetV2(object):
         position_bytes = np.packbits(self.pos_features).tobytes()
         next_move_bytes = self.next_moves.tobytes()
         result_bytes = self.results.tobytes()
+
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
 
         with gzip.open(filename, "wb", compresslevel=6) as f:
             f.write(header_bytes)
