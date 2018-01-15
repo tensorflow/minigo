@@ -6,6 +6,8 @@ MiniGo Coord/Coordinate: This is a tuple of the form (column, row) that's
     indexed from (0,0) from the upper-left.
 Flattened Coordinate: this is a number ranging from 0 - N^2 (so N^2+1
     possible values). The extra value N^2 is used to mark a 'pass' move.
+SGF Coordinate: Coordinate used for SGF serialization format. Coordinates use
+    two-letter pairs (r,c) indexed from the upper-left (aa).
 KGS Coordinate: Human-readable coordinate indexed from bottom left.
 GTP Coordinate: Tuple coordinate indexed starting at 1,1 from top-left (r, c)
 
@@ -15,6 +17,7 @@ Coord Type      upper_left      upper_right     pass
 -------------------------------------------------------
 minigo coord    (0, 0)          (18, 0)         None
 flat            0               342             361
+SGF             'aa'            'sa'            ''
 KGS             'A19'           'T19'           'pass'
 GTP             (1, 1)          (1,19)          'pass'
 """
@@ -46,13 +49,7 @@ def unflatten_coords(f):
     return divmod(f, go.N)
 
 def parse_sgf_coords(s):
-    """Transform a SGF coordinate into a coordinate-tuple
-
-    SGF coordinates have the form '<letter><letter>', where aa is top left
-    corner; sa (18, 1) is top right corner of a 19x19.
-
-    An SGF coordinate of '' is interpreted as a pass-move.
-    """
+    """Transform a SGF coordinate into a coordinate-tuple"""
     if s is None or s == '':
         return None
     return SGF_COLUMNS.index(s[1]), SGF_COLUMNS.index(s[0])
