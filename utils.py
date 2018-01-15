@@ -18,6 +18,11 @@ def parse_sgf_to_flat(sgf):
     return flatten_coords(parse_sgf_coords(sgf))
 
 def flatten_coords(c):
+    """
+    Takes coordinates of the form (row, col) and returns a number between 0 and
+    go-board-size^2-1 (i.e., N^2-1), unless the row/column is unspecified, in
+    which case, N^2 is returned
+    """
     if c is None:
         return go.N * go.N
     return go.N * c[0] + c[1]

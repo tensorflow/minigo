@@ -1,3 +1,8 @@
+"""Monte Carlo Tree Search implementation.
+
+All terminology here (Q, U, N, p_UCT) uses the same notation as in the
+AlphaGo (AG) paper.
+"""
 import numpy as np
 import copy
 import sys
@@ -6,20 +11,23 @@ import random
 import utils
 import math
 
-# All terminology here (Q, U, N, p_UCT) uses the same notation as in the
-# AlphaGo paper.
 # Exploration constant
 c_PUCT = 1.38
+
 # Dirichlet noise, as a function of go.N
 D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
 
-class MCTSNode():
-    '''A node of a MCTS search tree.
+class MCTSNode(object):
+    """A node of a MCTS search tree.
 
     A node knows how to compute the action scores of all of its children,
     so that a decision can be made about which move to explore next. Upon
     selecting a move, the children dictionary is updated with a new node.
-    '''
+
+    position: A go.Position instance
+    fmove: A move that led to this position, as flattened coords.
+
+    """
     def __init__(self, position, fmove=None, parent=None):
         self.parent = parent # pointer to another MCTSNode
         self.fmove = fmove # move that led to this position, as flattened coords
