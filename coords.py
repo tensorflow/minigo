@@ -37,13 +37,13 @@ def kgs_to_flat(sgf):
     return flatten_coords(parse_kgs_coords(sgf))
 
 def flatten_coords(c):
-    """Flattens a coordinate tuple from a MiniGo Coordinate"""
+    """Flattens a coordinate tuple from a MiniGo coordinate"""
     if c is None:
         return go.N * go.N
     return go.N * c[0] + c[1]
 
 def unflatten_coords(f):
-    """Unflattens a flattened coordinate into a Minigo Coordinate"""
+    """Unflattens a flattened coordinate into a Minigo coordinate"""
     if f == go.N * go.N:
         return None
     return divmod(f, go.N)
@@ -61,7 +61,7 @@ def unparse_sgf_coords(c):
     return SGF_COLUMNS[c[1]] + SGF_COLUMNS[c[0]]
 
 def parse_kgs_coords(s):
-    """Interprets KGS coordinates returning a coordinate tuple (c, r)."""
+    """Interprets KGS coordinates returning a minigo coordinate tuple."""
     if s == 'pass':
         return None
     s = s.upper()
@@ -81,7 +81,7 @@ def to_human_coord(coord):
         return "{}{}".format("ABCDEFGHJKLMNOPQRSTYVWYZ"[x], go.N-y) 
 
 def parse_pygtp_coords(vertex):
-    """Transforms a GTP coordinate into a standard MiniGo coordinate (c, r)
+    """Transforms a GTP coordinate into a standard MiniGo coordinate.
 
     GTP has a notion of both a Pass and a Resign, both of which
     are mapped to None so the conversion is not precisely bijective.
