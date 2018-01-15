@@ -61,7 +61,7 @@ def play(network, games, readouts, resign_threshold, verbosity=0):
             move = player.pick_move()
             player.play_move(move)
             if player.is_done(): # If 'move' was pass #2, score the board.
-                player.result = 1 if player.position.score() > 0 else -1
+                player.result = player.position.result()
 
         dur = time.time() - start
         global_n += 1

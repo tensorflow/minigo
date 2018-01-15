@@ -76,17 +76,21 @@ python3 -m unittest discover tests
 ```
 
 
-MuGo Zero: Selfplay, or GTP
-===========================
+Basics
+======
 
-You'll need to install
-[gsutil](https://cloud.google.com/storage/docs/gsutil_install) before
-proceeding.
+All commands are compatible with either Google Cloud Storage as a remote file
+system, or your local file system. The examples here use GCS, but local file
+paths will work just as well.
 
-If you just want to get MuGo Zero working, you can download the latest model at
-from `gs://mugozero-v1/models`. The model comes in 3 parts; if you want to see
-the latest, you can run
+To use GCS, set the BUCKET_NAME variable and authenticate. Otherwise, all
+commands fetching files from GCS will hang.
 
+<<<<<<< HEAD
+```bash
+export BUCKET_NAME=foobar;
+gcloud auth application-default login
+=======
 ```shell
 gsutil ls gs://mugozero-v1/models | tail -3
 ```
@@ -105,43 +109,35 @@ You'll need to copy them to your local disk:
 MUGO_MODELS=$HOME/mugo-models
 mkdir -p $MUGO_MODELS
 gsutil ls gs://mugozero-v1/models | tail -3 | xargs -I{} gsutil cp "{}" $MUGO_MODELS
+>>>>>>> master
 ```
-
-Or, you can build a random model with:
-
-```
-BUCKET_NAME=foobar python3 rl_loop.py bootstrap models/random_model
-```
-
 
 Selfplay
 --------
-To watch MuGo Zero play a game, you need to specify a model. Here's an example
-to play using the latest model you've downloaded
 
-```shell
-MUGO_MODELS=$HOME/mugo-models
+To watch MuGo Zero play itself:
 
-# How many searches to make per move
-READOUTS=100
-
-# How many games to play simultaneously
-GAMES=5
-
-# Latest model should look like: /path/to/models/000123-something
-LATEST_MODEL=$(ls -d $MUGO_MODELS/* | tail -1 | cut -f 1 -d '.')
-
-python3 main.py selfplay $LATEST_MODEL --readouts $READOUTS -g $GAMES -v 3
+```bash
+python3 main.py selfplay gs://$BUCKET_NAME/models/000000-bootstrap \
+  --readouts $READOUTS \
+  --games 1 \
+  --verbose 3
 ```
 
+<<<<<<< HEAD
+where `READOUTS` is how many searches to make per move, and (-g 1) is how
+many games to play simultaneously.  Timing information and statistics will be
+printed at each move.  Setting verbosity (-v) to 3 or higher will print a board at each move. 
+=======
 Timing information and statistics will be printed at each move.  Setting
 verbosity to 3 or higher will print a board at each move.
 
+>>>>>>> master
 
 MuGo Zero uses the GTP protocol, and you can use any gtp-compliant program with it.
 
 ```
-python3 main.py gtp $LATEST_MODEL -r $READOUTS -v 3
+python3 main.py gtp gs://$BUCKET_NAME/models/000000-bootstrap -r READOUTS -v 3
 ```
 
 (If no model is provided, it will initialize one with random values)
@@ -162,7 +158,7 @@ speaks GTP.) You can download the gogui set of tools at
 GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
 
 ```shell
-gogui-twogtp -black 'python3 main.py gtp policy --read-file=saved_models/20170718' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
+gogui-twogtp -black 'python3 main.py gtp gs://$BUCKET_NAME/models/000000-bootstrap' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
 ```
 
 Another way to play via GTP is to play against GnuGo, while spectating the games
@@ -178,33 +174,92 @@ Another way to play via GTP is to connect to CGOS, the [Computer Go Online Serve
 
 After configuring your cgos.config file, you can connect to CGOS with `cgosGtp -c cgos.config` and spectate your own game with `cgosView yss-aya.com 6819`
 
-Training Mugo Zero
-==================
+Reinforcement Learning
+======================
 
-Generate training chunks:
+The following sequence of commands will allow you to do one iteration of
+reinforcement learning on 9x9. These are the basic commands used in the 
+kubernetified version. You'll need GCS object admin permissions all steps.
+
+Bootstrap
+---------
+
+This command creates a random model, which appears at .
+`gs://$BUCKET_NAME/models/$MODEL_NAME(.index|.meta|.data-00000-of-00001)`
+
+```bash
+export MODEL_NAME=000000-bootstrap
+python3 main.py bootstrap gs://$BUCKET_NAME/models/$MODEL_NAME -n $BOARD_SIZE
+```
+
+Self-play
+---------
+
+This command starts self-playing, outputting its raw game data in a
+tensorflow-compatible format as well as in SGF form in the directories
 
 ```
+<<<<<<< HEAD
+gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker/*.tfrecord.zz
+gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
+```
+
+```bash
+python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
+  --readouts 10 \
+  --games 2 \
+  -v 3 -n 9 \
+  --output-dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
+  --output-sgf=gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker
+```
+
+Gather
+------
+=======
 python3 main.py gather
 ```
 
 This will look in `data/selfplay` for games and write chunks to
 `data/training_chunks`.  See main.py for description of the other arguments
+>>>>>>> master
 
-Run the training job:
+This command takes multiple tfrecord.zz files (which will probably be KBs in size)
+and shuffles them into tfrecord.zz files that are ~100 MB in size.
 
-```shell
-python3 main.py train train training_data_dir \
-    --load-file=path/to/model \
-    --save-file=where/to/save/model \
-    --logdir=path/to/tensorboard/logs
-    --epochs=1
-    --batch-size=64
+Gathering is done according to model numbers, so that games generated by
+one model stay together. The output will be in the directories
+
+```
+gs://$BUCKET_NAME/data/training_chunks/$MODEL_NAME-{chunk_number}.tfrecord.zz
 ```
 
-(TODO)
+The file `gs://$BUCKET_NAME/data/training_chunks/meta.txt` is used to keep track of
+which games have been processed so far.
 
-...
-As the network is trained, the current model will be saved at `--save-file`. If you reexecute the same command, the network will pick up training where it left off.
+```bash
+python3 main.py gather \
+  --input-directory=gs://$BUCKET_NAME/data/selfplay \
+  --output-directory=gs://$BUCKET_NAME/data/training_chunks
+```
+
+Training a new model
+--------------------
+
+This command finds the most recent 50 models' training chunks and trains
+starting from the latest model weights and generates a new set of model weights.
+
+Run the training job:
+```
+python3 main.py train gs://$BUCKET_NAME/data/training_chunks \
+    gs://$BUCKET_NAME/models/000001-somename \
+    --load-file=gs://$BUCKET_NAME/models/000000-bootstrap \
+    --generation-num=1 \
+    --logdir=path/to/tensorboard/logs \
+    -n 9
+```
+
+The updated model weights will be saved at the end. (TODO: implement some sort
+of local checkpointing based on global_step that will resume appropriately.)
 
 Additionally, you can follow along with the training progress with TensorBoard - if you give each run a different name (`logs/my_training_run`, `logs/my_training_run2`), you can overlay the runs on top of each other.
 
@@ -224,6 +279,25 @@ kubectl, etc.)
 
 *NOTE* These commands will result in VMs being created and will result in
 charges to your GCP account!  *Proceed with care!*
+
+You'll want to install the following command line tools
+  - [gcloud](https://cloud.google.com/sdk/downloads)
+  - gsutil (via `gcloud components install gsutil`)
+  - kubectl (via `gcloud components install kubectl`)
+  - docker
+
+In order for each step to work, you'll have to have the following permissions:
+  - storage.bucket.(create, get, setIamPolicy) ("Storage Admin")
+  - storage.objects.(create, delete, get, list, update) ("Storage Object Admin")
+  - iam.serviceAccounts.create ("Service Account Admin")
+  - iam.serviceAccountKeys.create ("Service Account Key Admin")
+  - iam.serviceAccounts.actAs ("Service Account User")
+  - resourcemanager.projects.setIamPolicy ("Project IAM Admin")
+  - container.clusters.create ("Kubernetes Engine Cluster Admin")
+  - container.secrets.create ("Kubernetes Engine Developer")
+
+You'll also want to activate Kubernetes Cluster on your GCP account (just visit
+the Kubernetes Engine page and it will automatically activate.)
 
 Brief Overview of Pipeline
 --------------------------
@@ -246,6 +320,9 @@ Now, what the cluster will do:
  - training -- one node
  - evaluation -- dunno lol ¯\(ツ)/¯
 
+<<<<<<< HEAD
+The main way these jobs interact is throughs GCS.
+=======
 The main way these jobs interact is the filesystem -- which is just a GCS
 bucket mounted as a fuse filesystem inside their container.
 
@@ -259,6 +336,7 @@ chunks, which it will use to play a new model.
 the evaluation job will collect the new model, evaluate it against the old one,
 and bless it into the directory of models if it meets expectations.
 
+>>>>>>> master
 
 Bringing up a cluster
 ---------------------
@@ -360,6 +438,10 @@ Tail the logs of an instance:
 kubectl logs -f <name of pod>
 ```
 
+To kill the job,
+```
+envsubst < player.yaml | kubectl delete -f -
+```
 
 Preflight checks for a training run.
 ====================================
@@ -380,22 +462,17 @@ Setting up the selfplay cluster
 * Set up the cluster as above and start the nvidia driver installation daemonset
 * While the nvidia drivers are getting installed on the fleet, check the
   various hyperparameters and operating parameters:
-  * `go.py`, check the board size
   * `dual_net.py`, check the `get_default_hyperparams` function
-  * `player_wrapper.sh`, the invocation of `main.py selfplay` has the readout
-    depth, game parallelism, etc.
-  * `strategies.py`, check the (currently static) resign threshold, the move
-    threshold for move 'temperature' (affects deterministic play), and the max
-    game depth.
-  * `main.py`, check the default params on 'gather'
+  * `player_wrapper.sh`, the invocation of `rl_loop.py selfplay` has the readout
+    depth, game parallelism, resign threshold, etc.
+  * `strategies.py`, check the move threshold for move 'temperature'
+    (affects deterministic play), and the max game depth.
   * `mcts.py`, check the noise density and the tree branching factor (lol good
     luck)
-  * `rl_loop.py`, check the cluster name, directory for tensorflow logs, and
-    constants at the top of the file.
 * Seed the model directory with a randomly initialized model. (`python3
   rl_loop.py bootstrap /path/to/where/you/want/new/model`)
-* Copy the model to the GCS bucket. (`gsutil cp /path/to/model*
-  gs://bucket/models/` etc)
+* If you're getting various tensorflow RestoreOp shape mismatches, this is
+  often caused by mixing up 9x9 vs. 19x19 in the various system parts.
 
 * Build your docker images with the latest version of the code, optionally
   bumping the version number in the Makefile.
@@ -430,7 +507,7 @@ Useful things for the selfplay cluster
 Setting up logging via stackdriver, plus metrics, bla bla.
 
 
-If you've run rsync to collect a set of SGF files (cheatsheet: `python
+If you've run rsync to collect a set of SGF files (cheatsheet: `python3
 rl_loop.py smart-rsync --source-dir="gs://$BUCKET_NAME/sgf/" --from-model-num 0
 --game-dir=sgf/`), here are some handy
 bashisms to run on them:

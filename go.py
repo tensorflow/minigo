@@ -31,25 +31,7 @@ class IllegalMove(Exception): pass
 
 class PlayerMove(namedtuple('PlayerMove', ['color', 'move'])): pass
 
-class GameMetadata(namedtuple("GameMetadata", "result handicap board_size")):
-    pass
-
-class PositionWithContext(namedtuple("SgfPosition", "position next_move metadata")):
-    '''
-    Wrapper around go.Position.
-    Stores a position, the move that came next, and the eventual result.
-    '''
-    def is_usable(self):
-        return all([
-            self.position is not None,
-            self.next_move is not None,
-            self.metadata.result != "Void",
-            self.metadata.handicap <= 4,
-        ])
-
-    def __str__(self):
-        return str(self.position) + '\nNext move: {} Result: {}'.format(
-                self.next_move, self.metadata.result)
+class PositionWithContext(namedtuple('SgfPosition', ['position', 'next_move', 'result'])): pass
 
 def set_board_size(n):
     '''
@@ -80,20 +62,12 @@ def replay_position(position):
         print(position_w_context.position)
     '''
     assert position.n == len(position.recent), "Position history is incomplete"
-    metadata = GameMetadata(
-        result=position.result(),
-        handicap=0,
-        board_size=position.board.shape[0]
-    )
-    set_board_size(metadata.board_size)
-
+    result = position.result()
     pos = Position(komi=position.komi)
     for player_move in position.recent:
         color, next_move = player_move
-        yield PositionWithContext(pos, next_move, metadata)
+        yield PositionWithContext(pos, next_move, result)
         pos = pos.play_move(next_move, color=color)
-    # return the original position, with unknown next move
-    yield PositionWithContext(pos, None, metadata)
 
 def find_reached(board, c):
     color = board[c]
@@ -501,6 +475,15 @@ class Position():
         return np.count_nonzero(working_board == BLACK) - np.count_nonzero(working_board == WHITE) - self.komi
 
     def result(self):
+        score = self.score()
+        if score > 0:
+            return 1
+        elif score < 0:
+            return -1
+        else:
+            return 0
+
+    def result_string(self):
         score = self.score()
         if score > 0:
             return 'B+' + '%.1f' % score

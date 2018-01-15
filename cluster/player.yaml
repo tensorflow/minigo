@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: mugo-player
 spec:
-  parallelism: 63
+  parallelism: 16
   completions: 200000
   template:
     metadata:
@@ -23,14 +23,18 @@ spec:
       - name: player
         image: gcr.io/$PROJECT/mugo-player:0.3
         imagePullPolicy: Always
-        args:
-        - $BUCKET_NAME
         volumeMounts:
         - name: service-credentials
           mountPath: /etc/credentials
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /etc/credentials/service-account.json
+        - name: BUCKET_NAME
+          value: $BUCKET_NAME
+        - name: BOARD_SIZE
+          value: "$BOARD_SIZE"
+        - name: GAMES
+          value: "8"
         securityContext:
           privileged: true
       volumes:
