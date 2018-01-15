@@ -9,7 +9,7 @@ Flattened Coordinate: this is a number ranging from 0 - N^2 (so N^2+1
 SGF Coordinate: Coordinate used for SGF serialization format. Coordinates use
     two-letter pairs (r,c) indexed from the upper-left (aa).
 KGS Coordinate: Human-readable coordinate indexed from bottom left.
-GTP Coordinate: Tuple coordinate indexed starting at 1,1 from top-left (r, c)
+PYGTP Coordinate: Tuple coordinate indexed starting at 1,1 from top-left (r, c)
 
 So, for a 19x19,
 
@@ -19,7 +19,7 @@ minigo coord    (0, 0)          (18, 0)         None
 flat            0               342             361
 SGF             'aa'            'sa'            ''
 KGS             'A19'           'T19'           'pass'
-GTP             (1, 1)          (1,19)          'pass'
+pygtp           (1, 19)         (19,19)         'pass'
 """
 
 import go
