@@ -14,7 +14,7 @@ So, for a 19x19,
 Coord Type      upper_left      upper_right     pass
 -------------------------------------------------------
 minigo coord    (0, 0)          (18, 0)         None
-flat            0               18              361
+flat            0               342             361
 KGS             'A19'           'T19'           'pass'
 GTP             (1, 1)          (1,19)          'pass'
 """
