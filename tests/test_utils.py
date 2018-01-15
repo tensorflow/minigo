@@ -27,50 +27,6 @@ def load_board(string):
     return board
 
 class TestUtils(unittest.TestCase):
-    def test_parsing(self):
-        self.assertEqual(utils.parse_sgf_coords('aa'), (0, 0))
-        self.assertEqual(utils.parse_sgf_coords('ac'), (2, 0))
-        self.assertEqual(utils.parse_sgf_coords('ca'), (0, 2))
-        self.assertEqual(utils.parse_sgf_coords(''), None)
-        self.assertEqual(utils.unparse_sgf_coords(None), '')
-        self.assertEqual(
-            'aa',
-            utils.unparse_sgf_coords(utils.parse_sgf_coords('aa')))
-        self.assertEqual(
-            'sa',
-            utils.unparse_sgf_coords(utils.parse_sgf_coords('sa')))
-        self.assertEqual(
-            (1, 17),
-            utils.parse_sgf_coords(utils.unparse_sgf_coords((1, 17))))
-        self.assertEqual(utils.parse_kgs_coords('A1'), (8, 0))
-        self.assertEqual(utils.parse_kgs_coords('A9'), (0, 0))
-        self.assertEqual(utils.parse_kgs_coords('C2'), (7, 2))
-        self.assertEqual(utils.parse_kgs_coords('J2'), (7, 8))
-        self.assertEqual(utils.parse_pygtp_coords((1, 1)), (8, 0))
-        self.assertEqual(utils.parse_pygtp_coords((1, 9)), (0, 0))
-        self.assertEqual(utils.parse_pygtp_coords((3, 2)), (7, 2))
-        self.assertEqual(utils.unparse_pygtp_coords((8, 0)), (1, 1))
-        self.assertEqual(utils.unparse_pygtp_coords((0, 0)), (1, 9))
-        self.assertEqual(utils.unparse_pygtp_coords((7, 2)), (3, 2))
-
-        self.assertEqual(utils.to_human_coord((0,8)), 'J9')
-        self.assertEqual(utils.to_human_coord((8,0)), 'A1')
-
-    def test_flatten(self):
-        self.assertEqual(utils.flatten_coords((0, 0)), 0)
-        self.assertEqual(utils.flatten_coords((0, 3)), 3)
-        self.assertEqual(utils.flatten_coords((3, 0)), 27)
-        self.assertEqual(utils.unflatten_coords(27), (3, 0))
-        self.assertEqual(utils.unflatten_coords(10), (1, 1))
-        self.assertEqual(utils.unflatten_coords(80), (8, 8))
-        self.assertEqual(utils.flatten_coords(utils.unflatten_coords(10)), 10)
-        self.assertEqual(utils.unflatten_coords(utils.flatten_coords((5, 4))), (5, 4))
-
-    def test_unflatten_coords_ndindex_equivalence(self):
-        ndindices = list(np.ndindex(go.N, go.N))
-        flat_coords = list(range(go.N * go.N))
-        self.assertEqual(list(map(utils.unflatten_coords, flat_coords)), ndindices)
-
     def test_shuffler(self):
         random.seed(1)
         dataset = (i for i in range(10))

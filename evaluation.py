@@ -1,5 +1,4 @@
 import go
-import utils
 import time
 import numpy as np
 

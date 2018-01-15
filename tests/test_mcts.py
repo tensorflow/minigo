@@ -5,16 +5,11 @@ import numpy as np
 import go
 from go import Position
 from test_utils import load_board, GoPositionTestCase
-from utils import parse_kgs_coords as pc
-from utils import to_human_coord as un_pc
-import utils
+from coords import parse_kgs_coords
+from coords import kgs_to_flat
+import coords
+
 from mcts import MCTSNode
-
-def pc_set(string):
-    return set(map(pc, string.split()))
-
-def fl_pc(string):
-    return utils.flatten_coords(pc(string))
 
 ALMOST_DONE_BOARD = load_board('''
 .XO.XO.OO
@@ -70,20 +65,20 @@ class TestMctsNodes(GoPositionTestCase):
 
     def test_select_leaf(self):
         probs = np.array([.02] * (go.N * go.N + 1))
-        probs[fl_pc('D9')] = 0.4
+        probs[kgs_to_flat('D9')] = 0.4
         root = MCTSNode(SEND_TWO_RETURN_ONE)
         root.incorporate_results(probs, 0)
 
         self.assertEqual(root.position.to_play, go.WHITE)
-        self.assertEqual(root.select_leaf(), root.children[fl_pc('D9')])
+        self.assertEqual(root.select_leaf(), root.children[kgs_to_flat('D9')])
 
     def test_backup_incorporate_results(self):
         probs = np.array([.02] * (go.N * go.N + 1))
         root = MCTSNode(SEND_TWO_RETURN_ONE)
         root.incorporate_results(probs, 0)
 
-        move = pc('D9')
-        fmove = utils.flatten_coords(move)
+        move = parse_kgs_coords('D9')
+        fmove = coords.flatten_coords(move)
         leaf = MCTSNode(root.position.play_move(move), fmove, root)
         leaf.incorporate_results(probs, -1) # white wins!
 
@@ -95,8 +90,8 @@ class TestMctsNodes(GoPositionTestCase):
         self.assertAlmostEqual(root.child_Q[fmove], -1)
         self.assertAlmostEqual(leaf.Q, -1)
 
-        move2 = pc('J3')
-        fmove2 = utils.flatten_coords(move2)
+        move2 = parse_kgs_coords('J3')
+        fmove2 = coords.flatten_coords(move2)
         leaf2 = MCTSNode(root.position.play_move(move), fmove2, root)
         leaf2.incorporate_results(probs, -0.2) # another white semi-win
         self.assertEqual(root.N, 3)
@@ -110,9 +105,9 @@ class TestMctsNodes(GoPositionTestCase):
         probs = np.array([0.02] * (go.N * go.N + 1), dtype=np.float32)
         root = MCTSNode(go.Position())
         root.incorporate_results(probs, 0)
-        first_pass = root.add_child(utils.flatten_coords(None))
+        first_pass = root.add_child(coords.flatten_coords(None))
         first_pass.incorporate_results(probs, 0)
-        second_pass = first_pass.add_child(utils.flatten_coords(None))
+        second_pass = first_pass.add_child(coords.flatten_coords(None))
         second_pass.incorporate_results(probs, 0)
         self.assertEqual(second_pass.N, 1)
         self.assertTrue(second_pass.position.is_game_over())
@@ -171,16 +166,16 @@ class TestMctsNodes(GoPositionTestCase):
             # pos = leaf.position
             # if len(pos.recent) == 0:
             #     continue
-            # moves = list(map(utils.to_human_coord,
+            # moves = list(map(coords.to_human_coord,
             #                  [move.move for move in pos.recent[2:]]))
             # print("From root: ", " <= ".join(moves))
 
         #Search should converge on D9 as only winning move.
         print(root.child_N)
         best_move_found = np.argmax(root.child_N)
-        self.assertEqual(best_move_found, fl_pc('D9'))
+        self.assertEqual(best_move_found, kgs_to_flat('D9'))
         # D9 should have a positive value
-        self.assertGreater(root.children[fl_pc('D9')].Q, 0)
+        self.assertGreater(root.children[kgs_to_flat('D9')].Q, 0)
         self.assertEqual(root.N, 20)
         # passing should be ineffective.
         self.assertLess(root.child_Q[-1], 0)

@@ -11,10 +11,10 @@ from collections import namedtuple
 import numpy as np
 import itertools
 
+import coords
 import go
 from go import Position, PositionWithContext
 import utils
-from utils import parse_sgf_coords as pc, unparse_sgf_coords as upc
 import sgf
 
 SGF_TEMPLATE = '''(;GM[1]FF[4]CA[UTF-8]AP[MuGo_sgfgenerator]RU[{ruleset}]
@@ -30,7 +30,7 @@ def translate_sgf_move_qs(player_move,q):
 def translate_sgf_move(player_move, comment):
     if player_move.color not in (go.BLACK, go.WHITE):
         raise ValueError("Can't translate color %s to sgf" % player_move.color)
-    coords = upc(player_move.move)
+    c = coords.unparse_sgf_coords(player_move.move)
     color = 'B' if player_move.color == go.BLACK else 'W'
     if comment is not None:
         comment = comment.replace(']', r'\]')
@@ -38,7 +38,7 @@ def translate_sgf_move(player_move, comment):
     else:
         comment_node = ""
     return ";{color}[{coords}]{comment_node}".format(
-        color=color, coords=coords, comment_node=comment_node)
+        color=color, coords=c, comment_node=comment_node)
 
 def make_sgf(
     move_history,
@@ -79,16 +79,16 @@ def sgf_prop_get(props, key, default):
 def handle_node(pos, node):
     'A node can either add B+W stones, play as B, or play as W.'
     props = node.properties
-    black_stones_added = [pc(coords) for coords in props.get('AB', [])]
-    white_stones_added = [pc(coords) for coords in props.get('AW', [])]
+    black_stones_added = [coords.parse_sgf_coords(c) for c in props.get('AB', [])]
+    white_stones_added = [coords.parse_sgf_coords(c) for c in props.get('AW', [])]
     if black_stones_added or white_stones_added:
         return add_stones(pos, black_stones_added, white_stones_added)
     # If B/W props are not present, then there is no move. But if it is present and equal to the empty string, then the move was a pass.
     elif 'B' in props:
-        black_move = pc(props.get('B', [''])[0])
+        black_move = coords.parse_sgf_coords(props.get('B', [''])[0])
         return pos.play_move(black_move, color=go.BLACK)
     elif 'W' in props:
-        white_move = pc(props.get('W', [''])[0])
+        white_move = coords.parse_sgf_coords(props.get('W', [''])[0])
         return pos.play_move(white_move, color=go.WHITE)
     else:
         return pos
@@ -103,9 +103,9 @@ def add_stones(pos, black_stones_added, white_stones_added):
 def get_next_move(node):
     props = node.next.properties
     if 'W' in props:
-        return pc(props['W'][0])
+        return coords.parse_sgf_coords(props['W'][0])
     else:
-        return pc(props['B'][0])
+        return coords.parse_sgf_coords(props['B'][0])
 
 def maybe_correct_next(pos, next_node):
     if (('B' in next_node.properties and not pos.to_play == go.BLACK) or

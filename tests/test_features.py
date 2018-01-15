@@ -3,7 +3,6 @@ import numpy as np
 
 import features
 import go
-import utils
 from test_utils import load_board, GoPositionTestCase
 
 go.set_board_size(9)

@@ -2,7 +2,8 @@ import go
 from sgf_wrapper import replay_sgf, translate_sgf_move, make_sgf
 import unittest
 
-from utils import parse_kgs_coords as pc
+import coords
+from coords import parse_kgs_coords
 from test_utils import GoPositionTestCase, load_board
 
 JAPANESE_HANDICAP_SGF = "(;GM[1]FF[4]CA[UTF-8]AP[CGoban:3]ST[2]RU[Japanese]SZ[9]HA[2]RE[Void]KM[5.50]PW[test_white]PB[test_black]AB[gc][cg];W[ee];B[dg])"
@@ -67,7 +68,7 @@ class TestSgfWrapper(GoPositionTestCase):
             n=1,
             komi=5.5,
             caps=(0, 0),
-            recent=(go.PlayerMove(go.WHITE, pc('E5')),),
+            recent=(go.PlayerMove(go.WHITE, coords.parse_kgs_coords('E5')),),
             to_play=go.BLACK,
         )
         final_board = load_board('''
@@ -86,8 +87,8 @@ class TestSgfWrapper(GoPositionTestCase):
             n=2,
             komi=5.5,
             caps=(0, 0),
-            recent=(go.PlayerMove(go.WHITE, pc('E5')),
-                    go.PlayerMove(go.BLACK, pc('D3')),),
+            recent=(go.PlayerMove(go.WHITE, parse_kgs_coords('E5')),
+                    go.PlayerMove(go.BLACK, parse_kgs_coords('D3')),),
             to_play=go.WHITE,
         )
         positions_w_context = list(replay_sgf(JAPANESE_HANDICAP_SGF))
@@ -113,7 +114,7 @@ class TestSgfWrapper(GoPositionTestCase):
             n=1,
             komi=5.5,
             caps=(0, 0),
-            recent=(go.PlayerMove(go.BLACK, pc('G7')),),
+            recent=(go.PlayerMove(go.BLACK, parse_kgs_coords('G7')),),
             to_play=go.BLACK,
         )
         final_board = load_board('''
@@ -133,13 +134,13 @@ class TestSgfWrapper(GoPositionTestCase):
             komi=5.5,
             caps=(7, 2),
             ko=None,
-            recent=(go.PlayerMove(go.WHITE, pc('E9')),
-                    go.PlayerMove(go.BLACK, pc('F9')),),
+            recent=(go.PlayerMove(go.WHITE, parse_kgs_coords('E9')),
+                    go.PlayerMove(go.BLACK, parse_kgs_coords('F9')),),
             to_play=go.WHITE
         )
         positions_w_context = list(replay_sgf(CHINESE_HANDICAP_SGF))
         self.assertEqualPositions(intermediate_position, positions_w_context[1].position)
-        self.assertEqual(positions_w_context[1].next_move, pc('C3'))
+        self.assertEqual(positions_w_context[1].next_move, parse_kgs_coords('C3'))
         final_replayed_position = positions_w_context[-1].position.play_move(
             positions_w_context[-1].next_move)
         self.assertEqualPositions(final_position, final_replayed_position)
