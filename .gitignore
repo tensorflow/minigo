@@ -6,8 +6,8 @@ data
 pip-selfcheck.json
 *.pyc
 sgf
-
-
+pyvenv.cfg
+.DS_store
 # Vim temp files
 *.swp
 *.swo

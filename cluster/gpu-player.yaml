@@ -26,8 +26,6 @@ spec:
         resources:
           limits:
             alpha.kubernetes.io/nvidia-gpu: 1
-        args:
-        - $BUCKET_NAME
         volumeMounts:
         - name: service-credentials
           mountPath: /etc/credentials
@@ -38,6 +36,12 @@ spec:
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /etc/credentials/service-account.json
+        - name: BUCKET_NAME
+          value: $BUCKET_NAME
+        - name: BOARD_SIZE
+          value: "$BOARD_SIZE"
+        - name: GAMES
+          value: "8"
         securityContext:
           privileged: true
       volumes:

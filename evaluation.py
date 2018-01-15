@@ -42,9 +42,6 @@ def play_match(black_net, white_net, games, readouts, verbosity):
             active.play_move(move)
             inactive.play_move(move)
 
-            if active.is_done(): # If 'move' was pass #2, score the board.
-                black.result = 1 if black.position.score() > 0 else -1
-                white.result = 1 if white.position.score() > 0 else -1
 
         dur = time.time() - start
         global_n += 1

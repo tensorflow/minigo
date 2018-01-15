@@ -12,7 +12,8 @@ import numpy as np
 import itertools
 
 import go
-from go import Position, GameMetadata, PositionWithContext
+from go import Position, PositionWithContext
+import utils
 from utils import parse_sgf_coords as pc, unparse_sgf_coords as upc
 import sgf
 
@@ -100,8 +101,6 @@ def add_stones(pos, black_stones_added, white_stones_added):
     return new_position
 
 def get_next_move(node):
-    if not node.next:
-        return None
     props = node.next.properties
     if 'W' in props:
         return pc(props['W'][0])
@@ -109,15 +108,19 @@ def get_next_move(node):
         return pc(props['B'][0])
 
 def maybe_correct_next(pos, next_node):
-    if next_node is None:
-        return
     if (('B' in next_node.properties and not pos.to_play == go.BLACK) or
         ('W' in next_node.properties and not pos.to_play == go.WHITE)):
         pos.flip_playerturn(mutate=True)
 
 def replay_sgf(sgf_contents):
     '''
-    Wrapper for sgf files, exposing contents as position_w_context instances
+    Wrapper for sgf files, returning go.PositionWithContext instances.
+
+    It does NOT return the very final position, as there is no follow up.
+    To get the final position, call pwc.position.play_move(pwc.next_move)
+    on the last PositionWithContext returned.
+
+    Example usage:
     with open(filename) as f:
         for position_w_context in replay_sgf(f.read()):
             print(position_w_context.position)
@@ -130,17 +133,19 @@ def replay_sgf(sgf_contents):
     komi = 0
     if props.get('KM') != None:
         komi = float(sgf_prop(props.get('KM')))
-    metadata = GameMetadata(
-        result=sgf_prop(props.get('RE')),
-        handicap=int(sgf_prop(props.get('HA', [0]))),
-        board_size=int(sgf_prop(props.get('SZ'))))
-    go.set_board_size(metadata.board_size)
+    result = utils.parse_game_result(sgf_prop(props.get('RE')))
+    go.set_board_size(int(sgf_prop(props.get('SZ'))))
 
     pos = Position(komi=komi)
     current_node = game.root
-    while pos is not None and current_node is not None:
+    while pos is not None and current_node.next is not None:
         pos = handle_node(pos, current_node)
         maybe_correct_next(pos, current_node.next)
         next_move = get_next_move(current_node)
-        yield PositionWithContext(pos, next_move, metadata)
+        yield PositionWithContext(pos, next_move, result)
         current_node = current_node.next 
+
+def replay_sgf_file(sgf_file):
+    with open(sgf_file) as f:
+        for pwc in replay_sgf(f.read()):
+            yield pwc

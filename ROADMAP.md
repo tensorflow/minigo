@@ -15,7 +15,6 @@ The reinforcement pipeline consists of four commands:
          -- readouts: 'How many simulations to run per move'=0,
          -- games: 'Number of games to play' = 1,
          -- verbose : '>1 will print debug info, >2 will print boards' = 1,
-         -- use_cpu: 'passed to the network initializer'=False,
 
     The selfplay command will play `iters` games between the network whose model
     files are found at path `network`.

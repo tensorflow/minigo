@@ -182,7 +182,7 @@ class MCTSPlayerMixin:
         if abs(self.result) == 2:
             res = "B+Resign" if self.result == 2 else "W+Resign"
         else:
-            res = pos.result()
+            res = pos.result_string()
         return res
 
     def to_sgf(self):
@@ -195,13 +195,10 @@ class MCTSPlayerMixin:
                                     black_name=self.network.name or "Unknown",
                                     comments=self.comments)
 
-    def to_dataset(self):
+    def extract_data(self):
         assert len(self.searches_pi) == self.root.position.n
-        pwcs = list(go.replay_position(self.root.position))[:-1]
-        results = np.ones([len(pwcs)], dtype=np.int8)
-        if self.result < 0:
-            results *= -1
-        return (pwcs, self.searches_pi, results)
+        for pwc, pi in zip(go.replay_position(self.root.position), self.searches_pi):
+            yield pwc.position, pi, pwc.result
 
     def chat(self, msg_type, sender, text):
         default_response = "Supported commands are 'winrate', 'nextplay', 'fortune', and 'help'."

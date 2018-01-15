@@ -1,26 +1,30 @@
 '''
-Features used by AlphaGo, in approximate order of importance.
-Feature                 # Notes
-Stone colour            3 Player stones; oppo. stones; empty
-Ones                    1 Constant plane of 1s
-    (Because of convolution w/ zero-padding, this is the only way the NN can know where the edge of the board is!!!)
-Turns since last move   8 How many turns since a move played
-Liberties               8 Number of liberties
-Capture size            8 How many opponent stones would be captured
-Self-atari size         8 How many own stones would be captured
-Liberties after move    8 Number of liberties after this move played
-ladder capture          1 Whether a move is a successful ladder cap
-Ladder escape           1 Whether a move is a successful ladder escape
-Sensibleness            1 Whether a move is legal + doesn't fill own eye
-Zeros                   1 Constant plane of 0s
+Turn go.Position into various feature planes.
+
+Impl? Feature                 # Notes
+
+(AG features)
+Y     Stone colour            3  Player stones; oppo. stones; empty
+Y     Ones                    1  Constant plane of 1s
+          (this lets the NN know where edge of board is.)
+Y     Turns since last move   8  How many turns since a move played
+Y     Liberties               8  Number of liberties
+Y     Capture size            8  How many opponent stones would be captured
+N     Self-atari size         8  How many own stones would be captured
+N     Liberties after move    8  Number of liberties after this move played
+N     ladder capture          1  Whether a move is a successful ladder capture
+N     Ladder escape           1  Whether a move is a successful ladder escape
+N     Sensibleness            1  Whether a move is legal + doesn't fill own eye
+
+(AGZ features)
+Y     Board history           16 W/B moves from last 8 turns
+Y     Turn-to-play            1  Ones if B to play, zeros otherwise.
 
 All features with 8 planes are 1-hot encoded, with plane i marked with 1 
 only if the feature was equal to i. Any features >= 8 would be marked as 8.
 '''
 
-import functools
 import numpy as np
-import random
 import go
 from utils import product
 
@@ -122,77 +126,22 @@ DEFAULT_FEATURES = [
     would_capture_feature,
 ]
 
+DEFAULT_FEATURES_PLANES = sum(f.planes for f in DEFAULT_FEATURES)
+
 NEW_FEATURES= [
-        stone_features,
-        color_to_play_feature
+    stone_features,
+    color_to_play_feature
 ]
 
+NEW_FEATURES_PLANES = sum(f.planes for f in NEW_FEATURES)
 
-def extract_features(position, features=DEFAULT_FEATURES):
+def extract_features(position, features=NEW_FEATURES):
     return np.concatenate([feature(position) for feature in features], axis=2)
 
-def bulk_extract_features(positions, features=DEFAULT_FEATURES):
+def bulk_extract_features(positions, features=NEW_FEATURES):
     num_positions = len(positions)
     num_planes = sum(f.planes for f in features)
     output = np.zeros([num_positions, go.N, go.N, num_planes], dtype=np.uint8)
     for i, pos in enumerate(positions):
         output[i] = extract_features(pos, features=features)
     return output
-
-"""
-Allowable symmetries:
-identity [12][34]
-rot90 [24][13]
-rot180 [43][21]
-rot270 [31][42]
-flip [13][24]
-fliprot90 [34][12]
-fliprot180 [42][31]
-fliprot270 [21][43]
-"""
-INVERSES = {
-    'identity': 'identity',
-    'rot90': 'rot270',
-    'rot180': 'rot180',
-    'rot270': 'rot90',
-    'flip': 'flip',
-    'fliprot90': 'fliprot90',
-    'fliprot180': 'fliprot180',
-    'fliprot270': 'fliprot270',
-}
-
-IMPLS = {
-    'identity': lambda x: x,
-    'rot90': np.rot90,
-    'rot180': functools.partial(np.rot90, k=2),
-    'rot270': functools.partial(np.rot90, k=3),
-    'flip': lambda x: np.rot90(np.fliplr(x)),
-    'fliprot90': np.flipud,
-    'fliprot180': lambda x: np.rot90(np.flipud(x)),
-    'fliprot270': np.fliplr,
-}
-
-assert set(INVERSES.keys()) == set(IMPLS.keys())
-SYMMETRIES = list(INVERSES.keys())
-
-# A symmetry is just a string describing the transformation.
-def invert_symmetry(s):
-    return INVERSES[s]
-
-def apply_symmetry_feat(s, features):
-    return IMPLS[s](features)
-
-def apply_symmetry_pi(s, pi):
-    pi = np.copy(pi)
-    # rotate all moves except for the pass move at end
-    pi[:-1] = IMPLS[s](pi[:-1].reshape([go.N, go.N])).ravel()
-    return pi
-
-def randomize_symmetries_feat(features):
-    symmetries_used = [random.choice(SYMMETRIES) for f in features]
-    return symmetries_used, [apply_symmetry_feat(s, f)
-        for s, f in zip(symmetries_used, features)]
-
-def invert_symmetries_pi(symmetries, pis):
-    return [apply_symmetry_pi(invert_symmetry(s), pi)
-        for s, pi in zip(symmetries, pis)]

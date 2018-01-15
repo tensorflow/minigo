@@ -2,6 +2,7 @@ import numpy as np
 import unittest
 from go import Position, PlayerMove, LibertyTracker, WHITE, BLACK, EMPTY
 import go
+import sgf_wrapper
 from utils import parse_kgs_coords as pc, parse_sgf_coords, unflatten_coords
 from test_utils import GoPositionTestCase, load_board
 
@@ -12,6 +13,8 @@ TEST_BOARD = load_board('''
 .X.....OO
 X........
 ''' + EMPTY_ROW * 7)
+
+NO_HANDICAP_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf];B[eg];W[dd];B[dc];W[cc];B[de];W[cd];B[ed];W[he];B[ce];W[be];B[df];W[bf];B[hd];W[ge];B[gd];W[gg];B[db];W[cb];B[cg];W[bg];B[gh];W[fh];B[hh];W[fg];B[eh];W[ei];B[di];W[fi];B[hg];W[dh];B[ch];W[ci];B[bh];W[ff];B[fe];W[hf];B[id];W[bi];B[ah];W[ef];B[dg];W[ee];B[di];W[ig];B[ai];W[ih];B[fb];W[hi];B[ag];W[ab];B[bd];W[bc];B[ae];W[ad];B[af];W[bd];B[ca];W[ba];B[da];W[ie])"
 
 def pc_set(string):
     return frozenset(map(pc, string.split()))
@@ -535,3 +538,39 @@ class TestScoring(unittest.TestCase):
             )
             expected_score = 2.5
             self.assertEqual(position.score(), expected_score)
+
+class TestPositionReplay(GoPositionTestCase):
+    def test_replay_position(self):
+        sgf_positions = list(sgf_wrapper.replay_sgf(NO_HANDICAP_SGF))
+        initial = sgf_positions[0]
+        self.assertEqual(initial.result, go.WHITE)
+
+        final = sgf_positions[-1].position.play_move(sgf_positions[-1].next_move)
+
+        # sanity check to ensure we're working with the right position
+        final_board = load_board('''
+            .OXX.....
+            O.OX.X...
+            .OOX.....
+            OOOOXXXXX
+            XOXXOXOOO
+            XOOXOO.O.
+            XOXXXOOXO
+            XXX.XOXXO
+            X..XOO.O.
+        ''')
+        expected_final_position = go.Position(
+            final_board,
+            n=62,
+            komi=6.5,
+            caps=(3, 2),
+            ko=None,
+            recent=tuple(),
+            to_play=go.BLACK
+        )
+        self.assertEqualPositions(expected_final_position, final)
+        self.assertEqual(final.n, len(final.recent))
+
+        replayed_positions = list(go.replay_position(final))
+        for sgf_pos, replay_pos in zip(sgf_positions, replayed_positions):
+            self.assertEqualPositions(sgf_pos.position, replay_pos.position)

@@ -82,7 +82,7 @@ class TestUtils(unittest.TestCase):
     def test_parse_game_result(self):
         self.assertEqual(utils.parse_game_result('B+3.5'), go.BLACK)
         self.assertEqual(utils.parse_game_result('W+T'), go.WHITE)
-        self.assertEqual(utils.parse_game_result('Void'), None)
+        self.assertEqual(utils.parse_game_result('Void'), 0)
 
 
 

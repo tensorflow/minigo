@@ -74,11 +74,11 @@ def unparse_pygtp_coords(c):
 
 def parse_game_result(result):
     if re.match(r'[bB]\+', result):
-        return go.BLACK
+        return 1
     elif re.match(r'[wW]\+', result):
-        return go.WHITE
+        return -1
     else:
-        return None
+        return 0
 
 def product(numbers):
     return functools.reduce(operator.mul, numbers)
@@ -87,6 +87,7 @@ def take_n(n, iterable):
     return list(itertools.islice(iterable, n))
 
 def iter_chunks(chunk_size, iterator):
+    iterator = iter(iterator)
     while True:
         next_chunk = take_n(chunk_size, iterator)
         # If len(iterable) % chunk_size == 0, don't return an empty chunk.

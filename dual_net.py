@@ -7,240 +7,255 @@ move prediction and score estimation.
 import functools
 import math
 import os.path
+import itertools
 import sys
 import tensorflow as tf
 from tqdm import tqdm
 from typing import Dict
 
 import features
+import preprocessing
+import symmetries
 import go
 
+EXAMPLES_PER_GENERATION = 2000000
+TRAIN_BATCH_SIZE = 16
 # Momentum comes from the AGZ paper. Set at 0.9.
 MOMENTUM = 0.9
-EPSILON = 1e-5
 
-def round_power_of_two(n):
-    """Finds the nearest powero f 2 to a number.
+class DualNetworkTrainer():
+    def __init__(self, save_file=None, **hparams):
+        self.hparams = get_default_hyperparams(**hparams)
+        self.save_file = save_file
+        self.sess = tf.Session(graph=tf.Graph())
+        # TODO: eval stuff
+        # self.eval_logdir = os.path.join(model_dir, 'logs', 'eval')
 
-    Thus, 84 -> 64, 120 -> 128, etc.
-    """
-    return 2 ** int(round(math.log(n, 2)))
+    def initialize_weights(self, init_from=None):
+        '''Initialize weights from model checkpoint.
 
+        If model checkpoint does not exist, fall back to init_from.
+        If that doesn't exist either, bootstrap with random weights.
 
-def get_default_hyperparams():
-    """Returns the hyperparams for the neural net.
-
-    In other words, returns a dict whose paramaters come from the AGZ paper:
-    {
-        k: number of filters (AlphaGoZero used 256). We use 128 by default for
-            a 19x19 go board.
-        fc_width: Dimensionality of the fully connected linear layer
-        num_shared_layers: number of shared residual blocks. AGZ used both 19
-            and 39. Here we use 19 because it's faster to train.
-        l2_strength: The L2 regularization parameter. Note AGZ paper has this
-            set to 10^-4 for self-play learning.
-    }
-    """
-    k = round_power_of_two(go.N ** 2 / 3) # width of each layer
-    fc_width = k * 2
-    num_shared_layers = go.N
-    l2_strength = 2e-5
-    return locals()
-
-
-class DualNetwork(object):
-    """Using TensorFlow, set up the neural network."""
-    def __init__(self, use_cpu=False):
-        self.num_input_planes = sum(f.planes for f in features.NEW_FEATURES)
-        hyperparams = get_default_hyperparams()
-        for name, param in hyperparams.items():
-            setattr(self, name, param)
-        self.test_summary_writer = None
-        self.summary_writer = None
-        self.training_stats = StatisticsCollector()
-        self.session = tf.Session()
-        self.name = None
-        if use_cpu:
-            # Set up the computation-graph context to use CPU context
-            with tf.device("/cpu:0"):
-                self.set_up_network()
+        This priority order prevents the mistake where the latest saved
+        model exists, but you accidentally init from an older model checkpoint
+        and then overwrite the newer model weights.
+        '''
+        if self.save_file is not None and os.path.exists(self.save_file + '.meta'):
+            tf.train.Saver().restore(self.sess, self.save_file)
+            return
+        if init_from is not None:
+            print("Initializing from {}".format(init_from), file=sys.stderr)
+            tf.train.Saver().restore(self.sess, init_from)
         else:
-            self.set_up_network()
+            print("Bootstrapping with random weights", file=sys.stderr)
+            self.sess.run(tf.global_variables_initializer())
 
-    def set_up_network(self):
-        # a global_step variable allows epoch counts to persist through
-        # multiple training sessions
-        self.global_step = global_step = tf.Variable(
-            0, name="global_step", trainable=False)
+    def save_weights(self):
+        with self.sess.graph.as_default():
+            tf.train.Saver().save(self.sess, self.save_file)
 
-        # the board input features
-        self.x = x = tf.placeholder(tf.float32,
-            [None, go.N, go.N, self.num_input_planes])
+    def bootstrap(self):
+        'Create a save file with random initial weights.'
+        sess = tf.Session(graph=tf.Graph())
+        with sess.graph.as_default():
+            input_tensors = get_inference_input()
+            output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
+                    train_mode=True, **self.hparams)
+            train_tensors = train_ops(input_tensors, output_tensors, **self.hparams)
+            sess.run(tf.global_variables_initializer())
+            tf.train.Saver().save(sess, self.save_file)
 
-        # the move probabilities to be predicted
-        self.pi = pi = tf.placeholder(tf.float32,
-            [None, (go.N * go.N) + 1])
-
-        # the result of the game. +1 = black wins -1 = white wins
-        self.outcome = outcome = tf.placeholder(tf.float32, [None])
-        self.train_mode = train_mode = tf.placeholder(
-                tf.bool, name='train_mode')
-
-        my_batchn = functools.partial(tf.layers.batch_normalization,
-                                      momentum=.997, epsilon=EPSILON,
-                                      fused=True, center=True, scale=True,
-                                      training=train_mode)
-
-        my_conv2d = functools.partial(tf.layers.conv2d,
-            filters=self.k, kernel_size=[3, 3], padding="same")
-
-        def my_res_layer(inputs):
-            int_layer1 = my_batchn(my_conv2d(inputs))
-            initial_output = tf.nn.relu(int_layer1)
-            int_layer2 = my_batchn(my_conv2d(initial_output))
-            output = tf.nn.relu(inputs + int_layer2)
-            return output
-
-        initial_output = tf.nn.relu(my_batchn( my_conv2d(x)))
-
-        # the shared stack
-        shared_output = initial_output
-        for i in range(self.num_shared_layers):
-            shared_output = my_res_layer(shared_output)
-
-        # policy head
-        policy_conv = tf.nn.relu(my_batchn(
-                my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
-            center=False, scale=False))
-        logits = tf.layers.dense(
-            tf.reshape(policy_conv, [-1, go.N * go.N * 2]),
-            go.N * go.N + 1)
-
-        self.policy_output = tf.nn.softmax(logits)
-
-        # value head
-        value_conv = tf.nn.relu(my_batchn(
-                my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
-            center=False, scale=False))
-        value_fc_hidden = tf.nn.relu(tf.layers.dense(
-            tf.reshape(value_conv, [-1, go.N * go.N]),
-            self.fc_width))
-        self.value_output = value_output = tf.nn.tanh(
-            tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]))
-
-        # Training ops
-        self.log_likelihood_cost = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits, labels=pi))
-        self.mse_cost = tf.reduce_mean(tf.square(value_output - outcome))
-        self.l2_cost = self.l2_strength * tf.add_n([tf.nn.l2_loss(v)
-            for v in tf.trainable_variables() if not 'bias' in v.name])
-
-        # Combined loss + regularization
-        self.dual_cost = self.mse_cost + self.log_likelihood_cost + self.l2_cost
-        learning_rate = tf.train.exponential_decay(1e-2, global_step, 10 ** 7, 0.5)
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            self.dual_train_step = tf.train.MomentumOptimizer(
-                learning_rate, MOMENTUM).minimize(self.dual_cost, global_step=global_step)
-
-        # misc ops
-        self.weight_summaries = tf.summary.merge([
-            tf.summary.histogram(weight_var.name, weight_var)
-            for weight_var in tf.trainable_variables()],
-            name="weight_summaries"
-        )
-
-        self.saver = tf.train.Saver()
-
-    def initialize_logging(self, tensorboard_logdir):
-        """Initializes a logging-summary writer.
-
-        This method initializes a writer to write for writing stats to
-        tensorboard.
-        """
-        self.summary_writer = tf.summary.FileWriter(os.path.join(
-                tensorboard_logdir, "training"), self.session.graph)
-
-    def initialize_variables(self, save_file=None):
-        self.session.run(tf.global_variables_initializer())
-        if save_file is not None:
-            try:
-                self.saver.restore(self.session, save_file)
-                self.name = os.path.basename(save_file)
-            except:
-                # some wizardry here... basically, only restore variables
-                # that are in the save file; otherwise, initialize them normally.
-                from tensorflow.python.framework import meta_graph
-                meta_graph_def = meta_graph.read_meta_graph_file(save_file + '.meta')
-                stored_var_names = set([n.name
-                    for n in meta_graph_def.graph_def.node
-                    if n.op == 'VariableV2'])
-                print(stored_var_names)
-                var_list = [v for v in tf.global_variables()
-                    if v.op.name in stored_var_names]
-                # initialize all of the variables
-                self.session.run(tf.global_variables_initializer())
-                # then overwrite the ones we have in the save file
-                # by using a throwaway saver, saved models are automatically
-                # "upgraded" to the latest graph definition.
-                throwaway_saver = tf.train.Saver(var_list=var_list)
-                throwaway_saver.restore(self.session, save_file)
+    def train(self, tf_records, init_from=None, logdir=None, num_steps=None):
+        if num_steps is None:
+            num_steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
+        with self.sess.graph.as_default():
+            input_tensors = preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records)
+            output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
+                train_mode=True, **self.hparams)
+            train_tensors = train_ops(input_tensors, output_tensors, **self.hparams)
+            weight_tensors = logging_ops()
+            self.initialize_weights(init_from)
+            if logdir is not None:
+                training_stats = StatisticsCollector()
+                logger = tf.summary.FileWriter(logdir, self.sess.graph)
+            for i in itertools.count():
+                if i > num_steps:
+                    break
+                try:
+                    tensor_values = self.sess.run(train_tensors)
+                except tf.errors.OutOfRangeError:
+                    break
+                if i % 1000 == 0:
+                    print(tensor_values)
+                if logdir is not None:
+                    training_stats.report(
+                        tensor_values['policy_cost'],
+                        tensor_values['value_cost'],
+                        tensor_values['l2_cost'],
+                        tensor_values['combined_cost'])
+                    if i % 100 == 0 and logdir is not None:
+                        accuracy_summaries = training_stats.collect()
+                        weight_summaries = self.sess.run(weight_tensors)
+                        global_step = tensor_values['global_step']
+                        logger.add_summary(accuracy_summaries, global_step)
+                        logger.add_summary(weight_summaries, global_step)
+            self.save_weights()
 
 
-    def get_global_step(self):
-        return self.session.run(self.global_step)
+class DualNetwork():
+    def __init__(self, save_file, **hparams):
+        self.save_file = save_file
+        self.hparams = get_default_hyperparams(**hparams)
+        self.inference_input = None
+        self.inference_output = None
+        self.sess = tf.Session(graph=tf.Graph())
+        self.initialize_graph()
 
-    def save_variables(self, save_file):
-        if save_file is not None:
-            self.saver.save(self.session, save_file)
+    def initialize_graph(self):
+        with self.sess.graph.as_default():
+            input_tensors = get_inference_input()
+            output_tensors = dual_net(input_tensors, batch_size=-1,
+                train_mode=False, **self.hparams)
+            self.inference_input = input_tensors
+            self.inference_output = output_tensors
+            if self.save_file is not None:
+                tf.train.Saver().restore(self.sess, self.save_file)
+            else:
+                self.sess.run(tf.global_variables_initializer())
 
-    def train(self, training_data, batch_size=32):
-        """training_data is instanceof our custom DataSet"""
-        num_minibatches = training_data.data_size // batch_size
-        for i in range(num_minibatches):
-            batch_x, batch_pi, batch_res = training_data.get_batch(batch_size)
-            _, policy_err, value_err, reg_err, cost = self.session.run(
-                [self.dual_train_step, self.log_likelihood_cost,
-                 self.mse_cost, self.l2_cost, self.dual_cost],
-                feed_dict={self.x: batch_x,
-                           self.pi: batch_pi,
-                           self.outcome: batch_res,
-                           self.train_mode: True,})
-            self.training_stats.report(policy_err, value_err, reg_err, cost)
-            #print("%d: %.3f, %.3f %.3f" % (i, policy_err, value_err, reg_err))
-
-        accuracy_summaries = self.training_stats.collect()
-        global_step = self.get_global_step()
-        if self.summary_writer is not None:
-            weight_summaries = self.session.run(
-                self.weight_summaries,
-                feed_dict={self.x: batch_x,
-                           self.pi: batch_pi,
-                           self.outcome: batch_res})
-            self.summary_writer.add_summary(weight_summaries, global_step)
-            self.summary_writer.add_summary(accuracy_summaries, global_step)
-
-
-    def run(self, position):
-        processed_position = features.extract_features(position, features=features.NEW_FEATURES)
-        probabilities, value = self.session.run([self.policy_output, self.value_output],
-                                         feed_dict={self.x: processed_position[None, :], self.train_mode:False})
-        return probabilities[0], value[0]
+    def run(self, position, use_random_symmetry=True):
+        probs, values = self.run_many([position],
+            use_random_symmetry=use_random_symmetry)
+        return probs[0], values[0]
 
     def run_many(self, positions, use_random_symmetry=True):
-        fts = functools.partial(features.extract_features, features=features.NEW_FEATURES)
-        processed = list(map(fts, positions))
+        processed = list(map(features.extract_features, positions))
         if use_random_symmetry:
-            syms_used, processed = features.randomize_symmetries_feat(processed)
-        probabilities, value = self.session.run(
-            [self.policy_output, self.value_output],
-            feed_dict={self.x: processed,
-                       self.train_mode: False})
+            syms_used, processed = symmetries.randomize_symmetries_feat(processed)
+        outputs = self.sess.run(self.inference_output,
+            feed_dict={self.inference_input['pos_tensor']: processed})
+        probabilities, value = outputs['policy_output'], outputs['value_output']
         if use_random_symmetry:
-            probabilities = features.invert_symmetries_pi(syms_used, probabilities)
+            probabilities = symmetries.invert_symmetries_pi(syms_used, probabilities)
         return probabilities, value
 
+
+def get_inference_input():
+    return {
+        'pos_tensor': tf.placeholder(tf.float32,
+            [None, go.N, go.N, features.NEW_FEATURES_PLANES]),
+        'pi_tensor': tf.placeholder(tf.float32,
+            [None, go.N * go.N + 1]),
+        'value_tensor': tf.placeholder(tf.float32, [None]),
+    }
+
+def _round_power_of_two(n):
+    return 2 ** int(round(math.log(n, 2)))
+
+def get_default_hyperparams(**overrides):
+    k = _round_power_of_two(go.N ** 2 / 3) # width of each layer
+    hparams = {
+        'k': k,  # Width of each conv layer
+        'fc_width': 2 * k,  # Width of each fully connected layer
+        'num_shared_layers': go.N,  # Number of shared trunk layers
+        'l2_strength': 2e-4,  # Regularization strength
+        'momentum': 0.9,  # Momentum used in SGD
+    }
+    hparams.update(**overrides)
+    return hparams
+
+def dual_net(input_tensors, batch_size, train_mode, **hparams):
+    '''
+    Given dict of batched tensors
+        pos_tensor: [BATCH_SIZE, go.N, go.N, features.NEW_FEATURES_PLANES]
+        pi_tensor: [BATCH_SIZE, go.N * go.N + 1]
+        value_tensor: [BATCH_SIZE]
+    return dict of tensors
+        logits: [BATCH_SIZE, go.N * go.N + 1]
+        policy: [BATCH_SIZE, go.N * go.N + 1]
+        value: [BATCH_SIZE]
+    '''
+    my_batchn = functools.partial(tf.layers.batch_normalization,
+                                  momentum=.997, epsilon=1e-5,
+                                  fused=True, center=True, scale=True, 
+                                  training=train_mode)
+
+    my_conv2d = functools.partial(tf.layers.conv2d,
+        filters=hparams['k'], kernel_size=[3, 3], padding="same")
+
+    def my_res_layer(inputs, train_mode):
+        int_layer1 = my_batchn(my_conv2d(inputs))
+        initial_output = tf.nn.relu(int_layer1)
+        int_layer2 = my_batchn(my_conv2d(initial_output))
+        output = tf.nn.relu(inputs + int_layer2)
+        return output
+
+    initial_output = tf.nn.relu(my_batchn(
+        my_conv2d(input_tensors['pos_tensor'])))
+
+    # the shared stack
+    shared_output = initial_output
+    for i in range(hparams['num_shared_layers']):
+        shared_output = my_res_layer(shared_output, train_mode)
+
+    # policy head
+    policy_conv = tf.nn.relu(my_batchn(
+            my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
+        center=False, scale=False))
+    logits = tf.layers.dense(
+        tf.reshape(policy_conv, [batch_size, go.N * go.N * 2]),
+        go.N * go.N + 1)
+
+    policy_output = tf.nn.softmax(logits)
+
+    # value head
+    value_conv = tf.nn.relu(my_batchn(
+            my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
+        center=False, scale=False))
+    value_fc_hidden = tf.nn.relu(tf.layers.dense(
+        tf.reshape(value_conv, [batch_size, go.N * go.N]),
+        hparams['fc_width']))
+    value_output = value_output = tf.nn.tanh(
+        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [batch_size]))
+    return {
+        'logits': logits,
+        'policy_output': policy_output,
+        'value_output': value_output,
+    }
+
+def train_ops(input_tensors, output_tensors, **hparams):
+    global_step = tf.Variable(0, name="global_step", trainable=False)
+    policy_cost = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(
+            logits=output_tensors['logits'],
+            labels=input_tensors['pi_tensor']))
+    value_cost = tf.reduce_mean(tf.square(
+        output_tensors['value_output'] - input_tensors['value_tensor']))
+    l2_cost = 1e-4 * tf.add_n([tf.nn.l2_loss(v)
+        for v in tf.trainable_variables() if not 'bias' in v.name])
+    combined_cost = policy_cost + value_cost + l2_cost
+    learning_rate = tf.train.exponential_decay(1e-2, global_step, 10 ** 7, 0.1)
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = tf.train.MomentumOptimizer(
+            learning_rate, hparams['momentum']).minimize(
+                combined_cost, global_step=global_step)
+
+    return {
+        'policy_cost': policy_cost,
+        'value_cost': value_cost,
+        'l2_cost': l2_cost,
+        'combined_cost': combined_cost,
+        'global_step': global_step,
+        'train_op': train_op,
+    }
+
+def logging_ops():
+    return tf.summary.merge([
+        tf.summary.histogram(weight_var.name, weight_var)
+        for weight_var in tf.trainable_variables()],
+        name="weight_summaries")
 
 
 class StatisticsCollector(object):
@@ -275,6 +290,9 @@ class StatisticsCollector(object):
         self.combined_costs = []
 
     def report(self, policy_cost, value_cost, regularization_cost, combined_cost):
+        # TODO refactor this to take a dict, and do something like
+        # self.accums = defaultdict(list) and do self.accums[thing].append(value)
+        # so that it can handle an arbitrary number of values.
         self.policy_costs.append(policy_cost)
         self.value_costs.append(value_cost)
         self.regularization_costs.append(regularization_cost)
@@ -295,11 +313,3 @@ class StatisticsCollector(object):
                        self.reg_error:avg_reg,
                        self.cost: avg_cost})
         return summary
-
-if __name__ == '__main__':
-    p = DualNetwork()
-    p.initialize_variables()
-
-    pos = go.Position()
-    probs, val = p.run(pos)
-    print(probs, val)

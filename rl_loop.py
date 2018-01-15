@@ -1,210 +1,88 @@
-"""
-A bunch of scripty glue for running the training jobs in a loop.
-
-This should mostly be reworked when we move to tf.Estimator's and a proper
-dataset queue.
-"""
+"""Wrapper script to ensure that main.py commands are called correctly."""
 import argh
 import argparse
-import subprocess
+import cloud_logging
 import os
-import time
-from tqdm import tqdm
-import sys
-import petname
+import main
 import shipname
-from load_data_sets import DataSetV2
-import re
-import google.cloud.logging as glog
-import logging
-from utils import logged_timer as timer
-import ds_wrangler
-import numpy as np
-import go
+<<<<<<< HEAD
+from tensorflow import gfile
+
+# Pull in environment variables. Run `source ./cluster/common` to set these.
+BUCKET_NAME = os.environ['BUCKET_NAME']
+N = os.environ['BOARD_SIZE']
+
+BASE_DIR = "gs://{}".format(BUCKET_NAME)
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
+SELFPLAY_DIR = os.path.join(BASE_DIR, 'data', 'selfplay')
+SGF_DIR = os.path.join(BASE_DIR, 'sgf')
+TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
 
-BUCKET = os.environ['BUCKET_NAME'] # Did this die?  Set your bucket!
-GAMES_BUCKET = "gs://%s/games/" % BUCKET
-MODELS_BUCKET = "gs://%s/models" % BUCKET
-MODEL_NUM_REGEX = "^\d{6}"
-GAME_DIRECTORY = "./data/selfplay/"
-MODEL_DIRECTORY = "./saved_models"
-TRAINING_DIRECTORY = "data/training_chunks"
-TF_LOG_DIR = "logs/%s" % BUCKET
+def print_flags():
+    flags = {
+        'BUCKET_NAME': BUCKET_NAME,
+        'N': N,
+        'BASE_DIR': BASE_DIR,
+        'MODELS_DIR': MODELS_DIR,
+        'SELFPLAY_DIR': SELFPLAY_DIR,
+        'SGF_DIR': SGF_DIR,
+        'TRAINING_CHUNK_DIR': TRAINING_CHUNK_DIR,
+    }
+    print("Computed variables are:")
+    print('\n'.join('--{}={}'.format(flag, value) for flag, value in flags.items()))
 
-def bootstrap(filename):
-    import dual_net
-    n = dual_net.DualNetwork()
-    n.initialize_variables()
-    n.save_variables(filename)
+def get_latest_model():
+    '''Finds the latest model, returning its model number and name
 
-def push_model(model_num, name):
-    for f in os.listdir(MODEL_DIRECTORY):
-        if f.startswith("{0:06d}".format(model_num)):
-            arg =  'gsutil cp %s/%s %s/%06d-%s.%s' % (
-                    MODEL_DIRECTORY,
-                    f, MODELS_BUCKET, model_num, name, f.split('.')[1])
-            subprocess.call(arg.split())
+    Returns: (17, 000017-modelname)
+    '''
+    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
+    model_filenames = [os.path.basename(m) for m in all_models]
+    model_numbers_names = [
+        (shipname.detect_model_num(m), shipname.detect_model_name(m))
+        for m in model_filenames]
+    latest_model = sorted(model_numbers_names, reverse=True)[-1]
+    return latest_model
 
-def dir_model_num(dir_path):
-    'Returns the model number of a directory, if present, e.g. 000010-neat-model => 10'
-    if not re.match(MODEL_NUM_REGEX, os.path.basename(dir_path)):
-        return None
-    return int(re.match(MODEL_NUM_REGEX, os.path.basename(dir_path)).group())
+def bootstrap():
+    bootstrap_name = shipname.generate(0)
+    bootstrap_model_path = os.path.join(MODELS_DIR, bootstrap_name)
+    print("Bootstrapping model at {}".format(bootstrap_model_path))
+    main.bootstrap(bootstrap_model_path, n=N)
 
+def selfplay(readouts=1600, games=8, verbose=2, resign_threshold=0.99):
+    _, model_name = get_latest_model()
+    print("Playing a game with model {}".format(model_name))
+    model_save_file = os.path.join(MODELS_DIR, model_name)
+    main.selfplay(
+        load_file=model_save_file,
+        output_dir=SELFPLAY_DIR,
+        output_sgf=SGF_DIR,
+        readouts=readouts,
+        games=games,
+        verbose=verbose,
+        n=N,
+    )
 
-def smart_rsync(from_model_num=0, source_dir=GAMES_BUCKET, game_dir=GAME_DIRECTORY):
-    from_model_num = 0 if from_model_num < 0 else from_model_num
-    seen_dirs = subprocess.check_output(('gsutil ls -d %s*' % source_dir).split()).split()
-    seen_dirs = list(map(lambda d: d.decode('UTF-8').strip('/'), seen_dirs))
-    model_dirs = [d for d in seen_dirs
-            if dir_model_num(d) is not None and dir_model_num(d) >= from_model_num ]
-    print("model_dirs:", model_dirs)
-    for d in model_dirs:
-        basename = os.path.basename(d)
-        if not os.path.isdir(os.path.join(game_dir, basename)):
-            os.mkdir(os.path.join(game_dir, basename))
-        subprocess.call('gsutil -m rsync -r -c {0}{2} {1}{2}/'.format(
-                    source_dir, game_dir, basename).split(),
-                    stderr=open('.rsync_log', 'ab'))
+def gather():
+    print("Gathering game output...")
+    main.gather(input_directory=SELFPLAY_DIR, output_directory=TRAINING_CHUNK_DIR)
 
-def find_largest_modelnum(directory):
-    return max([dir_model_num(f) or 0 for f in os.listdir(directory) ])
-
-def gather_loop():
-    # Check how many chunks there are.  Run rsync.  If there are no
-    # chunks, run gather, else wait a bit, and repeat.
-    while True:
-        while True:
-           num_chunks = sum([1 if p.endswith('.gz') else 0 for p in os.listdir(TRAINING_DIRECTORY)])
-           if num_chunks == 0:
-               break
-           print('Found ', num_chunks, ' chunks.  Waiting for training job to use them.')
-           time.sleep(30)
-
-        # Create training chunks, do something with the data...
-        with timer("=== Gather & write out chunks: "):
-            failball = subprocess.call( ('python main.py gather').split())
-            if failball:
-                print(failball)
-                sys.exit(1)
-            time.sleep(60*60*1)
-
-def rsync_loop():
-    while True:
-        maxnum = find_largest_modelnum(MODEL_DIRECTORY)
-        print ("Oldest model: ", maxnum)
-        with timer("=== Rsync new games"):
-            smart_rsync(maxnum-6)
-        logging.info("Rsync finished")
-        time.sleep(300)
-
-def train_loop():
-    model_num = find_largest_modelnum(MODEL_DIRECTORY) or 0
-    train_cmd = 'python main.py train --load-file {2}/{0:06d} -s {2}/{1:06d}' + \
-                ' --logdir {3} {4}'
-
-    while True:
-        print(" ====== Model %d ======" % (model_num))
-
-        print("Waiting for training chunks...")
-        while True:
-            num_chunks = sum([1 if fname.endswith('.gz') else 0 for fname in os.listdir(TRAINING_DIRECTORY)])
-            if num_chunks == 600:
-                break
-            if num_chunks != 0:
-                print("Found", num_chunks, ". Waiting for them to finish writing")
-                time.sleep(210)
-                break
-            time.sleep(120)
-
-        # Take a training step.
-        bigarg = train_cmd.format(model_num, model_num+1, MODEL_DIRECTORY, TF_LOG_DIR, TRAINING_DIRECTORY)
-        print("RUNNING '%s'" % bigarg)
-        failball = subprocess.call(bigarg.split())
-        if failball:
-            print(failball)
-            sys.exit(1)
-
-        # Back up the chunks
-        subprocess.call("gsutil -m cp {dirname}/*.gz gs://{bucket}/old_chunks/{num}/".format(
-                dirname= TRAINING_DIRECTORY,
-                 bucket= BUCKET,
-                 num= model_num).split())
-        subprocess.call("gsutil -m cp {dirname}/*.meta gs://{bucket}/old_chunks/{num}/".format(
-                dirname= TRAINING_DIRECTORY,
-                 bucket= BUCKET,
-                 num= model_num).split())
-        # Wipe the training directory.
-        for p in os.listdir(TRAINING_DIRECTORY):
-            if p.endswith('.gz'):
-                os.remove(os.path.join(TRAINING_DIRECTORY, p))
-
-        # For now, always promote our new model.
-        if go.N == 19:
-            new_name = shipname.generate()
-        else:
-            new_name = petname.generate()
-        print("A new champion! ", new_name)
-        model_num+=1
-        print("Pushing %06d-%s to saved_models" % (model_num, new_name))
-        push_model(model_num, new_name)
-        subprocess.call('./update-acls')
-
-def consolidate(
-        input_directory: 'where to look for games'='data/selfplay/',
-        max_positions: 'how many positions before discarding games'= 250000,
-        before_model: 'consolidate games only for models before this.'=1):
-
-    paths = [(root, dirs, files) for root, dirs, files in os.walk(input_directory) 
-             if dir_model_num(root) is not None and dir_model_num(root) < before_model]
-
-    for model, _, _ in paths:
-        metas = []
-        for player, _, files in os.walk(model):
-            for f in files:
-                if f.endswith('.meta') and f.find('combined') == -1:
-                    metas.append(os.path.join(player, f))
-        if not metas:
-            print("Skipping model", model)
-            continue
-        bigchunks = []
-        current = []
-        counter = 0
-        print("Consolidating for model: ", model)
-        for m in tqdm(metas):
-            sz,err = ds_wrangler._read_meta(m)
-            if err:
-                print('Invalid:', m)
-                continue
-            counter += sz
-            current.append(m)
-            if counter > max_positions:
-                print("%d positions in %d files" % (counter, len(current)))
-                bigchunks.append(current)
-                current = []
-                counter = 0
-
-        bigchunks.append(current)
-
-        for idx, c in enumerate(tqdm(bigchunks)):
-            datasets = [DataSetV2.read(filename.replace('.meta','.gz')) for filename in c]
-            combined = DataSetV2(
-                np.concatenate([d.pos_features for d in datasets]),
-                np.concatenate([d.next_moves for d in datasets]),
-                np.concatenate([d.results for d in datasets]))
-            combined.write(os.path.join(model, "%s-combined-%d.gz" % (os.path.basename(model), idx)))
-
+def train(logdir=None):
+    model_num, model_name = get_latest_model()
+    print("Training on gathered game data, initializing from {}".format(model_name))
+    new_model_name = shipname.generate(model_num + 1)
+    print("New model will be {}".format(new_model_name))
+    load_file = os.path.join(MODELS_DIR, model_name)
+    save_file = os.path.join(MODELS_DIR, new_model_name)
+    main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
+               generation_num=model_num, logdir=logdir, n=N)
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train_loop, gather_loop, rsync_loop, bootstrap, smart_rsync, consolidate])
+argh.add_commands(parser, [train, selfplay, gather, bootstrap])
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    try:
-        client = glog.Client('tensor-go')
-        client.setup_logging(logging.INFO)
-    except:
-        print('!! Cloud logging disabled')
-
+    print_flags()
+    cloud_logging.configure()
     argh.dispatch(parser)

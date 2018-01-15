@@ -64,7 +64,7 @@ class GtpInterface(object):
         return utils.unparse_pygtp_coords(move)
 
     def final_score(self):
-        return self.position.result()
+        return self.position.result_string()
 
     def showboard(self):
         print('\n\n' + str(self.position) + '\n\n', file=sys.stderr)
@@ -74,7 +74,7 @@ class GtpInterface(object):
         raise NotImplementedError
 
     def get_score(self):
-        return self.position.result()
+        return self.position.result_string()
 
     def suggest_move(self, position):
         raise NotImplementedError
@@ -96,11 +96,9 @@ class MCTSPlayer(MCTSPlayerMixin, GtpInterface): pass
 class CGOSPlayer(CGOSPlayerMixin, GtpInterface): pass
 
 def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1, cgos_mode=False):
-    n = DualNetwork()
-    try:
-        n.initialize_variables(read_file)
-    except:
-        n.initialize_variables()
+    n = DualNetwork(read_file)
+    instance = MCTSPlayer(n, simulations_per_move=readouts_per_move, verbosity=verbosity, two_player_mode=True)
+    gtp_engine = gtp.Engine(instance)
     if cgos_mode:
         instance = CGOSPlayer(n, seconds_per_move=5, verbosity=verbosity, two_player_mode=True)
     else:
