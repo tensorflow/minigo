@@ -15,11 +15,11 @@ So, for a 19x19,
 
 Coord Type      upper_left      upper_right     pass
 -------------------------------------------------------
-minigo coord    (0, 0)          (18, 0)         None
-flat            0               342             361
+minigo coord    (0, 0)          (0, 18)         None
+flat            0               18              361
 SGF             'aa'            'sa'            ''
 KGS             'A19'           'T19'           'pass'
-pygtp           (1, 19)         (19,19)         'pass'
+pygtp           (1, 19)         (19,19)         (0,0)
 """
 
 import go
