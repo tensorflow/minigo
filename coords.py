@@ -54,7 +54,7 @@ def parse_sgf_coords(s):
     """Transform a SGF coordinate into a coordinate-tuple
 
     SGF coordinates have the form '<letter><letter>', where aa is top left
-    corner; sa (18, 1) is top right corner of a 19x19. The resulting coordinate 
+    corner; sa (18, 1) is top right corner of a 19x19.
 
     An SGF coordinate of '' is interpreted as a pass-move.
     """
@@ -63,7 +63,7 @@ def parse_sgf_coords(s):
     return SGF_COLUMNS.index(s[1]), SGF_COLUMNS.index(s[0])
 
 def unparse_sgf_coords(c):
-    """Turns a coordinate tuple into a SGF coordinate."""
+    """Turns a MiniGo coordinate tuple into a SGF coordinate."""
     if c is None:
         return ''
     return SGF_COLUMNS[c[1]] + SGF_COLUMNS[c[0]]
@@ -82,7 +82,7 @@ def parse_kgs_coords(s):
     return go.N - row_from_bottom - 1, col
 
 def to_human_coord(coord):
-    """From a MiniGo coord to a human readable string
+    """Converts from a MiniGo coord to a human readable string
 
     This is equivalent to a KGS coordinate.
     """
@@ -93,7 +93,7 @@ def to_human_coord(coord):
         return "{}{}".format("ABCDEFGHJKLMNOPQRSTYVWYZ"[x], go.N-y) 
 
 def parse_pygtp_coords(vertex):
-    """Transform a GTP coordinate into a standard MiniGo coordinate (c, r)
+    """Transforms a GTP coordinate into a standard MiniGo coordinate (c, r)
 
     GTP coordinates are interpeted as (1, 1) being the bottom left and (1, 19)
     the top left. GTP has a notion of both a Pass and a Resign, both of which
@@ -104,7 +104,7 @@ def parse_pygtp_coords(vertex):
     return go.N - vertex[1], vertex[0] - 1
 
 def unparse_pygtp_coords(c):
-    """Transform a MiniGo Coordinate back into a GTP coordinate
+    """Transforms a MiniGo Coordinate back into a GTP coordinate
 
     As in other coordinates, None is interpreted as a Pass.
     """
