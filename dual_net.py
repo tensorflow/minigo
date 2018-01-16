@@ -32,7 +32,7 @@ class DualNetworkTrainer():
         # self.eval_logdir = os.path.join(model_dir, 'logs', 'eval')
 
     def initialize_weights(self, init_from=None):
-        '''Initialize weights from model checkpoint.
+        """Initialize weights from model checkpoint.
 
         If model checkpoint does not exist, fall back to init_from.
         If that doesn't exist either, bootstrap with random weights.
@@ -40,7 +40,7 @@ class DualNetworkTrainer():
         This priority order prevents the mistake where the latest saved
         model exists, but you accidentally init from an older model checkpoint
         and then overwrite the newer model weights.
-        '''
+        """
         if self.save_file is not None and os.path.exists(self.save_file + '.meta'):
             tf.train.Saver().restore(self.sess, self.save_file)
             return
@@ -151,22 +151,38 @@ def get_inference_input():
     }
 
 def _round_power_of_two(n):
+    """Finds the nearest power of 2 to a number.
+
+    Thus, 84 -> 64, 120 -> 128, etc.
+    """
     return 2 ** int(round(math.log(n, 2)))
 
 def get_default_hyperparams(**overrides):
+    """Returns the hyperparams for the neural net.
+
+    In other words, returns a dict whose paramaters come from the AGZ paper:
+
+    k: number of filters (AlphaGoZero used 256). We use 128 by default for
+        a 19x19 go board.
+    fc_width: Dimensionality of the fully connected linear layer
+    num_shared_layers: number of shared residual blocks. AGZ used both 19
+        and 39. Here we use 19 because it's faster to train.
+    l2_strength: The L2 regularization parameter.
+    momentum: The momentum parameter for training
+    """
     k = _round_power_of_two(go.N ** 2 / 3) # width of each layer
     hparams = {
-        'k': k,  # Width of each conv layer
-        'fc_width': 2 * k,  # Width of each fully connected layer
-        'num_shared_layers': go.N,  # Number of shared trunk layers
-        'l2_strength': 2e-4,  # Regularization strength
-        'momentum': 0.9,  # Momentum used in SGD
+        'k': k,
+        'fc_width': 2 * k,
+        'num_shared_layers': go.N,
+        'l2_strength': 2e-4,
+        'momentum': MOMENTUM,
     }
     hparams.update(**overrides)
     return hparams
 
 def dual_net(input_tensors, batch_size, train_mode, **hparams):
-    '''
+    """
     Given dict of batched tensors
         pos_tensor: [BATCH_SIZE, go.N, go.N, features.NEW_FEATURES_PLANES]
         pi_tensor: [BATCH_SIZE, go.N * go.N + 1]
@@ -175,7 +191,7 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
         logits: [BATCH_SIZE, go.N * go.N + 1]
         policy: [BATCH_SIZE, go.N * go.N + 1]
         value: [BATCH_SIZE]
-    '''
+    """
     my_batchn = functools.partial(tf.layers.batch_normalization,
                                   momentum=.997, epsilon=1e-5,
                                   fused=True, center=True, scale=True, 
