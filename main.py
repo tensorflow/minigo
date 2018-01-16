@@ -21,7 +21,6 @@ import selfplay_mcts
 from utils import logged_timer as timer
 import evaluation
 import sgf_wrapper
-import utils
 
 
 def _ensure_dir_exists(directory):

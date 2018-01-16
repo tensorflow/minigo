@@ -1,10 +1,10 @@
 import gtp
 import gtp_extensions
 
+import coords
 import datetime
 import go
 import random
-import utils
 import sys
 import os
 from dual_net import DualNetwork
@@ -51,17 +51,17 @@ class GtpInterface(object):
             self.position.flip_playerturn(mutate=True)
 
     def make_move(self, color, vertex):
-        coords = utils.parse_pygtp_coords(vertex)
+        c = coords.parse_pygtp_coords(vertex)
         # let's assume this never happens for now.
         # self.accomodate_out_of_turn(color)
-        return self.play_move(coords)
+        return self.play_move(c)
 
     def get_move(self, color):
         self.accomodate_out_of_turn(color)
         move = self.suggest_move(self.position)
         if self.should_resign():
             return gtp.RESIGN
-        return utils.unparse_pygtp_coords(move)
+        return coords.unparse_pygtp_coords(move)
 
     def final_score(self):
         return self.position.result_string()
@@ -79,7 +79,7 @@ class GtpInterface(object):
     def suggest_move(self, position):
         raise NotImplementedError
 
-    def play_move(self, coords):
+    def play_move(self, c):
         raise NotImplementedError
 
     def initialize_game(self):

@@ -3,9 +3,9 @@
 import gtp
 import sys
 import sgf_wrapper
-import utils
 import itertools
 import go
+import coords
 
 def parse_message(message):
     message = gtp.pre_engine(message).strip()
@@ -123,7 +123,7 @@ class GoGuiMixin(gtp.Engine):
 
     def heatmap(self, sort_order, node, prop):
         return "\n".join(["{!s:6} {}".format(
-            utils.to_human_coord(utils.unflatten_coords(key)),
+            coords.to_human_coord(coords.unflatten_coords(key)),
             node.__dict__.get(prop)[key])
             for key in sort_order if node.child_N[key] > 0][:20])
 

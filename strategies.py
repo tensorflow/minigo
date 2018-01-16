@@ -5,12 +5,12 @@ import sys
 import time
 import sgf_wrapper
 
+import coords
 import gtp
 import numpy as np
 from mcts import MCTSNode
 
 import go
-import utils
 
 MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 # When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
@@ -106,7 +106,7 @@ class MCTSPlayerMixin:
 
         return self.pick_move()
 
-    def play_move(self, coords):
+    def play_move(self, c):
         '''
         Notable side effects:
           - finalizes the probability distribution according to
@@ -119,7 +119,7 @@ class MCTSPlayerMixin:
                 self.root.children_as_pi(self.root.position.n > self.temp_threshold))
         self.qs.append(self.root.Q) # Save our resulting Q.
         self.comments.append(self.root.describe())
-        self.root = self.root.add_child(utils.flatten_coords(coords))
+        self.root = self.root.add_child(coords.flatten_coords(c))
         self.position = self.root.position # for showboard
         del self.root.parent.children
         print("visits at root:", self.root.N, file=sys.stderr, flush=True)
@@ -138,7 +138,7 @@ class MCTSPlayerMixin:
             selection = random.random()
             fcoord = cdf.searchsorted(selection)
             assert self.root.child_N[fcoord] != 0
-        return utils.unflatten_coords(fcoord)
+        return coords.unflatten_coords(fcoord)
 
     def tree_search(self):
         leaf = self.root.select_leaf()
@@ -163,7 +163,7 @@ class MCTSPlayerMixin:
         pos = node.position
         if len(pos.recent) == 0:
             return
-        moves = list(map(utils.to_human_coord,
+        moves = list(map(coords.to_human_coord,
                          [move.move for move in pos.recent[self.root.position.n:]]))
         print("From root: ", " <= ".join(moves), file=sys.stderr, flush=True)
 

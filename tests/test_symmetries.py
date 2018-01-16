@@ -1,11 +1,11 @@
 import itertools
 import numpy as np
 
+import coords
 import symmetries
 from symmetries import apply_symmetry_feat as apply_f
 from symmetries import apply_symmetry_pi as apply_p
 import go
-import utils
 from test_utils import GoPositionTestCase
 
 class TestSymmetryOperations(GoPositionTestCase):
@@ -57,11 +57,11 @@ class TestSymmetryOperations(GoPositionTestCase):
 
     def test_proper_move_transform(self):
         # Check that the reinterpretation of 362 = 19*19 + 1 during symmetry
-        # application is consistent with utils.unflatten_coords
+        # application is consistent with coords.unflatten_coords
         move_array = np.arange(go.N ** 2 + 1)
         coord_array = np.zeros([go.N, go.N])
         for c in range(go.N ** 2):
-            coord_array[utils.unflatten_coords(c)] = c
+            coord_array[coords.unflatten_coords(c)] = c
         for s in symmetries.SYMMETRIES:
             with self.subTest(symmetry=s):
                 transformed_moves = apply_p(s, move_array)
@@ -69,4 +69,4 @@ class TestSymmetryOperations(GoPositionTestCase):
                 for new_coord, old_coord in enumerate(transformed_moves[:-1]):
                     self.assertEqual(
                         old_coord,
-                        transformed_board[utils.unflatten_coords(new_coord)])
+                        transformed_board[coords.unflatten_coords(new_coord)])

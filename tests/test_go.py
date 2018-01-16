@@ -1,9 +1,11 @@
 import numpy as np
 import unittest
+
+from coords import parse_kgs_coords as parse_kgs_coords, parse_sgf_coords, unflatten_coords
+import coords
 from go import Position, PlayerMove, LibertyTracker, WHITE, BLACK, EMPTY
 import go
 import sgf_wrapper
-from utils import parse_kgs_coords as pc, parse_sgf_coords, unflatten_coords
 from test_utils import GoPositionTestCase, load_board
 
 go.set_board_size(9)
@@ -16,8 +18,8 @@ X........
 
 NO_HANDICAP_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf];B[eg];W[dd];B[dc];W[cc];B[de];W[cd];B[ed];W[he];B[ce];W[be];B[df];W[bf];B[hd];W[ge];B[gd];W[gg];B[db];W[cb];B[cg];W[bg];B[gh];W[fh];B[hh];W[fg];B[eh];W[ei];B[di];W[fi];B[hg];W[dh];B[ch];W[ci];B[bh];W[ff];B[fe];W[hf];B[id];W[bi];B[ah];W[ef];B[dg];W[ee];B[di];W[ig];B[ai];W[ih];B[fb];W[hi];B[ag];W[ab];B[bd];W[bc];B[ae];W[ad];B[af];W[bd];B[ca];W[ba];B[da];W[ie])"
 
-def pc_set(string):
-    return frozenset(map(pc, string.split()))
+def parse_kgs_coords_set(string):
+    return frozenset(map(parse_kgs_coords, string.split()))
 
 class TestGoBoard(GoPositionTestCase):
     def test_load_board(self):
@@ -25,28 +27,28 @@ class TestGoBoard(GoPositionTestCase):
         self.assertEqualNPArray(go.EMPTY_BOARD, load_board('. \n' * go.N ** 2))
 
     def test_parsing(self):
-        self.assertEqual(pc('A9'), (0, 0))
+        self.assertEqual(parse_kgs_coords('A9'), (0, 0))
         self.assertEqual(parse_sgf_coords('aa'), (0, 0))
-        self.assertEqual(pc('A3'), (6, 0))
+        self.assertEqual(parse_kgs_coords('A3'), (6, 0))
         self.assertEqual(parse_sgf_coords('ac'), (2, 0))
-        self.assertEqual(pc('D4'), parse_sgf_coords('df'))
+        self.assertEqual(parse_kgs_coords('D4'), parse_sgf_coords('df'))
 
     def test_neighbors(self):
-        corner = pc('A1')
+        corner = parse_kgs_coords('A1')
         neighbors = [go.EMPTY_BOARD[c] for c in go.NEIGHBORS[corner]]
         self.assertEqual(len(neighbors), 2)
 
-        side = pc('A2')
+        side = parse_kgs_coords('A2')
         side_neighbors = [go.EMPTY_BOARD[c] for c in go.NEIGHBORS[side]]
         self.assertEqual(len(side_neighbors), 3)
 
 
 class TestEyeHandling(GoPositionTestCase):
     def test_is_koish(self):
-        self.assertEqual(go.is_koish(TEST_BOARD, pc('A9')), BLACK)
-        self.assertEqual(go.is_koish(TEST_BOARD, pc('B8')), None)
-        self.assertEqual(go.is_koish(TEST_BOARD, pc('B9')), None)
-        self.assertEqual(go.is_koish(TEST_BOARD, pc('E5')), None)
+        self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('A9')), BLACK)
+        self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('B8')), None)
+        self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('B9')), None)
+        self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('E5')), None)
 
     def test_is_eyeish(self):
         board = load_board('''
@@ -60,9 +62,9 @@ class TestEyeHandling(GoPositionTestCase):
             .XO.X.O.O
             XXO.X.OO.
         ''')
-        B_eyes = pc_set('A2 A9 B8 J7 H8')
-        W_eyes = pc_set('H2 J1 J3')
-        not_eyes = pc_set('B3 E5')
+        B_eyes = parse_kgs_coords_set('A2 A9 B8 J7 H8')
+        W_eyes = parse_kgs_coords_set('H2 J1 J3')
+        not_eyes = parse_kgs_coords_set('B3 E5')
         for be in B_eyes:
             self.assertEqual(go.is_eyeish(board, be), BLACK, str(be))
         for we in W_eyes:
@@ -76,42 +78,42 @@ class TestLibertyTracker(unittest.TestCase):
 
         lib_tracker = LibertyTracker.from_board(board)
         self.assertEqual(len(lib_tracker.groups), 1)
-        self.assertNotEqual(lib_tracker.group_index[pc('A9')], go.MISSING_GROUP_ID)
-        self.assertEqual(lib_tracker.liberty_cache[pc('A9')], 2)
-        sole_group = lib_tracker.groups[lib_tracker.group_index[pc('A9')]]
-        self.assertEqual(sole_group.stones, pc_set('A9'))
-        self.assertEqual(sole_group.liberties, pc_set('B9 A8'))
+        self.assertNotEqual(lib_tracker.group_index[parse_kgs_coords('A9')], go.MISSING_GROUP_ID)
+        self.assertEqual(lib_tracker.liberty_cache[parse_kgs_coords('A9')], 2)
+        sole_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('A9')]]
+        self.assertEqual(sole_group.stones, parse_kgs_coords_set('A9'))
+        self.assertEqual(sole_group.liberties, parse_kgs_coords_set('B9 A8'))
         self.assertEqual(sole_group.color, BLACK)
 
     def test_place_stone(self):
         board = load_board('X........' + EMPTY_ROW * 8)
         lib_tracker = LibertyTracker.from_board(board)
-        lib_tracker.add_stone(BLACK, pc('B9'))
+        lib_tracker.add_stone(BLACK, parse_kgs_coords('B9'))
         self.assertEqual(len(lib_tracker.groups), 1)
-        self.assertNotEqual(lib_tracker.group_index[pc('A9')], go.MISSING_GROUP_ID)
-        self.assertEqual(lib_tracker.liberty_cache[pc('A9')], 3)
-        self.assertEqual(lib_tracker.liberty_cache[pc('B9')], 3)
-        sole_group = lib_tracker.groups[lib_tracker.group_index[pc('A9')]]
-        self.assertEqual(sole_group.stones, pc_set('A9 B9'))
-        self.assertEqual(sole_group.liberties, pc_set('C9 A8 B8'))
+        self.assertNotEqual(lib_tracker.group_index[parse_kgs_coords('A9')], go.MISSING_GROUP_ID)
+        self.assertEqual(lib_tracker.liberty_cache[parse_kgs_coords('A9')], 3)
+        self.assertEqual(lib_tracker.liberty_cache[parse_kgs_coords('B9')], 3)
+        sole_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('A9')]]
+        self.assertEqual(sole_group.stones, parse_kgs_coords_set('A9 B9'))
+        self.assertEqual(sole_group.liberties, parse_kgs_coords_set('C9 A8 B8'))
         self.assertEqual(sole_group.color, BLACK)
 
     def test_place_stone_opposite_color(self):
         board = load_board('X........' + EMPTY_ROW * 8)
         lib_tracker = LibertyTracker.from_board(board)
-        lib_tracker.add_stone(WHITE, pc('B9'))
+        lib_tracker.add_stone(WHITE, parse_kgs_coords('B9'))
         self.assertEqual(len(lib_tracker.groups), 2)
-        self.assertNotEqual(lib_tracker.group_index[pc('A9')], go.MISSING_GROUP_ID)
-        self.assertNotEqual(lib_tracker.group_index[pc('B9')], go.MISSING_GROUP_ID)
-        self.assertEqual(lib_tracker.liberty_cache[pc('A9')], 1)
-        self.assertEqual(lib_tracker.liberty_cache[pc('B9')], 2)
-        black_group = lib_tracker.groups[lib_tracker.group_index[pc('A9')]]
-        white_group = lib_tracker.groups[lib_tracker.group_index[pc('B9')]]
-        self.assertEqual(black_group.stones, pc_set('A9'))
-        self.assertEqual(black_group.liberties, pc_set('A8'))
+        self.assertNotEqual(lib_tracker.group_index[parse_kgs_coords('A9')], go.MISSING_GROUP_ID)
+        self.assertNotEqual(lib_tracker.group_index[parse_kgs_coords('B9')], go.MISSING_GROUP_ID)
+        self.assertEqual(lib_tracker.liberty_cache[parse_kgs_coords('A9')], 1)
+        self.assertEqual(lib_tracker.liberty_cache[parse_kgs_coords('B9')], 2)
+        black_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('A9')]]
+        white_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('B9')]]
+        self.assertEqual(black_group.stones, parse_kgs_coords_set('A9'))
+        self.assertEqual(black_group.liberties, parse_kgs_coords_set('A8'))
         self.assertEqual(black_group.color, BLACK)
-        self.assertEqual(white_group.stones, pc_set('B9'))
-        self.assertEqual(white_group.liberties, pc_set('C9 B8'))
+        self.assertEqual(white_group.stones, parse_kgs_coords_set('B9'))
+        self.assertEqual(white_group.liberties, parse_kgs_coords_set('C9 B8'))
         self.assertEqual(white_group.color, WHITE)
 
     def test_merge_multiple_groups(self):
@@ -121,12 +123,12 @@ class TestLibertyTracker(unittest.TestCase):
             .X.......
         ''' + EMPTY_ROW * 6)
         lib_tracker = LibertyTracker.from_board(board)
-        lib_tracker.add_stone(BLACK, pc('B8'))
+        lib_tracker.add_stone(BLACK, parse_kgs_coords('B8'))
         self.assertEqual(len(lib_tracker.groups), 1)
-        self.assertNotEqual(lib_tracker.group_index[pc('B8')], go.MISSING_GROUP_ID)
-        sole_group = lib_tracker.groups[lib_tracker.group_index[pc('B8')]]
-        self.assertEqual(sole_group.stones, pc_set('B9 A8 B8 C8 B7'))
-        self.assertEqual(sole_group.liberties, pc_set('A9 C9 D8 A7 C7 B6'))
+        self.assertNotEqual(lib_tracker.group_index[parse_kgs_coords('B8')], go.MISSING_GROUP_ID)
+        sole_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('B8')]]
+        self.assertEqual(sole_group.stones, parse_kgs_coords_set('B9 A8 B8 C8 B7'))
+        self.assertEqual(sole_group.liberties, parse_kgs_coords_set('A9 C9 D8 A7 C7 B6'))
         self.assertEqual(sole_group.color, BLACK)
 
         liberty_cache = lib_tracker.liberty_cache
@@ -140,10 +142,10 @@ class TestLibertyTracker(unittest.TestCase):
             .X.......
         ''' + EMPTY_ROW * 6)
         lib_tracker = LibertyTracker.from_board(board)
-        captured = lib_tracker.add_stone(BLACK, pc('C8'))
+        captured = lib_tracker.add_stone(BLACK, parse_kgs_coords('C8'))
         self.assertEqual(len(lib_tracker.groups), 4)
-        self.assertEqual(lib_tracker.group_index[pc('B8')], go.MISSING_GROUP_ID)
-        self.assertEqual(captured, pc_set('B8'))
+        self.assertEqual(lib_tracker.group_index[parse_kgs_coords('B8')], go.MISSING_GROUP_ID)
+        self.assertEqual(captured, parse_kgs_coords_set('B8'))
 
     def test_capture_many(self):
         board = load_board('''
@@ -152,26 +154,26 @@ class TestLibertyTracker(unittest.TestCase):
             .XX......
         ''' + EMPTY_ROW * 6)
         lib_tracker = LibertyTracker.from_board(board)
-        captured = lib_tracker.add_stone(BLACK, pc('D8'))
+        captured = lib_tracker.add_stone(BLACK, parse_kgs_coords('D8'))
         self.assertEqual(len(lib_tracker.groups), 4)
-        self.assertEqual(lib_tracker.group_index[pc('B8')], go.MISSING_GROUP_ID)
-        self.assertEqual(captured, pc_set('B8 C8'))
+        self.assertEqual(lib_tracker.group_index[parse_kgs_coords('B8')], go.MISSING_GROUP_ID)
+        self.assertEqual(captured, parse_kgs_coords_set('B8 C8'))
 
-        left_group = lib_tracker.groups[lib_tracker.group_index[pc('A8')]]
-        self.assertEqual(left_group.stones, pc_set('A8'))
-        self.assertEqual(left_group.liberties, pc_set('A9 B8 A7'))
+        left_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('A8')]]
+        self.assertEqual(left_group.stones, parse_kgs_coords_set('A8'))
+        self.assertEqual(left_group.liberties, parse_kgs_coords_set('A9 B8 A7'))
 
-        right_group = lib_tracker.groups[lib_tracker.group_index[pc('D8')]]
-        self.assertEqual(right_group.stones, pc_set('D8'))
-        self.assertEqual(right_group.liberties, pc_set('D9 C8 E8 D7'))
+        right_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('D8')]]
+        self.assertEqual(right_group.stones, parse_kgs_coords_set('D8'))
+        self.assertEqual(right_group.liberties, parse_kgs_coords_set('D9 C8 E8 D7'))
 
-        top_group = lib_tracker.groups[lib_tracker.group_index[pc('B9')]]
-        self.assertEqual(top_group.stones, pc_set('B9 C9'))
-        self.assertEqual(top_group.liberties, pc_set('A9 D9 B8 C8'))
+        top_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('B9')]]
+        self.assertEqual(top_group.stones, parse_kgs_coords_set('B9 C9'))
+        self.assertEqual(top_group.liberties, parse_kgs_coords_set('A9 D9 B8 C8'))
 
-        bottom_group = lib_tracker.groups[lib_tracker.group_index[pc('B7')]]
-        self.assertEqual(bottom_group.stones, pc_set('B7 C7'))
-        self.assertEqual(bottom_group.liberties, pc_set('B8 C8 A7 D7 B6 C6'))
+        bottom_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('B7')]]
+        self.assertEqual(bottom_group.stones, parse_kgs_coords_set('B7 C7'))
+        self.assertEqual(bottom_group.liberties, parse_kgs_coords_set('B8 C8 A7 D7 B6 C6'))
 
         liberty_cache = lib_tracker.liberty_cache
         for stone in top_group.stones:
@@ -192,17 +194,17 @@ class TestLibertyTracker(unittest.TestCase):
             XX.......
         ''' + EMPTY_ROW * 6)
         lib_tracker = LibertyTracker.from_board(board)
-        captured = lib_tracker.add_stone(BLACK, pc('A9'))
+        captured = lib_tracker.add_stone(BLACK, parse_kgs_coords('A9'))
         self.assertEqual(len(lib_tracker.groups), 2)
-        self.assertEqual(captured, pc_set('B9 A8'))
+        self.assertEqual(captured, parse_kgs_coords_set('B9 A8'))
 
-        corner_stone = lib_tracker.groups[lib_tracker.group_index[pc('A9')]]
-        self.assertEqual(corner_stone.stones, pc_set('A9'))
-        self.assertEqual(corner_stone.liberties, pc_set('B9 A8'))
+        corner_stone = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('A9')]]
+        self.assertEqual(corner_stone.stones, parse_kgs_coords_set('A9'))
+        self.assertEqual(corner_stone.liberties, parse_kgs_coords_set('B9 A8'))
 
-        surrounding_stones = lib_tracker.groups[lib_tracker.group_index[pc('C9')]]
-        self.assertEqual(surrounding_stones.stones, pc_set('C9 B8 C8 A7 B7'))
-        self.assertEqual(surrounding_stones.liberties, pc_set('B9 D9 A8 D8 C7 A6 B6'))
+        surrounding_stones = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('C9')]]
+        self.assertEqual(surrounding_stones.stones, parse_kgs_coords_set('C9 B8 C8 A7 B7'))
+        self.assertEqual(surrounding_stones.liberties, parse_kgs_coords_set('B9 D9 A8 D8 C7 A6 B6'))
 
         liberty_cache = lib_tracker.liberty_cache
         for stone in corner_stone.stones:
@@ -218,12 +220,12 @@ class TestLibertyTracker(unittest.TestCase):
         ''' + EMPTY_ROW * 7)
 
         lib_tracker = LibertyTracker.from_board(board)
-        captured = lib_tracker.add_stone(BLACK, pc('B8'))
+        captured = lib_tracker.add_stone(BLACK, parse_kgs_coords('B8'))
         self.assertEqual(len(lib_tracker.groups), 1)
-        sole_group_id = lib_tracker.group_index[pc('A9')]
+        sole_group_id = lib_tracker.group_index[parse_kgs_coords('A9')]
         sole_group = lib_tracker.groups[sole_group_id]
-        self.assertEqual(sole_group.stones, pc_set('A9 B9 A8 B8'))
-        self.assertEqual(sole_group.liberties, pc_set('C9 C8 A7 B7'))
+        self.assertEqual(sole_group.stones, parse_kgs_coords_set('A9 B9 A8 B8'))
+        self.assertEqual(sole_group.liberties, parse_kgs_coords_set('C9 C8 A7 B7'))
         self.assertEqual(captured, set())
 
     def test_same_opponent_group_neighboring_twice(self):
@@ -233,15 +235,15 @@ class TestLibertyTracker(unittest.TestCase):
         ''' + EMPTY_ROW * 7)
 
         lib_tracker = LibertyTracker.from_board(board)
-        captured = lib_tracker.add_stone(WHITE, pc('B8'))
+        captured = lib_tracker.add_stone(WHITE, parse_kgs_coords('B8'))
         self.assertEqual(len(lib_tracker.groups), 2)
-        black_group = lib_tracker.groups[lib_tracker.group_index[pc('A9')]]
-        self.assertEqual(black_group.stones, pc_set('A9 B9 A8'))
-        self.assertEqual(black_group.liberties, pc_set('C9 A7'))
+        black_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('A9')]]
+        self.assertEqual(black_group.stones, parse_kgs_coords_set('A9 B9 A8'))
+        self.assertEqual(black_group.liberties, parse_kgs_coords_set('C9 A7'))
 
-        white_group = lib_tracker.groups[lib_tracker.group_index[pc('B8')]]
-        self.assertEqual(white_group.stones, pc_set('B8'))
-        self.assertEqual(white_group.liberties, pc_set('C8 B7'))
+        white_group = lib_tracker.groups[lib_tracker.group_index[parse_kgs_coords('B8')]]
+        self.assertEqual(white_group.stones, parse_kgs_coords_set('B8'))
+        self.assertEqual(white_group.liberties, parse_kgs_coords_set('C8 B7'))
 
         self.assertEqual(captured, set())
 
@@ -252,7 +254,7 @@ class TestPosition(GoPositionTestCase):
             n=0,
             komi=6.5,
             caps=(1, 2),
-            ko=pc('A1'),
+            ko=parse_kgs_coords('A1'),
             recent=tuple(),
             to_play=BLACK,
         )
@@ -274,7 +276,7 @@ class TestPosition(GoPositionTestCase):
             n=0,
             komi=6.5,
             caps=(1, 2),
-            ko=pc('A1'),
+            ko=parse_kgs_coords('A1'),
             recent=tuple(),
             to_play=BLACK,
         )
@@ -306,8 +308,8 @@ class TestPosition(GoPositionTestCase):
             board=board,
             to_play=BLACK,
         )
-        suicidal_moves = pc_set('E9 H5')
-        nonsuicidal_moves = pc_set('B5 J1 A9')
+        suicidal_moves = parse_kgs_coords_set('E9 H5')
+        nonsuicidal_moves = parse_kgs_coords_set('B5 J1 A9')
         for move in suicidal_moves:
             assert(position.board[move] == go.EMPTY) #sanity check my coordinate input
             self.assertTrue(position.is_move_suicidal(move), str(move))
@@ -328,8 +330,8 @@ class TestPosition(GoPositionTestCase):
             .....O.X.
         ''')
         position = Position(board=board, to_play=BLACK)
-        illegal_moves = pc_set('A9 E9 J9')
-        legal_moves = pc_set('A4 G1 J1 H7') | {None}
+        illegal_moves = parse_kgs_coords_set('A9 E9 J9')
+        legal_moves = parse_kgs_coords_set('A4 G1 J1 H7') | {None}
         for move in illegal_moves:
             with self.subTest(type='illegal', move=move):
                 self.assertFalse(position.is_move_legal(move))
@@ -375,10 +377,10 @@ class TestPosition(GoPositionTestCase):
             komi=6.5,
             caps=(1, 2),
             ko=None,
-            recent=(PlayerMove(BLACK, pc('C9')),),
+            recent=(PlayerMove(BLACK, parse_kgs_coords('C9')),),
             to_play=WHITE,
         )
-        actual_position = start_position.play_move(pc('C9'))
+        actual_position = start_position.play_move(parse_kgs_coords('C9'))
         self.assertEqualPositions(actual_position, expected_position)
 
         expected_board2 = load_board('''
@@ -391,10 +393,10 @@ class TestPosition(GoPositionTestCase):
             komi=6.5,
             caps=(1, 2),
             ko=None,
-            recent=(PlayerMove(BLACK, pc('C9')), PlayerMove(WHITE, pc('J8'))),
+            recent=(PlayerMove(BLACK, parse_kgs_coords('C9')), PlayerMove(WHITE, parse_kgs_coords('J8'))),
             to_play=BLACK,
         )
-        actual_position2 = actual_position.play_move(pc('J8'))
+        actual_position2 = actual_position.play_move(parse_kgs_coords('J8'))
         self.assertEqualPositions(actual_position2, expected_position2)
 
     def test_move_with_capture(self):
@@ -425,10 +427,10 @@ class TestPosition(GoPositionTestCase):
             komi=6.5,
             caps=(7, 2),
             ko=None,
-            recent=(PlayerMove(BLACK, pc('B2')),),
+            recent=(PlayerMove(BLACK, parse_kgs_coords('B2')),),
             to_play=WHITE,
         )
-        actual_position = start_position.play_move(pc('B2'))
+        actual_position = start_position.play_move(parse_kgs_coords('B2'))
         self.assertEqualPositions(actual_position, expected_position)
 
     def test_ko_move(self):
@@ -454,30 +456,30 @@ class TestPosition(GoPositionTestCase):
             n=1,
             komi=6.5,
             caps=(2, 2),
-            ko=pc('B9'),
-            recent=(PlayerMove(BLACK, pc('A9')),),
+            ko=parse_kgs_coords('B9'),
+            recent=(PlayerMove(BLACK, parse_kgs_coords('A9')),),
             to_play=WHITE,
         )
-        actual_position = start_position.play_move(pc('A9'))
+        actual_position = start_position.play_move(parse_kgs_coords('A9'))
 
         self.assertEqualPositions(actual_position, expected_position)
 
         # Check that retaking ko is illegal until two intervening moves
         with self.assertRaises(go.IllegalMove):
-            actual_position.play_move(pc('B9'))
+            actual_position.play_move(parse_kgs_coords('B9'))
         pass_twice = actual_position.pass_move().pass_move()
-        ko_delayed_retake = pass_twice.play_move(pc('B9'))
+        ko_delayed_retake = pass_twice.play_move(parse_kgs_coords('B9'))
         expected_position = Position(
             board=start_board,
             n=4,
             komi=6.5,
             caps=(2, 3),
-            ko=pc('A9'),
+            ko=parse_kgs_coords('A9'),
             recent=(
-                PlayerMove(BLACK, pc('A9')),
+                PlayerMove(BLACK, parse_kgs_coords('A9')),
                 PlayerMove(WHITE, None),
                 PlayerMove(BLACK, None),
-                PlayerMove(WHITE, pc('B9'))),
+                PlayerMove(WHITE, parse_kgs_coords('B9'))),
             to_play=BLACK,
         )
         self.assertEqualPositions(ko_delayed_retake, expected_position)

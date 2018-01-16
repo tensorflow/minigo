@@ -3,12 +3,10 @@ import unittest.mock as mock
 import numpy as np
 np.random.seed(0)
 
+import coords
 import go
 from go import Position
 from test_utils import load_board, GoPositionTestCase
-from utils import parse_kgs_coords as pc
-from utils import to_human_coord as un_pc
-import utils
 from mcts import MCTSNode
 from strategies import MCTSPlayerMixin, time_recommendation
 
@@ -53,9 +51,9 @@ class TestMCTSPlayerMixin(GoPositionTestCase):
 
     def test_pick_moves(self):
         root = self.player.root
-        root.child_N[utils.flatten_coords((2, 0))] = 10
-        root.child_N[utils.flatten_coords((1, 0))] = 5
-        root.child_N[utils.flatten_coords((3, 0))] = 1
+        root.child_N[coords.flatten_coords((2, 0))] = 10
+        root.child_N[coords.flatten_coords((1, 0))] = 5
+        root.child_N[coords.flatten_coords((3, 0))] = 1
 
         root.position.n = go.N ** 2 #move 81, or 361, or... Endgame.
 

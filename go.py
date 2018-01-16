@@ -9,9 +9,9 @@ A PlayerMove is a (Color, Move) tuple
 from collections import namedtuple
 import copy
 import itertools
-
 import numpy as np
-from typing import Dict, List, Tuple
+
+import coords
 
 # Represent a board as a numpy array, with 0 empty, 1 is black, -1 is white.
 # This means that swapping colors is as simple as multiplying array by -1.
@@ -410,10 +410,9 @@ class Position():
             return pos
 
         if not self.is_move_legal(c):
-            import utils
             raise IllegalMove("{} move at {} is illegal: \n{}".format(
                 "Black" if self.to_play == BLACK else "White",
-                utils.to_human_coord(c), self))
+                coords.to_human_coord(c), self))
 
         potential_ko = is_koish(self.board,c)
 

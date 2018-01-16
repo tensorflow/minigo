@@ -3,10 +3,10 @@ import tensorflow as tf
 import numpy as np
 import tempfile
 
+import coords
 import preprocessing
 import features
 import go
-import utils
 from test_utils import GoPositionTestCase
 
 go.set_board_size(9)
@@ -101,17 +101,17 @@ class TestPreprocessing(GoPositionTestCase):
             preprocessing.make_dataset_from_sgf(sgf_file.name, record_file.name)
             recovered_data = self.extract_data(record_file.name)
         start_pos = go.Position()
-        first_move = utils.parse_sgf_coords('fd')
+        first_move = coords.parse_sgf_coords('fd')
         next_pos = start_pos.play_move(first_move)
-        second_move = utils.parse_sgf_coords('cf')
+        second_move = coords.parse_sgf_coords('cf')
         expected_data = [
             (
                 features.extract_features(start_pos),
-                preprocessing._one_hot(utils.flatten_coords(first_move)),
+                preprocessing._one_hot(coords.flatten_coords(first_move)),
                 -1
             ), (
                 features.extract_features(next_pos),
-                preprocessing._one_hot(utils.flatten_coords(second_move)),
+                preprocessing._one_hot(coords.flatten_coords(second_move)),
                 -1
             )]
         self.assertEqualData(expected_data, recovered_data)

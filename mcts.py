@@ -1,25 +1,35 @@
+"""Monte Carlo Tree Search implementation.
+
+All terminology here (Q, U, N, p_UCT) uses the same notation as in the
+AlphaGo (AG) paper.
+"""
 import numpy as np
 import copy
 import sys
-import go
 import random
-import utils
 import math
 
-# All terminology here (Q, U, N, p_UCT) uses the same notation as in the
-# AlphaGo paper.
+import coords
+import go
+
 # Exploration constant
 c_PUCT = 1.38
+
 # Dirichlet noise, as a function of go.N
 D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
 
-class MCTSNode():
-    '''A node of a MCTS search tree.
+class MCTSNode(object):
+    """A node of a MCTS search tree.
 
     A node knows how to compute the action scores of all of its children,
     so that a decision can be made about which move to explore next. Upon
     selecting a move, the children dictionary is updated with a new node.
-    '''
+
+    position: A go.Position instance
+    fmove: A move (coordinate) that led to this position, a a flattened coord
+            (raw number between 0-N^2, with None a pass)
+    parent: A parent MCTSNode.
+    """
     def __init__(self, position, fmove=None, parent=None):
         self.parent = parent # pointer to another MCTSNode
         self.fmove = fmove # move that led to this position, as flattened coords
@@ -80,7 +90,7 @@ class MCTSNode():
     def add_child(self, fcoord):
         """ Adds child node for fcoord if it doesn't already exist, and returns it. """
         if fcoord not in self.children:
-            new_position = self.position.play_move(utils.unflatten_coords(fcoord))
+            new_position = self.position.play_move(coords.unflatten_coords(fcoord))
             self.children[fcoord] = MCTSNode(new_position, fcoord, self)
         return self.children[fcoord]
 
@@ -142,8 +152,8 @@ class MCTSNode():
         while node.children:
             next_kid = np.argmax(node.child_N)
             node = node.children[next_kid]
-            output.append("%s (%d) ==> " % (utils.to_human_coord(
-                                            utils.unflatten_coords(node.fmove)),
+            output.append("%s (%d) ==> " % (coords.to_human_coord(
+                                            coords.unflatten_coords(node.fmove)),
                                             node.N))
         output.append("Q: {:.5f}\n".format(node.Q))
         return ''.join(output)
@@ -155,7 +165,7 @@ class MCTSNode():
         while node.children and max(node.child_N) > 1:
             next_kid = np.argmax(node.child_N)
             node = node.children[next_kid]
-            output.append("%s" % utils.to_human_coord(utils.unflatten_coords(node.fmove)))
+            output.append("%s" % coords.to_human_coord(coords.unflatten_coords(node.fmove)))
         return ' '.join(output)
 
     def describe(self):
@@ -170,7 +180,7 @@ class MCTSNode():
         output.append(self.most_visited_path())
         output.append("move:  action      Q      U      P    P-Dir    N  soft-N  p-delta  p-rel\n")
         output.append("\n".join(["{!s:6}: {: .3f}, {: .3f}, {:.3f}, {:.3f}, {:.3f}, {:4d} {:.4f} {: .5f} {: .2f}".format(
-                utils.to_human_coord(utils.unflatten_coords(key)),
+                coords.to_human_coord(coords.unflatten_coords(key)),
                 self.child_action_score[key],
                 self.child_Q[key],
                 self.child_U[key],
