@@ -7,7 +7,8 @@ MiniGo Coordinate: This is a tuple of the form (row, column) that is indexed
 Flattened Coordinate: this is a number ranging from 0 - N^2 (so N^2+1
     possible values). The extra value N^2 is used to mark a 'pass' move.
 SGF Coordinate: Coordinate used for SGF serialization format. Coordinates use
-    two-letter pairs (c, r) indexed from the upper-left (aa).
+    two-letter pairs having the form (column, row) indexed from the upper-left
+    where 0,0 == 'aa'.
 KGS Coordinate: Human-readable coordinate string indexed from bottom left, with
     the first character a capital letter and the second a number from 1-19.
 PYGTP Coordinate: Tuple coordinate indexed starting at 1,1 from bottom-left
