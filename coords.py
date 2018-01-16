@@ -2,14 +2,16 @@
 
 This introduces some helpers and terminology that are used throughout MiniGo.
 
-MiniGo Coord/Coordinate: This is a tuple of the form (column, row) that's
-    indexed from (0,0) from the upper-left.
+MiniGo Coordinate: This is a tuple of the form (row, column) that is indexed
+    starting out at (0, 0) from the upper-left.
 Flattened Coordinate: this is a number ranging from 0 - N^2 (so N^2+1
     possible values). The extra value N^2 is used to mark a 'pass' move.
 SGF Coordinate: Coordinate used for SGF serialization format. Coordinates use
-    two-letter pairs (r,c) indexed from the upper-left (aa).
-KGS Coordinate: Human-readable coordinate indexed from bottom left.
-PYGTP Coordinate: Tuple coordinate indexed starting at 1,1 from top-left (r, c)
+    two-letter pairs (c, r) indexed from the upper-left (aa).
+KGS Coordinate: Human-readable coordinate string indexed from bottom left, with
+    the first character a capital letter and the second a number from 1-19.
+PYGTP Coordinate: Tuple coordinate indexed starting at 1,1 from bottom-left
+    in the format (column, row)
 
 So, for a 19x19,
 
