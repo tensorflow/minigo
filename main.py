@@ -102,8 +102,7 @@ def selfplay(
          output_dir: "Where to write the games"="data/selfplay",
          output_sgf: "Where to write the sgfs"="sgf/",
          readouts: 'How many simulations to run per move'=100,
-         games: 'Number of games to play' = 4,
-         verbose : '>1 will print debug info, >2 will print boards' = 1,
+         verbose : '>=2 will print debug info, >=3 will print boards' = 1,
          resign_threshold : 'absolute value of threshold to resign at' = 0.95,
          n=19):
     go.set_board_size(int(n))
@@ -114,16 +113,13 @@ def selfplay(
         network = dual_net.DualNetwork(load_file)
         network.name = os.path.basename(load_file)
 
-    with timer("%d games" % games):
-        players = selfplay_mcts.play(network, games, readouts, resign_threshold, verbose)
+    with timer("Playing game"):
+        player = selfplay_mcts.play(network, readouts, resign_threshold, verbose)
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
-    all_game_data = []
-    for idx,p in enumerate(players):
-        game_data = p.extract_data()
-        all_game_data.extend(game_data)
-        with gfile.GFile(os.path.join(output_sgf, '{}-{}.sgf'.format(output_name, idx)), 'w') as f:
-            f.write(p.to_sgf())
+    game_data = p.extract_data()
+    with gfile.GFile(os.path.join(output_sgf, '{}-{}.sgf'.format(output_name, idx)), 'w') as f:
+        f.write(p.to_sgf())
 
     fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
     preprocessing.make_dataset_from_selfplay(all_game_data, fname)
