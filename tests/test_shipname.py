@@ -11,6 +11,9 @@ class TestShipname(unittest.TestCase):
         string = '000017-model.index'
         detected_name = shipname.detect_model_name(string)
         self.assertEqual(detected_name, '000017-model')
+        string = '000123-golden-horse-staple-battery.index'
+        detected_name = shipname.detect_model_name(string)
+        self.assertEqual(detected_name, '000123-golden-horse-staple-battery')
 
     def test_detect_num(self):
         string = '000017-model.index'
