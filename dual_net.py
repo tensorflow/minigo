@@ -79,9 +79,7 @@ class DualNetworkTrainer():
             if logdir is not None:
                 training_stats = StatisticsCollector()
                 logger = tf.summary.FileWriter(logdir, self.sess.graph)
-            for i in itertools.count():
-                if i > num_steps:
-                    break
+            for i in tqdm(range(num_steps)):
                 try:
                     tensor_values = self.sess.run(train_tensors)
                 except tf.errors.OutOfRangeError:

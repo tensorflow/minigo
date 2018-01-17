@@ -42,7 +42,7 @@ def get_latest_model():
     model_numbers_names = [
         (shipname.detect_model_num(m), shipname.detect_model_name(m))
         for m in model_filenames]
-    latest_model = sorted(model_numbers_names, reverse=True)[-1]
+    latest_model = sorted(model_numbers_names, reverse=True)[0]
     return latest_model
 
 def bootstrap():
