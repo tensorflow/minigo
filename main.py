@@ -4,6 +4,7 @@ import os.path
 import collections
 import random
 import re
+import socket
 import sys
 import time
 import cloud_logging
@@ -115,15 +116,15 @@ def selfplay(
     with timer("%d games" % games):
         players = selfplay_mcts.play(network, games, readouts, resign_threshold, verbose)
 
+    output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
     all_game_data = []
     for idx,p in enumerate(players):
         game_data = p.extract_data()
         all_game_data.extend(game_data)
-        fname ="{:d}-{:d}".format(int(time.time()), idx)
-        with gfile.GFile(os.path.join(output_sgf, fname + '.sgf'), 'w') as f:
+        with gfile.GFile(os.path.join(output_sgf, '{}-{}.sgf'.format(output_name, idx)), 'w') as f:
             f.write(p.to_sgf())
 
-    fname = os.path.join(output_dir, "{:d}.tfrecord.zz".format(int(time.time())))
+    fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
     preprocessing.make_dataset_from_selfplay(all_game_data, fname)
 
 def gather(
@@ -132,11 +133,12 @@ def gather(
         examples_per_record: 'how many tf.examples to gather in each chunk'=20000):
     _ensure_dir_exists(output_directory)
     models = [model_dir.strip('/') for model_dir in gfile.ListDirectory(input_directory)]
-    model_gamedata = {
-        model: gfile.Glob(
-            os.path.join(input_directory, model, '**', '*.tfrecord.zz'))
-        for model in models
-    }
+    with timer("Finding existing tfrecords..."):
+        model_gamedata = {
+            model: gfile.Glob(
+                os.path.join(input_directory, model, '**', '*.tfrecord.zz'))
+            for model in models
+        }
     print("Found %d models" % len(models))
     for model_name, record_files in model_gamedata.items():
         print("    %s: %s files" % (model_name, len(record_files)))
@@ -150,16 +152,16 @@ def gather(
 
     num_already_processed = len(already_processed)
 
-    for model_name, record_files in model_gamedata.items():
+    for model_name, record_files in sorted(model_gamedata.items()):
         if set(record_files) <= already_processed:
             print("%s is already fully processed" % model_name)
             continue
-
-        for i, example_batch in enumerate(
-                preprocessing.shuffle_tf_examples(examples_per_record, record_files)):
-            output_record = os.path.join(output_directory,
-                '{}-{}.tfrecord.zz'.format(model_name, str(i)))
-            preprocessing.write_tf_examples(output_record, example_batch, serialize=False)
+        with timer("Processing {}".format(model_name)):
+            for i, example_batch in enumerate(
+                    preprocessing.shuffle_tf_examples(examples_per_record, record_files)):
+                output_record = os.path.join(output_directory,
+                    '{}-{}.tfrecord.zz'.format(model_name, str(i)))
+                preprocessing.write_tf_examples(output_record, example_batch, serialize=False)
         already_processed.update(record_files)
 
     print("Processed %s new files" % (len(already_processed) - num_already_processed))

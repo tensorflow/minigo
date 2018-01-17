@@ -5,7 +5,6 @@ import cloud_logging
 import os
 import main
 import shipname
-<<<<<<< HEAD
 from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
