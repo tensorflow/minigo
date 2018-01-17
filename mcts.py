@@ -30,16 +30,16 @@ class MCTSNode(object):
             (raw number between 0-N^2, with None a pass)
     parent: A parent MCTSNode.
     """
-    def __init__(self, position, fmove=None, parent=None):
+    def __init__(self, position, seed_Q=0, fmove=None, parent=None):
         self.parent = parent # pointer to another MCTSNode
         self.fmove = fmove # move that led to this position, as flattened coords
         self.position = position
         # N and Q are duplicated at a node, and in the parent's child_N/Q.
         self.N = 0 # number of times node is visited
-        self.Q = 0 # value estimate
+        self.W = seed_Q # value estimate
         # duplication allows vectorized computation of action score.
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
-        self.child_Q = np.zeros([go.N * go.N + 1], dtype=np.float32)
+        self.child_W = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.original_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.children = {} # map of flattened moves to resulting MCTSNode
@@ -53,9 +53,17 @@ class MCTSNode(object):
         return self.child_Q + self.position.to_play * self.child_U
 
     @property
+    def child_Q(self):
+        return self.child_W / (1 + self.child_N)
+
+    @property
     def child_U(self):
         return (c_PUCT * math.sqrt(max(1, self.N)) *
             self.child_prior / (1 + self.child_N))
+
+    @property
+    def Q(self):
+        return self.W / (1 + self.N)
 
     @property
     def Q_perspective(self):
@@ -69,14 +77,10 @@ class MCTSNode(object):
             # if a node has never been evaluated, we have no basis to select a child.
             # this conveniently handles the root-node base case, too.
             if current.N == 0:
-                return current
+                break
             if current.position.is_game_over():
                 # do not attempt to explore children of a finished game position
-                return current
-
-            # If this move is a pass, and the 2nd pass is a leaf, open it first!
-            if current.position.recent and current.position.recent[-1].move is None and current.child_N[pass_move] == 0:
-                return current.add_child(pass_move)
+                break
 
             possible_choices = current.child_action_score
             decide_func = np.argmax if current.position.to_play == go.BLACK else np.argmin
@@ -85,16 +89,39 @@ class MCTSNode(object):
                 current = current.children[best_move]
             else:
                 # Reached a leaf node.
-                return current.add_child(best_move)
+                current = current.add_child(best_move)
+                break
+        current.add_virtual_loss(up_to=self)
+        return current
 
     def add_child(self, fcoord):
         """ Adds child node for fcoord if it doesn't already exist, and returns it. """
         if fcoord not in self.children:
             new_position = self.position.play_move(coords.unflatten_coords(fcoord))
-            self.children[fcoord] = MCTSNode(new_position, fcoord, self)
+            self.children[fcoord] = MCTSNode(
+                new_position, seed_Q=self.child_W[fcoord], fmove=fcoord,
+                parent=self)
         return self.children[fcoord]
 
-    def incorporate_results(self, move_probabilities, value, up_to=None):
+    def add_virtual_loss(self, up_to):
+        """Propagate a virtual loss up to the root node.
+
+        Also increment visit counts for each node
+
+        Args:
+            up_to: The node to propagate until. (Keep track of this! You'll
+                need it to reverse the virtual loss later.)
+        """
+        loss = self.position.to_play * -1
+        self.N += 1
+        self.W += loss
+        if self.parent is None or self is up_to:
+            return
+        self.parent.child_N[self.fmove] += 1
+        self.parent.child_W += loss
+        self.parent.add_virtual_loss(up_to)
+
+    def incorporate_results(self, move_probabilities, value, up_to):
         assert move_probabilities.shape == (go.N * go.N + 1,)
         # if game is over, override the value estimate with the true score
         if self.position.is_game_over():
@@ -110,31 +137,25 @@ class MCTSNode(object):
         # Conversely, if W is winning, then B will explore all 362 moves before
         # continuing to explore the most favorable move. This is a waste of search.
         #
-        # The first time the child is actually selected and explored,
-        # backup_value will actually replace this default value with the actual
-        # value.
-        self.child_Q = np.ones([go.N * go.N + 1], dtype=np.float32) * value
+        # The value seeded here will stick around; this acts as a prior.
+        self.child_W = np.ones([go.N * go.N + 1], dtype=np.float32) * value
         self.backup_value(value, up_to=up_to)
 
-    def backup_value(self, value, up_to=None):
+    def backup_value(self, value, up_to):
         """Propagates a value estimation up to the root node.
 
         Args:
             value: the value to be propagated (1 = black wins, -1 = white wins)
-            up_to: the node to propagate until. If not set, unnecessary
-                computation may be done to propagate back to the start of game.
+            up_to: the node to propagate until. Must agree with the up_to value
+                used while adding virtual losses.
         """
-        self.N += 1
-        Q, N = self.Q, self.N
-        # Incrementally calculate Q = running average of all descendant Qs, 
-        # given the newest value and the previous averaged N-1 values.
-        updated_Q = Q + (value - Q) / N
-        self.Q = updated_Q
+        revert_loss = self.position.to_play
+
+        self.W += value + revert_loss
         if self.parent is None or self is up_to:
             return
-        self.parent.child_N[self.fmove] = N
-        self.parent.child_Q[self.fmove] = updated_Q
-        self.parent.backup_value(value, up_to=up_to)
+        self.parent.child_W[self.fmove] += value + revert_loss
+        self.parent.backup_value(value, up_to)
 
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))

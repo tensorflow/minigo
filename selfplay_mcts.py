@@ -26,6 +26,13 @@ def play(network, readouts, resign_threshold, verbosity=0):
     player.initialize_game()
     
     start = time.time()
+    # Must run this once at the start, so that 8 child nodes actually exist
+    # for parallel search to bootstrap. Subsequent moves will have tree reuse
+    # which solves the cold start problem.
+    first_node = player.root.select_leaf()
+    prob, val = network.run(first_node.position)
+    first_node.incorporate_results(prob, val, first_node)
+
     for i in itertools.count():
         player.root.inject_noise()
         while player.root.N < readouts:
@@ -37,8 +44,6 @@ def play(network, readouts, resign_threshold, verbosity=0):
 
             for leaf, prob, val in zip(leaves, probs, vals):
                 leaf.incorporate_results(prob, val, up_to=player.root)
-
-        dur = time.time() - start
 
         if (verbosity >= 3):
             print(players[0].root.position)
@@ -59,6 +64,8 @@ def play(network, readouts, resign_threshold, verbosity=0):
             if verbosity >= 3:
                 print("Played >>",
                       coords.to_human_coord(coords.unflatten_coords(players[0].root.fmove)))
+
+            dur = time.time() - start
             print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (
                 i, readouts, dur / readouts / 100.0, dur), flush=True)
 
