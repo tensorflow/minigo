@@ -160,7 +160,7 @@ def _round_power_of_two(n):
 def get_default_hyperparams(**overrides):
     """Returns the hyperparams for the neural net.
 
-    In other words, returns a dict whose paramaters come from the AGZ
+    In other words, returns a dict whose parameters come from the AGZ
     paper:
       k: number of filters (AlphaGoZero used 256). We use 128 by
         default for a 19x19 go board.
