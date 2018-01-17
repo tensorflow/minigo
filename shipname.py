@@ -5,7 +5,7 @@ import petname
 import go
 
 MODEL_NUM_REGEX = "^\d{6}"
-MODEL_NAME_REGEX = "^\d{6}-\w+"
+MODEL_NAME_REGEX = "^\d{6}(-\w+)+"
 
 SHIP_FILE = "data/names.txt"
 
