@@ -74,7 +74,9 @@ class DataSetV2(object):
         next_move_bytes = self.next_moves.tobytes()
         result_bytes = self.results.tobytes()
 
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        directory = os.path.dirname(filename)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
 
         with gzip.open(filename, "wb", compresslevel=6) as f:
             f.write(header_bytes)

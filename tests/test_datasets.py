@@ -6,7 +6,7 @@ import load_data_sets
 import random
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-TEMP_FILE_NAME = "dataset_unittest_tempfile"
+TEMP_FILE_NAME = "/tmp/dataset_unittest_tempfile"
 
 class TestDataSetV2(GoPositionTestCase):
     def tearDown(self):
