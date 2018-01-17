@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: mugo-gpu-player
 spec:
-  parallelism: 1380
+  parallelism: 11
   completions: 200000
   template:
     metadata:
@@ -21,7 +21,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: player
-        image: gcr.io/$PROJECT/mugo-gpu-player:0.3
+        image: gcr.io/$PROJECT/mugo-gpu-player:0.9
         imagePullPolicy: Always
         resources:
           limits:

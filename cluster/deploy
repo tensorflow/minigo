@@ -18,8 +18,6 @@ gcloud iam service-accounts keys create \
   ${SERVICE_ACCOUNT}-key.json \
   --iam-account $SERVICE_ACCOUNT_EMAIL
 
-gcloud iam service-accounts set-iam-policy 
-
 gcloud projects add-iam-policy-binding $PROJECT \
   --member serviceAccount:$SERVICE_ACCOUNT_EMAIL \
   --role roles/storage.objectAdmin \

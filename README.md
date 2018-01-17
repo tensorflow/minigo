@@ -1,4 +1,4 @@
-MuGo Zero: A minimalist Go engine modeled after AlphaGo Zero, built on MuGo
+Minigo: A minimalist Go engine modeled after AlphaGo Zero, built on MuGo
 ==================================================
 
 This is a pure Python implementation of a neural-network based Go AI, using TensorFlow.
@@ -86,56 +86,46 @@ paths will work just as well.
 To use GCS, set the BUCKET_NAME variable and authenticate. Otherwise, all
 commands fetching files from GCS will hang.
 
-<<<<<<< HEAD
 ```bash
 export BUCKET_NAME=foobar;
 gcloud auth application-default login
-=======
-```shell
-gsutil ls gs://mugozero-v1/models | tail -3
+gsutil ls gs://minigo/models | tail -3
 ```
 
 Which might look like
 
 ```
-gs://mugozero-v1/models/000193-trusty.data-00000-of-00001
-gs://mugozero-v1/models/000193-trusty.index
-gs://mugozero-v1/models/000193-trusty.meta
+gs://minigo/models/000193-trusty.data-00000-of-00001
+gs://minigo/models/000193-trusty.index
+gs://minigo/models/000193-trusty.meta
 ```
 
 You'll need to copy them to your local disk:
 
 ```shell
-MUGO_MODELS=$HOME/mugo-models
-mkdir -p $MUGO_MODELS
-gsutil ls gs://mugozero-v1/models | tail -3 | xargs -I{} gsutil cp "{}" $MUGO_MODELS
->>>>>>> master
+MINIGO_MODELS=$HOME/minigo-models
+mkdir -p $MINIGO_MODELS
+gsutil ls gs://minigo/models | tail -3 | xargs -I{} gsutil cp "{}" $MINIGO_MODELS
 ```
 
 Selfplay
 --------
 
-To watch MuGo Zero play itself:
+To watch Minigo play itself:
 
-```bash
-python3 main.py selfplay gs://$BUCKET_NAME/models/000000-bootstrap \
-  --readouts $READOUTS \
-  --games 1 \
-  --verbose 3
-```
+MINIGO_MODELS=$HOME/minigo-models
+mkdir -p $MINIGO_MODELS
+gsutil ls gs://mugozero-v1/models | tail -3 | xargs -I{} gsutil cp "{}"
+$MINIGO_MODELS
 
-<<<<<<< HEAD
 where `READOUTS` is how many searches to make per move, and (-g 1) is how
 many games to play simultaneously.  Timing information and statistics will be
 printed at each move.  Setting verbosity (-v) to 3 or higher will print a board at each move. 
-=======
-Timing information and statistics will be printed at each move.  Setting
-verbosity to 3 or higher will print a board at each move.
 
->>>>>>> master
+Playing Against Minigo
+----------------------
 
-MuGo Zero uses the GTP protocol, and you can use any gtp-compliant program with it.
-
+Minigo uses the GTP protocol, and you can use any gtp-compliant program with it.
 ```
 python3 main.py gtp gs://$BUCKET_NAME/models/000000-bootstrap -r READOUTS -v 3
 ```
@@ -199,11 +189,11 @@ This command starts self-playing, outputting its raw game data in a
 tensorflow-compatible format as well as in SGF form in the directories
 
 ```
-<<<<<<< HEAD
 gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker/*.tfrecord.zz
 gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
 ```
 
+(-n 9 makes 9x9 games)
 ```bash
 python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
   --readouts 10 \
@@ -215,13 +205,13 @@ python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
 
 Gather
 ------
-=======
+
+This command takes multiple tfrecord.zz files (which will probably be KBs in size)
+and shuffles them into tfrecord.zz files that are ~100 MB in size.
+
+```
 python3 main.py gather
 ```
-
-This will look in `data/selfplay` for games and write chunks to
-`data/training_chunks`.  See main.py for description of the other arguments
->>>>>>> master
 
 This command takes multiple tfrecord.zz files (which will probably be KBs in size)
 and shuffles them into tfrecord.zz files that are ~100 MB in size.
@@ -233,8 +223,8 @@ one model stay together. The output will be in the directories
 gs://$BUCKET_NAME/data/training_chunks/$MODEL_NAME-{chunk_number}.tfrecord.zz
 ```
 
-The file `gs://$BUCKET_NAME/data/training_chunks/meta.txt` is used to keep track of
-which games have been processed so far.
+The file `gs://$BUCKET_NAME/data/training_chunks/meta.txt`is used to keep track of
+which games have been processed so far. (more about this needed)
 
 ```bash
 python3 main.py gather \
@@ -267,11 +257,11 @@ Additionally, you can follow along with the training progress with TensorBoard -
 tensorboard --logdir=path/to/tensorboard/logs/
 ```
 
-Running MuGo Zero on a Cluster
+Running Minigo on a Cluster
 ==============================
 
 As you might notice, playing games is fairly slow.  One way to speed up playing
-games is to run MuGo Zero on many computers simultaneously.  MuGo Zero was
+games is to run Minigo on many computers simultaneously.  Minigo was
 originally trained via a pipeline running many selfplay-workers simultaneously.
 The worker jobs are built into containers and run on a Kubernetes cluster,
 hosted on the Google Cloud Platform (TODO: links for installing GCP SDK,
@@ -315,14 +305,13 @@ your clusters...
 
 Now, what the cluster will do:
 
-3 main tasks:
+two main tasks:
  - selfplay -- all but one of the nodes
  - training -- one node
- - evaluation -- dunno lol ¯\(ツ)/¯
 
-<<<<<<< HEAD
-The main way these jobs interact is throughs GCS.
-=======
+GCS for simple task signalling
+------------------------------
+
 The main way these jobs interact is the filesystem -- which is just a GCS
 bucket mounted as a fuse filesystem inside their container.
 
@@ -333,10 +322,6 @@ bucket.
 The training job will collect games from that directory and turn it into
 chunks, which it will use to play a new model.
 
-the evaluation job will collect the new model, evaluate it against the old one,
-and bless it into the directory of models if it meets expectations.
-
->>>>>>> master
 
 Bringing up a cluster
 ---------------------
@@ -359,10 +344,10 @@ Bringing up a cluster
     ```
     $ kubectl get nodes
     NAME                                  STATUS    ROLES     AGE       VERSION
-    gke-mugo-default-pool-b09dcf70-08rp   Ready     <none>    5m        v1.7.8-gke.0
-    gke-mugo-default-pool-b09dcf70-0q5w   Ready     <none>    5m        v1.7.8-gke.0
-    gke-mugo-default-pool-b09dcf70-1zmm   Ready     <none>    5m        v1.7.8-gke.0
-    gke-mugo-default-pool-b09dcf70-50vm   Ready     <none>    5m        v1.7.8-gke.0
+    gke-minigo-default-pool-b09dcf70-08rp   Ready     <none>    5m        v1.7.8-gke.0
+    gke-minigo-default-pool-b09dcf70-0q5w   Ready     <none>    5m        v1.7.8-gke.0
+    gke-minigo-default-pool-b09dcf70-1zmm   Ready     <none>    5m        v1.7.8-gke.0
+    gke-minigo-default-pool-b09dcf70-50vm   Ready     <none>    5m        v1.7.8-gke.0
     ```
 
 4. (Optional, GPU only).  If you've set up a GPU enabled cluster, you'll need to install the NVIDIA drivers on each of the nodes in your cluster that will have GPU workers.  This is accomplished by running:

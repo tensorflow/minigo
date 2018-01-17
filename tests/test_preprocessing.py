@@ -7,6 +7,7 @@ import coords
 import preprocessing
 import features
 import go
+
 from test_utils import GoPositionTestCase
 
 go.set_board_size(9)

@@ -5,6 +5,7 @@ import cloud_logging
 import os
 import main
 import shipname
+from utils import timer
 from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
@@ -13,7 +14,7 @@ N = os.environ['BOARD_SIZE']
 
 BASE_DIR = "gs://{}".format(BUCKET_NAME)
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
-SELFPLAY_DIR = os.path.join(BASE_DIR, 'data', 'selfplay')
+SELFPLAY_DIR = os.path.join(BASE_DIR, 'games')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
@@ -56,7 +57,7 @@ def selfplay(readouts=1600, games=8, verbose=2, resign_threshold=0.99):
     model_save_file = os.path.join(MODELS_DIR, model_name)
     main.selfplay(
         load_file=model_save_file,
-        output_dir=SELFPLAY_DIR,
+        output_dir=os.path.join(SELFPLAY_DIR, model_name),
         output_sgf=SGF_DIR,
         readouts=readouts,
         games=games,
@@ -78,8 +79,15 @@ def train(logdir=None):
     main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
                generation_num=model_num, logdir=logdir, n=N)
 
+def loop(logdir=None):
+    while True:
+        with timer("Gather"):
+            gather()
+        with timer("Train"):
+            train(logdir)
+
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train, selfplay, gather, bootstrap])
+argh.add_commands(parser, [train, selfplay, gather, bootstrap, loop])
 
 if __name__ == '__main__':
     print_flags()

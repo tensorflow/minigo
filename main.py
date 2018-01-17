@@ -22,6 +22,7 @@ import selfplay_mcts
 from utils import logged_timer as timer
 import evaluation
 import sgf_wrapper
+import utils
 
 
 def _ensure_dir_exists(directory):
@@ -140,7 +141,7 @@ def gather(
             for model in models
         }
     print("Found %d models" % len(models))
-    for model_name, record_files in model_gamedata.items():
+    for model_name, record_files in sorted(model_gamedata.items()):
         print("    %s: %s files" % (model_name, len(record_files)))
 
     meta_file = os.path.join(output_directory, 'meta.txt')
@@ -153,16 +154,16 @@ def gather(
     num_already_processed = len(already_processed)
 
     for model_name, record_files in sorted(model_gamedata.items()):
-        if set(record_files) <= already_processed:
-            print("%s is already fully processed" % model_name)
-            continue
-        with timer("Processing {}".format(model_name)):
+        with timer("Processing %s" % model_name):
+            if set(record_files) <= already_processed:
+                print("%s is already fully processed" % model_name)
+                continue
             for i, example_batch in enumerate(
-                    preprocessing.shuffle_tf_examples(examples_per_record, record_files)):
+                    tqdm(preprocessing.shuffle_tf_examples(examples_per_record, record_files))):
                 output_record = os.path.join(output_directory,
                     '{}-{}.tfrecord.zz'.format(model_name, str(i)))
                 preprocessing.write_tf_examples(output_record, example_batch, serialize=False)
-        already_processed.update(record_files)
+            already_processed.update(record_files)
 
     print("Processed %s new files" % (len(already_processed) - num_already_processed))
     with gfile.GFile(meta_file, 'w') as f:
@@ -171,7 +172,10 @@ def gather(
 def convert(file):
     assert file.endswith('.gz')
     outfile = file.replace('.gz', '.tfrecord.zz')
-    preprocessing.make_dataset_from_DSv2(file, outfile)
+    try:
+        preprocessing.make_dataset_from_DSv2(file, outfile)
+    except:
+        print("error for ",file)
 
 parser = argparse.ArgumentParser()
 argh.add_commands(parser, [gtp, bootstrap, train, selfplay, gather, evaluate, convert])

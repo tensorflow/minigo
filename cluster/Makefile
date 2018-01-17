@@ -1,10 +1,11 @@
-VERSION=0.3
+VERSION=0.9
 PROJECT=tensor-go
 
 
 make gpu-image:
-		mkdir -p staging/
+		mkdir -p staging/data
 		cp ../*.py staging/
+		cp ../data/names.txt staging/data/
 		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/mugo-gpu-player:$(VERSION)" .

@@ -153,30 +153,31 @@ def get_inference_input():
 def _round_power_of_two(n):
     """Finds the nearest power of 2 to a number.
 
-    Thus, 84 -> 64, 120 -> 128, etc.
+    Thus 84 -> 64, 120 -> 128, etc.
     """
     return 2 ** int(round(math.log(n, 2)))
 
 def get_default_hyperparams(**overrides):
     """Returns the hyperparams for the neural net.
 
-    In other words, returns a dict whose paramaters come from the AGZ paper:
-
-    k: number of filters (AlphaGoZero used 256). We use 128 by default for
-        a 19x19 go board.
-    fc_width: Dimensionality of the fully connected linear layer
-    num_shared_layers: number of shared residual blocks. AGZ used both 19
+    In other words, returns a dict whose paramaters come from the AGZ
+    paper:
+      k: number of filters (AlphaGoZero used 256). We use 128 by
+        default for a 19x19 go board.
+      fc_width: Dimensionality of the fully connected linear layer
+      num_shared_layers: number of shared residual blocks.  AGZ used both 19
         and 39. Here we use 19 because it's faster to train.
-    l2_strength: The L2 regularization parameter.
-    momentum: The momentum parameter for training
+      l2_strength: The L2 regularization parameter.
+      momentum: The momentum parameter for training
     """
+
     k = _round_power_of_two(go.N ** 2 / 3) # width of each layer
     hparams = {
-        'k': k,
-        'fc_width': 2 * k,
-        'num_shared_layers': go.N,
-        'l2_strength': 2e-4,
-        'momentum': MOMENTUM,
+        'k': k,  # Width of each conv layer
+        'fc_width': 2 * k,  # Width of each fully connected layer
+        'num_shared_layers': go.N,  # Number of shared trunk layers
+        'l2_strength': 2e-4,  # Regularization strength
+        'momentum': 0.9,  # Momentum used in SGD
     }
     hparams.update(**overrides)
     return hparams

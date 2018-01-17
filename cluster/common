@@ -1,7 +1,8 @@
 export PROJECT=tensor-go
-export CLUSTER_NAME=mugozero
-export BUCKET_NAME=mugozero-v1
-export SERVICE_ACCOUNT=mugo-services
+export CLUSTER_NAME=mugozero2
+export BUCKET_NAME=mugozero-v2
+export SERVICE_ACCOUNT=mugo-services2
 export SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT}@${PROJECT}.iam.gserviceaccount.com
-export ZONE=us-west1-c
-export BOARD_SIZE=9
+export BOARD_SIZE=19
+export GAMES=8
+

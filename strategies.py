@@ -122,7 +122,6 @@ class MCTSPlayerMixin:
         self.root = self.root.add_child(coords.flatten_coords(c))
         self.position = self.root.position # for showboard
         del self.root.parent.children
-        print("visits at root:", self.root.N, file=sys.stderr, flush=True)
         return True # GTP requires positive result.
 
     def pick_move(self):
