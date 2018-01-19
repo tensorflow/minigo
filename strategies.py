@@ -71,8 +71,10 @@ class MCTSPlayerMixin:
         self.resign_threshold = -abs(resign_threshold)
         super().__init__()
 
-    def initialize_game(self):
-        self.root = MCTSNode(go.Position())
+    def initialize_game(self, position=None):
+        if position is None:
+            position = go.Position()
+        self.root = MCTSNode(position)
         self.result = 0
         self.comments = []
         self.searches_pi = []
@@ -84,8 +86,6 @@ class MCTSPlayerMixin:
         incorporate_results, and pick_move
         '''
         start = time.time()
-        if not self.root:
-            self.root = MCTSNode(position)
 
         if self.simulations_per_move == 0 :
             while time.time() - start < self.seconds_per_move:
@@ -141,6 +141,12 @@ class MCTSPlayerMixin:
 
     def tree_search(self):
         leaf = self.root.select_leaf()
+        # if game is over, override the value estimate with the true score
+        if leaf.position.is_game_over():
+            value = 1 if leaf.position.score() > 0 else -1
+            leaf.backup_value(value, up_to=self.root)
+            return
+        leaf.add_virtual_loss(up_to=self.root)
         move_probs, value = self.network.run(leaf.position)
         leaf.incorporate_results(move_probs, value, up_to=self.root)
 

@@ -100,3 +100,12 @@ class GoPositionTestCase(unittest.TestCase):
         if r_len > 0: # if a position has no history, then don't bother testing
             self.assertEqual(pos1.recent[-r_len:], pos2.recent[-r_len:])
         self.assertEqual(pos1.to_play, pos2.to_play)
+
+class MCTSTestMixin():
+    def assertNoPendingVirtualLosses(self):
+        """Raise an error if any node in this subtree has vlosses pending."""
+        queue = [self]
+        while queue:
+            current = queue.pop()
+            self.assertEqual(current.losses_applied, 0)
+            queue.extend(current.children.values())

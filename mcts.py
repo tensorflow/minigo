@@ -30,18 +30,22 @@ class MCTSNode(object):
             (raw number between 0-N^2, with None a pass)
     parent: A parent MCTSNode.
     """
-    def __init__(self, position, seed_Q=0, fmove=None, parent=None):
+
+    def __init__(self, position, initial_Q=0, fmove=None, parent=None):
         self.parent = parent # pointer to another MCTSNode
         self.fmove = fmove # move that led to this position, as flattened coords
         self.position = position
+        self.is_expanded = False
         # N and Q are duplicated at a node, and in the parent's child_N/Q.
         self.N = 0 # number of times node is visited
-        self.W = seed_Q # value estimate
+        self.W = initial_Q # value estimate
+        self.losses_applied = 0 # number of virtual losses on this node
         # duplication allows vectorized computation of action score.
+        self.legal_moves = 10 * self.position.all_legal_moves()
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_W = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.original_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
-        self.child_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
+        self.prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.children = {} # map of flattened moves to resulting MCTSNode
 
     def __repr__(self):
@@ -50,7 +54,7 @@ class MCTSNode(object):
 
     @property
     def child_action_score(self):
-        return self.child_Q + self.position.to_play * self.child_U
+        return (self.child_Q * self.position.to_play + self.child_U) + self.legal_moves
 
     @property
     def child_Q(self):
@@ -58,8 +62,8 @@ class MCTSNode(object):
 
     @property
     def child_U(self):
-        return (c_PUCT * math.sqrt(max(1, self.N)) *
-            self.child_prior / (1 + self.child_N))
+        return (c_PUCT * math.sqrt(self.N) *
+            self.prior / (1 + self.child_N))
 
     @property
     def Q(self):
@@ -74,24 +78,20 @@ class MCTSNode(object):
         current = self
         pass_move = go.N * go.N
         while True:
+            current.N += 1
             # if a node has never been evaluated, we have no basis to select a child.
-            # this conveniently handles the root-node base case, too.
-            if current.N == 0:
-                break
-            if current.position.is_game_over():
-                # do not attempt to explore children of a finished game position
+            if not self.is_expanded:
                 break
 
-            possible_choices = current.child_action_score
-            decide_func = np.argmax if current.position.to_play == go.BLACK else np.argmin
-            best_move = decide_func(possible_choices)
+            best_move = np.argmax(current.child_action_score)
+            current.child_N[best_move] += 1
             if best_move in current.children:
                 current = current.children[best_move]
             else:
                 # Reached a leaf node.
                 current = current.add_child(best_move)
+                current.N += 1
                 break
-        current.add_virtual_loss(up_to=self)
         return current
 
     def add_child(self, fcoord):
@@ -99,8 +99,7 @@ class MCTSNode(object):
         if fcoord not in self.children:
             new_position = self.position.play_move(coords.unflatten_coords(fcoord))
             self.children[fcoord] = MCTSNode(
-                new_position, seed_Q=self.child_W[fcoord], fmove=fcoord,
-                parent=self)
+                new_position, initial_Q=self.child_W[fcoord], fmove=fcoord, parent=self)
         return self.children[fcoord]
 
     def add_virtual_loss(self, up_to):
@@ -112,24 +111,24 @@ class MCTSNode(object):
             up_to: The node to propagate until. (Keep track of this! You'll
                 need it to reverse the virtual loss later.)
         """
-        loss = self.position.to_play * -1
-        self.N += 1
-        self.W += loss
+        self.losses_applied += 1
         if self.parent is None or self is up_to:
             return
-        self.parent.child_N[self.fmove] += 1
-        self.parent.child_W += loss
         self.parent.add_virtual_loss(up_to)
+
+    def revert_virtual_loss(self, up_to):
+        self.losses_applied -= 1
+        if self.parent is None or self is up_to:
+            return
+        self.parent.revert_virtual_loss(up_to)
 
     def incorporate_results(self, move_probabilities, value, up_to):
         assert move_probabilities.shape == (go.N * go.N + 1,)
-        # if game is over, override the value estimate with the true score
-        if self.position.is_game_over():
-            value = 1 if self.position.score() > 0 else -1
-        self.original_prior = move_probabilities
-        # heavily downweight illegal moves so they never pop up.
-        illegal_moves = 1 - self.position.all_legal_moves()
-        self.child_prior = move_probabilities - illegal_moves * 10
+        # A finished game should not be going through this code path - should
+        # directly call backup_value() on the result of the game.
+        assert not self.position.is_game_over()
+        self.is_expanded = True
+        self.original_prior = self.prior = move_probabilities
         # initialize child Q as current node's value, to prevent dynamics where
         # if B is winning, then B will only ever explore 1 move, because the Q
         # estimation will be so much larger than the 0 of the other moves.
@@ -149,17 +148,15 @@ class MCTSNode(object):
             up_to: the node to propagate until. Must agree with the up_to value
                 used while adding virtual losses.
         """
-        revert_loss = self.position.to_play
-
-        self.W += value + revert_loss
+        self.W += value
         if self.parent is None or self is up_to:
             return
-        self.parent.child_W[self.fmove] += value + revert_loss
+        self.parent.child_W[self.fmove] += value
         self.parent.backup_value(value, up_to)
 
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))
-        self.child_prior = self.child_prior * 0.75 + dirch * 0.25
+        self.prior = self.prior * 0.75 + dirch * 0.25
 
     def children_as_pi(self, stretch=False):
         probs = self.child_N
@@ -193,7 +190,7 @@ class MCTSNode(object):
         sort_order = list(range(go.N * go.N + 1))
         sort_order.sort(key=lambda i: self.child_N[i], reverse=True)
         soft_n = self.child_N / sum(self.child_N)
-        p_delta = soft_n - self.child_prior
+        p_delta = soft_n - self.prior
         p_rel = p_delta / soft_n
         # Dump out some statistics
         output = []
@@ -205,7 +202,7 @@ class MCTSNode(object):
                 self.child_action_score[key],
                 self.child_Q[key],
                 self.child_U[key],
-                self.child_prior[key],
+                self.prior[key],
                 self.original_prior[key],
                 int(self.child_N[key]),
                 soft_n[key],
