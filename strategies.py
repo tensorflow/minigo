@@ -139,19 +139,25 @@ class MCTSPlayerMixin:
             assert self.root.child_N[fcoord] != 0
         return coords.unflatten_coords(fcoord)
 
-    def tree_search(self):
-        leaf = self.root.select_leaf()
-        if self.verbosity >= 3:
-            self.show_path_to_root(leaf)
-        # if game is over, override the value estimate with the true score
-        if leaf.position.is_game_over():
-            value = 1 if leaf.position.score() > 0 else -1
-            leaf.backup_value(value, up_to=self.root)
-            return
-        leaf.add_virtual_loss(up_to=self.root)
-        move_probs, value = self.network.run(leaf.position)
-        leaf.revert_virtual_loss(up_to=self.root)
-        leaf.incorporate_results(move_probs, value, up_to=self.root)
+    def tree_search(self, num_parallel=1):
+        leaves = []
+        failsafe = 0
+        while len(leaves) < num_parallel and failsafe < num_parallel * 2:
+            failsafe += 1
+            leaf = self.root.select_leaf()
+            if self.verbosity >= 3:
+                self.show_path_to_root(leaf)
+            # if game is over, override the value estimate with the true score
+            if leaf.position.is_game_over():
+                value = 1 if leaf.position.score() > 0 else -1
+                leaf.backup_value(value, up_to=self.root)
+                continue
+            leaf.add_virtual_loss(up_to=self.root)
+            leaves.append(leaf)
+        move_probs, values = self.network.run_many([leaf.position for leaf in leaves])
+        for leaf, move_prob, value in zip(leaves, move_probs, values):
+            leaf.revert_virtual_loss(up_to=self.root)
+            leaf.incorporate_results(move_prob, value, up_to=self.root)
 
     def is_done(self):
         '''True if the last two moves were Pass or if the position is at a move

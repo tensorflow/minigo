@@ -44,6 +44,9 @@ class DummyNet():
     def run(self, position):
         return self.fake_priors, self.fake_value
 
+    def run_many(self, positions):
+        return [self.fake_priors] * len(positions), [self.fake_value] * len(positions)
+
 class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
     def setUp(self):
         self.player = MCTSPlayerMixin(DummyNet())
@@ -131,10 +134,11 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         self.assertEqual(best_move, kgs_to_flat('D9'))
         # D9 should have a positive value
         self.assertGreater(player.root.children[kgs_to_flat('D9')].Q, 0)
-        self.assertEqual(player.root.N, 20)
+        self.assertGreaterEqual(player.root.N, 20)
         # passing should be ineffective.
         self.assertLess(player.root.child_Q[-1], 0)
         # no virtual losses should be pending
         self.assertNoPendingVirtualLosses(player.root)
         # uncomment to debug this test
         # print(player.root.describe())
+
