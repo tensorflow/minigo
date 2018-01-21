@@ -154,7 +154,7 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         # virtual losses should enable multiple searches to happen simultaneously
         # without throwing an error...
         for i in range(5):
-            player.tree_search(num_parallel=8)
+            player.tree_search(num_parallel=4)
         # uncomment to debug this test
         # print(player.root.describe())
 
@@ -167,4 +167,12 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         # passing should be ineffective.
         self.assertLess(player.root.child_Q[-1], 0)
         # no virtual losses should be pending
+        self.assertNoPendingVirtualLosses(player.root)
+
+    def test_ridiculously_parallel_tree_search(self):
+        player = initialize_almost_done_player()
+        # Test that an almost complete game
+        # will tree search with # parallelism > # legal moves.
+        for i in range(10):
+            player.tree_search(num_parallel=20)
         self.assertNoPendingVirtualLosses(player.root)
