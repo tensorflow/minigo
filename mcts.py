@@ -112,14 +112,22 @@ class MCTSNode(object):
                 need it to reverse the virtual loss later.)
         """
         self.losses_applied += 1
+        # This is a "win" for the current node; hence a loss for its parent node
+        # who will be deciding whether to investigate this node again.
+        loss = self.position.to_play
+        self.W += loss
         if self.parent is None or self is up_to:
             return
+        self.parent.child_W[self.fmove] += loss
         self.parent.add_virtual_loss(up_to)
 
     def revert_virtual_loss(self, up_to):
         self.losses_applied -= 1
+        revert = -1 * self.position.to_play 
+        self.W += revert
         if self.parent is None or self is up_to:
             return
+        self.parent.child_W[self.fmove] += revert
         self.parent.revert_virtual_loss(up_to)
 
     def incorporate_results(self, move_probabilities, value, up_to):

@@ -7,7 +7,7 @@ import coords
 import go
 from go import Position
 from coords import kgs_to_flat
-from test_utils import load_board, GoPositionTestCase
+from test_utils import load_board, GoPositionTestCase, MCTSTestMixin
 from mcts import MCTSNode
 from strategies import MCTSPlayerMixin, time_recommendation
 
@@ -44,7 +44,7 @@ class DummyNet():
     def run(self, position):
         return self.fake_priors, self.fake_value
 
-class TestMCTSPlayerMixin(GoPositionTestCase):
+class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
     def setUp(self):
         self.player = MCTSPlayerMixin(DummyNet())
         self.player.initialize_game()
@@ -134,5 +134,7 @@ class TestMCTSPlayerMixin(GoPositionTestCase):
         self.assertEqual(player.root.N, 20)
         # passing should be ineffective.
         self.assertLess(player.root.child_Q[-1], 0)
+        # no virtual losses should be pending
+        self.assertNoPendingVirtualLosses(player.root)
         # uncomment to debug this test
         # print(player.root.describe())

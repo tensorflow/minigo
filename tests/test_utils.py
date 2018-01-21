@@ -102,9 +102,9 @@ class GoPositionTestCase(unittest.TestCase):
         self.assertEqual(pos1.to_play, pos2.to_play)
 
 class MCTSTestMixin():
-    def assertNoPendingVirtualLosses(self):
+    def assertNoPendingVirtualLosses(self, root):
         """Raise an error if any node in this subtree has vlosses pending."""
-        queue = [self]
+        queue = [root]
         while queue:
             current = queue.pop()
             self.assertEqual(current.losses_applied, 0)

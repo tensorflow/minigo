@@ -141,6 +141,8 @@ class MCTSPlayerMixin:
 
     def tree_search(self):
         leaf = self.root.select_leaf()
+        if self.verbosity >= 3:
+            self.show_path_to_root(leaf)
         # if game is over, override the value estimate with the true score
         if leaf.position.is_game_over():
             value = 1 if leaf.position.score() > 0 else -1
@@ -148,6 +150,7 @@ class MCTSPlayerMixin:
             return
         leaf.add_virtual_loss(up_to=self.root)
         move_probs, value = self.network.run(leaf.position)
+        leaf.revert_virtual_loss(up_to=self.root)
         leaf.incorporate_results(move_probs, value, up_to=self.root)
 
     def is_done(self):
