@@ -37,7 +37,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
         current_readouts = player.root.N
         # we want to do "X additional readouts", rather than "up to X readouts".
         while player.root.N < current_readouts + readouts:
-            player.tree_search()
+            player.tree_search(num_parallel=SIMULTANEOUS_LEAVES)
 
         if (verbosity >= 3):
             print(players[0].root.position)
