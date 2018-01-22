@@ -1,3 +1,4 @@
+import coords
 import go
 import time
 import numpy as np
