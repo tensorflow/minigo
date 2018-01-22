@@ -118,11 +118,11 @@ def selfplay(
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
     game_data = player.extract_data()
-    with gfile.GFile(os.path.join(output_sgf, '{}-{}.sgf'.format(output_name, idx)), 'w') as f:
-        f.write(p.to_sgf())
+    with gfile.GFile(os.path.join(output_sgf, '{}.sgf'.format(output_name)), 'w') as f:
+        f.write(player.to_sgf())
 
     fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
-    preprocessing.make_dataset_from_selfplay(all_game_data, fname)
+    preprocessing.make_dataset_from_selfplay(game_data, fname)
 
 def gather(
         input_directory: 'where to look for games'='data/selfplay/',

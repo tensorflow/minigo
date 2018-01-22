@@ -1,3 +1,4 @@
+import coords
 import itertools
 import numpy as np
 import random
@@ -40,8 +41,8 @@ def play(network, readouts, resign_threshold, verbosity=0):
             player.tree_search(num_parallel=SIMULTANEOUS_LEAVES)
 
         if (verbosity >= 3):
-            print(players[0].root.position)
-            print(players[0].root.describe())
+            print(player.root.position)
+            print(player.root.describe())
 
         # Sets is_done to be True if player.should resign.
         if player.should_resign(): # TODO: make this less side-effecty.
@@ -59,7 +60,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
                 player.root.position.n, readouts, dur / readouts / 100.0, dur), flush=True)
         if verbosity >= 3:
             print("Played >>",
-                  coords.to_human_coord(coords.unflatten_coords(players[0].root.fmove)))
+                  coords.to_human_coord(coords.unflatten_coords(player.root.fmove)))
 
 
         # TODO: break when i >= 2 * go.N * go.N (where is this being done now??...)

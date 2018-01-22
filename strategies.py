@@ -146,7 +146,7 @@ class MCTSPlayerMixin:
         while len(leaves) < num_parallel and failsafe < num_parallel * 2:
             failsafe += 1
             leaf = self.root.select_leaf()
-            if self.verbosity >= 3:
+            if self.verbosity >= 4:
                 self.show_path_to_root(leaf)
             # if game is over, override the value estimate with the true score
             if leaf.position.is_game_over():
