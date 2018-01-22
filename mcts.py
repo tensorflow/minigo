@@ -44,6 +44,7 @@ class MCTSNode(object):
         self.legal_moves = 10 * self.position.all_legal_moves()
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_W = np.zeros([go.N * go.N + 1], dtype=np.float32)
+        # save a copy of the original prior before it gets mutated by d-noise.
         self.original_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.children = {} # map of flattened moves to resulting MCTSNode
@@ -135,6 +136,8 @@ class MCTSNode(object):
         # A finished game should not be going through this code path - should
         # directly call backup_value() on the result of the game.
         assert not self.position.is_game_over()
+        if self.is_expanded:
+            return
         self.is_expanded = True
         self.original_prior = self.prior = move_probabilities
         # initialize child Q as current node's value, to prevent dynamics where
@@ -153,8 +156,7 @@ class MCTSNode(object):
 
         Args:
             value: the value to be propagated (1 = black wins, -1 = white wins)
-            up_to: the node to propagate until. Must agree with the up_to value
-                used while adding virtual losses.
+            up_to: the node to propagate until.
         """
         self.W += value
         if self.parent is None or self is up_to:

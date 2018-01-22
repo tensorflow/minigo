@@ -176,3 +176,11 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         for i in range(10):
             player.tree_search(num_parallel=20)
         self.assertNoPendingVirtualLosses(player.root)
+
+    def test_cold_start_parallel_tree_search(self):
+        # Test that parallel tree search doesn't trip on an empty tree
+        player = MCTSPlayerMixin(DummyNet())
+        player.initialize_game()
+        self.assertEqual(player.root.N, 0)
+        self.assertFalse(player.root.is_expanded)
+        player.tree_search(num_parallel=4)

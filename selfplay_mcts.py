@@ -26,31 +26,25 @@ def play(network, readouts, resign_threshold, verbosity=0):
     player.initialize_game()
     
     start = time.time()
-    # Must run this once at the start, so that 8 child nodes actually exist
-    # for parallel search to bootstrap. Subsequent moves will have tree reuse
-    # which solves the cold start problem.
+    # Must run this once at the start, so that noise injection actually
+    # affects the first move of the game.
     first_node = player.root.select_leaf()
     prob, val = network.run(first_node.position)
     first_node.incorporate_results(prob, val, first_node)
 
-    for i in itertools.count():
+    while True:
         player.root.inject_noise()
-        while player.root.N < readouts:
-            leaves = [player.root.select_leaf() for i in range(SIMULTANEOUS_LEAVES)]
-            if verbosity > 3:
-                player.show_path_to_root(leaves[0])
-
-            probs, vals = network.run_many([leaf.position for leaf in leaves])
-
-            for leaf, prob, val in zip(leaves, probs, vals):
-                leaf.incorporate_results(prob, val, up_to=player.root)
+        current_readouts = player.root.N
+        # we want to do "X additional readouts", rather than "up to X readouts".
+        while player.root.N < current_readouts + readouts:
+            player.tree_search()
 
         if (verbosity >= 3):
             print(players[0].root.position)
             print(players[0].root.describe())
 
         # Sets is_done to be True if player.should resign.
-        if player.should_resign(): # TODO: make this less side-effecty.            
+        if player.should_resign(): # TODO: make this less side-effecty.
             break
         move = player.pick_move()
         player.play_move(move)
@@ -60,14 +54,13 @@ def play(network, readouts, resign_threshold, verbosity=0):
 
         if (verbosity >= 2) or (verbosity >= 1 and i % 10 == 9):
             print("Q: {}".format(p.root.Q))
-            # print Q somewhere
-            if verbosity >= 3:
-                print("Played >>",
-                      coords.to_human_coord(coords.unflatten_coords(players[0].root.fmove)))
-
             dur = time.time() - start
             print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (
                 i, readouts, dur / readouts / 100.0, dur), flush=True)
+        if verbosity >= 3:
+            print("Played >>",
+                  coords.to_human_coord(coords.unflatten_coords(players[0].root.fmove)))
+
 
         # TODO: break when i >= 2 * go.N * go.N (where is this being done now??...)
 
