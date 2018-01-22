@@ -89,11 +89,11 @@ class MCTSPlayerMixin:
 
         if self.simulations_per_move == 0 :
             while time.time() - start < self.seconds_per_move:
-                self.tree_search(num_parallel=8)
+                self.tree_search(num_parallel=16)
         else:
             current_readouts = self.root.N
             while self.root.N < current_readouts + self.simulations_per_move:
-                self.tree_search(num_parallel=8)
+                self.tree_search(num_parallel=16)
             if self.verbosity > 0:
                 print("%d: Searched %d times in %s seconds\n\n" % (
                     self.simulations_per_move, self.root.N, time.time() - start), file=sys.stderr)
@@ -180,7 +180,6 @@ class MCTSPlayerMixin:
             return
         moves = list(map(coords.to_human_coord,
                          [move.move for move in pos.recent[self.root.position.n:]]))
-        print("From root: ", " <= ".join(moves), file=sys.stderr, flush=True)
 
     def should_resign(self):
         '''Returns true if the player resigned.  No further moves should be played'''

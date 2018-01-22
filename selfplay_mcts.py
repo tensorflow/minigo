@@ -6,7 +6,7 @@ import time
 import go
 from gtp_wrapper import MCTSPlayer
 
-SIMULTANEOUS_LEAVES = 8
+SIMULTANEOUS_LEAVES = 16
 
 def play(network, readouts, resign_threshold, verbosity=0):
     ''' Plays out a self-play match, returning
@@ -25,7 +25,6 @@ def play(network, readouts, resign_threshold, verbosity=0):
 
     player.initialize_game()
     
-    start = time.time()
     # Must run this once at the start, so that noise injection actually
     # affects the first move of the game.
     first_node = player.root.select_leaf()
@@ -33,6 +32,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
     first_node.incorporate_results(prob, val, first_node)
 
     while True:
+        start = time.time()
         player.root.inject_noise()
         current_readouts = player.root.N
         # we want to do "X additional readouts", rather than "up to X readouts".
@@ -52,11 +52,11 @@ def play(network, readouts, resign_threshold, verbosity=0):
             # TODO: actually handle the result instead of ferrying it around as a property.
             player.result = player.position.result()
 
-        if (verbosity >= 2) or (verbosity >= 1 and i % 10 == 9):
-            print("Q: {}".format(p.root.Q))
+        if (verbosity >= 2) or (verbosity >= 1 and player.root.position.n % 10 == 9):
+            print("Q: {}".format(player.root.Q))
             dur = time.time() - start
             print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (
-                i, readouts, dur / readouts / 100.0, dur), flush=True)
+                player.root.position.n, readouts, dur / readouts / 100.0, dur), flush=True)
         if verbosity >= 3:
             print("Played >>",
                   coords.to_human_coord(coords.unflatten_coords(players[0].root.fmove)))

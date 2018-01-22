@@ -117,7 +117,7 @@ def selfplay(
         player = selfplay_mcts.play(network, readouts, resign_threshold, verbose)
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
-    game_data = p.extract_data()
+    game_data = player.extract_data()
     with gfile.GFile(os.path.join(output_sgf, '{}-{}.sgf'.format(output_name, idx)), 'w') as f:
         f.write(p.to_sgf())
 
