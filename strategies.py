@@ -89,10 +89,11 @@ class MCTSPlayerMixin:
 
         if self.simulations_per_move == 0 :
             while time.time() - start < self.seconds_per_move:
-                self.tree_search()
+                self.tree_search(num_parallel=8)
         else:
-            for i in range(self.simulations_per_move):
-                self.tree_search()
+            current_readouts = self.root.N
+            while self.root.N < current_readouts + self.simulations_per_move:
+                self.tree_search(num_parallel=8)
             if self.verbosity > 0:
                 print("%d: Searched %d times in %s seconds\n\n" % (
                     self.simulations_per_move, self.root.N, time.time() - start), file=sys.stderr)

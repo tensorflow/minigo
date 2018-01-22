@@ -184,3 +184,4 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         self.assertEqual(player.root.N, 0)
         self.assertFalse(player.root.is_expanded)
         player.tree_search(num_parallel=4)
+        self.assertNoPendingVirtualLosses(player.root)
