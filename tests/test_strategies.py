@@ -151,6 +151,8 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         player = initialize_almost_done_player()
         # check -- white is losing.
         self.assertEqual(player.root.position.score(), -0.5)
+        # initialize the tree so that the root node has populated children.
+        player.tree_search(num_parallel=1)
         # virtual losses should enable multiple searches to happen simultaneously
         # without throwing an error...
         for i in range(5):
@@ -174,14 +176,19 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         # Test that an almost complete game
         # will tree search with # parallelism > # legal moves.
         for i in range(10):
-            player.tree_search(num_parallel=20)
+            player.tree_search(num_parallel=50)
         self.assertNoPendingVirtualLosses(player.root)
 
     def test_cold_start_parallel_tree_search(self):
         # Test that parallel tree search doesn't trip on an empty tree
-        player = MCTSPlayerMixin(DummyNet())
+        player = MCTSPlayerMixin(DummyNet(fake_value=0.17))
         player.initialize_game()
         self.assertEqual(player.root.N, 0)
         self.assertFalse(player.root.is_expanded)
         player.tree_search(num_parallel=4)
         self.assertNoPendingVirtualLosses(player.root)
+        # Even though the root gets selected 4 times by tree search, its
+        # final visit count should just be 1.
+        self.assertEqual(player.root.N, 1)
+        # 0.085 = average(0, 0.17), since 0 is the prior on the root.
+        self.assertAlmostEqual(player.root.Q, 0.085)

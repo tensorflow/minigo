@@ -129,12 +129,29 @@ class MCTSNode(object):
         self.parent.child_W[self.fmove] += revert
         self.parent.revert_virtual_loss(up_to)
 
+    def revert_visits(self, up_to):
+        """Revert visit increments.
+
+        Sometimes, repeated calls to select_leaf return the same node.
+        This is rare and we're okay with the wasted computation to evaluate
+        the position multiple times by the dual_net. But select_leaf has the
+        side effect of incrementing visit counts. Since we want the value to
+        only count once for the repeatedly selected node, we also have to
+        revert the incremented visit counts.
+        """
+        self.N -= 1
+        if self.parent is None or self is up_to:
+            return
+        self.parent.child_N[self.fmove] -= 1
+        self.parent.revert_visits(up_to)
+
     def incorporate_results(self, move_probabilities, value, up_to):
         assert move_probabilities.shape == (go.N * go.N + 1,)
         # A finished game should not be going through this code path - should
         # directly call backup_value() on the result of the game.
         assert not self.position.is_game_over()
         if self.is_expanded:
+            self.revert_visits(up_to=up_to)
             return
         self.is_expanded = True
         self.original_prior = self.child_prior = move_probabilities
