@@ -83,17 +83,17 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
 
     def test_inject_noise(self):
         player = initialize_basic_player()
-        sum_priors = np.sum(player.root.prior)
+        sum_priors = np.sum(player.root.child_prior)
         self.assertAlmostEqual(sum_priors, 1) # dummyNet should return normalized priors.
         self.assertTrue(np.all(player.root.child_U == player.root.child_U[0]))
 
         player.root.inject_noise()
-        new_sum_priors = np.sum(player.root.prior)
+        new_sum_priors = np.sum(player.root.child_prior)
         # priors should still be normalized after injecting noise
         self.assertAlmostEqual(sum_priors, new_sum_priors)
 
         # With dirichelet noise, majority of density should be in one node.
-        max_p = np.max(player.root.prior)
+        max_p = np.max(player.root.child_prior)
         self.assertGreater(max_p, 3/(go.N ** 2 + 1))
 
     def test_pick_moves(self):

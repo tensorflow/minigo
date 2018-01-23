@@ -46,7 +46,7 @@ class MCTSNode(object):
         self.child_W = np.zeros([go.N * go.N + 1], dtype=np.float32)
         # save a copy of the original prior before it gets mutated by d-noise.
         self.original_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
-        self.prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
+        self.child_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.children = {} # map of flattened moves to resulting MCTSNode
 
     def __repr__(self):
@@ -63,8 +63,8 @@ class MCTSNode(object):
 
     @property
     def child_U(self):
-        return (c_PUCT * math.sqrt(self.N) *
-            self.prior / (1 + self.child_N))
+        return (c_PUCT * math.sqrt(1 + self.N) *
+            self.child_prior / (1 + self.child_N))
 
     @property
     def Q(self):
@@ -106,8 +106,6 @@ class MCTSNode(object):
     def add_virtual_loss(self, up_to):
         """Propagate a virtual loss up to the root node.
 
-        Also increment visit counts for each node
-
         Args:
             up_to: The node to propagate until. (Keep track of this! You'll
                 need it to reverse the virtual loss later.)
@@ -139,7 +137,7 @@ class MCTSNode(object):
         if self.is_expanded:
             return
         self.is_expanded = True
-        self.original_prior = self.prior = move_probabilities
+        self.original_prior = self.child_prior = move_probabilities
         # initialize child Q as current node's value, to prevent dynamics where
         # if B is winning, then B will only ever explore 1 move, because the Q
         # estimation will be so much larger than the 0 of the other moves.
@@ -166,7 +164,7 @@ class MCTSNode(object):
 
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))
-        self.prior = self.prior * 0.75 + dirch * 0.25
+        self.child_prior = self.child_prior * 0.75 + dirch * 0.25
 
     def children_as_pi(self, stretch=False):
         probs = self.child_N
@@ -200,8 +198,8 @@ class MCTSNode(object):
         sort_order = list(range(go.N * go.N + 1))
         sort_order.sort(key=lambda i: self.child_N[i], reverse=True)
         soft_n = self.child_N / sum(self.child_N)
-        p_delta = soft_n - self.prior
-        p_rel = p_delta / soft_n
+        p_delta = soft_n - self.child_prior
+        p_rel = p_delta / self.child_prior
         # Dump out some statistics
         output = []
         output.append("{q:.4f}\n".format(q=self.Q))
@@ -212,7 +210,7 @@ class MCTSNode(object):
                 self.child_action_score[key],
                 self.child_Q[key],
                 self.child_U[key],
-                self.prior[key],
+                self.child_prior[key],
                 self.original_prior[key],
                 int(self.child_N[key]),
                 soft_n[key],
