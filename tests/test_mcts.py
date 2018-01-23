@@ -144,12 +144,16 @@ class TestMctsNodes(GoPositionTestCase):
         self.assertEqual(child, child2)
         self.assertEqual(current_children, root.children)
 
-    def never_select_illegal_moves(self):
+    def test_never_select_illegal_moves(self):
         probs = np.array([0.02] * (go.N * go.N + 1))
         # let's say the NN were to accidentally put a high weight on an illegal move
         probs[1] = 0.99
         root = MCTSNode(SEND_TWO_RETURN_ONE)
         root.incorporate_results(probs, 0, root)
+        # and let's say the root were visited a lot of times, which pumps up the
+        # action score for unvisited moves...
+        root.N = 100000
+        root.child_N[root.position.all_legal_moves()] = 10000
         # this should not throw an error...
         leaf = root.select_leaf()
         # the returned leaf should not be the illegal move

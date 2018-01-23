@@ -41,7 +41,7 @@ class MCTSNode(object):
         self.W = initial_Q # value estimate
         self.losses_applied = 0 # number of virtual losses on this node
         # duplication allows vectorized computation of action score.
-        self.legal_moves = 10 * self.position.all_legal_moves()
+        self.illegal_moves = 1000 * (1 - self.position.all_legal_moves())
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_W = np.zeros([go.N * go.N + 1], dtype=np.float32)
         # save a copy of the original prior before it gets mutated by d-noise.
@@ -55,7 +55,7 @@ class MCTSNode(object):
 
     @property
     def child_action_score(self):
-        return (self.child_Q * self.position.to_play + self.child_U) + self.legal_moves
+        return self.child_Q * self.position.to_play + self.child_U - self.illegal_moves
 
     @property
     def child_Q(self):
@@ -162,7 +162,7 @@ class MCTSNode(object):
         # Conversely, if W is winning, then B will explore all 362 moves before
         # continuing to explore the most favorable move. This is a waste of search.
         #
-        # The value seeded here will stick around; this acts as a prior.
+        # The value seeded here acts as a prior, and gets averaged into Q calculations.
         self.child_W = np.ones([go.N * go.N + 1], dtype=np.float32) * value
         self.backup_value(value, up_to=up_to)
 
