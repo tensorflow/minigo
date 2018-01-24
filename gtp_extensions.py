@@ -130,7 +130,7 @@ class GoGuiMixin(gtp.Engine):
     def cmd_spin(self, arguments):
         for i in range(50):
             for j in range(100):
-                self._game.tree_search(num_parallel=8)
+                self._game.tree_search()
             moves = self.cmd_nextplay(None).lower()
             moves = moves.split()
             colors = "bw" if self._game.root.position.to_play is go.BLACK else "wb"

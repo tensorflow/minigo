@@ -53,7 +53,8 @@ class MCTSPlayerMixin:
     # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
     # Otherwise, it uses 'seconds_per_move' of wall time'
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
-                 resign_threshold=-0.90, verbosity=0, two_player_mode=False):
+                 resign_threshold=-0.90, verbosity=0, two_player_mode=False,
+                 num_parallel=1):
         self.network = network
         self.seconds_per_move = seconds_per_move
         self.simulations_per_move = simulations_per_move
@@ -63,6 +64,7 @@ class MCTSPlayerMixin:
             self.temp_threshold = -1
         else:
             self.temp_threshold = TEMPERATURE_CUTOFF
+        self.num_parallel = num_parallel
         self.qs = []
         self.comments = []
         self.searches_pi = []
@@ -89,11 +91,11 @@ class MCTSPlayerMixin:
 
         if self.simulations_per_move == 0 :
             while time.time() - start < self.seconds_per_move:
-                self.tree_search(num_parallel=16)
+                self.tree_search()
         else:
             current_readouts = self.root.N
             while self.root.N < current_readouts + self.simulations_per_move:
-                self.tree_search(num_parallel=16)
+                self.tree_search()
             if self.verbosity > 0:
                 print("%d: Searched %d times in %s seconds\n\n" % (
                     self.simulations_per_move, self.root.N, time.time() - start), file=sys.stderr)
@@ -140,7 +142,9 @@ class MCTSPlayerMixin:
             assert self.root.child_N[fcoord] != 0
         return coords.unflatten_coords(fcoord)
 
-    def tree_search(self, num_parallel=1):
+    def tree_search(self, num_parallel=None):
+        if num_parallel is None:
+            num_parallel = self.num_parallel
         leaves = []
         failsafe = 0
         while len(leaves) < num_parallel and failsafe < num_parallel * 2:

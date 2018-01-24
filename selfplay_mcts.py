@@ -17,7 +17,8 @@ def play(network, readouts, resign_threshold, verbosity=0):
     where n is the number of moves in the game'''
     player = MCTSPlayer(network,
                         resign_threshold=resign_threshold,
-                        verbosity=verbosity)
+                        verbosity=verbosity,
+                        num_parallel=SIMULTANEOUS_LEAVES)
     global_n = 0
 
     # Disable resign in 5% of games
@@ -38,7 +39,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
         current_readouts = player.root.N
         # we want to do "X additional readouts", rather than "up to X readouts".
         while player.root.N < current_readouts + readouts:
-            player.tree_search(num_parallel=SIMULTANEOUS_LEAVES)
+            player.tree_search()
 
         if (verbosity >= 3):
             print(player.root.position)
