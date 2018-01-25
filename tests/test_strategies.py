@@ -45,6 +45,8 @@ class DummyNet():
         return self.fake_priors, self.fake_value
 
     def run_many(self, positions):
+        if not positions:
+            raise ValueError("No positions passed! (Tensorflow would have failed here.")
         return [self.fake_priors] * len(positions), [self.fake_value] * len(positions)
 
 def initialize_basic_player():
@@ -192,3 +194,13 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         self.assertEqual(player.root.N, 1)
         # 0.085 = average(0, 0.17), since 0 is the prior on the root.
         self.assertAlmostEqual(player.root.Q, 0.085)
+
+    def test_tree_search_failsafe(self):
+        # Test that the failsafe works correctly. It can trigger if the MCTS
+        # repeatedly visits a finished game state.
+        probs = np.array([.001] * (go.N * go.N + 1))
+        probs[-1] = 1 # Make the dummy net always want to pass
+        player = MCTSPlayerMixin(DummyNet(fake_priors=probs))
+        pass_position = go.Position().pass_move()
+        player.initialize_game(pass_position)
+        player.tree_search(num_parallel=1)

@@ -159,10 +159,11 @@ class MCTSPlayerMixin:
                 continue
             leaf.add_virtual_loss(up_to=self.root)
             leaves.append(leaf)
-        move_probs, values = self.network.run_many([leaf.position for leaf in leaves])
-        for leaf, move_prob, value in zip(leaves, move_probs, values):
-            leaf.revert_virtual_loss(up_to=self.root)
-            leaf.incorporate_results(move_prob, value, up_to=self.root)
+        if leaves:
+            move_probs, values = self.network.run_many([leaf.position for leaf in leaves])
+            for leaf, move_prob, value in zip(leaves, move_probs, values):
+                leaf.revert_virtual_loss(up_to=self.root)
+                leaf.incorporate_results(move_prob, value, up_to=self.root)
 
     def is_done(self):
         '''True if the last two moves were Pass or if the position is at a move
