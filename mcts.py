@@ -81,7 +81,7 @@ class MCTSNode(object):
         while True:
             current.N += 1
             # if a node has never been evaluated, we have no basis to select a child.
-            if not self.is_expanded:
+            if not current.is_expanded:
                 break
 
             best_move = np.argmax(current.child_action_score)
@@ -213,7 +213,7 @@ class MCTSNode(object):
 
     def describe(self):
         sort_order = list(range(go.N * go.N + 1))
-        sort_order.sort(key=lambda i: self.child_N[i], reverse=True)
+        sort_order.sort(key=lambda i: (self.child_N[i], self.child_action_score[i]), reverse=True)
         soft_n = self.child_N / sum(self.child_N)
         p_delta = soft_n - self.child_prior
         p_rel = p_delta / self.child_prior
@@ -233,5 +233,5 @@ class MCTSNode(object):
                 soft_n[key],
                 p_delta[key],
                 p_rel[key])
-                for key in sort_order if self.child_N[key] > 0][:15]))
+                for key in sort_order][:15]))
         return ''.join(output)

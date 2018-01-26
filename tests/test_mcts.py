@@ -165,3 +165,17 @@ class TestMctsNodes(GoPositionTestCase):
             leaf = root.select_leaf()
             self.assertNotEqual(leaf.fmove, 1)
 
+    def test_dont_pick_unexpanded_child(self):
+        probs = np.array([0.001] * (go.N * go.N + 1))
+        # make one move really likely so that tree search goes down that path twice
+        # even with a virtual loss
+        probs[17] = 0.999
+        root = MCTSNode(go.Position())
+        root.incorporate_results(probs, 0, root)
+        leaf1 = root.select_leaf()
+        self.assertEqual(leaf1.fmove, 17)
+        leaf1.add_virtual_loss(up_to=root)
+        # the second select_leaf pick should return the same thing, since the child
+        # hasn't yet been sent to neural net for eval + result incorporation
+        leaf2 = root.select_leaf()
+        self.assertIs(leaf1, leaf2)
