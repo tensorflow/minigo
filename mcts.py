@@ -83,16 +83,17 @@ class MCTSNode(object):
             # if a node has never been evaluated, we have no basis to select a child.
             if not current.is_expanded:
                 break
+            # HACK: if last move was a pass, always investigate double-pass first
+            # to avoid situations where we auto-lose by passing too early.
+            if (current.position.recent
+                and current.position.recent[-1].move is None
+                and current.child_N[pass_move] == 0):
+                current = current.add_child(pass_move)
+                continue
 
             best_move = np.argmax(current.child_action_score)
             current.child_N[best_move] += 1
-            if best_move in current.children:
-                current = current.children[best_move]
-            else:
-                # Reached a leaf node.
-                current = current.add_child(best_move)
-                current.N += 1
-                break
+            current = current.add_child(best_move)
         return current
 
     def add_child(self, fcoord):
