@@ -30,7 +30,7 @@ Goals of the Project
    tools.
 
 3. Provide our data, results, and discoveries in the open to benefit the Go,
-   machine learning communities, and Kubernetes communities.
+   machine learning, and Kubernetes communities.
 
 An explicit non-goal of the project is to produce a competitive Go program that
 establishes itself as the top Go AI. Instead, we strive for a readable,
