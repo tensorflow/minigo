@@ -1,9 +1,11 @@
 Minigo: A minimalist Go engine modeled after AlphaGo Zero, built on MuGo
 ==================================================
 
-This is a pure Python implementation of a neural-network based Go AI, using TensorFlow.
+This is a pure Python implementation of a neural-network based Go AI, using
+TensorFlow. While inspired by Deepmind's AlphaGo algorithm, this project is not
+a Deepmind project.
 
-This is based off of Brian Lee's "MuGo" -- a pure Python implementation of the
+Minigo is based off of Brian Lee's "MuGo" -- a pure Python implementation of the
 first AlphaGo paper ["Mastering the Game of Go with Deep Neural Networks and
 Tree Search"](https://www.nature.com/articles/nature16961) published in
 *Nature*. This implementation adds features and architecture changes present in
@@ -12,18 +14,28 @@ Knowledge"](https://www.nature.com/articles/nature24270). More recently, this
 architecture was extended for Chess and Shogi in ["Mastering Chess and Shogi by
 Self-Play with a General Reinforcement Learning
 Algorithm"](https://arxiv.org/abs/1712.01815).  These papers will often be
-abridged in documentation as *AG* (for AlphaGo), *AGZ* (for AlphaGo Zero), and
-*AZ* (for AlphaZero) respectively.
+abridged in Minigo documentation as *AG* (for AlphaGo), *AGZ* (for AlphaGo
+Zero), and *AZ* (for AlphaZero) respectively.
 
-The goal of this project is to reproduce the results of the original paper
-through an open-source implementation using the Google Cloud Platform and
-open-source pipeline tools.  A secondary goal is to provide a clear set of
-learning examples for establishing RL pipelines on various hardware
-accelerators available in TensorFlow.
 
-An explicit non-goal is to produce a competitive program, and the original
-non-goal of MuGo -- "diving into the fiddly bits of optimizing" -- is preserved
-in the service of the secondary goal above :)
+Goals of the Project
+==================================================
+
+1. Provide a clear set of learning examples using Tensorflow, Kubernetes, and
+   Google Cloud Platform for establishing Reinforcement Learning pipelines on
+   various hardware accelerators.
+
+2. Reproduce the methods of the original Deepmind AlphaGo papers as faithfully
+   as possible, through an open-source implementation and open-source pipeline
+   tools.
+
+3. Provide our data, results, and discoveries in the open to benefit the Go,
+   machine learning, and Kubernetes communities.
+
+An explicit non-goal of the project is to produce a competitive Go program that
+establishes itself as the top Go AI. Instead, we strive for a readable,
+understandable implementation that can benefit the community, even if that
+means our implementation is not as fast or efficient as possible.
 
 Getting Started
 ===============
