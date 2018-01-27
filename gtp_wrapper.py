@@ -44,7 +44,7 @@ class GtpInterface(object):
             except:
                 print("Error saving sgf", file=sys.stderr, flush=True)
         self.position = go.Position(komi=self.komi)
-        self.initialize_game()
+        self.initialize_game(self.position)
 
     def accomodate_out_of_turn(self, color):
         if not translate_gtp_colors(color) == self.position.to_play:

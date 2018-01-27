@@ -16,7 +16,8 @@ go.set_board_size(9)
 
 def rl_loop():
     # monkeypatch the hyperparams so that we get a quickly executing network.
-    dual_net.get_default_hyperparams = lambda **kwargs: {'k': 1, 'fc_width': 2, 'num_shared_layers': 1, 'l2_strength': 2e-4,}
+    dual_net.get_default_hyperparams = lambda **kwargs: {
+    'k': 1, 'fc_width': 2, 'num_shared_layers': 1, 'l2_strength': 2e-4, 'momentum': 0.9}
 
     with tempfile.TemporaryDirectory() as base_dir:
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
@@ -34,15 +35,13 @@ def rl_loop():
             load_file=model_save_file,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
-            readouts=5,
-            games=2,
+            readouts=10,
             n=9)
         main.selfplay(
             load_file=model_save_file,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
-            readouts=5,
-            games=2,
+            readouts=10,
             n=9)
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)

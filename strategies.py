@@ -53,7 +53,8 @@ class MCTSPlayerMixin:
     # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
     # Otherwise, it uses 'seconds_per_move' of wall time'
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
-                 resign_threshold=-0.90, verbosity=0, two_player_mode=False):
+                 resign_threshold=-0.90, verbosity=0, two_player_mode=False,
+                 num_parallel=1):
         self.network = network
         self.seconds_per_move = seconds_per_move
         self.simulations_per_move = simulations_per_move
@@ -63,6 +64,7 @@ class MCTSPlayerMixin:
             self.temp_threshold = -1
         else:
             self.temp_threshold = TEMPERATURE_CUTOFF
+        self.num_parallel = num_parallel
         self.qs = []
         self.comments = []
         self.searches_pi = []
@@ -71,8 +73,10 @@ class MCTSPlayerMixin:
         self.resign_threshold = -abs(resign_threshold)
         super().__init__()
 
-    def initialize_game(self):
-        self.root = MCTSNode(go.Position())
+    def initialize_game(self, position=None):
+        if position is None:
+            position = go.Position()
+        self.root = MCTSNode(position)
         self.result = 0
         self.comments = []
         self.searches_pi = []
@@ -84,14 +88,13 @@ class MCTSPlayerMixin:
         incorporate_results, and pick_move
         '''
         start = time.time()
-        if not self.root:
-            self.root = MCTSNode(position)
 
         if self.simulations_per_move == 0 :
             while time.time() - start < self.seconds_per_move:
                 self.tree_search()
         else:
-            for i in range(self.simulations_per_move):
+            current_readouts = self.root.N
+            while self.root.N < current_readouts + self.simulations_per_move:
                 self.tree_search()
             if self.verbosity > 0:
                 print("%d: Searched %d times in %s seconds\n\n" % (
@@ -139,10 +142,28 @@ class MCTSPlayerMixin:
             assert self.root.child_N[fcoord] != 0
         return coords.unflatten_coords(fcoord)
 
-    def tree_search(self):
-        leaf = self.root.select_leaf()
-        move_probs, value = self.network.run(leaf.position)
-        leaf.incorporate_results(move_probs, value, up_to=self.root)
+    def tree_search(self, num_parallel=None):
+        if num_parallel is None:
+            num_parallel = self.num_parallel
+        leaves = []
+        failsafe = 0
+        while len(leaves) < num_parallel and failsafe < num_parallel * 2:
+            failsafe += 1
+            leaf = self.root.select_leaf()
+            if self.verbosity >= 4:
+                self.show_path_to_root(leaf)
+            # if game is over, override the value estimate with the true score
+            if leaf.position.is_game_over():
+                value = 1 if leaf.position.score() > 0 else -1
+                leaf.backup_value(value, up_to=self.root)
+                continue
+            leaf.add_virtual_loss(up_to=self.root)
+            leaves.append(leaf)
+        if leaves:
+            move_probs, values = self.network.run_many([leaf.position for leaf in leaves])
+            for leaf, move_prob, value in zip(leaves, move_probs, values):
+                leaf.revert_virtual_loss(up_to=self.root)
+                leaf.incorporate_results(move_prob, value, up_to=self.root)
 
     def is_done(self):
         '''True if the last two moves were Pass or if the position is at a move
@@ -164,7 +185,6 @@ class MCTSPlayerMixin:
             return
         moves = list(map(coords.to_human_coord,
                          [move.move for move in pos.recent[self.root.position.n:]]))
-        print("From root: ", " <= ".join(moves), file=sys.stderr, flush=True)
 
     def should_resign(self):
         '''Returns true if the player resigned.  No further moves should be played'''
