@@ -204,3 +204,28 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
         pass_position = go.Position().pass_move()
         player.initialize_game(pass_position)
         player.tree_search(num_parallel=1)
+        self.assertNoPendingVirtualLosses(player.root)
+
+    def test_only_check_game_end_once(self):
+        # When presented with a situation where the last move was a pass,
+        # and we have to decide whether to pass, it should be the first thing
+        # we check, but not more than that.
+
+        white_passed_pos = go.Position(
+            ).play_move((3, 3) # b plays
+            ).play_move((3, 4) # w plays
+            ).play_move((4, 3) # b plays
+            ).pass_move() # w passes - if B passes too, B would lose by komi.
+
+        player = MCTSPlayerMixin(DummyNet(fake_priors=np.array([.001] * (go.N * go.N + 1))))
+        player.initialize_game(white_passed_pos)
+        # initialize the root
+        player.tree_search()
+        # explore a child - should be a pass move.
+        player.tree_search()
+        pass_move = go.N * go.N
+        self.assertEqual(player.root.children[pass_move].N, 1)
+        self.assertEqual(player.root.child_N[pass_move], 1)
+        player.tree_search()
+        # check that we didn't visit the pass node any more times.
+        self.assertEqual(player.root.child_N[pass_move], 1)

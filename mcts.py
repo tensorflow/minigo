@@ -88,6 +88,7 @@ class MCTSNode(object):
             if (current.position.recent
                 and current.position.recent[-1].move is None
                 and current.child_N[pass_move] == 0):
+                current.child_N[pass_move] += 1
                 current = current.add_child(pass_move)
                 continue
 
@@ -195,7 +196,10 @@ class MCTSNode(object):
         output = []
         while node.children:
             next_kid = np.argmax(node.child_N)
-            node = node.children[next_kid]
+            node = node.children.get(next_kid)
+            if node is None:
+                output.append("GAME END")
+                break
             output.append("%s (%d) ==> " % (coords.to_human_coord(
                                             coords.unflatten_coords(node.fmove)),
                                             node.N))

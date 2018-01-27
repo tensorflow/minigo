@@ -1,3 +1,4 @@
+import sys; sys.path.insert(0, '.')
 import dual_net
 import strategies
 import sgf_wrapper
@@ -36,39 +37,5 @@ def analyze_symmetries(sgf_file, load_file):
 
         print("{:3d} {:.3f} +/- {:.3f} min {:.3f} {} max {:.3f} {}".format(
             i, mean, stdev, *all_vals[0], *all_vals[-1]))
-
-def test_seed(x):
-    random.seed(x)
-    p.initialize_game(p.root.position)
-    p.tree_search()
-    print(p.root.describe())
-    print(np.argmax(p.root.child_action_score))
-    if np.argmax(p.root.child_action_score) == 361:
-        return True
-
-# p = initialize_game('virtual_losses_sgf/2018-01-24T11:30:16.071119.sgf', 'models/000273-golden-horse', 166)
-# random.seed(277)
-# p.tree_search()
-# pdb.run('p.tree_search(num_parallel=2)')
-MODEL = 'models/000273-golden-horse'
-GAME = '/Users/brilee/Downloads/362329.sgf'
-p = initialize_game(GAME, MODEL, 341)
-
-# MODEL = 'models/000190-temeraire'
-# GAME = '/Users/brilee/Downloads/361793.sgf'
-# analyze_symmetries(GAME, MODEL)
-
-# i = 0
-# while True:
-#   if test_seed(i):
-#     print(i)
-#     break
-#   i += 1
-
-random.seed(2)
-MODEL = 'models/000273-golden-horse'
-GAME = '/Users/brilee/Downloads/362329.sgf'
-p = initialize_game(GAME, MODEL, 341)
-p.tree_search()
 
 
