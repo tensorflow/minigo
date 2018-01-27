@@ -37,7 +37,7 @@ SEND_TWO_RETURN_ONE = go.Position(
 class DummyNet():
     def __init__(self, fake_priors=None, fake_value=0):
         if fake_priors is None:
-            fake_priors = np.ones((go.N **2) +1) / (go.N ** 2 + 1)
+            fake_priors = np.ones((go.N ** 2) +1) / (go.N ** 2 + 1)
         self.fake_priors = fake_priors
         self.fake_value = fake_value
 
@@ -217,7 +217,7 @@ class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
             ).play_move((4, 3) # b plays
             ).pass_move() # w passes - if B passes too, B would lose by komi.
 
-        player = MCTSPlayerMixin(DummyNet(fake_priors=np.array([.001] * (go.N * go.N + 1))))
+        player = MCTSPlayerMixin(DummyNet())
         player.initialize_game(white_passed_pos)
         # initialize the root
         player.tree_search()
