@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: mugo-gpu-player
+  name: minigo-gpu-player
 spec:
   parallelism: 11
   completions: 200000
@@ -17,11 +17,11 @@ spec:
               - key: job-label
                 operator: In
                 values:
-                - mugo-gpu-player
+                - minigo-gpu-player
             topologyKey: kubernetes.io/hostname
       containers:
       - name: player
-        image: gcr.io/$PROJECT/mugo-gpu-player:0.9
+        image: gcr.io/$PROJECT/minigo-gpu-player:0.10
         imagePullPolicy: Always
         resources:
           limits:

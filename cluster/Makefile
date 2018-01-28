@@ -1,4 +1,4 @@
-VERSION=0.9
+VERSION=0.12
 PROJECT=tensor-go
 
 
@@ -8,7 +8,7 @@ make gpu-image:
 		cp ../data/names.txt staging/data/
 		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
-	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/mugo-gpu-player:$(VERSION)" .
+	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/minigo-gpu-player:$(VERSION)" .
 		rm staging/*.py
 		rm staging/requirements.txt
 		rm staging/player_wrapper.sh
@@ -19,7 +19,7 @@ image:
 		cp -r ../data staging/
 		cp ../requirements-cpu.txt staging/
 		cp player_wrapper.sh staging/
-	    docker build -t "gcr.io/$(PROJECT)/mugo-player:$(VERSION)" .
+	    docker build -t "gcr.io/$(PROJECT)/minigo-player:$(VERSION)" .
 		rm staging/*.py
 		rm -r staging/data
 		rm staging/requirements-cpu.txt
@@ -30,15 +30,15 @@ image-clean:
 		cp ../*.py staging/
 		cp ../requirements-cpu.txt staging/
 		cp player_wrapper.sh staging/
-	    docker build --no-cache -t "gcr.io/$(PROJECT)/mugo-player:$(VERSION)" .
+	    docker build --no-cache -t "gcr.io/$(PROJECT)/minigo-player:$(VERSION)" .
 		rm staging/*.py
 		rm staging/requirements-cpu.txt
 		rm staging/player_wrapper.sh
 
 push: image
-	    gcloud docker -- push "gcr.io/$(PROJECT)/mugo-player:$(VERSION)"
+	    gcloud docker -- push "gcr.io/$(PROJECT)/minigo-player:$(VERSION)"
 
 gpu-push: gpu-image
-	    gcloud docker -- push "gcr.io/$(PROJECT)/mugo-gpu-player:$(VERSION)"
+	    gcloud docker -- push "gcr.io/$(PROJECT)/minigo-gpu-player:$(VERSION)"
 
 .PHONY: image push
