@@ -53,6 +53,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
         if player.is_done():
             # TODO: actually handle the result instead of ferrying it around as a property.
             player.result = player.position.result()
+            break
 
         if (verbosity >= 2) or (verbosity >= 1 and player.root.position.n % 10 == 9):
             print("Q: {}".format(player.root.Q))
