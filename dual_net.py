@@ -82,8 +82,6 @@ class DualNetworkTrainer():
                     tensor_values = self.sess.run(train_tensors)
                 except tf.errors.OutOfRangeError:
                     break
-                if i % 1000 == 0:
-                    print(tensor_values)
                 if logdir is not None:
                     training_stats.report(
                         tensor_values['policy_cost'],

@@ -22,9 +22,10 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             raw_data.append((feature, pi, value))
         return raw_data
 
-    def extract_data(self, tf_record):
+    def extract_data(self, tf_record,filter_amount=1):
         tf_example_tensor = preprocessing.get_input_tensors(
-            1, [tf_record], num_repeats=1, shuffle_records=False, shuffle_examples=False)
+            1, [tf_record], num_repeats=1, shuffle_records=False, 
+            shuffle_examples=False, filter_amount=filter_amount)
         recovered_data = []
         with tf.Session() as sess:
             while True:
@@ -61,6 +62,18 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             recovered_data = self.extract_data(f.name)
 
         self.assertEqualData(raw_data, recovered_data)
+
+    def test_filter(self):
+        raw_data = self.create_random_data(100)
+        tfexamples = list(map(preprocessing.make_tf_example, *zip(*raw_data)))
+
+        with tempfile.NamedTemporaryFile() as f:
+            preprocessing.write_tf_examples(f.name, tfexamples)
+            recovered_data = self.extract_data(f.name, filter_amount=.05)
+
+        #TODO: this will flake out very infrequently.  Use set_random_seed
+        self.assertLess(len(recovered_data), 50)
+
 
     def test_serialize_round_trip_no_parse(self):
         np.random.seed(1)
