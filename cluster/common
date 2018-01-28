@@ -4,5 +4,4 @@ export BUCKET_NAME=mugozero-v2
 export SERVICE_ACCOUNT=mugo-services2
 export SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT}@${PROJECT}.iam.gserviceaccount.com
 export BOARD_SIZE=19
-export GAMES=8
 
