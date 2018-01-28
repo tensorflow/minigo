@@ -21,7 +21,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: player
-        image: gcr.io/$PROJECT/minigo-gpu-player:0.9
+        image: gcr.io/$PROJECT/minigo-gpu-player:0.10
         imagePullPolicy: Always
         resources:
           limits:

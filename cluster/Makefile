@@ -1,4 +1,4 @@
-VERSION=0.9
+VERSION=0.10
 PROJECT=tensor-go
 
 
@@ -30,7 +30,7 @@ image-clean:
 		cp ../*.py staging/
 		cp ../requirements-cpu.txt staging/
 		cp player_wrapper.sh staging/
-	    docker build --no-cache -t "gcr.io/$(PROJECT)/mugo-player:$(VERSION)" .
+	    docker build --no-cache -t "gcr.io/$(PROJECT)/minigo-player:$(VERSION)" .
 		rm staging/*.py
 		rm staging/requirements-cpu.txt
 		rm staging/player_wrapper.sh
