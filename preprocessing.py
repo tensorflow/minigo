@@ -167,18 +167,3 @@ def shuffle_tf_examples(batch_size, records_to_shuffle):
             yield list(result)
         except tf.errors.OutOfRangeError:
             break
-
-def make_dataset_from_DSv2(dataset_v2, tf_record):
-    '''
-    (Deprecated!) Convert an existing DatasetV2 file into a tf_record file.
-    '''
-    import load_data_sets
-    ds = load_data_sets.DataSetV2.read(dataset_v2)
-    tf_examples = []
-    for i in range(ds.size):
-        tf_examples.append(make_tf_example(
-            ds.pos_features[i],
-            ds.next_moves[i],
-            ds.results[i]))
-    write_tf_examples(tf_record, tf_examples)
-

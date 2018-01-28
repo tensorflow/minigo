@@ -165,16 +165,8 @@ def gather(
     with gfile.GFile(meta_file, 'w') as f:
         f.write('\n'.join(sorted(already_processed)))
 
-def convert(file):
-    assert file.endswith('.gz')
-    outfile = file.replace('.gz', '.tfrecord.zz')
-    try:
-        preprocessing.make_dataset_from_DSv2(file, outfile)
-    except:
-        print("error for ",file)
-
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train, selfplay, gather, evaluate, convert])
+argh.add_commands(parser, [gtp, bootstrap, train, selfplay, gather, evaluate])
 
 if __name__ == '__main__':
     cloud_logging.configure()
