@@ -6,7 +6,7 @@ import symmetries
 from symmetries import apply_symmetry_feat as apply_f
 from symmetries import apply_symmetry_pi as apply_p
 import go
-import test_utils
+from tests import test_utils
 
 class TestSymmetryOperations(test_utils.MiniGoUnitTest):
     def setUp(self):

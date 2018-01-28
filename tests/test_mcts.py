@@ -4,15 +4,14 @@ import numpy as np
 
 import go
 from go import Position
-import test_utils
-from test_utils import load_board
+from tests import test_utils
 from coords import parse_kgs_coords
 from coords import kgs_to_flat
 import coords
 
 from mcts import MCTSNode
 
-ALMOST_DONE_BOARD = load_board('''
+ALMOST_DONE_BOARD = test_utils.load_board('''
 .XO.XO.OO
 X.XXOOOO.
 XXXXXOOOO

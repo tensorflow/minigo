@@ -1,7 +1,7 @@
 import unittest
 
 import shipname
-import test_utils
+from tests import test_utils
 
 class TestShipname(test_utils.MiniGoUnitTest):
     def test_bootstrap_gen(self):

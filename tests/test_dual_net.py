@@ -5,7 +5,7 @@ import unittest
 import dual_net
 import go
 import preprocessing
-import test_utils
+from tests import test_utils
 
 fast_hparams = {'k': 1, 'fc_width': 2, 'num_shared_layers': 1}
 

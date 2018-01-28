@@ -6,11 +6,10 @@ import coords
 from go import Position, PlayerMove, LibertyTracker, WHITE, BLACK, EMPTY
 import go
 import sgf_wrapper
-import test_utils
-from test_utils import load_board
+from tests import test_utils
 
 EMPTY_ROW = '.' * go.N + '\n'
-TEST_BOARD = load_board('''
+TEST_BOARD = test_utils.load_board('''
 .X.....OO
 X........
 ''' + EMPTY_ROW * 7)
@@ -23,7 +22,7 @@ def parse_kgs_coords_set(string):
 class TestBasicFunctions(test_utils.MiniGoUnitTest):
     def test_load_board(self):
         self.assertEqualNPArray(go.EMPTY_BOARD, np.zeros([go.N, go.N]))
-        self.assertEqualNPArray(go.EMPTY_BOARD, load_board('. \n' * go.N ** 2))
+        self.assertEqualNPArray(go.EMPTY_BOARD, test_utils.load_board('. \n' * go.N ** 2))
 
     def test_neighbors(self):
         corner = parse_kgs_coords('A1')
@@ -41,7 +40,7 @@ class TestBasicFunctions(test_utils.MiniGoUnitTest):
         self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('E5')), None)
 
     def test_is_eyeish(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .XX...XXX
             X.X...X.X
             XX.....X.
@@ -64,7 +63,7 @@ class TestBasicFunctions(test_utils.MiniGoUnitTest):
 
 class TestLibertyTracker(test_utils.MiniGoUnitTest):
     def test_lib_tracker_init(self):
-        board = load_board('X........' + EMPTY_ROW * 8)
+        board = test_utils.load_board('X........' + EMPTY_ROW * 8)
 
         lib_tracker = LibertyTracker.from_board(board)
         self.assertEqual(len(lib_tracker.groups), 1)
@@ -76,7 +75,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
         self.assertEqual(sole_group.color, BLACK)
 
     def test_place_stone(self):
-        board = load_board('X........' + EMPTY_ROW * 8)
+        board = test_utils.load_board('X........' + EMPTY_ROW * 8)
         lib_tracker = LibertyTracker.from_board(board)
         lib_tracker.add_stone(BLACK, parse_kgs_coords('B9'))
         self.assertEqual(len(lib_tracker.groups), 1)
@@ -89,7 +88,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
         self.assertEqual(sole_group.color, BLACK)
 
     def test_place_stone_opposite_color(self):
-        board = load_board('X........' + EMPTY_ROW * 8)
+        board = test_utils.load_board('X........' + EMPTY_ROW * 8)
         lib_tracker = LibertyTracker.from_board(board)
         lib_tracker.add_stone(WHITE, parse_kgs_coords('B9'))
         self.assertEqual(len(lib_tracker.groups), 2)
@@ -107,7 +106,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
         self.assertEqual(white_group.color, WHITE)
 
     def test_merge_multiple_groups(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .X.......
             X.X......
             .X.......
@@ -126,7 +125,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
             self.assertEqual(liberty_cache[stone], 6, str(stone))
 
     def test_capture_stone(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .X.......
             XO.......
             .X.......
@@ -138,7 +137,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
         self.assertEqual(captured, parse_kgs_coords_set('B8'))
 
     def test_capture_many(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .XX......
             XOO......
             .XX......
@@ -178,7 +177,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
             self.assertEqual(liberty_cache[stone], 0, str(stone))
 
     def test_capture_multiple_groups(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .OX......
             OXX......
             XX.......
@@ -204,7 +203,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
 
 
     def test_same_friendly_group_neighboring_twice(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             XX.......
             X........
         ''' + EMPTY_ROW * 7)
@@ -219,7 +218,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
         self.assertEqual(captured, set())
 
     def test_same_opponent_group_neighboring_twice(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             XX.......
             X........
         ''' + EMPTY_ROW * 7)
@@ -283,7 +282,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
         self.assertEqualPositions(flip_position, expected_position)
 
     def test_is_move_suicidal(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             ...O.O...
             ....O....
             XO.....O.
@@ -308,7 +307,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
             self.assertFalse(position.is_move_suicidal(move), str(move))
 
     def test_legal_moves(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .O.O.XOX.
             O..OOOOOX
             ......O.O
@@ -357,7 +356,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
             recent=tuple(),
             to_play=BLACK,
         )
-        expected_board = load_board('''
+        expected_board = test_utils.load_board('''
             .XX....OO
             X........
         ''' + EMPTY_ROW * 7)
@@ -373,7 +372,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
         actual_position = start_position.play_move(parse_kgs_coords('C9'))
         self.assertEqualPositions(actual_position, expected_position)
 
-        expected_board2 = load_board('''
+        expected_board2 = test_utils.load_board('''
             .XX....OO
             X.......O
         ''' + EMPTY_ROW * 7)
@@ -390,7 +389,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
         self.assertEqualPositions(actual_position2, expected_position2)
 
     def test_move_with_capture(self):
-        start_board = load_board(EMPTY_ROW * 5 + '''
+        start_board = test_utils.load_board(EMPTY_ROW * 5 + '''
             XXXX.....
             XOOX.....
             O.OX.....
@@ -405,7 +404,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
             recent=tuple(),
             to_play=BLACK,
         )
-        expected_board = load_board(EMPTY_ROW * 5 + '''
+        expected_board = test_utils.load_board(EMPTY_ROW * 5 + '''
             XXXX.....
             X..X.....
             .X.X.....
@@ -424,7 +423,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
         self.assertEqualPositions(actual_position, expected_position)
 
     def test_ko_move(self):
-        start_board = load_board('''
+        start_board = test_utils.load_board('''
             .OX......
             OX.......
         ''' + EMPTY_ROW * 7)
@@ -437,7 +436,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
             recent=tuple(),
             to_play=BLACK,
         )
-        expected_board = load_board('''
+        expected_board = test_utils.load_board('''
             X.X......
             OX.......
         ''' + EMPTY_ROW * 7)
@@ -483,7 +482,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
         self.assertTrue(second_pass.is_game_over())
 
     def test_scoring(self):
-            board = load_board('''
+            board = test_utils.load_board('''
                 .XX......
                 OOXX.....
                 OOOX...X.
@@ -506,7 +505,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
             expected_score = 1.5
             self.assertEqual(position.score(), expected_score)
 
-            board = load_board('''
+            board = test_utils.load_board('''
                 XXX......
                 OOXX.....
                 OOOX...X.
@@ -537,7 +536,7 @@ class TestPosition(test_utils.MiniGoUnitTest):
         final = sgf_positions[-1].position.play_move(sgf_positions[-1].next_move)
 
         # sanity check to ensure we're working with the right position
-        final_board = load_board('''
+        final_board = test_utils.load_board('''
             .OXX.....
             O.OX.X...
             .OOX.....

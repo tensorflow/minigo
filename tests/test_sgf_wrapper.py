@@ -4,8 +4,7 @@ import unittest
 
 import coords
 from coords import parse_kgs_coords
-import test_utils
-from test_utils import load_board
+from tests import test_utils
 
 JAPANESE_HANDICAP_SGF = "(;GM[1]FF[4]CA[UTF-8]AP[CGoban:3]ST[2]RU[Japanese]SZ[9]HA[2]RE[Void]KM[5.50]PW[test_white]PB[test_black]AB[gc][cg];W[ee];B[dg])"
 
@@ -53,7 +52,7 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
         self.assertEqual(initial.position.komi, 5.5)
 
     def test_japanese_handicap_handling(self):
-        intermediate_board = load_board('''
+        intermediate_board = test_utils.load_board('''
             .........
             .........
             ......X..
@@ -72,7 +71,7 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
             recent=(go.PlayerMove(go.WHITE, coords.parse_kgs_coords('E5')),),
             to_play=go.BLACK,
         )
-        final_board = load_board('''
+        final_board = test_utils.load_board('''
             .........
             .........
             ......X..
@@ -99,7 +98,7 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
         self.assertEqualPositions(final_position, final_replayed_position)
 
     def test_chinese_handicap_handling(self):
-        intermediate_board = load_board('''
+        intermediate_board = test_utils.load_board('''
             .........
             .........
             ......X..
@@ -118,7 +117,7 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
             recent=(go.PlayerMove(go.BLACK, parse_kgs_coords('G7')),),
             to_play=go.BLACK,
         )
-        final_board = load_board('''
+        final_board = test_utils.load_board('''
             ....OX...
             .O.OOX...
             O.O.X.X..

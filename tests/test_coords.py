@@ -3,7 +3,7 @@ import numpy
 
 import coords
 import go
-import test_utils
+from tests import test_utils
 
 class TestCoords(test_utils.MiniGoUnitTest):
     def test_upperleft(self):

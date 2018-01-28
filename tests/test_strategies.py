@@ -6,12 +6,11 @@ import coords
 import go
 from go import Position
 from coords import kgs_to_flat
-import test_utils
-from test_utils import load_board
+from tests import test_utils
 from mcts import MCTSNode
 from strategies import MCTSPlayerMixin, time_recommendation
 
-ALMOST_DONE_BOARD = load_board('''
+ALMOST_DONE_BOARD = test_utils.load_board('''
 .XO.XO.OO
 X.XXOOOO.
 XXXXXOOOO
