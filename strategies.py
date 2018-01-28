@@ -122,7 +122,7 @@ class MCTSPlayerMixin:
                 self.root.children_as_pi(self.root.position.n > self.temp_threshold))
         self.qs.append(self.root.Q) # Save our resulting Q.
         self.comments.append(self.root.describe())
-        self.root = self.root.add_child(coords.flatten_coords(c))
+        self.root = self.root.maybe_add_child(coords.flatten_coords(c))
         self.position = self.root.position # for showboard
         del self.root.parent.children
         return True # GTP requires positive result.
