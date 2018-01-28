@@ -12,8 +12,6 @@ import dual_net
 import go
 import main
 
-go.set_board_size(9)
-
 def rl_loop():
     # monkeypatch the hyperparams so that we get a quickly executing network.
     dual_net.get_default_hyperparams = lambda **kwargs: {
@@ -35,18 +33,16 @@ def rl_loop():
             load_file=model_save_file,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
-            readouts=10,
-            n=9)
+            readouts=10)
         main.selfplay(
             load_file=model_save_file,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
-            readouts=10,
-            n=9)
+            readouts=10)
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data... (ctrl+C to quit)")
-        main.train(gather_dir, save_file=model_save_file, n=9, num_steps=10000)
+        main.train(gather_dir, save_file=model_save_file, num_steps=10000)
 
 if __name__ == '__main__':
     rl_loop()

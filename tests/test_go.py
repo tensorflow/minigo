@@ -8,8 +8,6 @@ import go
 import sgf_wrapper
 from test_utils import GoPositionTestCase, load_board
 
-go.set_board_size(9)
-
 EMPTY_ROW = '.' * go.N + '\n'
 TEST_BOARD = load_board('''
 .X.....OO

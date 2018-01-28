@@ -33,8 +33,7 @@ def _ensure_dir_exists(directory):
 def gtp(load_file: "The path to the network model files"=None,
         readouts: 'How many simulations to run per move'=100,
         cgos_mode: 'Whether to use CGOS time constraints'=False,
-        verbose=1, n=19):
-    go.set_board_size(int(n))
+        verbose=1):
     engine = make_gtp_instance(load_file,
                                readouts_per_move=readouts,
                                verbosity=verbose,
@@ -54,13 +53,11 @@ def gtp(load_file: "The path to the network model files"=None,
             sys.stdout.write(engine_reply)
             sys.stdout.flush()
 
-def bootstrap(save_file, n=19):
-    go.set_board_size(int(n))
+def bootstrap(save_file):
     dual_net.DualNetworkTrainer(save_file).bootstrap()
 
 def train(chunk_dir, save_file, load_file=None, generation_num=0,
-          logdir=None, n=19, num_steps=None):
-    go.set_board_size(int(n))
+          logdir=None, num_steps=None):
     tf_records = gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz'))
     tf_records = [f for f in tf_records
         if (generation_num - 50) < int(os.path.basename(f)[:6]) <= generation_num]
@@ -75,9 +72,7 @@ def evaluate(
         output_dir: 'Where to write the evaluation results'='data/evaluate/sgf',
         readouts: 'How many readouts to make per move.'=400,
         games: 'the number of games to play'=16,
-        verbose: 'How verbose the players should be (see selfplay)' = 1,
-        n=19):
-    go.set_board_size(int(n))
+        verbose: 'How verbose the players should be (see selfplay)' = 1):
 
     black_model = os.path.abspath(black_model)
     white_model = os.path.abspath(white_model)
@@ -103,9 +98,7 @@ def selfplay(
          output_sgf: "Where to write the sgfs"="sgf/",
          readouts: 'How many simulations to run per move'=100,
          verbose : '>=2 will print debug info, >=3 will print boards' = 1,
-         resign_threshold : 'absolute value of threshold to resign at' = 0.95,
-         n=19):
-    go.set_board_size(int(n))
+         resign_threshold : 'absolute value of threshold to resign at' = 0.95):
     _ensure_dir_exists(output_sgf)
     _ensure_dir_exists(output_dir)
 

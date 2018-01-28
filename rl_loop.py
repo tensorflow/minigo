@@ -10,7 +10,6 @@ from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
 BUCKET_NAME = os.environ['BUCKET_NAME']
-N = os.environ['BOARD_SIZE']
 
 BASE_DIR = "gs://{}".format(BUCKET_NAME)
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
@@ -22,7 +21,6 @@ TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 def print_flags():
     flags = {
         'BUCKET_NAME': BUCKET_NAME,
-        'N': N,
         'BASE_DIR': BASE_DIR,
         'MODELS_DIR': MODELS_DIR,
         'SELFPLAY_DIR': SELFPLAY_DIR,
@@ -49,7 +47,7 @@ def bootstrap():
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(MODELS_DIR, bootstrap_name)
     print("Bootstrapping model at {}".format(bootstrap_model_path))
-    main.bootstrap(bootstrap_model_path, n=N)
+    main.bootstrap(bootstrap_model_path)
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
@@ -61,7 +59,6 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         output_sgf=SGF_DIR,
         readouts=readouts,
         verbose=verbose,
-        n=N,
     )
 
 def gather():
@@ -76,7 +73,7 @@ def train(logdir=None):
     load_file = os.path.join(MODELS_DIR, model_name)
     save_file = os.path.join(MODELS_DIR, new_model_name)
     main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
-               generation_num=model_num, logdir=logdir, n=N)
+               generation_num=model_num, logdir=logdir)
 
 def loop(logdir=None):
     while True:

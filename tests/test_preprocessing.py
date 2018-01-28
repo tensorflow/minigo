@@ -10,7 +10,6 @@ import go
 
 from test_utils import GoPositionTestCase
 
-go.set_board_size(9)
 TEST_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf])"
 
 class TestPreprocessing(GoPositionTestCase):

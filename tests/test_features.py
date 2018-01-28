@@ -5,7 +5,6 @@ import features
 import go
 from test_utils import load_board, GoPositionTestCase
 
-go.set_board_size(9)
 EMPTY_ROW = '.' * go.N + '\n'
 TEST_BOARD = load_board('''
 .X.....OO

@@ -7,7 +7,7 @@ import unittest
 import go
 import utils
 
-go.set_board_size(9)
+assert go.N == 9, "All unit tests must be run with BOARD_SIZE=9"
 
 def load_board(string):
     reverse_map = {
@@ -50,9 +50,6 @@ class GoPositionTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         print("\n%s.%s: %.3f seconds" % (cls.__module__, cls.__name__, time.time() - cls.start_time))
-
-    def setUp(self):
-        go.set_board_size(9)
 
     def assertEqualNPArray(self, array1, array2):
         if not np.all(array1 == array2):
