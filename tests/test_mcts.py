@@ -120,9 +120,9 @@ class TestMctsNodes(GoPositionTestCase):
         probs = np.array([0.02] * (go.N * go.N + 1), dtype=np.float32)
         root = MCTSNode(go.Position())
         root.select_leaf().incorporate_results(probs, 0, root)
-        first_pass = root.add_child(coords.flatten_coords(None))
+        first_pass = root.maybe_add_child(coords.flatten_coords(None))
         first_pass.incorporate_results(probs, 0, root)
-        second_pass = first_pass.add_child(coords.flatten_coords(None))
+        second_pass = first_pass.maybe_add_child(coords.flatten_coords(None))
         with self.assertRaises(AssertionError):
             second_pass.incorporate_results(probs, 0, root)
         node_to_explore = second_pass.select_leaf()
@@ -131,16 +131,16 @@ class TestMctsNodes(GoPositionTestCase):
 
     def test_add_child(self):
         root = MCTSNode(go.Position())
-        child = root.add_child(17)
+        child = root.maybe_add_child(17)
         self.assertIn(17, root.children)
         self.assertEqual(child.parent, root)
         self.assertEqual(child.fmove, 17)
 
     def test_add_child_idempotency(self):
         root = MCTSNode(go.Position())
-        child = root.add_child(17)
+        child = root.maybe_add_child(17)
         current_children = copy.copy(root.children)
-        child2 = root.add_child(17)
+        child2 = root.maybe_add_child(17)
         self.assertEqual(child, child2)
         self.assertEqual(current_children, root.children)
 

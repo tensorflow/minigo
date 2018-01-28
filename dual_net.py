@@ -20,8 +20,6 @@ import go
 
 EXAMPLES_PER_GENERATION = 2000000
 TRAIN_BATCH_SIZE = 16
-# Momentum comes from the AGZ paper. Set at 0.9.
-MOMENTUM = 0.9
 
 class DualNetworkTrainer():
     def __init__(self, save_file=None, **hparams):

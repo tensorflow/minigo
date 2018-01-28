@@ -4,8 +4,7 @@ All terminology here (Q, U, N, p_UCT) uses the same notation as in the
 AlphaGo (AG) paper.
 """
 import numpy as np
-import copy
-import sys
+import collections
 import random
 import math
 
@@ -17,6 +16,18 @@ c_PUCT = 1.38
 
 # Dirichlet noise, as a function of go.N
 D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
+
+class DummyNode(object):
+    """A fake node of a MCTS search tree.
+
+    This node is intended to be a placeholder for the root node, which would
+    otherwise have no parent node. If all nodes have parents, code becomes
+    simpler."""
+    def __init__(self):
+        self.parent = None
+        self.child_N = collections.defaultdict(float)
+        self.child_W = collections.defaultdict(float)
+
 
 class MCTSNode(object):
     """A node of a MCTS search tree.
@@ -31,16 +42,15 @@ class MCTSNode(object):
     parent: A parent MCTSNode.
     """
 
-    def __init__(self, position, initial_Q=0, fmove=None, parent=None):
-        self.parent = parent # pointer to another MCTSNode
+    def __init__(self, position, fmove=None, parent=None):
+        if parent is None:
+            parent = DummyNode()
+        self.parent = parent
         self.fmove = fmove # move that led to this position, as flattened coords
         self.position = position
         self.is_expanded = False
-        # N and Q are duplicated at a node, and in the parent's child_N/Q.
-        self.N = 0 # number of times node is visited
-        self.W = initial_Q # value estimate
         self.losses_applied = 0 # number of virtual losses on this node
-        # duplication allows vectorized computation of action score.
+        # using child_() allows vectorized computation of action score.
         self.illegal_moves = 1000 * (1 - self.position.all_legal_moves())
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_W = np.zeros([go.N * go.N + 1], dtype=np.float32)
@@ -71,6 +81,22 @@ class MCTSNode(object):
         return self.W / (1 + self.N)
 
     @property
+    def N(self):
+        return self.parent.child_N[self.fmove]
+
+    @N.setter
+    def N(self, value):
+        self.parent.child_N[self.fmove] = value
+
+    @property
+    def W(self):
+        return self.parent.child_W[self.fmove]
+
+    @W.setter
+    def W(self, value):
+        self.parent.child_W[self.fmove] = value
+
+    @property
     def Q_perspective(self):
         "Return value of position, from perspective of player to play."
         return self.Q * self.position.to_play
@@ -88,21 +114,19 @@ class MCTSNode(object):
             if (current.position.recent
                 and current.position.recent[-1].move is None
                 and current.child_N[pass_move] == 0):
-                current.child_N[pass_move] += 1
-                current = current.add_child(pass_move)
+                current = current.maybe_add_child(pass_move)
                 continue
 
             best_move = np.argmax(current.child_action_score)
-            current.child_N[best_move] += 1
-            current = current.add_child(best_move)
+            current = current.maybe_add_child(best_move)
         return current
 
-    def add_child(self, fcoord):
+    def maybe_add_child(self, fcoord):
         """ Adds child node for fcoord if it doesn't already exist, and returns it. """
         if fcoord not in self.children:
             new_position = self.position.play_move(coords.unflatten_coords(fcoord))
             self.children[fcoord] = MCTSNode(
-                new_position, initial_Q=self.child_W[fcoord], fmove=fcoord, parent=self)
+                new_position, fmove=fcoord, parent=self)
         return self.children[fcoord]
 
     def add_virtual_loss(self, up_to):
@@ -119,7 +143,6 @@ class MCTSNode(object):
         self.W += loss
         if self.parent is None or self is up_to:
             return
-        self.parent.child_W[self.fmove] += loss
         self.parent.add_virtual_loss(up_to)
 
     def revert_virtual_loss(self, up_to):
@@ -128,7 +151,6 @@ class MCTSNode(object):
         self.W += revert
         if self.parent is None or self is up_to:
             return
-        self.parent.child_W[self.fmove] += revert
         self.parent.revert_virtual_loss(up_to)
 
     def revert_visits(self, up_to):
@@ -144,7 +166,6 @@ class MCTSNode(object):
         self.N -= 1
         if self.parent is None or self is up_to:
             return
-        self.parent.child_N[self.fmove] -= 1
         self.parent.revert_visits(up_to)
 
     def incorporate_results(self, move_probabilities, value, up_to):
@@ -178,7 +199,6 @@ class MCTSNode(object):
         self.W += value
         if self.parent is None or self is up_to:
             return
-        self.parent.child_W[self.fmove] += value
         self.parent.backup_value(value, up_to)
 
     def inject_noise(self):
