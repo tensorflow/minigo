@@ -3,7 +3,8 @@ import numpy as np
 
 import features
 import go
-from test_utils import load_board, GoPositionTestCase
+import test_utils
+from test_utils import load_board
 
 EMPTY_ROW = '.' * go.N + '\n'
 TEST_BOARD = load_board('''
@@ -49,7 +50,7 @@ for coord in ((0, 0), (0, 1), (0, 2), (0, 3), (1, 1)):
 # .X.......
 # .........
 
-class TestFeatureExtraction(GoPositionTestCase):
+class TestFeatureExtraction(test_utils.MiniGoUnitTest):
     def test_stone_features(self):
         f = features.stone_features(TEST_POSITION3)
         self.assertEqual(TEST_POSITION3.to_play, go.WHITE)

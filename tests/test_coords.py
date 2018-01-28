@@ -3,9 +3,9 @@ import numpy
 
 import coords
 import go
+import test_utils
 
-
-class TestCoords(unittest.TestCase):
+class TestCoords(test_utils.MiniGoUnitTest):
     def test_upperleft(self):
         self.assertEqual(coords.parse_sgf_coords('aa'), (0, 0))
         self.assertEqual(coords.unflatten_coords(0), (0, 0))

@@ -9,7 +9,7 @@ import test_utils
 
 fast_hparams = {'k': 1, 'fc_width': 2, 'num_shared_layers': 1}
 
-class TestDualNet(test_utils.TimedUnitTest):
+class TestDualNet(test_utils.MiniGoUnitTest):
     def test_train(self):
         with tempfile.TemporaryDirectory() as model_dir, \
             tempfile.NamedTemporaryFile() as tf_record:

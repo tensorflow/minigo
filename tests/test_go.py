@@ -6,7 +6,8 @@ import coords
 from go import Position, PlayerMove, LibertyTracker, WHITE, BLACK, EMPTY
 import go
 import sgf_wrapper
-from test_utils import GoPositionTestCase, load_board
+import test_utils
+from test_utils import load_board
 
 EMPTY_ROW = '.' * go.N + '\n'
 TEST_BOARD = load_board('''
@@ -19,17 +20,10 @@ NO_HANDICAP_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0
 def parse_kgs_coords_set(string):
     return frozenset(map(parse_kgs_coords, string.split()))
 
-class TestGoBoard(GoPositionTestCase):
+class TestBasicFunctions(test_utils.MiniGoUnitTest):
     def test_load_board(self):
         self.assertEqualNPArray(go.EMPTY_BOARD, np.zeros([go.N, go.N]))
         self.assertEqualNPArray(go.EMPTY_BOARD, load_board('. \n' * go.N ** 2))
-
-    def test_parsing(self):
-        self.assertEqual(parse_kgs_coords('A9'), (0, 0))
-        self.assertEqual(parse_sgf_coords('aa'), (0, 0))
-        self.assertEqual(parse_kgs_coords('A3'), (6, 0))
-        self.assertEqual(parse_sgf_coords('ac'), (2, 0))
-        self.assertEqual(parse_kgs_coords('D4'), parse_sgf_coords('df'))
 
     def test_neighbors(self):
         corner = parse_kgs_coords('A1')
@@ -40,8 +34,6 @@ class TestGoBoard(GoPositionTestCase):
         side_neighbors = [go.EMPTY_BOARD[c] for c in go.NEIGHBORS[side]]
         self.assertEqual(len(side_neighbors), 3)
 
-
-class TestEyeHandling(GoPositionTestCase):
     def test_is_koish(self):
         self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('A9')), BLACK)
         self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('B8')), None)
@@ -70,7 +62,7 @@ class TestEyeHandling(GoPositionTestCase):
         for ne in not_eyes:
             self.assertEqual(go.is_eyeish(board, ne), None, str(ne))
 
-class TestLibertyTracker(unittest.TestCase):
+class TestLibertyTracker(test_utils.MiniGoUnitTest):
     def test_lib_tracker_init(self):
         board = load_board('X........' + EMPTY_ROW * 8)
 
@@ -245,7 +237,7 @@ class TestLibertyTracker(unittest.TestCase):
 
         self.assertEqual(captured, set())
 
-class TestPosition(GoPositionTestCase):
+class TestPosition(test_utils.MiniGoUnitTest):
     def test_passing(self):
         start_position = Position(
             board=TEST_BOARD,
@@ -490,8 +482,6 @@ class TestPosition(GoPositionTestCase):
         second_pass = first_pass.play_move(None)
         self.assertTrue(second_pass.is_game_over())
 
-
-class TestScoring(unittest.TestCase):
     def test_scoring(self):
             board = load_board('''
                 .XX......
@@ -539,7 +529,6 @@ class TestScoring(unittest.TestCase):
             expected_score = 2.5
             self.assertEqual(position.score(), expected_score)
 
-class TestPositionReplay(GoPositionTestCase):
     def test_replay_position(self):
         sgf_positions = list(sgf_wrapper.replay_sgf(NO_HANDICAP_SGF))
         initial = sgf_positions[0]

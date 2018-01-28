@@ -4,7 +4,8 @@ import numpy as np
 
 import go
 from go import Position
-from test_utils import load_board, GoPositionTestCase
+import test_utils
+from test_utils import load_board
 from coords import parse_kgs_coords
 from coords import kgs_to_flat
 import coords
@@ -47,7 +48,7 @@ SEND_TWO_RETURN_ONE = go.Position(
 )
 
 
-class TestMctsNodes(GoPositionTestCase):
+class TestMctsNodes(test_utils.MiniGoUnitTest):
     def test_action_flipping(self):
         np.random.seed(1)
         probs = np.array([.02] * (go.N * go.N + 1))

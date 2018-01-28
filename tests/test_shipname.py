@@ -1,8 +1,9 @@
 import unittest
 
 import shipname
+import test_utils
 
-class TestShipname(unittest.TestCase):
+class TestShipname(test_utils.MiniGoUnitTest):
     def test_bootstrap_gen(self):
         name = shipname.generate(0)
         self.assertIn('bootstrap', name)

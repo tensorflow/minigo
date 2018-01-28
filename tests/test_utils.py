@@ -41,8 +41,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(utils.parse_game_result('Void'), 0)
 
 
-
-class GoPositionTestCase(unittest.TestCase):
+class MiniGoUnitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.start_time = time.time()
@@ -98,7 +97,6 @@ class GoPositionTestCase(unittest.TestCase):
             self.assertEqual(pos1.recent[-r_len:], pos2.recent[-r_len:])
         self.assertEqual(pos1.to_play, pos2.to_play)
 
-class MCTSTestMixin():
     def assertNoPendingVirtualLosses(self, root):
         """Raise an error if any node in this subtree has vlosses pending."""
         queue = [root]
