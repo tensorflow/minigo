@@ -6,10 +6,9 @@ import symmetries
 from symmetries import apply_symmetry_feat as apply_f
 from symmetries import apply_symmetry_pi as apply_p
 import go
+from tests import test_utils
 
-from test_utils import GoPositionTestCase
-
-class TestSymmetryOperations(GoPositionTestCase):
+class TestSymmetryOperations(test_utils.MiniGoUnitTest):
     def setUp(self):
         np.random.seed(1)
         self.feat = np.random.random([go.N, go.N, 3])

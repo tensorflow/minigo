@@ -44,7 +44,6 @@ def make_sgf(
     move_history,
     result_string,
     ruleset="Chinese",
-    boardsize=None,
     komi=7.5,
     white_name=PROGRAM_IDENTIFIER,
     black_name=PROGRAM_IDENTIFIER,
@@ -59,8 +58,7 @@ def make_sgf(
         result_string: "B+R", "W+0.5", etc.
         comments: iterable of string/None. Will be zipped with move_history.
     '''
-    if boardsize is None:
-        boardsize = go.N
+    boardsize = go.N
     game_moves = ''.join(translate_sgf_move(*z)
         for z in itertools.zip_longest(move_history, comments))
     result = result_string
@@ -136,7 +134,6 @@ def replay_sgf(sgf_contents):
     if props.get('KM') != None:
         komi = float(sgf_prop(props.get('KM')))
     result = utils.parse_game_result(sgf_prop(props.get('RE')))
-    go.set_board_size(int(sgf_prop(props.get('SZ'))))
 
     pos = Position(komi=komi)
     current_node = game.root

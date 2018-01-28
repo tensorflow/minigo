@@ -7,13 +7,11 @@ import coords
 import preprocessing
 import features
 import go
+from tests import test_utils
 
-from test_utils import GoPositionTestCase
-
-go.set_board_size(9)
 TEST_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf])"
 
-class TestPreprocessing(GoPositionTestCase):
+class TestPreprocessing(test_utils.MiniGoUnitTest):
     def create_random_data(self, num_examples):
         raw_data = []
         for i in range(num_examples):

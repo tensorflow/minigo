@@ -5,11 +5,11 @@ import unittest
 import dual_net
 import go
 import preprocessing
+from tests import test_utils
 
-go.set_board_size(9)
 fast_hparams = {'k': 1, 'fc_width': 2, 'num_shared_layers': 1}
 
-class TestDualNet(unittest.TestCase):
+class TestDualNet(test_utils.MiniGoUnitTest):
     def test_train(self):
         with tempfile.TemporaryDirectory() as model_dir, \
             tempfile.NamedTemporaryFile() as tf_record:

@@ -86,7 +86,7 @@ pip3 install -r requirements-cpu.txt
 Running unit tests
 ------------------
 ```
-python3 -m unittest discover tests
+BOARD_SIZE=9 python3 -m unittest discover tests
 ```
 
 

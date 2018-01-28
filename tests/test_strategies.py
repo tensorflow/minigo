@@ -1,17 +1,16 @@
 import unittest
 import unittest.mock as mock
 import numpy as np
-np.random.seed(0)
 
 import coords
 import go
 from go import Position
 from coords import kgs_to_flat
-from test_utils import load_board, GoPositionTestCase, MCTSTestMixin
+from tests import test_utils
 from mcts import MCTSNode
 from strategies import MCTSPlayerMixin, time_recommendation
 
-ALMOST_DONE_BOARD = load_board('''
+ALMOST_DONE_BOARD = test_utils.load_board('''
 .XO.XO.OO
 X.XXOOOO.
 XXXXXOOOO
@@ -68,8 +67,7 @@ def initialize_almost_done_player():
     return player
 
 
-class TestMCTSPlayerMixin(GoPositionTestCase, MCTSTestMixin):
-
+class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
     def test_time_controls(self):
         secs_per_move = 5
         for time_limit in (10, 100, 1000):

@@ -33,8 +33,6 @@ spec:
           value: $BUCKET_NAME
         - name: BOARD_SIZE
           value: "$BOARD_SIZE"
-        - name: GAMES
-          value: "8"
         securityContext:
           privileged: true
       volumes:

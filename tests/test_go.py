@@ -6,12 +6,10 @@ import coords
 from go import Position, PlayerMove, LibertyTracker, WHITE, BLACK, EMPTY
 import go
 import sgf_wrapper
-from test_utils import GoPositionTestCase, load_board
-
-go.set_board_size(9)
+from tests import test_utils
 
 EMPTY_ROW = '.' * go.N + '\n'
-TEST_BOARD = load_board('''
+TEST_BOARD = test_utils.load_board('''
 .X.....OO
 X........
 ''' + EMPTY_ROW * 7)
@@ -21,17 +19,10 @@ NO_HANDICAP_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0
 def parse_kgs_coords_set(string):
     return frozenset(map(parse_kgs_coords, string.split()))
 
-class TestGoBoard(GoPositionTestCase):
+class TestBasicFunctions(test_utils.MiniGoUnitTest):
     def test_load_board(self):
         self.assertEqualNPArray(go.EMPTY_BOARD, np.zeros([go.N, go.N]))
-        self.assertEqualNPArray(go.EMPTY_BOARD, load_board('. \n' * go.N ** 2))
-
-    def test_parsing(self):
-        self.assertEqual(parse_kgs_coords('A9'), (0, 0))
-        self.assertEqual(parse_sgf_coords('aa'), (0, 0))
-        self.assertEqual(parse_kgs_coords('A3'), (6, 0))
-        self.assertEqual(parse_sgf_coords('ac'), (2, 0))
-        self.assertEqual(parse_kgs_coords('D4'), parse_sgf_coords('df'))
+        self.assertEqualNPArray(go.EMPTY_BOARD, test_utils.load_board('. \n' * go.N ** 2))
 
     def test_neighbors(self):
         corner = parse_kgs_coords('A1')
@@ -42,8 +33,6 @@ class TestGoBoard(GoPositionTestCase):
         side_neighbors = [go.EMPTY_BOARD[c] for c in go.NEIGHBORS[side]]
         self.assertEqual(len(side_neighbors), 3)
 
-
-class TestEyeHandling(GoPositionTestCase):
     def test_is_koish(self):
         self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('A9')), BLACK)
         self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('B8')), None)
@@ -51,7 +40,7 @@ class TestEyeHandling(GoPositionTestCase):
         self.assertEqual(go.is_koish(TEST_BOARD, parse_kgs_coords('E5')), None)
 
     def test_is_eyeish(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .XX...XXX
             X.X...X.X
             XX.....X.
@@ -72,9 +61,9 @@ class TestEyeHandling(GoPositionTestCase):
         for ne in not_eyes:
             self.assertEqual(go.is_eyeish(board, ne), None, str(ne))
 
-class TestLibertyTracker(unittest.TestCase):
+class TestLibertyTracker(test_utils.MiniGoUnitTest):
     def test_lib_tracker_init(self):
-        board = load_board('X........' + EMPTY_ROW * 8)
+        board = test_utils.load_board('X........' + EMPTY_ROW * 8)
 
         lib_tracker = LibertyTracker.from_board(board)
         self.assertEqual(len(lib_tracker.groups), 1)
@@ -86,7 +75,7 @@ class TestLibertyTracker(unittest.TestCase):
         self.assertEqual(sole_group.color, BLACK)
 
     def test_place_stone(self):
-        board = load_board('X........' + EMPTY_ROW * 8)
+        board = test_utils.load_board('X........' + EMPTY_ROW * 8)
         lib_tracker = LibertyTracker.from_board(board)
         lib_tracker.add_stone(BLACK, parse_kgs_coords('B9'))
         self.assertEqual(len(lib_tracker.groups), 1)
@@ -99,7 +88,7 @@ class TestLibertyTracker(unittest.TestCase):
         self.assertEqual(sole_group.color, BLACK)
 
     def test_place_stone_opposite_color(self):
-        board = load_board('X........' + EMPTY_ROW * 8)
+        board = test_utils.load_board('X........' + EMPTY_ROW * 8)
         lib_tracker = LibertyTracker.from_board(board)
         lib_tracker.add_stone(WHITE, parse_kgs_coords('B9'))
         self.assertEqual(len(lib_tracker.groups), 2)
@@ -117,7 +106,7 @@ class TestLibertyTracker(unittest.TestCase):
         self.assertEqual(white_group.color, WHITE)
 
     def test_merge_multiple_groups(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .X.......
             X.X......
             .X.......
@@ -136,7 +125,7 @@ class TestLibertyTracker(unittest.TestCase):
             self.assertEqual(liberty_cache[stone], 6, str(stone))
 
     def test_capture_stone(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .X.......
             XO.......
             .X.......
@@ -148,7 +137,7 @@ class TestLibertyTracker(unittest.TestCase):
         self.assertEqual(captured, parse_kgs_coords_set('B8'))
 
     def test_capture_many(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .XX......
             XOO......
             .XX......
@@ -188,7 +177,7 @@ class TestLibertyTracker(unittest.TestCase):
             self.assertEqual(liberty_cache[stone], 0, str(stone))
 
     def test_capture_multiple_groups(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .OX......
             OXX......
             XX.......
@@ -214,7 +203,7 @@ class TestLibertyTracker(unittest.TestCase):
 
 
     def test_same_friendly_group_neighboring_twice(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             XX.......
             X........
         ''' + EMPTY_ROW * 7)
@@ -229,7 +218,7 @@ class TestLibertyTracker(unittest.TestCase):
         self.assertEqual(captured, set())
 
     def test_same_opponent_group_neighboring_twice(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             XX.......
             X........
         ''' + EMPTY_ROW * 7)
@@ -247,7 +236,7 @@ class TestLibertyTracker(unittest.TestCase):
 
         self.assertEqual(captured, set())
 
-class TestPosition(GoPositionTestCase):
+class TestPosition(test_utils.MiniGoUnitTest):
     def test_passing(self):
         start_position = Position(
             board=TEST_BOARD,
@@ -293,7 +282,7 @@ class TestPosition(GoPositionTestCase):
         self.assertEqualPositions(flip_position, expected_position)
 
     def test_is_move_suicidal(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             ...O.O...
             ....O....
             XO.....O.
@@ -318,7 +307,7 @@ class TestPosition(GoPositionTestCase):
             self.assertFalse(position.is_move_suicidal(move), str(move))
 
     def test_legal_moves(self):
-        board = load_board('''
+        board = test_utils.load_board('''
             .O.O.XOX.
             O..OOOOOX
             ......O.O
@@ -367,7 +356,7 @@ class TestPosition(GoPositionTestCase):
             recent=tuple(),
             to_play=BLACK,
         )
-        expected_board = load_board('''
+        expected_board = test_utils.load_board('''
             .XX....OO
             X........
         ''' + EMPTY_ROW * 7)
@@ -383,7 +372,7 @@ class TestPosition(GoPositionTestCase):
         actual_position = start_position.play_move(parse_kgs_coords('C9'))
         self.assertEqualPositions(actual_position, expected_position)
 
-        expected_board2 = load_board('''
+        expected_board2 = test_utils.load_board('''
             .XX....OO
             X.......O
         ''' + EMPTY_ROW * 7)
@@ -400,7 +389,7 @@ class TestPosition(GoPositionTestCase):
         self.assertEqualPositions(actual_position2, expected_position2)
 
     def test_move_with_capture(self):
-        start_board = load_board(EMPTY_ROW * 5 + '''
+        start_board = test_utils.load_board(EMPTY_ROW * 5 + '''
             XXXX.....
             XOOX.....
             O.OX.....
@@ -415,7 +404,7 @@ class TestPosition(GoPositionTestCase):
             recent=tuple(),
             to_play=BLACK,
         )
-        expected_board = load_board(EMPTY_ROW * 5 + '''
+        expected_board = test_utils.load_board(EMPTY_ROW * 5 + '''
             XXXX.....
             X..X.....
             .X.X.....
@@ -434,7 +423,7 @@ class TestPosition(GoPositionTestCase):
         self.assertEqualPositions(actual_position, expected_position)
 
     def test_ko_move(self):
-        start_board = load_board('''
+        start_board = test_utils.load_board('''
             .OX......
             OX.......
         ''' + EMPTY_ROW * 7)
@@ -447,7 +436,7 @@ class TestPosition(GoPositionTestCase):
             recent=tuple(),
             to_play=BLACK,
         )
-        expected_board = load_board('''
+        expected_board = test_utils.load_board('''
             X.X......
             OX.......
         ''' + EMPTY_ROW * 7)
@@ -492,10 +481,8 @@ class TestPosition(GoPositionTestCase):
         second_pass = first_pass.play_move(None)
         self.assertTrue(second_pass.is_game_over())
 
-
-class TestScoring(unittest.TestCase):
     def test_scoring(self):
-            board = load_board('''
+            board = test_utils.load_board('''
                 .XX......
                 OOXX.....
                 OOOX...X.
@@ -518,7 +505,7 @@ class TestScoring(unittest.TestCase):
             expected_score = 1.5
             self.assertEqual(position.score(), expected_score)
 
-            board = load_board('''
+            board = test_utils.load_board('''
                 XXX......
                 OOXX.....
                 OOOX...X.
@@ -541,7 +528,6 @@ class TestScoring(unittest.TestCase):
             expected_score = 2.5
             self.assertEqual(position.score(), expected_score)
 
-class TestPositionReplay(GoPositionTestCase):
     def test_replay_position(self):
         sgf_positions = list(sgf_wrapper.replay_sgf(NO_HANDICAP_SGF))
         initial = sgf_positions[0]
@@ -550,7 +536,7 @@ class TestPositionReplay(GoPositionTestCase):
         final = sgf_positions[-1].position.play_move(sgf_positions[-1].next_move)
 
         # sanity check to ensure we're working with the right position
-        final_board = load_board('''
+        final_board = test_utils.load_board('''
             .OXX.....
             O.OX.X...
             .OOX.....

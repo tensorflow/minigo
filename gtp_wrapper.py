@@ -25,9 +25,9 @@ class GtpInterface(object):
         self.komi = 6.5
 
     def set_size(self, n):
-        self.size = n
-        go.set_board_size(n)
-        self.clear()
+        if n != go.N:
+            raise ValueError(("Can't handle boardsize {n}!"
+                "Restart with env var BOARD_SIZE={n}").format(n=n))
 
     def set_komi(self, komi):
         self.komi = komi
