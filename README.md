@@ -40,10 +40,12 @@ means our implementation is not as fast or efficient as possible.
 Getting Started
 ===============
 
-This project assumes you're using:
+This project assumes you have the following:
 
 - virtualenv / virtualenvwrapper
 - Python 3.6+
+- (OSX) XCode Commandline tools
+- [Docker](https://docs.docker.com/install/)
 
 The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
