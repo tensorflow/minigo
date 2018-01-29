@@ -16,13 +16,23 @@ import google.cloud.logging as glog
 import logging
 import contextlib
 import io
+import sys
+import os
 
-def configure():
+LOGGING_PROJECT = os.environ.get('LOGGING_PROJECT', '')
+
+def configure(project=LOGGING_PROJECT):
+    if not project:
+        print('!! Error: The $LOGGING_PROJECT enviroment '
+              'variable is required in order to set up cloud logging. '
+              'Cloud logging is disabled.')
+        return
+
     logging.basicConfig(level=logging.INFO)
     try:
         # if this fails, redirect stderr to /dev/null so no startup spam.
         with contextlib.redirect_stderr(io.StringIO()):
-            client = glog.Client('tensor-go')
+            client = glog.Client(project)
             client.setup_logging(logging.INFO)
     except:
         print('!! Cloud logging disabled')

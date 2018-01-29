@@ -1,6 +1,6 @@
 #!/bin/sh
 
-source ./common
+source ./common.sh
 
 set -e
 

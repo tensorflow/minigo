@@ -14,6 +14,6 @@
 
 #!/bin/bash
 
-source ./common
+source ./common.sh
 
 envsubst < gpu-player.yaml | kubectl apply -f -

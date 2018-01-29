@@ -1,5 +1,5 @@
 #!/bin/sh
 
-source ./common
+source ./common.sh
 
 gcloud container clusters delete $CLUSTER_NAME
