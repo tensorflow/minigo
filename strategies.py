@@ -112,7 +112,7 @@ class MCTSPlayerMixin:
                 self.tree_search()
             if self.verbosity > 0:
                 print("%d: Searched %d times in %s seconds\n\n" % (
-                    self.simulations_per_move, self.root.N, time.time() - start), file=sys.stderr)
+                    position.n, self.simulations_per_move, time.time() - start), file=sys.stderr)
 
         #print some stats on anything with probability > 1%
         if self.verbosity > 2:

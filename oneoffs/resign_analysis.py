@@ -18,38 +18,58 @@ import os
 import itertools
 import re
 import numpy as np
+from tqdm import tqdm
 
 def crawl(sgf_directory='sgf', print_summary=True): 
     max_w_upset = {'value': 0}
     max_b_upset = {'value': 0}
 
     worst_qs = []
-    for root, _, filenames in os.walk(sgf_directory):
-        for filename in filenames:
-            if not filename.endswith('.sgf'):
-                continue
+    tot_files = 0
+    num_resign_disabled = 0
+    bad_resigns = 0
+    bad_resign_files = []
+    other_thresh = 0.9
+    sgfs = lambda root,fils: [os.path.join(root, f) for f in fils if f.endswith('.sgf')]
+    fs = [ i for sublist in [sgfs(root, files) for root, _, files in os.walk(sgf_directory)] for i in sublist]
+    for filename in tqdm(fs):
 
-            data = open(os.path.join(root, filename)).read()
-            result = re.search("RE\[([BWbw])\+", data)
-            if not result:
-                print("No result string found in sgf: ", filename)
-                continue
-            else:
-                result = result.group(1)
+          data = open(filename).read()
+          result = re.search("RE\[([BWbw])\+", data)
+          if not result:
+              print("No result string found in sgf: ", filename)
+              continue
+          else:
+              result = result.group(1)
 
-            q_values = list(map(float, re.findall("C\[(-?\d.\d*)", data)))
-            if result == "B":
-                print("%s:%s+:%s" % (filename, result, min(q_values)))
-                worst_qs.append(min(q_values))
-                if min(q_values) < max_b_upset['value']:
-                    max_b_upset = {"filename": os.path.join(root, filename),
-                                   "value": min(q_values)}
-            else:
-                print("%s:%s+:%s" % (filename, result, max(q_values))) 
-                worst_qs.append(max(q_values))
-                if max(q_values) > max_w_upset['value']:
-                    max_w_upset = {"filename": os.path.join(root, filename),
-                                   "value": max(q_values)}
+          threshold = re.search("Resign Threshold: -(\d.\d*)", data)
+          if not threshold:
+              print("No threshold found for ", filename)
+          else:
+              threshold = float(threshold.group(1))
+              if threshold == 1.0:
+                  num_resign_disabled += 1
+
+          tot_files += 1
+          q_values = list(map(float, re.findall("C\[(-?\d.\d*)", data)))
+          if result == "B":
+              look_for = min
+          else:
+              look_for = max
+
+          #print("%s:%s+:%s" % (filename, result, min(q_values)))
+          worst_qs.append(look_for(q_values))
+
+          if threshold == 1.0 and abs(look_for(q_values)) > other_thresh:
+              bad_resigns += 1
+              bad_resign_files.append(filename)
+
+          if look_for == min and min(q_values) < max_b_upset['value']:
+              max_b_upset = {"filename": filename,
+                             "value": look_for(q_values)}
+          elif look_for == max and max(q_values) > max_w_upset['value']:
+              max_w_upset = {"filename": filename,
+                             "value": max(q_values)}
 
 
     if print_summary:
@@ -58,12 +78,13 @@ def crawl(sgf_directory='sgf', print_summary=True):
         both = np.array(list(map(abs, worst_qs)))
         print("Biggest w upset:", max_w_upset)
         print("Biggest b upset:", max_b_upset)
-
         print ("99th percentiles (both/w/b)")
         print(np.percentile(both, 99))
         print(np.percentile(b_upsets, 1))
         print(np.percentile(w_upsets, 99))
-
+        print ("Bad resigns: {} / {} ({:.2f}%) ".format(bad_resigns, num_resign_disabled, (bad_resigns / (num_resign_disabled+1)) * 100.0))
+        print ("Total files:", tot_files)
+        print (bad_resign_files)
 
 if __name__ == '__main__':
     argh.dispatch_command(crawl)
