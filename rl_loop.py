@@ -1,4 +1,18 @@
-"""Wrapper script to ensure that main.py commands are called correctly."""
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Wrapper scripts to ensure that main.py commands are called correctly."""
 import argh
 import argparse
 import cloud_logging
@@ -43,6 +57,19 @@ def get_latest_model():
     latest_model = sorted(model_numbers_names, reverse=True)[0]
     return latest_model
 
+def convert_all():
+    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
+    model_filenames = [os.path.basename(m).split('.')[0] for m in all_models]
+    print(model_filenames)
+    from tqdm import tqdm
+
+    import multiprocessing
+    pool = multiprocessing.Pool(10)
+    for m in tqdm(model_filenames[10:]):
+        p = os.path.join('gs://mugozero-v2/games/', m) + "/**/*.gz"
+        games = gfile.Glob(p)
+        pool.map(main.convert, games)
+
 def bootstrap():
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(MODELS_DIR, bootstrap_name)
@@ -75,15 +102,8 @@ def train(logdir=None):
     main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
                generation_num=model_num, logdir=logdir)
 
-def loop(logdir=None):
-    while True:
-        with timer("Gather"):
-            gather()
-        with timer("Train"):
-            train(logdir)
-
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train, selfplay, gather, bootstrap, loop])
+argh.add_commands(parser, [train, selfplay, gather, bootstrap, convert_all])
 
 if __name__ == '__main__':
     print_flags()

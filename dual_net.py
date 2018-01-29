@@ -1,3 +1,17 @@
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 The policy and value networks share a majority of their architecture.
 This helps the intermediate layers extract concepts that are relevant to both
@@ -30,7 +44,7 @@ class DualNetworkTrainer():
         # self.eval_logdir = os.path.join(model_dir, 'logs', 'eval')
 
     def initialize_weights(self, init_from=None):
-        """Initialize weights from model checkpoint.
+        '''Initialize weights from model checkpoint.
 
         If model checkpoint does not exist, fall back to init_from.
         If that doesn't exist either, bootstrap with random weights.
@@ -38,7 +52,7 @@ class DualNetworkTrainer():
         This priority order prevents the mistake where the latest saved
         model exists, but you accidentally init from an older model checkpoint
         and then overwrite the newer model weights.
-        """
+        '''
         if self.save_file is not None and os.path.exists(self.save_file + '.meta'):
             tf.train.Saver().restore(self.sess, self.save_file)
             return
@@ -172,7 +186,6 @@ def get_default_hyperparams(**overrides):
       l2_strength: The L2 regularization parameter.
       momentum: The momentum parameter for training
     """
-
     k = _round_power_of_two(go.N ** 2 / 3) # width of each layer
     hparams = {
         'k': k,  # Width of each conv layer
@@ -185,7 +198,7 @@ def get_default_hyperparams(**overrides):
     return hparams
 
 def dual_net(input_tensors, batch_size, train_mode, **hparams):
-    """
+    '''
     Given dict of batched tensors
         pos_tensor: [BATCH_SIZE, go.N, go.N, features.NEW_FEATURES_PLANES]
         pi_tensor: [BATCH_SIZE, go.N * go.N + 1]
@@ -194,7 +207,7 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
         logits: [BATCH_SIZE, go.N * go.N + 1]
         policy: [BATCH_SIZE, go.N * go.N + 1]
         value: [BATCH_SIZE]
-    """
+    '''
     my_batchn = functools.partial(tf.layers.batch_normalization,
                                   momentum=.997, epsilon=1e-5,
                                   fused=True, center=True, scale=True, 

@@ -1,28 +1,28 @@
-'''
-Turn go.Position into various feature planes.
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-Impl? Feature                 # Notes
-
-(AG features)
-Y     Stone colour            3  Player stones; oppo. stones; empty
-Y     Ones                    1  Constant plane of 1s
-          (this lets the NN know where edge of board is.)
-Y     Turns since last move   8  How many turns since a move played
-Y     Liberties               8  Number of liberties
-Y     Capture size            8  How many opponent stones would be captured
-N     Self-atari size         8  How many own stones would be captured
-N     Liberties after move    8  Number of liberties after this move played
-N     ladder capture          1  Whether a move is a successful ladder capture
-N     Ladder escape           1  Whether a move is a successful ladder escape
-N     Sensibleness            1  Whether a move is legal + doesn't fill own eye
-
-(AGZ features)
-Y     Board history           16 W/B moves from last 8 turns
-Y     Turn-to-play            1  Ones if B to play, zeros otherwise.
-
+"""
+Features used by AlphaGo Zero, in approximate order of importance.
+Feature                 # Notes
+Stone History           16 The stones of each color during the last 8 moves.
+Ones                    1  Constant plane of 1s
 All features with 8 planes are 1-hot encoded, with plane i marked with 1 
 only if the feature was equal to i. Any features >= 8 would be marked as 8.
-'''
+
+This file includes the features from the first paper as DEFAULT_FEATURES
+and the features from AGZ as NEW_FEATURES.
+"""
 
 import numpy as np
 import go
