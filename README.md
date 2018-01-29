@@ -93,6 +93,23 @@ pip3 install -r requirements-cpu.txt
 ```
 
 
+Setting up the Environment
+--------------------------
+
+You may want to use a cloud project for resources. If so set:
+
+```shell
+PROJECT=foo-project
+```
+
+Then, running
+
+```shell
+source cluster/common.sh
+```
+
+will set up other environment variables defaults.
+
 Running unit tests
 ------------------
 ```
@@ -399,11 +416,11 @@ Creating Docker images
 
 You will need a Docker image in order to initialize the pods.
 
-First you need to update the param in the `Makefile`:
+If you would like to override the GCR Project or image tag, you can set:
 
 ```
-source common
-sed -i "s/tensor-go/$PROJECT/" Makefile
+export PROJECT=my-project
+export VERSION=0.1234
 ```
 
 Then `make` will produce and push the image!
@@ -434,7 +451,7 @@ share as well, limit the parallelism to the number of nodes available.
 Now launch the job via the launcher.  (it just subs in the environment variable
 for the bucket name, neat!)
 ```
-source common
+source common.sh
 envsubst < player.yaml | kubectl apply -f -
 ```
 
@@ -468,7 +485,7 @@ Setting up the selfplay cluster
 
 * Check your gcloud -- authorized?  Correct default zone settings?
 * Check the project name, cluster name, & bucket name variables in the
-  `cluster/common` script.  Did you change things?
+  `cluster/common.sh` script.  Did you change things?
   * If Yes: Grep for the original string.  Depending on what you changed, you may
     need to change the yaml files for the selfplay workers.
 * Create the service account and bucket, if needed, by running `cluster/deploy`,
