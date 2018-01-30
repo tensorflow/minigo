@@ -23,9 +23,9 @@ LOGGING_PROJECT = os.environ.get('LOGGING_PROJECT', '')
 
 def configure(project=LOGGING_PROJECT):
     if not project:
-        print('!! Error: The $LOGGING_PROJECT enviroment '
+        sys.stderr.write('!! Error: The $LOGGING_PROJECT enviroment '
               'variable is required in order to set up cloud logging. '
-              'Cloud logging is disabled.')
+              'Cloud logging is disabled.\n')
         return
 
     logging.basicConfig(level=logging.INFO)
@@ -35,4 +35,4 @@ def configure(project=LOGGING_PROJECT):
             client = glog.Client(project)
             client.setup_logging(logging.INFO)
     except:
-        print('!! Cloud logging disabled')
+        sys.stderr.write('!! Cloud logging disabled\n')
