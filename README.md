@@ -63,6 +63,7 @@ This project assumes you have the following:
 - virtualenv / virtualenvwrapper
 - Python 3.5+
 - [Docker](https://docs.docker.com/install/)
+- [gcloud](https://cloud.google.com/sdk/downloads)
 
 The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
@@ -179,8 +180,8 @@ Playing Against Minigo
 ----------------------
 
 Minigo uses the
-[http://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html](GTP
-protocol), and you can use any gtp-compliant program with it.
+[GTP Protocol](http://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html), 
+and you can use any gtp-compliant program with it.
 
 ```
 # Latest model should look like: /path/to/models/000123-something
@@ -362,7 +363,7 @@ manually specify how many machines we want: this means kubernetes will leave
 machines running even if they're not doing anything!  So be sure to clean up
 your clusters...
 
-GCS for simple task signalling
+GCS for simple task signaling
 ------------------------------
 
 The main way these jobs interact is through GCS, a distributed webservice
