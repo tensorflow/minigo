@@ -26,15 +26,17 @@ import dual_net
 import go
 import main
 
+
 def rl_loop():
     # monkeypatch the hyperparams so that we get a quickly executing network.
     dual_net.get_default_hyperparams = lambda **kwargs: {
-    'k': 1, 'fc_width': 2, 'num_shared_layers': 1, 'l2_strength': 2e-4, 'momentum': 0.9}
+        'k': 1, 'fc_width': 2, 'num_shared_layers': 1, 'l2_strength': 2e-4, 'momentum': 0.9}
 
     with tempfile.TemporaryDirectory() as base_dir:
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
-        model_selfplay_dir = os.path.join(selfplay_dir, '000000-bootstrap', 'worker1')
+        model_selfplay_dir = os.path.join(
+            selfplay_dir, '000000-bootstrap', 'worker1')
         gather_dir = os.path.join(base_dir, 'data', 'training_chunks')
         sgf_dir = os.path.join(base_dir, 'sgf', '000000-bootstrap')
         os.mkdir(os.path.join(base_dir, 'data'))
@@ -57,6 +59,7 @@ def rl_loop():
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data... (ctrl+C to quit)")
         main.train(gather_dir, save_file=model_save_file, num_steps=10000)
+
 
 if __name__ == '__main__':
     rl_loop()

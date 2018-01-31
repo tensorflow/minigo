@@ -23,6 +23,7 @@ import random
 import re
 import time
 
+
 def parse_game_result(result):
     if re.match(r'[bB]\+', result):
         return 1
@@ -31,11 +32,14 @@ def parse_game_result(result):
     else:
         return 0
 
+
 def product(numbers):
     return functools.reduce(operator.mul, numbers)
 
+
 def take_n(n, iterable):
     return list(itertools.islice(iterable, n))
+
 
 def iter_chunks(chunk_size, iterator):
     iterator = iter(iterator)
@@ -46,6 +50,7 @@ def iter_chunks(chunk_size, iterator):
             yield next_chunk
         else:
             break
+
 
 def shuffler(iterator, pool_size=10**5, refill_threshold=0.9):
     yields_between_refills = round(pool_size * (1 - refill_threshold))
@@ -62,12 +67,14 @@ def shuffler(iterator, pool_size=10**5, refill_threshold=0.9):
     # finish consuming whatever's left - no need for further randomization.
     yield from pool
 
+
 @contextmanager
 def timer(message):
     tick = time.time()
     yield
     tock = time.time()
     print("%s: %.3f seconds" % (message, (tock - tick)))
+
 
 @contextmanager
 def logged_timer(message):

@@ -41,7 +41,7 @@ TEST_POSITION = go.Position(
     board=ALMOST_DONE_BOARD,
     n=75,
     komi=2.5,
-    caps=(1,4),
+    caps=(1, 4),
     ko=None,
     recent=(go.PlayerMove(go.BLACK, (0, 1)),
             go.PlayerMove(go.WHITE, (0, 8))),
@@ -52,7 +52,7 @@ SEND_TWO_RETURN_ONE = go.Position(
     board=ALMOST_DONE_BOARD,
     n=75,
     komi=0.5,
-    caps=(0,0),
+    caps=(0, 0),
     ko=None,
     recent=(go.PlayerMove(go.BLACK, (0, 1)),
             go.PlayerMove(go.WHITE, (0, 8)),
@@ -75,7 +75,8 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         black_leaf = black_root.select_leaf()
         white_leaf = white_root.select_leaf()
         self.assertEqual(black_leaf.fmove, white_leaf.fmove)
-        self.assertEqualNPArray(black_root.child_action_score, white_root.child_action_score)
+        self.assertEqualNPArray(
+            black_root.child_action_score, white_root.child_action_score)
 
     def test_select_leaf(self):
         probs = np.array([.02] * (go.N * go.N + 1))
@@ -91,14 +92,13 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         root = MCTSNode(SEND_TWO_RETURN_ONE)
         root.select_leaf().incorporate_results(probs, 0, root)
 
-
         leaf = root.select_leaf()
-        leaf.incorporate_results(probs, -1, root) # white wins!
+        leaf.incorporate_results(probs, -1, root)  # white wins!
 
         # Root was visited twice: first at the root, then at this child.
         self.assertEqual(root.N, 2)
         # Root has 0 as a prior and two visits with value 0, -1
-        self.assertAlmostEqual(root.Q, -1/3) # average of 0, 0, -1
+        self.assertAlmostEqual(root.Q, -1/3)  # average of 0, 0, -1
         # Leaf should have one visit
         self.assertEqual(root.child_N[leaf.fmove], 1)
         self.assertEqual(leaf.N, 1)
@@ -116,7 +116,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # which happens in this test because root is W to play and leaf was a W win.
         self.assertEqual(root.position.to_play, go.WHITE)
         leaf2 = root.select_leaf()
-        leaf2.incorporate_results(probs, -0.2, root) # another white semi-win
+        leaf2.incorporate_results(probs, -0.2, root)  # another white semi-win
         self.assertEqual(root.N, 3)
         # average of 0, 0, -1, -0.2
         self.assertAlmostEqual(root.Q, -0.3)

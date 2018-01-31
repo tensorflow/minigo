@@ -45,13 +45,16 @@ import gtp
 KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRST'
 SGF_COLUMNS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+
 def sgf_to_flat(sgf):
     """Transforms an SGF coordinate directly into a flattened coordinate."""
     return flatten_coords(parse_sgf_coords(sgf))
 
+
 def kgs_to_flat(sgf):
     """Transforms a KGS coordinate directly into a flattened coordinate."""
     return flatten_coords(parse_kgs_coords(sgf))
+
 
 def flatten_coords(c):
     """Flattens a coordinate tuple from a MiniGo coordinate"""
@@ -59,11 +62,13 @@ def flatten_coords(c):
         return go.N * go.N
     return go.N * c[0] + c[1]
 
+
 def unflatten_coords(f):
     """Unflattens a flattened coordinate into a Minigo coordinate"""
     if f == go.N * go.N:
         return None
     return divmod(f, go.N)
+
 
 def parse_sgf_coords(s):
     """Transform a SGF coordinate into a coordinate-tuple"""
@@ -71,11 +76,13 @@ def parse_sgf_coords(s):
         return None
     return SGF_COLUMNS.index(s[1]), SGF_COLUMNS.index(s[0])
 
+
 def unparse_sgf_coords(c):
     """Turns a MiniGo coordinate tuple into a SGF coordinate."""
     if c is None:
         return ''
     return SGF_COLUMNS[c[1]] + SGF_COLUMNS[c[0]]
+
 
 def parse_kgs_coords(s):
     """Interprets KGS coordinates returning a minigo coordinate tuple."""
@@ -86,6 +93,7 @@ def parse_kgs_coords(s):
     row_from_bottom = int(s[1:]) - 1
     return go.N - row_from_bottom - 1, col
 
+
 def to_human_coord(coord):
     """Converts from a MiniGo coord to a human readable string.
 
@@ -95,7 +103,8 @@ def to_human_coord(coord):
         return "pass"
     else:
         y, x = coord
-        return "{}{}".format("ABCDEFGHJKLMNOPQRSTYVWYZ"[x], go.N-y) 
+        return "{}{}".format("ABCDEFGHJKLMNOPQRSTYVWYZ"[x], go.N-y)
+
 
 def parse_pygtp_coords(vertex):
     """Transforms a GTP coordinate into a standard MiniGo coordinate.
@@ -106,6 +115,7 @@ def parse_pygtp_coords(vertex):
     if vertex in (gtp.PASS, gtp.RESIGN):
         return None
     return go.N - vertex[1], vertex[0] - 1
+
 
 def unparse_pygtp_coords(c):
     """Transforms a MiniGo Coordinate back into a GTP coordinate."""

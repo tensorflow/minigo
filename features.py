@@ -31,10 +31,12 @@ from utils import product
 # Resolution/truncation limit for one-hot features
 P = 8
 
+
 def make_onehot(feature, planes):
     onehot_features = np.zeros(feature.shape + (planes,), dtype=np.uint8)
     capped = np.minimum(feature, planes)
-    onehot_index_offsets = np.arange(0, product(onehot_features.shape), planes) + capped.ravel()
+    onehot_index_offsets = np.arange(0, product(
+        onehot_features.shape), planes) + capped.ravel()
     # A 0 is encoded as [0,0,0,0], not [1,0,0,0], so we'll
     # filter out any offsets that are a multiple of $planes
     # A 1 is encoded as [1,0,0,0], not [0,1,0,0], so subtract 1 from offsets
@@ -43,11 +45,13 @@ def make_onehot(feature, planes):
     onehot_features.ravel()[nonzero_index_offsets] = 1
     return onehot_features
 
+
 def planes(num_planes):
     def deco(f):
         f.planes = num_planes
         return f
     return deco
+
 
 @planes(16)
 def stone_features(position):
@@ -61,11 +65,13 @@ def stone_features(position):
     # apply deltas to compute previous board states
     last_eight[1:num_deltas_avail + 1] -= cumulative_deltas
     # if no more deltas are available, just repeat oldest board.
-    last_eight[num_deltas_avail + 1:] = last_eight[num_deltas_avail].reshape(1, go.N, go.N)
+    last_eight[num_deltas_avail +
+               1:] = last_eight[num_deltas_avail].reshape(1, go.N, go.N)
 
     features[::2] = last_eight == position.to_play
     features[1::2] = last_eight == -position.to_play
     return np.rollaxis(features, 0, 3)
+
 
 @planes(1)
 def color_to_play_feature(position):
@@ -89,22 +95,26 @@ def stone_color_feature(position):
     features[board == go.EMPTY, 2] = 1
     return features
 
+
 @planes(1)
 def ones_feature(position):
     return np.ones([go.N, go.N, 1], dtype=np.uint8)
+
 
 @planes(P)
 def recent_move_feature(position):
     onehot_features = np.zeros([go.N, go.N, P], dtype=np.uint8)
     for i, player_move in enumerate(reversed(position.recent[-P:])):
-        _, move = player_move # unpack the info from position.recent
+        _, move = player_move  # unpack the info from position.recent
         if move is not None:
             onehot_features[move[0], move[1], i] = 1
     return onehot_features
 
+
 @planes(P)
 def liberty_feature(position):
     return make_onehot(position.get_liberties(), P)
+
 
 @planes(P)
 def would_capture_feature(position):
@@ -118,6 +128,7 @@ def would_capture_feature(position):
             features[last_lib] += len(g.stones)
     return make_onehot(features, P)
 
+
 DEFAULT_FEATURES = [
     stone_color_feature,
     ones_feature,
@@ -128,15 +139,17 @@ DEFAULT_FEATURES = [
 
 DEFAULT_FEATURES_PLANES = sum(f.planes for f in DEFAULT_FEATURES)
 
-NEW_FEATURES= [
+NEW_FEATURES = [
     stone_features,
     color_to_play_feature
 ]
 
 NEW_FEATURES_PLANES = sum(f.planes for f in NEW_FEATURES)
 
+
 def extract_features(position, features=NEW_FEATURES):
     return np.concatenate([feature(position) for feature in features], axis=2)
+
 
 def bulk_extract_features(positions, features=NEW_FEATURES):
     num_positions = len(positions)
