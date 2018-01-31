@@ -8,3 +8,5 @@ protobuf
 six
 petname
 google.cloud.logging
+matplotlib
+pandas
