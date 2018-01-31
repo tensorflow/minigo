@@ -63,6 +63,7 @@ This project assumes you have the following:
 - virtualenv / virtualenvwrapper
 - Python 3.5+
 - [Docker](https://docs.docker.com/install/)
+- [gcloud](https://cloud.google.com/sdk/downloads)
 
 The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
@@ -179,13 +180,13 @@ Playing Against Minigo
 ----------------------
 
 Minigo uses the
-[http://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html](GTP
-protocol), and you can use any gtp-compliant program with it.
+[GTP Protocol](http://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html), 
+and you can use any gtp-compliant program with it.
 
 ```
 # Latest model should look like: /path/to/models/000123-something
 LATEST_MODEL=$(ls -d $MINIGO_MODELS/* | tail -1 | cut -f 1 -d '.')
-python3 main.py gtp $LATEST_MODEL -r $READOUTS -v 3
+BOARD_SIZE=19 python3 main.py gtp -l $LATEST_MODEL -r $READOUTS -v 3
 ```
 
 (If no model is provided, it will initialize one with random values)
@@ -206,13 +207,13 @@ speaks GTP.) You can download the gogui set of tools at
 GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
 
 ```shell
-gogui-twogtp -black 'python3 main.py gtp gs://$BUCKET_NAME/models/000000-bootstrap' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
+gogui-twogtp -black 'python3 main.py gtp -l gs://$BUCKET_NAME/models/000000-bootstrap' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
 ```
 
 Another way to play via GTP is to watch it play against GnuGo, while spectating the games
 ```
 BLACK="gnugo --mode gtp"
-WHITE="python3 main.py gtp path/to/model"
+WHITE="python3 main.py gtp -l path/to/model"
 TWOGTP="gogui-twogtp -black \"$BLACK\" -white \"$WHITE\" -games 10 \
   -size 19 -alternate -sgffile gnugo"
 gogui -size 19 -program "$TWOGTP" -computer-both -auto
@@ -362,7 +363,7 @@ manually specify how many machines we want: this means kubernetes will leave
 machines running even if they're not doing anything!  So be sure to clean up
 your clusters...
 
-GCS for simple task signalling
+GCS for simple task signaling
 ------------------------------
 
 The main way these jobs interact is through GCS, a distributed webservice
