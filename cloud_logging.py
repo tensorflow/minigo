@@ -21,11 +21,12 @@ import os
 
 LOGGING_PROJECT = os.environ.get('LOGGING_PROJECT', '')
 
+
 def configure(project=LOGGING_PROJECT):
     if not project:
         sys.stderr.write('!! Error: The $LOGGING_PROJECT enviroment '
-              'variable is required in order to set up cloud logging. '
-              'Cloud logging is disabled.\n')
+                         'variable is required in order to set up cloud logging. '
+                         'Cloud logging is disabled.\n')
         return
 
     logging.basicConfig(level=logging.INFO)

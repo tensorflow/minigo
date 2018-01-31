@@ -23,6 +23,7 @@ from gtp_wrapper import MCTSPlayer
 
 SIMULTANEOUS_LEAVES = 8
 
+
 def play(network, readouts, resign_threshold, verbosity=0):
     ''' Plays out a self-play match, returning
     - the final position
@@ -60,7 +61,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
             print(player.root.describe())
 
         # Sets is_done to be True if player.should resign.
-        if player.should_resign(): # TODO: make this less side-effecty.
+        if player.should_resign():  # TODO: make this less side-effecty.
             break
         move = player.pick_move()
         player.play_move(move)
@@ -77,7 +78,6 @@ def play(network, readouts, resign_threshold, verbosity=0):
         if verbosity >= 3:
             print("Played >>",
                   coords.to_human_coord(coords.unflatten_coords(player.root.fmove)))
-
 
         # TODO: break when i >= 2 * go.N * go.N (where is this being done now??...)
 

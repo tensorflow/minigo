@@ -16,6 +16,7 @@ import unittest
 
 import shipname
 
+
 class TestShipname(unittest.TestCase):
     def test_bootstrap_gen(self):
         name = shipname.generate(0)

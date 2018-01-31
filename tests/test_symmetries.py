@@ -23,6 +23,7 @@ import go
 
 from tests import test_utils
 
+
 class TestSymmetryOperations(test_utils.MiniGoUnitTest):
     def setUp(self):
         np.random.seed(1)
@@ -34,14 +35,14 @@ class TestSymmetryOperations(test_utils.MiniGoUnitTest):
         for s in symmetries.SYMMETRIES:
             with self.subTest(symmetry=s):
                 self.assertEqualNPArray(self.feat,
-                    apply_f(s, apply_f(symmetries.invert_symmetry(s), self.feat)))
+                                        apply_f(s, apply_f(symmetries.invert_symmetry(s), self.feat)))
                 self.assertEqualNPArray(self.feat,
-                    apply_f(symmetries.invert_symmetry(s), apply_f(s, self.feat)))
+                                        apply_f(symmetries.invert_symmetry(s), apply_f(s, self.feat)))
 
                 self.assertEqualNPArray(self.pi,
-                    apply_p(s, apply_p(symmetries.invert_symmetry(s), self.pi)))
+                                        apply_p(s, apply_p(symmetries.invert_symmetry(s), self.pi)))
                 self.assertEqualNPArray(self.pi,
-                    apply_p(symmetries.invert_symmetry(s), apply_p(s, self.pi)))
+                                        apply_p(symmetries.invert_symmetry(s), apply_p(s, self.pi)))
 
     def test_compositions(self):
         test_cases = [
@@ -54,9 +55,9 @@ class TestSymmetryOperations(test_utils.MiniGoUnitTest):
         for s1, s2, composed in test_cases:
             with self.subTest(s1=s1, s2=s2, composed=composed):
                 self.assertEqualNPArray(apply_f(composed, self.feat),
-                    apply_f(s2, apply_f(s1, self.feat)))
+                                        apply_f(s2, apply_f(s1, self.feat)))
                 self.assertEqualNPArray(apply_p(composed, self.pi),
-                    apply_p(s2, apply_p(s1, self.pi)))
+                                        apply_p(s2, apply_p(s1, self.pi)))
 
     def test_uniqueness(self):
         all_symmetries_f = [

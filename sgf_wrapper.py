@@ -37,9 +37,11 @@ SZ[{boardsize}]KM[{komi}]PW[{white_name}]PB[{black_name}]RE[{result}]
 
 PROGRAM_IDENTIFIER = "Minigo"
 
-def translate_sgf_move_qs(player_move,q):
-  return "{move}C[{q:.4f}]".format(
-      move=translate_sgf_move(player_move), q=q)
+
+def translate_sgf_move_qs(player_move, q):
+    return "{move}C[{q:.4f}]".format(
+        move=translate_sgf_move(player_move), q=q)
+
 
 def translate_sgf_move(player_move, comment):
     if player_move.color not in (go.BLACK, go.WHITE):
@@ -54,6 +56,7 @@ def translate_sgf_move(player_move, comment):
     return ";{color}[{coords}]{comment_node}".format(
         color=color, coords=c, comment_node=comment_node)
 
+
 def make_sgf(
     move_history,
     result_string,
@@ -62,7 +65,7 @@ def make_sgf(
     white_name=PROGRAM_IDENTIFIER,
     black_name=PROGRAM_IDENTIFIER,
     comments=[]
-    ):
+):
     '''Turn a game into SGF.
 
     Doesn't handle handicap games or positions with incomplete history.
@@ -74,9 +77,10 @@ def make_sgf(
     '''
     boardsize = go.N
     game_moves = ''.join(translate_sgf_move(*z)
-        for z in itertools.zip_longest(move_history, comments))
+                         for z in itertools.zip_longest(move_history, comments))
     result = result_string
-    return SGF_TEMPLATE.format(**locals()) 
+    return SGF_TEMPLATE.format(**locals())
+
 
 def sgf_prop(value_list):
     'Converts raw sgf library output to sensible value'
@@ -87,14 +91,18 @@ def sgf_prop(value_list):
     else:
         return value_list
 
+
 def sgf_prop_get(props, key, default):
     return sgf_prop(props.get(key, default))
+
 
 def handle_node(pos, node):
     'A node can either add B+W stones, play as B, or play as W.'
     props = node.properties
-    black_stones_added = [coords.parse_sgf_coords(c) for c in props.get('AB', [])]
-    white_stones_added = [coords.parse_sgf_coords(c) for c in props.get('AW', [])]
+    black_stones_added = [coords.parse_sgf_coords(
+        c) for c in props.get('AB', [])]
+    white_stones_added = [coords.parse_sgf_coords(
+        c) for c in props.get('AW', [])]
     if black_stones_added or white_stones_added:
         return add_stones(pos, black_stones_added, white_stones_added)
     # If B/W props are not present, then there is no move. But if it is present and equal to the empty string, then the move was a pass.
@@ -107,12 +115,15 @@ def handle_node(pos, node):
     else:
         return pos
 
+
 def add_stones(pos, black_stones_added, white_stones_added):
     working_board = np.copy(pos.board)
     go.place_stones(working_board, go.BLACK, black_stones_added)
     go.place_stones(working_board, go.WHITE, white_stones_added)
-    new_position = Position(board=working_board, n=pos.n, komi=pos.komi, caps=pos.caps, ko=pos.ko, recent=pos.recent, to_play=pos.to_play)
+    new_position = Position(board=working_board, n=pos.n, komi=pos.komi,
+                            caps=pos.caps, ko=pos.ko, recent=pos.recent, to_play=pos.to_play)
     return new_position
+
 
 def get_next_move(node):
     props = node.next.properties
@@ -121,10 +132,12 @@ def get_next_move(node):
     else:
         return coords.parse_sgf_coords(props['B'][0])
 
+
 def maybe_correct_next(pos, next_node):
     if (('B' in next_node.properties and not pos.to_play == go.BLACK) or
-        ('W' in next_node.properties and not pos.to_play == go.WHITE)):
+            ('W' in next_node.properties and not pos.to_play == go.WHITE)):
         pos.flip_playerturn(mutate=True)
+
 
 def replay_sgf(sgf_contents):
     '''
@@ -156,7 +169,8 @@ def replay_sgf(sgf_contents):
         maybe_correct_next(pos, current_node.next)
         next_move = get_next_move(current_node)
         yield PositionWithContext(pos, next_move, result)
-        current_node = current_node.next 
+        current_node = current_node.next
+
 
 def replay_sgf_file(sgf_file):
     with open(sgf_file) as f:

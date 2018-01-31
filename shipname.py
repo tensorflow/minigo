@@ -25,6 +25,7 @@ SHIP_FILE = "data/names.txt"
 
 names = open(SHIP_FILE).read().split('\n')
 
+
 def generate(model_num):
     if model_num == 0:
         new_name = 'bootstrap'
@@ -34,6 +35,7 @@ def generate(model_num):
         new_name = petname.generate()
     full_name = "%06d-%s" % (model_num, new_name)
     return full_name
+
 
 def detect_model_num(string):
     '''Takes a string related to a model name and extract its model number.
@@ -46,6 +48,7 @@ def detect_model_num(string):
         return int(match.group())
     else:
         return None
+
 
 def detect_model_name(string):
     '''Takes a string related to a model name and extract its model number.

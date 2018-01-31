@@ -30,6 +30,7 @@ MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 # When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
+
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):
     '''Given current move number and "desired" seconds per move,
@@ -60,7 +61,6 @@ def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
         return seconds_per_move
     else:
         return seconds_per_move * decay_factor ** (player_move_num - core_moves)
-
 
 
 class MCTSPlayerMixin:
@@ -103,7 +103,7 @@ class MCTSPlayerMixin:
         '''
         start = time.time()
 
-        if self.simulations_per_move == 0 :
+        if self.simulations_per_move == 0:
             while time.time() - start < self.seconds_per_move:
                 self.tree_search()
         else:
@@ -114,7 +114,7 @@ class MCTSPlayerMixin:
                 print("%d: Searched %d times in %s seconds\n\n" % (
                     position.n, self.simulations_per_move, time.time() - start), file=sys.stderr)
 
-        #print some stats on anything with probability > 1%
+        # print some stats on anything with probability > 1%
         if self.verbosity > 2:
             print(self.root.describe(), file=sys.stderr)
             print('\n\n', file=sys.stderr)
@@ -134,12 +134,12 @@ class MCTSPlayerMixin:
         if not self.two_player_mode:
             self.searches_pi.append(
                 self.root.children_as_pi(self.root.position.n > self.temp_threshold))
-        self.qs.append(self.root.Q) # Save our resulting Q.
+        self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
         self.root = self.root.maybe_add_child(coords.flatten_coords(c))
-        self.position = self.root.position # for showboard
+        self.position = self.root.position  # for showboard
         del self.root.parent.children
-        return True # GTP requires positive result.
+        return True  # GTP requires positive result.
 
     def pick_move(self):
         '''Picks a move to play, based on MCTS readout statistics.
@@ -174,7 +174,8 @@ class MCTSPlayerMixin:
             leaf.add_virtual_loss(up_to=self.root)
             leaves.append(leaf)
         if leaves:
-            move_probs, values = self.network.run_many([leaf.position for leaf in leaves])
+            move_probs, values = self.network.run_many(
+                [leaf.position for leaf in leaves])
             for leaf, move_prob, value in zip(leaves, move_probs, values):
                 leaf.revert_virtual_loss(up_to=self.root)
                 leaf.incorporate_results(move_prob, value, up_to=self.root)
@@ -183,7 +184,7 @@ class MCTSPlayerMixin:
         '''True if the last two moves were Pass or if the position is at a move
         greater than the max depth.  False otherwise.
         '''
-        if self.result != 0: #Someone's twiddled our result bit!
+        if self.result != 0:  # Someone's twiddled our result bit!
             return True
 
         if self.root.position.is_game_over():
@@ -202,12 +203,13 @@ class MCTSPlayerMixin:
 
     def should_resign(self):
         '''Returns true if the player resigned.  No further moves should be played'''
-        if self.root.Q_perspective < self.resign_threshold: # Force resign
-            self.result = self.root.position.to_play * -2 # use 2 & -2 as "+resign"
+        if self.root.Q_perspective < self.resign_threshold:  # Force resign
+            self.result = self.root.position.to_play * -2  # use 2 & -2 as "+resign"
             if self.verbosity > 1:
                 res = "B+" if self.result is 2 else "W+"
                 print("%sResign: %.3f" % (res, self.root.Q), file=sys.stderr)
-                print(self.root.position, self.root.position.score(), file=sys.stderr)
+                print(self.root.position,
+                      self.root.position.score(), file=sys.stderr)
             return True
         return False
 
@@ -222,7 +224,8 @@ class MCTSPlayerMixin:
         pos = self.root.position
         res = self.make_result_string(pos)
         if self.comments:
-            self.comments[0] = ("Resign Threshold: %0.3f\n" % self.resign_threshold) + self.comments[0]
+            self.comments[0] = ("Resign Threshold: %0.3f\n" %
+                                self.resign_threshold) + self.comments[0]
         return sgf_wrapper.make_sgf(pos.recent, res,
                                     white_name=self.network.name or "Unknown",
                                     black_name=self.network.name or "Unknown",
@@ -241,7 +244,7 @@ class MCTSPlayerMixin:
         if 'winrate' in text.lower():
             wr = (abs(self.root.Q) + 1.0) / 2.0
             color = "Black" if self.root.Q > 0 else "White"
-            return  "{:s} {:.2f}%".format(color, wr * 100.0)
+            return "{:s} {:.2f}%".format(color, wr * 100.0)
         elif 'nextplay' in text.lower():
             return "I'm thinking... " + self.root.most_visited_path()
         elif 'fortune' in text.lower():
@@ -250,6 +253,7 @@ class MCTSPlayerMixin:
             return "I can't help much with go -- try ladders!  Otherwise: " + default_response
         else:
             return default_response
+
 
 class CGOSPlayerMixin(MCTSPlayerMixin):
     def suggest_move(self, position):

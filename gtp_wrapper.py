@@ -24,6 +24,7 @@ import os
 from dual_net import DualNetwork
 from strategies import MCTSPlayerMixin, CGOSPlayerMixin
 
+
 def translate_gtp_colors(gtp_color):
     if gtp_color == gtp.BLACK:
         return go.BLACK
@@ -31,6 +32,7 @@ def translate_gtp_colors(gtp_color):
         return go.WHITE
     else:
         return go.EMPTY
+
 
 class GtpInterface(object):
     def __init__(self):
@@ -41,7 +43,7 @@ class GtpInterface(object):
     def set_size(self, n):
         if n != go.N:
             raise ValueError(("Can't handle boardsize {n}!"
-                "Restart with env var BOARD_SIZE={n}").format(n=n))
+                              "Restart with env var BOARD_SIZE={n}").format(n=n))
 
     def set_komi(self, komi):
         self.komi = komi
@@ -52,7 +54,7 @@ class GtpInterface(object):
             try:
                 sgf = self.to_sgf()
                 with open(datetime.datetime.now().strftime("%Y-%m-%d-%H:%M.sgf"), 'w') as f:
-                        f.write(sgf)
+                    f.write(sgf)
             except NotImplementedError:
                 pass
             except:
@@ -106,18 +108,25 @@ class GtpInterface(object):
         raise NotImplementedError
 
 
-class MCTSPlayer(MCTSPlayerMixin, GtpInterface): pass
-class CGOSPlayer(CGOSPlayerMixin, GtpInterface): pass
+class MCTSPlayer(MCTSPlayerMixin, GtpInterface):
+    pass
+
+
+class CGOSPlayer(CGOSPlayerMixin, GtpInterface):
+    pass
+
 
 def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1, cgos_mode=False):
     n = DualNetwork(read_file)
-    instance = MCTSPlayer(n, simulations_per_move=readouts_per_move, verbosity=verbosity, two_player_mode=True)
+    instance = MCTSPlayer(n, simulations_per_move=readouts_per_move,
+                          verbosity=verbosity, two_player_mode=True)
     gtp_engine = gtp.Engine(instance)
     if cgos_mode:
-        instance = CGOSPlayer(n, seconds_per_move=5, verbosity=verbosity, two_player_mode=True)
+        instance = CGOSPlayer(n, seconds_per_move=5,
+                              verbosity=verbosity, two_player_mode=True)
     else:
         instance = MCTSPlayer(n, simulations_per_move=readouts_per_move,
                               verbosity=verbosity, two_player_mode=True)
-    name ="Somebot-" + os.path.basename(read_file)
+    name = "Somebot-" + os.path.basename(read_file)
     gtp_engine = gtp_extensions.GTPDeluxe(instance, name=name)
     return gtp_engine

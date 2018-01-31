@@ -40,21 +40,33 @@ MISSING_GROUP_ID = -1
 ALL_COORDS = [(i, j) for i in range(N) for j in range(N)]
 EMPTY_BOARD = np.zeros([N, N], dtype=np.int8)
 
+
 def _check_bounds(c):
     return c[0] % N == c[0] and c[1] % N == c[1]
 
-NEIGHBORS = {(x, y): list(filter(_check_bounds, [(x+1, y), (x-1, y), (x, y+1), (x, y-1)])) for x, y in ALL_COORDS}
-DIAGONALS = {(x, y): list(filter(_check_bounds, [(x+1, y+1), (x+1, y-1), (x-1, y+1), (x-1, y-1)])) for x, y in ALL_COORDS}
 
-class IllegalMove(Exception): pass
+NEIGHBORS = {(x, y): list(filter(_check_bounds, [
+    (x+1, y), (x-1, y), (x, y+1), (x, y-1)])) for x, y in ALL_COORDS}
+DIAGONALS = {(x, y): list(filter(_check_bounds, [
+    (x+1, y+1), (x+1, y-1), (x-1, y+1), (x-1, y-1)])) for x, y in ALL_COORDS}
 
-class PlayerMove(namedtuple('PlayerMove', ['color', 'move'])): pass
 
-class PositionWithContext(namedtuple('SgfPosition', ['position', 'next_move', 'result'])): pass
+class IllegalMove(Exception):
+    pass
+
+
+class PlayerMove(namedtuple('PlayerMove', ['color', 'move'])):
+    pass
+
+
+class PositionWithContext(namedtuple('SgfPosition', ['position', 'next_move', 'result'])):
+    pass
+
 
 def place_stones(board, color, stones):
     for s in stones:
         board[s] = color
+
 
 def replay_position(position):
     '''
@@ -72,6 +84,7 @@ def replay_position(position):
         yield PositionWithContext(pos, next_move, result)
         pos = pos.play_move(next_move, color=color)
 
+
 def find_reached(board, c):
     color = board[c]
     chain = set([c])
@@ -87,19 +100,22 @@ def find_reached(board, c):
                 reached.add(n)
     return chain, reached
 
+
 def is_koish(board, c):
     'Check if c is surrounded on all sides by 1 color, and return that color'
-    if board[c] != EMPTY: return None
+    if board[c] != EMPTY:
+        return None
     neighbors = {board[n] for n in NEIGHBORS[c]}
     if len(neighbors) == 1 and not EMPTY in neighbors:
         return list(neighbors)[0]
     else:
         return None
 
+
 def is_eyeish(board, c):
     'Check if c is an eye, for the purpose of restricting MC rollouts.'
-    #pass is fine.
-    if c is None: 
+    # pass is fine.
+    if c is None:
         return
     color = is_koish(board, c)
     if color is None:
@@ -116,12 +132,14 @@ def is_eyeish(board, c):
     else:
         return color
 
+
 class Group(namedtuple('Group', ['id', 'stones', 'liberties', 'color'])):
     '''
     stones: a frozenset of Coordinates belonging to this group
     liberties: a frozenset of Coordinates that are empty and adjacent to this group.
     color: color of this group
     '''
+
     def __eq__(self, other):
         return self.stones == other.stones and self.liberties == other.liberties and self.color == other.color
 
@@ -139,7 +157,8 @@ class LibertyTracker():
                 coord = found_color[0][0], found_color[1][0]
                 chain, reached = find_reached(board, coord)
                 liberties = frozenset(r for r in reached if board[r] == EMPTY)
-                new_group = Group(curr_group_id, frozenset(chain), liberties, color)
+                new_group = Group(curr_group_id, frozenset(
+                    chain), liberties, color)
                 lib_tracker.groups[curr_group_id] = new_group
                 for s in chain:
                     lib_tracker.group_index[s] = curr_group_id
@@ -160,9 +179,11 @@ class LibertyTracker():
         # group_index: a NxN numpy array of group_ids. -1 means no group
         # groups: a dict of group_id to groups
         # liberty_cache: a NxN numpy array of liberty counts
-        self.group_index = group_index if group_index is not None else -np.ones([N, N], dtype=np.int32)
+        self.group_index = group_index if group_index is not None else - \
+            np.ones([N, N], dtype=np.int32)
         self.groups = groups or {}
-        self.liberty_cache = liberty_cache if liberty_cache is not None else np.zeros([N, N], dtype=np.uint8)
+        self.liberty_cache = liberty_cache if liberty_cache is not None else np.zeros([
+                                                                                      N, N], dtype=np.uint8)
         self.max_group_id = max_group_id
 
     def __deepcopy__(self, memodict={}):
@@ -224,12 +245,14 @@ class LibertyTracker():
     def _merge_groups(self, group1_id, group2_id):
         group1 = self.groups[group1_id]
         group2 = self.groups[group2_id]
-        self.groups[group1_id] = Group(group1_id, group1.stones | group2.stones, group1.liberties, group1.color)
+        self.groups[group1_id] = Group(
+            group1_id, group1.stones | group2.stones, group1.liberties, group1.color)
         del self.groups[group2_id]
         for s in group2.stones:
             self.group_index[s] = group1_id
 
-        self._update_liberties(group1_id, add=group2.liberties, remove=group2.stones)
+        self._update_liberties(
+            group1_id, add=group2.liberties, remove=group2.stones)
 
         return group1
 
@@ -244,7 +267,8 @@ class LibertyTracker():
     def _update_liberties(self, group_id, add=set(), remove=set()):
         group = self.groups[group_id]
         new_libs = (group.liberties | add) - remove
-        self.groups[group_id] = Group(group_id, group.stones, new_libs, group.color)
+        self.groups[group_id] = Group(
+            group_id, group.stones, new_libs, group.color)
 
         new_lib_count = len(new_libs)
         for s in self.groups[group_id].stones:
@@ -257,10 +281,11 @@ class LibertyTracker():
                 if group_id != MISSING_GROUP_ID:
                     self._update_liberties(group_id, add={s})
 
+
 class Position():
     def __init__(self, board=None, n=0, komi=7.5, caps=(0, 0),
-        lib_tracker=None, ko=None, recent=tuple(),
-        board_deltas=None, to_play=BLACK):
+                 lib_tracker=None, ko=None, recent=tuple(),
+                 board_deltas=None, to_play=BLACK):
         '''
         board: a numpy array
         n: an int representing moves played so far
@@ -281,7 +306,8 @@ class Position():
         self.lib_tracker = lib_tracker or LibertyTracker.from_board(self.board)
         self.ko = ko
         self.recent = recent
-        self.board_deltas = board_deltas if board_deltas is not None else np.zeros([0, N, N], dtype=np.int8)
+        self.board_deltas = board_deltas if board_deltas is not None else np.zeros([
+                                                                                   0, N, N], dtype=np.int8)
         self.to_play = to_play
         self.last_eight = None
 
@@ -306,16 +332,21 @@ class Position():
         for i in range(N):
             row = []
             for j in range(N):
-                appended = '<' if (self.recent and (i, j) == self.recent[-1].move) else ' '
-                row.append(pretty_print_map[board[i,j]] + appended)
+                appended = '<' if (self.recent and (i, j) ==
+                                   self.recent[-1].move) else ' '
+                row.append(pretty_print_map[board[i, j]] + appended)
                 row.append('\x1b[0m')
             raw_board_contents.append(''.join(row))
 
         row_labels = ['%2d ' % i for i in range(N, 0, -1)]
-        annotated_board_contents = [''.join(r) for r in zip(row_labels, raw_board_contents, row_labels)]
-        header_footer_rows = ['   ' + ' '.join('ABCDEFGHJKLMNOPQRST'[:N]) + '   ']
-        annotated_board = '\n'.join(itertools.chain(header_footer_rows, annotated_board_contents, header_footer_rows))
-        details = "\nMove: {}. Captures X: {} O: {}\n".format(self.n, *captures)
+        annotated_board_contents = [''.join(r) for r in zip(
+            row_labels, raw_board_contents, row_labels)]
+        header_footer_rows = [
+            '   ' + ' '.join('ABCDEFGHJKLMNOPQRST'[:N]) + '   ']
+        annotated_board = '\n'.join(itertools.chain(
+            header_footer_rows, annotated_board_contents, header_footer_rows))
+        details = "\nMove: {}. Captures X: {} O: {}\n".format(
+            self.n, *captures)
         return annotated_board + details
 
     def is_move_suicidal(self, move):
@@ -360,7 +391,7 @@ class Position():
         adjacent = np.ones([N+2, N+2], dtype=np.int8)
         adjacent[1:-1, 1:-1] = np.abs(self.board)
         num_adjacent_stones = (adjacent[:-2, 1:-1] + adjacent[1:-1, :-2] +
-            adjacent[2:, 1:-1] + adjacent[1:-1, 2:])
+                               adjacent[2:, 1:-1] + adjacent[1:-1, 2:])
         # Surrounded spots are those that are empty and have 4 adjacent stones.
         surrounded_spots = np.multiply(
             (self.board == EMPTY),
@@ -417,7 +448,7 @@ class Position():
                 "Black" if self.to_play == BLACK else "White",
                 coords.to_human_coord(c), self))
 
-        potential_ko = is_koish(self.board,c)
+        potential_ko = is_koish(self.board, c)
 
         place_stones(pos.board, color, [c])
         captured_stones = pos.lib_tracker.add_stone(color, c)
@@ -453,8 +484,8 @@ class Position():
 
     def is_game_over(self):
         return (len(self.recent) >= 2
-            and self.recent[-1].move is None
-            and self.recent[-2].move is None)
+                and self.recent[-1].move is None
+                and self.recent[-2].move is None)
 
     def score(self):
         'Return score from B perspective. If W is winning, score is negative.'
@@ -471,7 +502,7 @@ class Position():
             elif O_border and not X_border:
                 territory_color = WHITE
             else:
-                territory_color = UNKNOWN # dame, or seki
+                territory_color = UNKNOWN  # dame, or seki
             place_stones(working_board, territory_color, territory)
 
         return np.count_nonzero(working_board == BLACK) - np.count_nonzero(working_board == WHITE) - self.komi
