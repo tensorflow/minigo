@@ -28,10 +28,12 @@ TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
 
 # Constructing tf.Examples
 
+
 def _one_hot(index):
     onehot = np.zeros([go.N * go.N + 1], dtype=np.float32)
     onehot[index] = 1
     return onehot
+
 
 def make_tf_example(features, pi, value):
     '''
@@ -53,6 +55,7 @@ def make_tf_example(features, pi, value):
 
 # Write tf.Example to files
 
+
 def write_tf_examples(filename, tf_examples, serialize=True):
     '''
     Args:
@@ -61,7 +64,7 @@ def write_tf_examples(filename, tf_examples, serialize=True):
         serialize: whether to serialize the examples.
     '''
     with tf.python_io.TFRecordWriter(
-        filename, options=TF_RECORD_CONFIG) as writer:
+            filename, options=TF_RECORD_CONFIG) as writer:
         for ex in tf_examples:
             if serialize:
                 writer.write(ex.SerializeToString())
@@ -69,6 +72,7 @@ def write_tf_examples(filename, tf_examples, serialize=True):
                 writer.write(ex)
 
 # Read tf.Example from files
+
 
 def batch_parse_tf_example(batch_size, example_batch):
     '''
@@ -85,7 +89,8 @@ def batch_parse_tf_example(batch_size, example_batch):
     parsed = tf.parse_example(example_batch, features)
     x = tf.decode_raw(parsed['x'], tf.uint8)
     x = tf.cast(x, tf.float32)
-    x = tf.reshape(x, [batch_size, go.N, go.N, features_lib.NEW_FEATURES_PLANES])
+    x = tf.reshape(x, [batch_size, go.N, go.N,
+                       features_lib.NEW_FEATURES_PLANES])
     pi = tf.decode_raw(parsed['pi'], tf.float32)
     pi = tf.reshape(pi, [batch_size, go.N * go.N + 1])
     outcome = parsed['outcome']
@@ -95,6 +100,7 @@ def batch_parse_tf_example(batch_size, example_batch):
         'pi_tensor': pi,
         'value_tensor': outcome,
     }
+
 
 def read_tf_records(batch_size, tf_records, num_repeats=None,
                     shuffle_records=True, shuffle_examples=True,
@@ -120,9 +126,11 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
         random.shuffle(tf_records)
     record_list = tf.data.Dataset.from_tensor_slices(tf_records)
     dataset = record_list.interleave(lambda x:
-            tf.data.TFRecordDataset(x, compression_type='ZLIB'),
-            cycle_length=64, block_length=16)
-    dataset = dataset.filter(lambda x: tf.less(tf.random_uniform([1]), filter_amount)[0])
+                                     tf.data.TFRecordDataset(
+                                         x, compression_type='ZLIB'),
+                                     cycle_length=64, block_length=16)
+    dataset = dataset.filter(lambda x: tf.less(
+        tf.random_uniform([1]), filter_amount)[0])
     # TODO(amj): apply py_func for transforms here.
     if num_repeats is not None:
         dataset = dataset.repeat(num_repeats)
@@ -132,6 +140,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
         dataset = dataset.shuffle(buffer_size=10000)
     dataset = dataset.batch(batch_size)
     return dataset
+
 
 def get_input_tensors(batch_size, tf_records, num_repeats=None,
                       shuffle_records=True, shuffle_examples=True,
@@ -145,10 +154,12 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
                               shuffle_examples=shuffle_examples,
                               filter_amount=filter_amount)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
-    dataset = dataset.map(functools.partial(batch_parse_tf_example, batch_size))
+    dataset = dataset.map(functools.partial(
+        batch_parse_tf_example, batch_size))
     return dataset.make_one_shot_iterator().get_next()
 
 # End-to-end utility functions
+
 
 def make_dataset_from_selfplay(data_extracts, tf_record):
     '''
@@ -157,19 +168,22 @@ def make_dataset_from_selfplay(data_extracts, tf_record):
         tf_record: name of file to write to
     '''
     tf_examples = (make_tf_example(features_lib.extract_features(pos), pi, result)
-        for pos, pi, result in data_extracts)
+                   for pos, pi, result in data_extracts)
     write_tf_examples(tf_record, tf_examples)
+
 
 def make_dataset_from_sgf(sgf_filename, tf_record):
     pwcs = sgf_wrapper.replay_sgf_file(sgf_filename)
     tf_examples = map(_make_tf_example_from_pwc, pwcs)
     write_tf_examples(tf_record, tf_examples)
 
+
 def _make_tf_example_from_pwc(position_w_context):
     features = features_lib.extract_features(position_w_context.position)
     pi = _one_hot(coords.flatten_coords(position_w_context.next_move))
     value = position_w_context.result
     return make_tf_example(features, pi, value)
+
 
 def shuffle_tf_examples(gather_size, records_to_shuffle):
     '''Read through tf.Record and yield shuffled, but unparsed tf.Examples

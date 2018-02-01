@@ -54,11 +54,15 @@ assert set(INVERSES.keys()) == set(IMPLS.keys())
 SYMMETRIES = list(INVERSES.keys())
 
 # A symmetry is just a string describing the transformation.
+
+
 def invert_symmetry(s):
     return INVERSES[s]
 
+
 def apply_symmetry_feat(s, features):
     return IMPLS[s](features)
+
 
 def apply_symmetry_pi(s, pi):
     pi = np.copy(pi)
@@ -66,11 +70,13 @@ def apply_symmetry_pi(s, pi):
     pi[:-1] = IMPLS[s](pi[:-1].reshape([go.N, go.N])).ravel()
     return pi
 
+
 def randomize_symmetries_feat(features):
     symmetries_used = [random.choice(SYMMETRIES) for f in features]
     return symmetries_used, [apply_symmetry_feat(s, f)
-        for s, f in zip(symmetries_used, features)]
+                             for s, f in zip(symmetries_used, features)]
+
 
 def invert_symmetries_pi(symmetries, pis):
     return [apply_symmetry_pi(invert_symmetry(s), pi)
-        for s, pi in zip(symmetries, pis)]
+            for s, pi in zip(symmetries, pis)]

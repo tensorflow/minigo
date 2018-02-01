@@ -23,6 +23,7 @@ import utils
 
 assert go.N == 9, "All unit tests must be run with BOARD_SIZE=9"
 
+
 def load_board(string):
     reverse_map = {
         'X': go.BLACK,
@@ -39,6 +40,7 @@ def load_board(string):
     for i, char in enumerate(string):
         np.ravel(board)[i] = reverse_map[char]
     return board
+
 
 class TestUtils(unittest.TestCase):
     def test_shuffler(self):
@@ -62,11 +64,13 @@ class MiniGoUnitTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        print("\n%s.%s: %.3f seconds" % (cls.__module__, cls.__name__, time.time() - cls.start_time))
+        print("\n%s.%s: %.3f seconds" %
+              (cls.__module__, cls.__name__, time.time() - cls.start_time))
 
     def assertEqualNPArray(self, array1, array2):
         if not np.all(array1 == array2):
-            raise AssertionError("Arrays differed in one or more locations:\n%s\n%s" % (array1, array2))
+            raise AssertionError(
+                "Arrays differed in one or more locations:\n%s\n%s" % (array1, array2))
 
     def assertNotEqualNPArray(self, array1, array2):
         if np.all(array1 == array2):
@@ -90,15 +94,20 @@ class MiniGoUnitTest(unittest.TestCase):
         lt1_mapping = find_group_mapping(lib_tracker1)
         lt2_mapping = find_group_mapping(lib_tracker2)
 
-        remapped_group_index1 = [lt1_mapping.get(gid, go.MISSING_GROUP_ID) for gid in lib_tracker1.group_index.ravel().tolist()]
-        remapped_group_index2 = [lt2_mapping.get(gid, go.MISSING_GROUP_ID) for gid in lib_tracker2.group_index.ravel().tolist()]
+        remapped_group_index1 = [lt1_mapping.get(
+            gid, go.MISSING_GROUP_ID) for gid in lib_tracker1.group_index.ravel().tolist()]
+        remapped_group_index2 = [lt2_mapping.get(
+            gid, go.MISSING_GROUP_ID) for gid in lib_tracker2.group_index.ravel().tolist()]
         self.assertEqual(remapped_group_index1, remapped_group_index2)
 
-        remapped_groups1 = {lt1_mapping.get(gid): group for gid, group in lib_tracker1.groups.items()}
-        remapped_groups2 = {lt2_mapping.get(gid): group for gid, group in lib_tracker2.groups.items()}
+        remapped_groups1 = {lt1_mapping.get(
+            gid): group for gid, group in lib_tracker1.groups.items()}
+        remapped_groups2 = {lt2_mapping.get(
+            gid): group for gid, group in lib_tracker2.groups.items()}
         self.assertEqual(remapped_groups1, remapped_groups2)
 
-        self.assertEqualNPArray(lib_tracker1.liberty_cache, lib_tracker2.liberty_cache)
+        self.assertEqualNPArray(
+            lib_tracker1.liberty_cache, lib_tracker2.liberty_cache)
 
     def assertEqualPositions(self, pos1, pos2):
         self.assertEqualNPArray(pos1.board, pos2.board)
@@ -107,7 +116,7 @@ class MiniGoUnitTest(unittest.TestCase):
         self.assertEqual(pos1.caps, pos2.caps)
         self.assertEqual(pos1.ko, pos2.ko)
         r_len = min(len(pos1.recent), len(pos2.recent))
-        if r_len > 0: # if a position has no history, then don't bother testing
+        if r_len > 0:  # if a position has no history, then don't bother testing
             self.assertEqual(pos1.recent[-r_len:], pos2.recent[-r_len:])
         self.assertEqual(pos1.to_play, pos2.to_play)
 

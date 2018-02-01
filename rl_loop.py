@@ -42,7 +42,9 @@ def print_flags():
         'TRAINING_CHUNK_DIR': TRAINING_CHUNK_DIR,
     }
     print("Computed variables are:")
-    print('\n'.join('--{}={}'.format(flag, value) for flag, value in flags.items()))
+    print('\n'.join('--{}={}'.format(flag, value)
+                    for flag, value in flags.items()))
+
 
 def get_latest_model():
     '''Finds the latest model, returning its model number and name
@@ -57,6 +59,7 @@ def get_latest_model():
     latest_model = sorted(model_numbers_names, reverse=True)[0]
     return latest_model
 
+
 def convert_all():
     all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
     model_filenames = [os.path.basename(m).split('.')[0] for m in all_models]
@@ -70,11 +73,13 @@ def convert_all():
         games = gfile.Glob(p)
         pool.map(main.convert, games)
 
+
 def bootstrap():
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(MODELS_DIR, bootstrap_name)
     print("Bootstrapping model at {}".format(bootstrap_model_path))
     main.bootstrap(bootstrap_model_path)
+
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
@@ -88,9 +93,12 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         verbose=verbose,
     )
 
+
 def gather():
     print("Gathering game output...")
-    main.gather(input_directory=SELFPLAY_DIR, output_directory=TRAINING_CHUNK_DIR)
+    main.gather(input_directory=SELFPLAY_DIR,
+                output_directory=TRAINING_CHUNK_DIR)
+
 
 def train(logdir=None):
     model_num, model_name = get_latest_model()
@@ -101,6 +109,7 @@ def train(logdir=None):
     save_file = os.path.join(MODELS_DIR, new_model_name)
     main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
                generation_num=model_num, logdir=logdir)
+
 
 parser = argparse.ArgumentParser()
 argh.add_commands(parser, [train, selfplay, gather, bootstrap, convert_all])

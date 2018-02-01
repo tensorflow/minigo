@@ -26,6 +26,7 @@ from tests import test_utils
 
 TEST_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf])"
 
+
 class TestPreprocessing(test_utils.MiniGoUnitTest):
     def create_random_data(self, num_examples):
         raw_data = []
@@ -37,9 +38,9 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             raw_data.append((feature, pi, value))
         return raw_data
 
-    def extract_data(self, tf_record,filter_amount=1):
+    def extract_data(self, tf_record, filter_amount=1):
         tf_example_tensor = preprocessing.get_input_tensors(
-            1, [tf_record], num_repeats=1, shuffle_records=False, 
+            1, [tf_record], num_repeats=1, shuffle_records=False,
             shuffle_examples=False, filter_amount=filter_amount)
         recovered_data = []
         with tf.Session() as sess:
@@ -86,9 +87,8 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             preprocessing.write_tf_examples(f.name, tfexamples)
             recovered_data = self.extract_data(f.name, filter_amount=.05)
 
-        #TODO: this will flake out very infrequently.  Use set_random_seed
+        # TODO: this will flake out very infrequently.  Use set_random_seed
         self.assertLess(len(recovered_data), 50)
-
 
     def test_serialize_round_trip_no_parse(self):
         np.random.seed(1)
@@ -96,25 +96,28 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
         tfexamples = list(map(preprocessing.make_tf_example, *zip(*raw_data)))
 
         with tempfile.NamedTemporaryFile() as start_file, \
-            tempfile.NamedTemporaryFile() as rewritten_file:
+                tempfile.NamedTemporaryFile() as rewritten_file:
             preprocessing.write_tf_examples(start_file.name, tfexamples)
             # We want to test that the rewritten, shuffled file contains correctly
             # serialized tf.Examples.
             batch_size = 4
-            batches = list(preprocessing.shuffle_tf_examples(batch_size, [start_file.name]))
-            self.assertEqual(len(batches), 3) # 2 batches of 4, 1 incomplete batch of 2.
+            batches = list(preprocessing.shuffle_tf_examples(
+                batch_size, [start_file.name]))
+            # 2 batches of 4, 1 incomplete batch of 2.
+            self.assertEqual(len(batches), 3)
 
             # concatenate list of lists into one list
             all_batches = list(itertools.chain.from_iterable(batches))
 
             for batch in batches:
-                preprocessing.write_tf_examples(rewritten_file.name, all_batches, serialize=False)
+                preprocessing.write_tf_examples(
+                    rewritten_file.name, all_batches, serialize=False)
 
             original_data = self.extract_data(start_file.name)
             recovered_data = self.extract_data(rewritten_file.name)
 
         # stuff is shuffled, so sort before checking equality
-        sort_key = lambda nparray_tuple: nparray_tuple[2]
+        def sort_key(nparray_tuple): return nparray_tuple[2]
         original_data = sorted(original_data, key=sort_key)
         recovered_data = sorted(recovered_data, key=sort_key)
 
@@ -122,10 +125,11 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
 
     def test_make_dataset_from_sgf(self):
         with tempfile.NamedTemporaryFile() as sgf_file, \
-            tempfile.NamedTemporaryFile() as record_file:
+                tempfile.NamedTemporaryFile() as record_file:
             sgf_file.write(TEST_SGF.encode('utf8'))
             sgf_file.seek(0)
-            preprocessing.make_dataset_from_sgf(sgf_file.name, record_file.name)
+            preprocessing.make_dataset_from_sgf(
+                sgf_file.name, record_file.name)
             recovered_data = self.extract_data(record_file.name)
         start_pos = go.Position()
         first_move = coords.parse_sgf_coords('fd')

@@ -30,7 +30,10 @@ import go
 c_PUCT = 1.38
 
 # Dirichlet noise, as a function of go.N
-D_NOISE_ALPHA = lambda: 0.03 * 19 / go.N
+
+
+def D_NOISE_ALPHA(): return 0.03 * 19 / go.N
+
 
 class DummyNode(object):
     """A fake node of a MCTS search tree.
@@ -38,6 +41,7 @@ class DummyNode(object):
     This node is intended to be a placeholder for the root node, which would
     otherwise have no parent node. If all nodes have parents, code becomes
     simpler."""
+
     def __init__(self):
         self.parent = None
         self.child_N = collections.defaultdict(float)
@@ -61,10 +65,10 @@ class MCTSNode(object):
         if parent is None:
             parent = DummyNode()
         self.parent = parent
-        self.fmove = fmove # move that led to this position, as flattened coords
+        self.fmove = fmove  # move that led to this position, as flattened coords
         self.position = position
         self.is_expanded = False
-        self.losses_applied = 0 # number of virtual losses on this node
+        self.losses_applied = 0  # number of virtual losses on this node
         # using child_() allows vectorized computation of action score.
         self.illegal_moves = 1000 * (1 - self.position.all_legal_moves())
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
@@ -72,7 +76,7 @@ class MCTSNode(object):
         # save a copy of the original prior before it gets mutated by d-noise.
         self.original_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_prior = np.zeros([go.N * go.N + 1], dtype=np.float32)
-        self.children = {} # map of flattened moves to resulting MCTSNode
+        self.children = {}  # map of flattened moves to resulting MCTSNode
 
     def __repr__(self):
         return "<MCTSNode move=%s, N=%s, to_play=%s>" % (
@@ -89,7 +93,7 @@ class MCTSNode(object):
     @property
     def child_U(self):
         return (c_PUCT * math.sqrt(1 + self.N) *
-            self.child_prior / (1 + self.child_N))
+                self.child_prior / (1 + self.child_N))
 
     @property
     def Q(self):
@@ -128,7 +132,7 @@ class MCTSNode(object):
             # to avoid situations where we auto-lose by passing too early.
             if (current.position.recent
                 and current.position.recent[-1].move is None
-                and current.child_N[pass_move] == 0):
+                    and current.child_N[pass_move] == 0):
                 current = current.maybe_add_child(pass_move)
                 continue
 
@@ -139,7 +143,8 @@ class MCTSNode(object):
     def maybe_add_child(self, fcoord):
         """ Adds child node for fcoord if it doesn't already exist, and returns it. """
         if fcoord not in self.children:
-            new_position = self.position.play_move(coords.unflatten_coords(fcoord))
+            new_position = self.position.play_move(
+                coords.unflatten_coords(fcoord))
             self.children[fcoord] = MCTSNode(
                 new_position, fmove=fcoord, parent=self)
         return self.children[fcoord]
@@ -162,7 +167,7 @@ class MCTSNode(object):
 
     def revert_virtual_loss(self, up_to):
         self.losses_applied -= 1
-        revert = -1 * self.position.to_play 
+        revert = -1 * self.position.to_play
         self.W += revert
         if self.parent is None or self is up_to:
             return
@@ -248,12 +253,14 @@ class MCTSNode(object):
         while node.children and max(node.child_N) > 1:
             next_kid = np.argmax(node.child_N)
             node = node.children[next_kid]
-            output.append("%s" % coords.to_human_coord(coords.unflatten_coords(node.fmove)))
+            output.append("%s" % coords.to_human_coord(
+                coords.unflatten_coords(node.fmove)))
         return ' '.join(output)
 
     def describe(self):
         sort_order = list(range(go.N * go.N + 1))
-        sort_order.sort(key=lambda i: (self.child_N[i], self.child_action_score[i]), reverse=True)
+        sort_order.sort(key=lambda i: (
+            self.child_N[i], self.child_action_score[i]), reverse=True)
         soft_n = self.child_N / sum(self.child_N)
         p_delta = soft_n - self.child_prior
         p_rel = p_delta / self.child_prior
@@ -261,17 +268,18 @@ class MCTSNode(object):
         output = []
         output.append("{q:.4f}\n".format(q=self.Q))
         output.append(self.most_visited_path())
-        output.append("move:  action      Q      U      P    P-Dir    N  soft-N  p-delta  p-rel\n")
+        output.append(
+            "move:  action      Q      U      P    P-Dir    N  soft-N  p-delta  p-rel\n")
         output.append("\n".join(["{!s:6}: {: .3f}, {: .3f}, {:.3f}, {:.3f}, {:.3f}, {:4d} {:.4f} {: .5f} {: .2f}".format(
-                coords.to_human_coord(coords.unflatten_coords(key)),
-                self.child_action_score[key],
-                self.child_Q[key],
-                self.child_U[key],
-                self.child_prior[key],
-                self.original_prior[key],
-                int(self.child_N[key]),
-                soft_n[key],
-                p_delta[key],
-                p_rel[key])
-                for key in sort_order][:15]))
+            coords.to_human_coord(coords.unflatten_coords(key)),
+            self.child_action_score[key],
+            self.child_Q[key],
+            self.child_U[key],
+            self.child_prior[key],
+            self.original_prior[key],
+            int(self.child_N[key]),
+            soft_n[key],
+            p_delta[key],
+            p_rel[key])
+            for key in sort_order][:15]))
         return ''.join(output)

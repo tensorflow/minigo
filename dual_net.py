@@ -35,6 +35,7 @@ import go
 EXAMPLES_PER_GENERATION = 2000000
 TRAIN_BATCH_SIZE = 16
 
+
 class DualNetworkTrainer():
     def __init__(self, save_file=None, **hparams):
         self.hparams = get_default_hyperparams(**hparams)
@@ -73,8 +74,9 @@ class DualNetworkTrainer():
         with sess.graph.as_default():
             input_tensors = get_inference_input()
             output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
-                    train_mode=True, **self.hparams)
-            train_tensors = train_ops(input_tensors, output_tensors, **self.hparams)
+                                      train_mode=True, **self.hparams)
+            train_tensors = train_ops(
+                input_tensors, output_tensors, **self.hparams)
             sess.run(tf.global_variables_initializer())
             tf.train.Saver().save(sess, self.save_file)
 
@@ -82,10 +84,12 @@ class DualNetworkTrainer():
         if num_steps is None:
             num_steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
         with self.sess.graph.as_default():
-            input_tensors = preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records)
+            input_tensors = preprocessing.get_input_tensors(
+                TRAIN_BATCH_SIZE, tf_records)
             output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
-                train_mode=True, **self.hparams)
-            train_tensors = train_ops(input_tensors, output_tensors, **self.hparams)
+                                      train_mode=True, **self.hparams)
+            train_tensors = train_ops(
+                input_tensors, output_tensors, **self.hparams)
             weight_tensors = logging_ops()
             self.initialize_weights(init_from)
             if logdir is not None:
@@ -124,7 +128,7 @@ class DualNetwork():
         with self.sess.graph.as_default():
             input_tensors = get_inference_input()
             output_tensors = dual_net(input_tensors, batch_size=-1,
-                train_mode=False, **self.hparams)
+                                      train_mode=False, **self.hparams)
             self.inference_input = input_tensors
             self.inference_output = output_tensors
             if self.save_file is not None:
@@ -142,29 +146,32 @@ class DualNetwork():
 
     def run(self, position, use_random_symmetry=True):
         probs, values = self.run_many([position],
-            use_random_symmetry=use_random_symmetry)
+                                      use_random_symmetry=use_random_symmetry)
         return probs[0], values[0]
 
     def run_many(self, positions, use_random_symmetry=True):
         processed = list(map(features.extract_features, positions))
         if use_random_symmetry:
-            syms_used, processed = symmetries.randomize_symmetries_feat(processed)
+            syms_used, processed = symmetries.randomize_symmetries_feat(
+                processed)
         outputs = self.sess.run(self.inference_output,
-            feed_dict={self.inference_input['pos_tensor']: processed})
+                                feed_dict={self.inference_input['pos_tensor']: processed})
         probabilities, value = outputs['policy_output'], outputs['value_output']
         if use_random_symmetry:
-            probabilities = symmetries.invert_symmetries_pi(syms_used, probabilities)
+            probabilities = symmetries.invert_symmetries_pi(
+                syms_used, probabilities)
         return probabilities, value
 
 
 def get_inference_input():
     return {
         'pos_tensor': tf.placeholder(tf.float32,
-            [None, go.N, go.N, features.NEW_FEATURES_PLANES]),
+                                     [None, go.N, go.N, features.NEW_FEATURES_PLANES]),
         'pi_tensor': tf.placeholder(tf.float32,
-            [None, go.N * go.N + 1]),
+                                    [None, go.N * go.N + 1]),
         'value_tensor': tf.placeholder(tf.float32, [None]),
     }
+
 
 def _round_power_of_two(n):
     """Finds the nearest power of 2 to a number.
@@ -172,6 +179,7 @@ def _round_power_of_two(n):
     Thus 84 -> 64, 120 -> 128, etc.
     """
     return 2 ** int(round(math.log(n, 2)))
+
 
 def get_default_hyperparams(**overrides):
     """Returns the hyperparams for the neural net.
@@ -186,7 +194,7 @@ def get_default_hyperparams(**overrides):
       l2_strength: The L2 regularization parameter.
       momentum: The momentum parameter for training
     """
-    k = _round_power_of_two(go.N ** 2 / 3) # width of each layer
+    k = _round_power_of_two(go.N ** 2 / 3)  # width of each layer
     hparams = {
         'k': k,  # Width of each conv layer
         'fc_width': 2 * k,  # Width of each fully connected layer
@@ -196,6 +204,7 @@ def get_default_hyperparams(**overrides):
     }
     hparams.update(**overrides)
     return hparams
+
 
 def dual_net(input_tensors, batch_size, train_mode, **hparams):
     '''
@@ -210,11 +219,11 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
     '''
     my_batchn = functools.partial(tf.layers.batch_normalization,
                                   momentum=.997, epsilon=1e-5,
-                                  fused=True, center=True, scale=True, 
+                                  fused=True, center=True, scale=True,
                                   training=train_mode)
 
     my_conv2d = functools.partial(tf.layers.conv2d,
-        filters=hparams['k'], kernel_size=[3, 3], padding="same")
+                                  filters=hparams['k'], kernel_size=[3, 3], padding="same")
 
     def my_res_layer(inputs, train_mode):
         int_layer1 = my_batchn(my_conv2d(inputs))
@@ -233,7 +242,7 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
 
     # policy head
     policy_conv = tf.nn.relu(my_batchn(
-            my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
+        my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
         center=False, scale=False))
     logits = tf.layers.dense(
         tf.reshape(policy_conv, [batch_size, go.N * go.N * 2]),
@@ -243,7 +252,7 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
 
     # value head
     value_conv = tf.nn.relu(my_batchn(
-            my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
+        my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
         center=False, scale=False))
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
         tf.reshape(value_conv, [batch_size, go.N * go.N]),
@@ -256,6 +265,7 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
         'value_output': value_output,
     }
 
+
 def train_ops(input_tensors, output_tensors, **hparams):
     global_step = tf.Variable(0, name="global_step", trainable=False)
     policy_cost = tf.reduce_mean(
@@ -265,7 +275,7 @@ def train_ops(input_tensors, output_tensors, **hparams):
     value_cost = tf.reduce_mean(tf.square(
         output_tensors['value_output'] - input_tensors['value_tensor']))
     l2_cost = 1e-4 * tf.add_n([tf.nn.l2_loss(v)
-        for v in tf.trainable_variables() if not 'bias' in v.name])
+                               for v in tf.trainable_variables() if not 'bias' in v.name])
     combined_cost = policy_cost + value_cost + l2_cost
     learning_rate = tf.train.exponential_decay(1e-2, global_step, 10 ** 7, 0.1)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -282,6 +292,7 @@ def train_ops(input_tensors, output_tensors, **hparams):
         'global_step': global_step,
         'train_op': train_op,
     }
+
 
 def logging_ops():
     return tf.summary.merge([
@@ -311,9 +322,11 @@ class StatisticsCollector(object):
         reg_summary = tf.summary.scalar("Regularization error", reg_error)
         cost_summary = tf.summary.scalar("Combined cost", cost)
         accuracy_summaries = tf.summary.merge(
-                [policy_summary, value_summary, reg_summary, cost_summary],
-                name="accuracy_summaries")
-    session = tf.Session(graph=graph)
+            [policy_summary, value_summary, reg_summary, cost_summary],
+            name="accuracy_summaries")
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = tf.Session(graph=tf.Graph(), config=config)
 
     def __init__(self):
         self.policy_costs = []
@@ -333,15 +346,16 @@ class StatisticsCollector(object):
     def collect(self):
         avg_pol = sum(self.policy_costs) / len(self.policy_costs)
         avg_val = sum(self.value_costs) / len(self.value_costs)
-        avg_reg = sum(self.regularization_costs) / len(self.regularization_costs)
+        avg_reg = sum(self.regularization_costs) / \
+            len(self.regularization_costs)
         avg_cost = sum(self.combined_costs) / len(self.combined_costs)
         self.policy_costs = []
         self.value_costs = []
         self.regularization_costs = []
         self.combined_costs = []
         summary = self.session.run(self.accuracy_summaries,
-            feed_dict={self.policy_error:avg_pol,
-                       self.value_error:avg_val,
-                       self.reg_error:avg_reg,
-                       self.cost: avg_cost})
+                                   feed_dict={self.policy_error: avg_pol,
+                                              self.value_error: avg_val,
+                                              self.reg_error: avg_reg,
+                                              self.cost: avg_cost})
         return summary

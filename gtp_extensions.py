@@ -21,6 +21,7 @@ import itertools
 import go
 import coords
 
+
 def parse_message(message):
     message = gtp.pre_engine(message).strip()
     first, rest = (message.split(" ", 1) + [None])[:2]
@@ -34,7 +35,7 @@ def parse_message(message):
         message_id = None
         command, arguments = first, rest
 
-    command = command.replace("-", "_") # for kgs extensions.
+    command = command.replace("-", "_")  # for kgs extensions.
     return message_id, command, arguments
 
 
@@ -72,6 +73,7 @@ class KgsExtensionsMixin(gtp.Engine):
             return "Unparseable message, args: %r" % arguments
         return self._game.chat(msg_type, sender, text)
 
+
 class RegressionsMixin(gtp.Engine):
     def cmd_loadsgf(self, arguments):
         args = arguments.split()
@@ -104,6 +106,8 @@ class RegressionsMixin(gtp.Engine):
 
 # Should this class blatantly reach into the game_obj and frob its tree?  Sure!
 # What are private members?  Python lets you do *anything!*
+
+
 class GoGuiMixin(gtp.Engine):
     """ GTP extensions of 'analysis commands' for gogui.
     We reach into the game_obj (an instance of the players in strategies.py),
@@ -111,6 +115,7 @@ class GoGuiMixin(gtp.Engine):
     methods on the Player object, but its a little weird to do that on a Player,
     which doesn't really care about GTP commands, etc.  So instead, we just
     violate encapsulation a bit... Suggestions welcome :) """
+
     def __init__(self, game_obj, name="gtp (python, gogui extensions)", version="0.1"):
         super().__init__(game_obj=game_obj, name=name, version=version)
         self.known_commands += ["gogui-analyze_commands"]
@@ -132,7 +137,8 @@ class GoGuiMixin(gtp.Engine):
     def cmd_q_heatmap(self, arguments):
         sort_order = list(range(self._game.size * self._game.size + 1))
         reverse = True if self._game.root.position.to_play is go.BLACK else False
-        sort_order.sort(key=lambda i: self._game.root.child_Q[i], reverse=reverse)
+        sort_order.sort(
+            key=lambda i: self._game.root.child_Q[i], reverse=reverse)
         return self.heatmap(sort_order, self._game.root, 'child_Q')
 
     def heatmap(self, sort_order, node, prop):
@@ -148,11 +154,13 @@ class GoGuiMixin(gtp.Engine):
             moves = self.cmd_nextplay(None).lower()
             moves = moves.split()
             colors = "bw" if self._game.root.position.to_play is go.BLACK else "wb"
-            moves_cols = " ".join(['{} {}'.format(*z) 
+            moves_cols = " ".join(['{} {}'.format(*z)
                                    for z in zip(itertools.cycle(colors), moves)])
-            print("gogui-gfx: TEXT", "{:.3f} after {}".format(self._game.root.Q, self._game.root.N), file=sys.stderr, flush=True)
+            print("gogui-gfx: TEXT", "{:.3f} after {}".format(
+                self._game.root.Q, self._game.root.N), file=sys.stderr, flush=True)
             print("gogui-gfx: VAR", moves_cols, file=sys.stderr, flush=True)
         return self.cmd_nextplay(None)
+
 
 class GTPDeluxe(KgsExtensionsMixin, RegressionsMixin, GoGuiMixin):
     pass
