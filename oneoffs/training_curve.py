@@ -13,7 +13,7 @@ python training_curve.py --num_positions=3
 Only grab games after 2005 (default is 2000)
 python training_curve.py --min_year=2005
 """
-
+import sys; sys.path.insert(0, '.')
 import sgf_wrapper
 
 import go
@@ -36,6 +36,7 @@ import tensorflow as tf
 import sgf
 import pdb
 
+from tqdm import tqdm
 from sgf_wrapper import sgf_prop
 from gtp_wrapper import make_gtp_instance, MCTSPlayer
 from utils import logged_timer as timer
@@ -153,7 +154,7 @@ def find_and_filter_sgf_files(base_dir, min_year = None, komi = None):
   sgf_files = []
   count = 0
   print("Finding all sgf files in {} with year >= {} and komi = {}".format(base_dir, min_year, komi))
-  for i, (dirpath, dirnames, filenames) in enumerate(os.walk(base_dir)):
+  for i, (dirpath, dirnames, filenames) in tqdm(enumerate(os.walk(base_dir))):
     for filename in filenames:
       count+=1
       if count%5000 == 0:
@@ -173,7 +174,7 @@ def sample_positions_from_games(sgf_files, num_positions=1):
   move_idxs = []
   
   fail_count = 0
-  for i, path in enumerate(sgf_files):
+  for i, path in tqdm(enumerate(sgf_files)):
     if i % 1000 == 0:
       print(i)
     try:
@@ -206,7 +207,7 @@ def get_training_curve_data(model_dir, pos_data, move_data, result_data, idx_sta
   player=None
   
   print("Evaluating models {}-{}, eval_every={}".format(idx_start, len(model_paths), eval_every))
-  for idx in range(idx_start, len(model_paths), eval_every):
+  for idx in tqdm(range(idx_start, len(model_paths), eval_every)):
     if player:
       restore_params(model_paths[idx], player)
     else:
