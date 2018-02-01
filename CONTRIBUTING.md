@@ -21,3 +21,9 @@ All submissions, including submissions by project members, require review. We
 use GitHub pull requests for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
+
+Some Minigo-specific expectations:
+
+*   We format all our python code with
+    [autopep8](https://pypi.python.org/pypi/autopep8). If you use Vim, check
+    out [Vim-CodeFmt](https://github.com/google/vim-codefmt).
