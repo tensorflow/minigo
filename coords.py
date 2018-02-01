@@ -39,8 +39,9 @@ KGS             'A19'           'T19'           'pass'
 pygtp           (1, 19)         (19, 19)        (0, 0)
 """
 
-import go
 import gtp
+
+import go
 
 KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRST'
 SGF_COLUMNS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -56,41 +57,41 @@ def kgs_to_flat(sgf):
     return flatten_coords(parse_kgs_coords(sgf))
 
 
-def flatten_coords(c):
+def flatten_coords(coord):
     """Flattens a coordinate tuple from a MiniGo coordinate"""
-    if c is None:
+    if coord is None:
         return go.N * go.N
-    return go.N * c[0] + c[1]
+    return go.N * coord[0] + coord[1]
 
 
-def unflatten_coords(f):
+def unflatten_coords(flat):
     """Unflattens a flattened coordinate into a Minigo coordinate"""
-    if f == go.N * go.N:
+    if flat == go.N * go.N:
         return None
-    return divmod(f, go.N)
+    return divmod(flat, go.N)
 
 
-def parse_sgf_coords(s):
+def parse_sgf_coords(sgfc):
     """Transform a SGF coordinate into a coordinate-tuple"""
-    if s is None or s == '':
+    if sgfc is None or sgfc == '':
         return None
-    return SGF_COLUMNS.index(s[1]), SGF_COLUMNS.index(s[0])
+    return SGF_COLUMNS.index(sgfc[1]), SGF_COLUMNS.index(sgfc[0])
 
 
-def unparse_sgf_coords(c):
+def unparse_sgf_coords(coord):
     """Turns a MiniGo coordinate tuple into a SGF coordinate."""
-    if c is None:
+    if coord is None:
         return ''
-    return SGF_COLUMNS[c[1]] + SGF_COLUMNS[c[0]]
+    return SGF_COLUMNS[coord[1]] + SGF_COLUMNS[coord[0]]
 
 
-def parse_kgs_coords(s):
+def parse_kgs_coords(kgsc):
     """Interprets KGS coordinates returning a minigo coordinate tuple."""
-    if s == 'pass':
+    if kgsc == 'pass':
         return None
-    s = s.upper()
-    col = KGS_COLUMNS.index(s[0])
-    row_from_bottom = int(s[1:]) - 1
+    kgsc = kgsc.upper()
+    col = KGS_COLUMNS.index(kgsc[0])
+    row_from_bottom = int(kgsc[1:]) - 1
     return go.N - row_from_bottom - 1, col
 
 
@@ -99,11 +100,10 @@ def to_human_coord(coord):
 
     This is equivalent to a KGS coordinate.
     """
-    if coord == None:
+    if coord is None:
         return "pass"
-    else:
-        y, x = coord
-        return "{}{}".format("ABCDEFGHJKLMNOPQRSTYVWYZ"[x], go.N-y)
+    y, x = coord
+    return "{}{}".format("ABCDEFGHJKLMNOPQRSTYVWYZ"[x], go.N-y)
 
 
 def parse_pygtp_coords(vertex):
@@ -117,8 +117,8 @@ def parse_pygtp_coords(vertex):
     return go.N - vertex[1], vertex[0] - 1
 
 
-def unparse_pygtp_coords(c):
+def unparse_pygtp_coords(coord):
     """Transforms a MiniGo Coordinate back into a GTP coordinate."""
-    if c is None:
+    if coord is None:
         return gtp.PASS
-    return c[1] + 1, go.N - c[0]
+    return coord[1] + 1, go.N - coord[0]

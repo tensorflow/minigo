@@ -9,9 +9,7 @@ make echo:
 		echo $(PROJECT)
 
 make gpu-image:
-		mkdir -p staging/data
 		cp ../*.py staging/
-		cp ../data/names.txt staging/data/
 		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/minigo-gpu-player:$(VERSION)" .
@@ -20,14 +18,11 @@ make gpu-image:
 		rm staging/player_wrapper.sh
 
 image:
-		mkdir -p staging/data
 		cp ../*.py staging/
-		cp -r ../data staging/
 		cp ../requirements-cpu.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build -t "gcr.io/$(PROJECT)/minigo-player:$(VERSION)" .
 		rm staging/*.py
-		rm -r staging/data
 		rm staging/requirements-cpu.txt
 		rm staging/player_wrapper.sh
 
