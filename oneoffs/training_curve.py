@@ -45,7 +45,7 @@ from tensorflow import gfile
 tf.app.flags.DEFINE_string(
     "sgf_dir", "sgf/baduk_db/", "sgf database")
 
-tf.app.flags.DEFINE_string("model_dir", "gs://mugozero-v1/models", 
+tf.app.flags.DEFINE_string("model_dir", "saved_models", 
                            "Where the model files are saved")
 tf.app.flags.DEFINE_string("plot_dir", "data", "Where to save the plots.")
 tf.app.flags.DEFINE_integer("min_year", "2000",
