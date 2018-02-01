@@ -324,7 +324,9 @@ class StatisticsCollector(object):
         accuracy_summaries = tf.summary.merge(
             [policy_summary, value_summary, reg_summary, cost_summary],
             name="accuracy_summaries")
-    session = tf.Session(graph=graph)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = tf.Session(graph=tf.Graph(), config=config)
 
     def __init__(self):
         self.policy_costs = []
