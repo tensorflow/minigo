@@ -54,6 +54,10 @@ RUN sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
 COPY bootstrap.sh /usr/local/bin
 RUN chmod a+x /usr/local/bin/bootstrap.sh
 
+COPY ../requirements-cpu.txt /usr/local/requirements-cpu.txt
+RUN chmod a+r /usr/local/requirements-cpu.txt
+
 RUN pip3 install --upgrade pip
+RUN pip3 install -r /usr/local/requirements-cpu.txt
 
 ENTRYPOINT ["/usr/local/bin/bootstrap.sh"]

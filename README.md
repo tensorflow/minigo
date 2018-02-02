@@ -81,10 +81,10 @@ First set up and enter your virtualenv. Then start by installing TensorFlow and
 the dependencies:
 
 ```
-pip3 install -r requirements.txt
+pip3 install -r requirements-gpu.txt
 ```
 
-The `requirements.txt` file assumes you'll use a GPU; if you wish to run on GPU
+The `requirements-gpu.txt` file assumes you'll use a GPU; if you wish to run on GPU
 you must install CUDA 8.0 or later (see TensorFlow documentation).
 
 If you don't want to run on GPU or don't have one, you can downgrade:

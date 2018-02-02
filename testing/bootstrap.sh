@@ -38,5 +38,6 @@ export PYTHONPATH=$PYTHONPATH:/src/minigo
 
 pip3 install -r requirements-cpu.txt
 
-# Invoke the script to run the workflow
-python3 -m testing.run_e2e_workflow  \
+ls *.py | xargs pylint
+
+BOARD_SIZE=9 python3 -m unittest discover tests

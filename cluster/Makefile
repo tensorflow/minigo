@@ -10,11 +10,11 @@ make echo:
 
 make gpu-image:
 		cp ../*.py staging/
-		cp ../requirements.txt staging/
+		cp ../requirements-gpu.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/minigo-gpu-player:$(VERSION)" .
 		rm staging/*.py
-		rm staging/requirements.txt
+		rm staging/requirements-gpu.txt
 		rm staging/player_wrapper.sh
 
 image:
