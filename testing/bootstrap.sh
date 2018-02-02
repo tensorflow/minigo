@@ -36,8 +36,6 @@ export PYTHONPATH=$PYTHONPATH:/src/minigo
 # Note: currently, this is hardcoded for python, but it would be easy to modify
 # this to add other languages
 
-pip3 install -r requirements-cpu.txt
-
 ls *.py | xargs pylint
 
 BOARD_SIZE=9 python3 -m unittest discover tests

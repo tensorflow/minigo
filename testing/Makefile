@@ -19,9 +19,13 @@ DIR := ${CURDIR}
 all: build
 
 build:
+	mkdir -p staging
+	cp ../requirements-cpu.txt staging/requirements-cpu.txt
 	@echo {\"image\": \"$(IMG):$(TAG)\"} > version.json
 	docker build ${DOCKER_BUILD_OPTS} -t $(IMG):$(TAG) .
 	docker tag $(IMG):$(TAG) $(IMG):latest
+	rm staging/*
+	rmdir staging
 	@echo Built $(IMG):$(TAG) and tagged with latest
 
 push: build

@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Docker image test-harness for running python tests
+# Docker image test-harness container for running python tests. Based off of
+# https://github.com/kubeflow/kubeflow/tree/master/testing
 
 FROM python:3.6-slim
 
@@ -20,7 +21,7 @@ FROM python:3.6-slim
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM linux
 
-# Define en_US.
+# Define en_US.UTF-8. I copied this clearly.
 ENV LANGUAGE=en_US.UTF-8 \
     LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
@@ -28,10 +29,6 @@ ENV LANGUAGE=en_US.UTF-8 \
     LC_MESSAGES=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 
-# buildDeps should be packages needed only to build some other packages as
-# these packages are purged in a later step.
-#
-# gcc & python-dev are needed so we can install crcmod for gsutil
 RUN set -ex  \
     && apt-get update -yqq \
     && apt-get install -yqq --no-install-recommends \
@@ -54,10 +51,10 @@ RUN sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
 COPY bootstrap.sh /usr/local/bin
 RUN chmod a+x /usr/local/bin/bootstrap.sh
 
-COPY ../requirements-cpu.txt /usr/local/requirements-cpu.txt
-RUN chmod a+r /usr/local/requirements-cpu.txt
-
+# We could pre-load requirements to make running the tests
+# faster, but this requires rebuilding every time we have a new dep.
+COPY staging/requirements-cpu.txt /tmp/requirements-cpu.txt
 RUN pip3 install --upgrade pip
-RUN pip3 install -r /usr/local/requirements-cpu.txt
+RUN pip3 install -r /tmp/requirements-cpu.txt
 
 ENTRYPOINT ["/usr/local/bin/bootstrap.sh"]
