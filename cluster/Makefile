@@ -9,6 +9,7 @@ make echo:
 		echo $(PROJECT)
 
 make gpu-image:
+		mkdir -p staging
 		cp ../*.py staging/
 		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
@@ -18,6 +19,7 @@ make gpu-image:
 		rm staging/player_wrapper.sh
 
 image:
+		mkdir -p staging
 		cp ../*.py staging/
 		cp ../requirements-cpu.txt staging/
 		cp player_wrapper.sh staging/
