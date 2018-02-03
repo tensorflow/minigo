@@ -29,7 +29,7 @@ def play_match(black_net, white_net, games, readouts, verbosity):
     readouts: number of readouts to perform for each step in each game.
     """
 
-    # For n games, we create lists of n black and n white playerss
+    # For n games, we create lists of n black and n white players
     black_players = [MCTSPlayer(
         black_net, verbosity=verbosity, two_player_mode=True) for i in range(games)]
     white_players = [MCTSPlayer(
