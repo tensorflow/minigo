@@ -11,7 +11,7 @@ ignore=
       # cloud_logging.py,
       # coords.py,
       dual_net.py,
-      evaluation.py,
+      # evaluation.py,
       features.py,
       go.py,
       gtp_extensions.py,
@@ -74,7 +74,8 @@ confidence=
 # no Warning level messages displayed, use"--disable=all --enable=classes
 # --disable=W"
 
-disable=bare-except
+disable=bare-except,
+        too-many-locals
         # print-statement,
         # parameter-unpacking,
         # unpacking-in-except,
