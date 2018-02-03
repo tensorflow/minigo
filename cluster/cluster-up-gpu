@@ -4,20 +4,26 @@ source ./common.sh
 
 set -e
 
+echo "Using Project:      ${PROJECT}"
+echo "Using Zone:         ${ZONE}"
+echo "Using Cluster Name: ${CLUSTER_NAME}"
+echo "Using K8S Version:  ${K8S_VERSION}"
+
 # Create a Kubernetes cluster
-gcloud alpha container clusters create \
-  --enable-kubernetes-alpha \
+gcloud beta container clusters create \
   --num-nodes 5 \
   --accelerator type=nvidia-tesla-k80,count=1 \
   --machine-type n1-standard-2 \
   --disk-size 20 \
   --preemptible \
-  --cluster-ipv4-cidr=10.0.0.0/10 \
-  --zone=asia-east1-a \
+  --cluster-ipv4-cidr=10.0.0.0/10 \ # Allocate a big CIDR block for a big cluster
+  --zone=$ZONE \
+  --cluster-version=$K8S_VERSION \
+  --project=$PROJECT \
   $CLUSTER_NAME
 
 # Fetch its credentials so we can use kubectl locally
-gcloud container clusters get-credentials $CLUSTER_NAME
+gcloud container clusters get-credentials $CLUSTER_NAME --project $PROJECT --zone $ZONE
 
 # Import the credentials into the cluster as a secret
 kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT}-key.json

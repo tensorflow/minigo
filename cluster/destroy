@@ -4,6 +4,8 @@ source ./common.sh
 
 ./cluster-down
 
-gcloud iam service-accounts delete $SERVICE_ACCOUNT_EMAIL
+# Left here for documentation, if you really wish to delete more things:
+#
+# gcloud iam service-accounts delete $SERVICE_ACCOUNT_EMAIL
 
-gsutil -m rm -r gs://$BUCKET_NAME
+# gsutil -m rm -r gs://$BUCKET_NAME

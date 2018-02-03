@@ -5,4 +5,5 @@ export BUCKET_NAME=${BUCKET_NAME:-minigo-v2}
 export SERVICE_ACCOUNT=${SERVICE_ACCOUNT:-minigo-services2}
 export SERVICE_ACCOUNT_EMAIL=${SERVICE_ACCOUNT}@${PROJECT}.iam.gserviceaccount.com
 export BOARD_SIZE=${BOARD_SIZE:-19}
-
+export K8S_VERSION=${K8S_VERSION:-1.9.2-gke.0}
+export ZONE=${ZONE:-asia-east1-a}

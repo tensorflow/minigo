@@ -16,4 +16,6 @@
 
 source ./common.sh
 
+# TODO(kashomon): envsubst doesn't exist for OSX. needs to be brew-installed
+# via gettext. Should probably warn the user about that.
 envsubst < gpu-player.yaml | kubectl apply -f -

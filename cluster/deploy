@@ -4,6 +4,7 @@ set -ex
 
 source ./common.sh
 
+
 # Create a GCS bucket for data storage
 gsutil mb -p $PROJECT gs://$BUCKET_NAME
 
