@@ -277,3 +277,38 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         player.tree_search()
         # check that we didn't visit the pass node any more times.
         self.assertEqual(player.root.child_N[pass_move], 1)
+
+    def test_extract_data_normal_end(self):
+        player = MCTSPlayerMixin(DummyNet())
+        player.initialize_game()
+        player.tree_search()
+        player.play_move(None)
+        player.tree_search()
+        player.play_move(None)
+        self.assertTrue(player.root.is_done())
+        player.set_result(player.root.position.result(), was_resign=False)
+
+        data = list(player.extract_data())
+        self.assertEqual(len(data), 2)
+        position, pi, result = data[0]
+        # White wins by komi
+        self.assertEqual(result, go.WHITE)
+        self.assertEqual(player.result_string, "W+{}".format(player.root.position.komi))
+
+    def test_extract_data_resign_end(self):
+        player = MCTSPlayerMixin(DummyNet())
+        player.initialize_game()
+        player.tree_search()
+        player.play_move((0, 0))
+        player.tree_search()
+        player.play_move(None)
+        player.tree_search()
+        # Black is winning on the board
+        self.assertEqual(player.root.position.result(), go.BLACK)
+        # But if Black resigns
+        player.set_result(go.WHITE, was_resign=True)
+
+        data = list(player.extract_data())
+        position, pi, result = data[0]
+        # Result should say White is the winner
+        self.assertEqual(result, go.WHITE)
