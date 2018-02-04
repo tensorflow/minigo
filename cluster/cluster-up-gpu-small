@@ -9,13 +9,11 @@ echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
 
-# Create a Kubernetes cluster
+# Create a small Kubernetes gpu cluster.
 gcloud beta container clusters create \
   --num-nodes 5 \
   --accelerator type=nvidia-tesla-k80,count=1 \
   --machine-type n1-standard-2 \
-  --disk-size 20 \
-  --preemptible \
   --zone=$ZONE \
   --cluster-version=$K8S_VERSION \
   --project=$PROJECT \
