@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Evulation plays games between two opponents."""
+"""Evalation plays games between two neural nets."""
 
 import time
 
 from gtp_wrapper import MCTSPlayer
 
 
+# TODO(kashomon): Change this to play just one game.
 def play_match(black_net, white_net, games, readouts, verbosity):
-    """Plays matches between two players.
+    """Plays matches between two neural nets.
 
     black_net: Instance of minigo.DualNetwork, a wrapper around a tensorflow
         convolutional network.
@@ -48,7 +49,7 @@ def play_match(black_net, white_net, games, readouts, verbosity):
         white.initialize_game()
 
     # The heart of the game-playing loop. Each iteration through the while loop
-    # is plays one move for each player. That means we:
+    # plays one move for each player. That means we:
     #   - Do a bunch of MTCS readouts (for each active player, for each game)
     #   - Play a move (for each active player, for each game)
     #   - Remove any finished player-pairs
