@@ -11,7 +11,7 @@ echo "Using K8S Version:  ${K8S_VERSION}"
 
 # Create a Kubernetes cluster. This setup is designed for creating large clusters.
 gcloud beta container clusters create \
-  --num-nodes 5 \
+  --num-nodes 600 \
   --accelerator type=nvidia-tesla-k80,count=1 \
   --machine-type n1-standard-2 \
   --disk-size 20 \
