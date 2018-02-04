@@ -39,7 +39,7 @@ XXXXOOOOO
 
 TEST_POSITION = go.Position(
     board=ALMOST_DONE_BOARD,
-    n=75,
+    n=105,
     komi=2.5,
     caps=(1, 4),
     ko=None,
@@ -124,8 +124,8 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         self.assertEqual(leaf.N, 2)
         self.assertEqual(leaf2.N, 1)
         # average of 0, -1, -0.2
+        self.assertAlmostEqual(leaf.Q, root.child_Q[leaf.fmove])
         self.assertAlmostEqual(leaf.Q, -0.4)
-        self.assertAlmostEqual(root.child_Q[leaf.fmove], -0.4)
         # average of -1, -0.2
         self.assertAlmostEqual(leaf.child_Q[leaf2.fmove], -0.6)
         self.assertAlmostEqual(leaf2.Q, -0.6)
