@@ -299,6 +299,7 @@ class Position():
             Should satisfy next_pos.board - next_pos.board_deltas[0] == pos.board
         to_play: BLACK or WHITE
         '''
+        assert type(recent) is tuple
         self.board = board if board is not None else np.copy(EMPTY_BOARD)
         self.n = n
         self.komi = komi
@@ -474,6 +475,7 @@ class Position():
         pos.caps = new_caps
         pos.ko = new_ko
         pos.recent += (PlayerMove(color, c),)
+
         # keep a rolling history of last 7 deltas - that's all we'll need to
         # extract the last 8 board states.
         pos.board_deltas = np.concatenate((

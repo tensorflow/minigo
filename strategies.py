@@ -26,10 +26,10 @@ from mcts import MCTSNode
 
 import go
 
-MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 # When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
+MAX_DEPTH = (go.N ** 2) * 1.4  # 505 moves for 19x19, 113 for 9x9
 
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):
@@ -165,9 +165,9 @@ class MCTSPlayerMixin:
             failsafe += 1
             leaf = self.root.select_leaf()
             if self.verbosity >= 4:
-                self.show_path_to_root(leaf)
+                print(self.show_path_to_root(leaf))
             # if game is over, override the value estimate with the true score
-            if leaf.position.is_game_over():
+            if leaf.position.is_game_over() or leaf.position.n >= MAX_DEPTH:
                 value = 1 if leaf.position.score() > 0 else -1
                 leaf.backup_value(value, up_to=self.root)
                 continue
@@ -190,16 +190,21 @@ class MCTSPlayerMixin:
         if self.root.position.is_game_over():
             return True
 
-        if self.root.position.n >= MAX_GAME_DEPTH:
-            return True
         return False
 
     def show_path_to_root(self, node):
         pos = node.position
+        diff = node.position.n - self.root.position.n
         if len(pos.recent) == 0:
             return
-        moves = list(map(coords.to_human_coord,
-                         [move.move for move in pos.recent[self.root.position.n:]]))
+        fmt = lambda move: "{}-{}".format('b' if move.color == 1 else 'w',
+                                          coords.to_human_coord(move.move))
+        path = " ".join(fmt(move) for move in pos.recent[-diff:]) 
+        if node.position.n >= MAX_DEPTH:
+            path += " (depth cutoff reached) %0.1f" % node.position.score()
+        elif node.position.is_game_over():
+            path += " (game over) %0.1f" % node.position.score()
+        return path
 
     def should_resign(self):
         '''Returns true if the player resigned.  No further moves should be played'''
