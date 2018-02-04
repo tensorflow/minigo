@@ -26,12 +26,12 @@ import math
 import coords
 import go
 
+MAX_DEPTH = (go.N ** 2) * 1.4  # 505 moves for 19x19, 113 for 9x9
+
 # Exploration constant
 c_PUCT = 1.38
 
 # Dirichlet noise, as a function of go.N
-
-
 def D_NOISE_ALPHA(): return 0.03 * 19 / go.N
 
 
@@ -220,6 +220,12 @@ class MCTSNode(object):
         if self.parent is None or self is up_to:
             return
         self.parent.backup_value(value, up_to)
+
+    def is_done(self):
+        '''True if the last two moves were Pass or if the position is at a move
+        greater than the max depth.
+        '''
+        return self.position.is_game_over() or self.position.n >= MAX_DEPTH
 
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))

@@ -23,7 +23,7 @@ from coords import parse_kgs_coords
 from coords import kgs_to_flat
 import coords
 
-from mcts import MCTSNode
+from mcts import MCTSNode, MAX_DEPTH
 
 ALMOST_DONE_BOARD = test_utils.load_board('''
 .XO.XO.OO

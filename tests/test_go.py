@@ -615,6 +615,6 @@ class TestPosition(test_utils.MiniGoUnitTest):
         self.assertEqualPositions(expected_final_position, final)
         self.assertEqual(final.n, len(final.recent))
 
-        replayed_positions = list(go.replay_position(final))
+        replayed_positions = list(go.replay_position(final, 1))
         for sgf_pos, replay_pos in zip(sgf_positions, replayed_positions):
             self.assertEqualPositions(sgf_pos.position, replay_pos.position)

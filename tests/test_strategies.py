@@ -21,8 +21,8 @@ import go
 from go import Position
 from coords import kgs_to_flat
 from tests import test_utils
-from mcts import MCTSNode
-from strategies import MCTSPlayerMixin, time_recommendation, MAX_DEPTH
+from mcts import MCTSNode, MAX_DEPTH
+from strategies import MCTSPlayerMixin, time_recommendation
 
 ALMOST_DONE_BOARD = test_utils.load_board('''
 .XO.XO.OO

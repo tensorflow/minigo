@@ -29,8 +29,6 @@ import go
 # When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
-MAX_DEPTH = (go.N ** 2) * 1.4  # 505 moves for 19x19, 113 for 9x9
-
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):
     '''Given current move number and "desired" seconds per move,
@@ -84,6 +82,7 @@ class MCTSPlayerMixin:
         self.searches_pi = []
         self.root = None
         self.result = 0
+        self.result_string = None
         self.resign_threshold = -abs(resign_threshold)
         super().__init__()
 
@@ -92,6 +91,7 @@ class MCTSPlayerMixin:
             position = go.Position()
         self.root = MCTSNode(position)
         self.result = 0
+        self.result_string = None
         self.comments = []
         self.searches_pi = []
         self.qs = []
@@ -167,7 +167,7 @@ class MCTSPlayerMixin:
             if self.verbosity >= 4:
                 print(self.show_path_to_root(leaf))
             # if game is over, override the value estimate with the true score
-            if leaf.position.is_game_over() or leaf.position.n >= MAX_DEPTH:
+            if leaf.is_done():
                 value = 1 if leaf.position.score() > 0 else -1
                 leaf.backup_value(value, up_to=self.root)
                 continue
@@ -179,18 +179,6 @@ class MCTSPlayerMixin:
             for leaf, move_prob, value in zip(leaves, move_probs, values):
                 leaf.revert_virtual_loss(up_to=self.root)
                 leaf.incorporate_results(move_prob, value, up_to=self.root)
-
-    def is_done(self):
-        '''True if the last two moves were Pass or if the position is at a move
-        greater than the max depth.  False otherwise.
-        '''
-        if self.result != 0:  # Someone's twiddled our result bit!
-            return True
-
-        if self.root.position.is_game_over():
-            return True
-
-        return False
 
     def show_path_to_root(self, node):
         pos = node.position
@@ -208,37 +196,32 @@ class MCTSPlayerMixin:
 
     def should_resign(self):
         '''Returns true if the player resigned.  No further moves should be played'''
-        if self.root.Q_perspective < self.resign_threshold:  # Force resign
-            self.result = self.root.position.to_play * -2  # use 2 & -2 as "+resign"
-            if self.verbosity > 1:
-                res = "B+" if self.result is 2 else "W+"
-                print("%sResign: %.3f" % (res, self.root.Q), file=sys.stderr)
-                print(self.root.position,
-                      self.root.position.score(), file=sys.stderr)
-            return True
-        return False
+        return self.root.Q_perspective < self.resign_threshold
 
-    def make_result_string(self, pos):
-        if abs(self.result) == 2:
-            res = "B+Resign" if self.result == 2 else "W+Resign"
+    def set_result(self, winner, was_resign):
+        self.result = winner
+        if was_resign:
+            string = "B+R" if winner == go.BLACK else "W+R"
         else:
-            res = pos.result_string()
-        return res
+            string = self.root.position.result_string()
+        self.result_string = string
 
     def to_sgf(self):
+        assert self.result_string is not None
         pos = self.root.position
-        res = self.make_result_string(pos)
         if self.comments:
             self.comments[0] = ("Resign Threshold: %0.3f\n" %
                                 self.resign_threshold) + self.comments[0]
-        return sgf_wrapper.make_sgf(pos.recent, res,
+        return sgf_wrapper.make_sgf(pos.recent, self.result_string,
                                     white_name=self.network.name or "Unknown",
                                     black_name=self.network.name or "Unknown",
                                     comments=self.comments)
 
     def extract_data(self):
         assert len(self.searches_pi) == self.root.position.n
-        for pwc, pi in zip(go.replay_position(self.root.position), self.searches_pi):
+        assert self.result != 0
+        for pwc, pi in zip(go.replay_position(self.root.position, self.result),
+                           self.searches_pi):
             yield pwc.position, pi, pwc.result
 
     def chat(self, msg_type, sender, text):
