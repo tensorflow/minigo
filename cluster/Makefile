@@ -1,7 +1,7 @@
 # Version and project can be overridden with the following:
 #  make target VERSION=0.XY PROJECT=foo-project
 
-VERSION?=0.12
+VERSION?=0.13
 PROJECT?=minigo-pub
 
 make echo:
