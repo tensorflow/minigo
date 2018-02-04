@@ -312,3 +312,4 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         position, pi, result = data[0]
         # Result should say White is the winner
         self.assertEqual(result, go.WHITE)
+        self.assertEqual(player.result_string, "W+R")
