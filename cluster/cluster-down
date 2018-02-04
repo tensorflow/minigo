@@ -2,4 +2,4 @@
 
 source ./common.sh
 
-gcloud container clusters delete $CLUSTER_NAME
+gcloud container clusters delete $CLUSTER_NAME --project=$PROJECT --zone=$ZONE

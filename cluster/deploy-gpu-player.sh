@@ -16,4 +16,15 @@
 
 source ./common.sh
 
+command -v envsubst >/dev/null 2>&1 || {
+  echo >&2 "envsubst is required and not found. Aborting"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo >&2 "------------------------------------------------"
+    echo >&2 "If you're on OSX, you can install with brew via:"
+    echo >&2 "  brew install gettext"
+    echo >&2 "  brew link --force gettext"
+  fi
+  exit 1;
+}
+
 envsubst < gpu-player.yaml | kubectl apply -f -

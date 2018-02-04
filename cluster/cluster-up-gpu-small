@@ -9,23 +9,18 @@ echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
 
-# Create a Kubernetes cluster. This setup is designed for creating large clusters.
+# Create a small Kubernetes gpu cluster.
 gcloud beta container clusters create \
-  --num-nodes 600 \
+  --num-nodes 5 \
   --accelerator type=nvidia-tesla-k80,count=1 \
   --machine-type n1-standard-2 \
-  --disk-size 20 \
-  --preemptible \
-  # Allocating a big CIDR is necessary for large clusters (>1008 Nodes)
-  # See more details https://stackoverflow.com/questions/42129327/gke-cluster-creation-fails-because-the-network-default-does-not-have-available
-  --cluster-ipv4-cidr=10.0.0.0/10 \
   --zone=$ZONE \
   --cluster-version=$K8S_VERSION \
   --project=$PROJECT \
   $CLUSTER_NAME
 
 # Fetch its credentials so we can use kubectl locally
-gcloud container clusters get-credentials $CLUSTER_NAME --project $PROJECT --zone $ZONE
+gcloud container clusters get-credentials $CLUSTER_NAME --project=$PROJECT --zone=$ZONE
 
 # Import the credentials into the cluster as a secret
 kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT}-key.json
