@@ -161,15 +161,15 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
 # End-to-end utility functions
 
 
-def make_dataset_from_selfplay(data_extracts, tf_record):
+def make_dataset_from_selfplay(data_extracts):
     '''
+    Returns an iterable of tf.Examples.
     Args:
         data_extracts: An iterable of (position, pi, result) tuples
-        tf_record: name of file to write to
     '''
     tf_examples = (make_tf_example(features_lib.extract_features(pos), pi, result)
                    for pos, pi, result in data_extracts)
-    write_tf_examples(tf_record, tf_examples)
+    return tf_examples
 
 
 def make_dataset_from_sgf(sgf_filename, tf_record):
