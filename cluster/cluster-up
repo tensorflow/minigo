@@ -3,7 +3,7 @@
 source ./common.sh
 source ./utils.sh
 
-set -ex
+set -e
 
 echo "Using Project:      ${PROJECT}"
 echo "Using Zone:         ${ZONE}"
@@ -11,11 +11,11 @@ echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
 
 # Create a Kubernetes cluster
+# Note, we require Intel Broadwells since they are a bit newer, and can provide
+# up to a 30% speedup, since we're so CPU bound.
 gcloud beta container clusters create \
-  --num-nodes 4 \
+  --num-nodes 3 \
   --machine-type n1-standard-8 \
-  # Intel Broadwells are a bit newer, and can provide up to a 30% speedup,
-  # since we're so CPU bound.
   --min-cpu-platform "Intel Broadwell" \
   --disk-size 30 \
   --zone $ZONE \
