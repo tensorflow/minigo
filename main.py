@@ -118,10 +118,12 @@ def evaluate(
 def selfplay(
         load_file: "The path to the network model files",
         output_dir: "Where to write the games"="data/selfplay",
+        holdout_dir: "Where to write the games"="data/holdout",
         output_sgf: "Where to write the sgfs"="sgf/",
         readouts: 'How many simulations to run per move'=100,
         verbose: '>=2 will print debug info, >=3 will print boards' = 1,
-        resign_threshold: 'absolute value of threshold to resign at' = 0.95):
+        resign_threshold: 'absolute value of threshold to resign at' = 0.95
+        holdout_pct: 'how many games to hold out for evaluation' = 0.05):
     _ensure_dir_exists(output_sgf)
     _ensure_dir_exists(output_dir)
 
@@ -138,8 +140,15 @@ def selfplay(
     with gfile.GFile(os.path.join(output_sgf, '{}.sgf'.format(output_name)), 'w') as f:
         f.write(player.to_sgf())
 
-    fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
-    preprocessing.make_dataset_from_selfplay(game_data, fname)
+    tf_examples = preprocessing.make_dataset_from_selfplay(game_data)
+
+    # Hold out 5% of games for evaluation.
+    if random.random() < holdout_pct:
+        fname = os.path.join(holdout_dir, "{}.tfrecord.zz".format(output_name))
+    else:
+        fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
+
+    preprocessing.write_tf_examples(fname, tf_examples)
 
 
 def gather(

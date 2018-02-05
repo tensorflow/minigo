@@ -27,7 +27,8 @@ BUCKET_NAME = os.environ['BUCKET_NAME']
 
 BASE_DIR = "gs://{}".format(BUCKET_NAME)
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
-SELFPLAY_DIR = os.path.join(BASE_DIR, 'games')
+SELFPLAY_DIR = os.path.join(BASE_DIR, 'data/selfplay')
+HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
@@ -88,6 +89,7 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     main.selfplay(
         load_file=model_save_file,
         output_dir=os.path.join(SELFPLAY_DIR, model_name),
+        holdout_dir=os.path.join(HOLDOUT_DIR, model_name),
         output_sgf=SGF_DIR,
         readouts=readouts,
         verbose=verbose,
