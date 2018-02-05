@@ -63,7 +63,7 @@ This project assumes you have the following:
 - virtualenv / virtualenvwrapper
 - Python 3.5+
 - [Docker](https://docs.docker.com/install/)
-- [gcloud](https://cloud.google.com/sdk/downloads)
+- [Cloud SDK](https://cloud.google.com/sdk/downloads)
 
 The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good

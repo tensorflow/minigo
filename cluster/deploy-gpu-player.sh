@@ -16,6 +16,8 @@
 
 source ./common.sh
 
+# envsubst doesn't exist for OSX. needs to be brew-installed
+# via gettext. Should probably warn the user about that.
 command -v envsubst >/dev/null 2>&1 || {
   echo >&2 "envsubst is required and not found. Aborting"
   if [[ "$OSTYPE" == "darwin"* ]]; then
