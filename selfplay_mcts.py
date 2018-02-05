@@ -16,12 +16,14 @@ import go
 import time
 import numpy as np
 import random
+import sys
 
 import coords
 import go
 from gtp_wrapper import MCTSPlayer
 
 SIMULTANEOUS_LEAVES = 8
+
 
 def play(network, readouts, resign_threshold, verbosity=0):
     ''' Plays out a self-play match, returning
@@ -60,7 +62,8 @@ def play(network, readouts, resign_threshold, verbosity=0):
             print(player.root.describe())
 
         if player.should_resign():
-            player.set_result(-1 * player.root.position.to_play, was_resign=True)
+            player.set_result(-1 * player.root.position.to_play,
+                              was_resign=True)
             break
         move = player.pick_move()
         player.play_move(move)
