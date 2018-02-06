@@ -11,7 +11,7 @@ echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
 echo "Number of Nodes:    ${NUM_K8S_NODES}"
 
-export PARALLELISM="$((3 * ${NUM_K8S_NODES}))"
+export PARALLELISM="$((8 * ${NUM_K8S_NODES}))"
 
 check_gcloud_exists
 
