@@ -1,9 +1,9 @@
 # Kubernetes Cluster and Image Management
 
-As you might notice, playing games is fairly slow.  One way to speed up playing
-games is to run Minigo on many computers simultaneously.  Minigo was originally
-trained by containerizing these worker jobs and running them on a Kubernetes
-cluster, hosted on the Google Cloud Platform.
+Playing games on a local machine can be pretty slow.  One way to speed up
+playing games is to run Minigo on many computers simultaneously.  Minigo was
+originally trained by containerizing these worker jobs and running them on a
+Kubernetes cluster, hosted on the Google Cloud Platform.
 
 *NOTE* These commands will result in VMs and other GCP resources being created
 and will result in charges to your GCP account!  *Proceed with care!*
