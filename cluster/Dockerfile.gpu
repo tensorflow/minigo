@@ -33,4 +33,4 @@ RUN pip3 install -r /app/requirements.txt
 
 ADD staging/ /app
 
-ENTRYPOINT ["/bin/bash ./player_wrapper.sh"]
+ENTRYPOINT ["/bin/sh", "player_wrapper.sh"]
