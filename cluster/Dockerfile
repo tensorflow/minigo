@@ -16,7 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         zip \
         zlib1g-dev \
-        fuse \
         python3 \
         python3-numpy \
         python3-dev \
@@ -36,4 +35,4 @@ RUN pip3 install -r /app/requirements-cpu.txt
 
 ADD staging/ /app
 
-ENTRYPOINT ["./player_wrapper.sh"]
+ENTRYPOINT ["/bin/sh", "player_wrapper.sh"]

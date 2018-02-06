@@ -1,5 +1,5 @@
 argh
-numpy
+numpy>=1.14.0
 pygtp>=0.4
 sgf==0.5
 tqdm>=4.17

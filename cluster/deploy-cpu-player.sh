@@ -29,4 +29,4 @@ command -v envsubst >/dev/null 2>&1 || {
   exit 1;
 }
 
-cat gpu-player.yaml | envsubst | kubectl apply -f -
+cat cpu-player.yaml | envsubst | kubectl apply -f -
