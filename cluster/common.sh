@@ -8,6 +8,7 @@ export CLUSTER_NAME=${CLUSTER_NAME:-"minigo2"}
 export BOARD_SIZE=${BOARD_SIZE:-"19"}
 export K8S_VERSION=${K8S_VERSION:-"1.9.2-gke.0"}
 export ZONE=${ZONE:-"asia-east1-a"}
+export NUM_K8S_NODES=${NUM_K8S_NODES:-"5"}
 
 # Configuration for service accounts so that the cluster can do cloud-things.
 export SERVICE_ACCOUNT=${SERVICE_ACCOUNT:-"minigo-services2"}
@@ -15,7 +16,7 @@ export SERVICE_ACCOUNT_EMAIL="${SERVICE_ACCOUNT}@${PROJECT}.iam.gserviceaccount.
 export SERVICE_ACCOUNT_KEY_LOCATION=${SERVICE_ACCOUNT_KEY_LOCATION:-"/tmp/${SERVICE_ACCOUNT}-key.json"}
 
 # Constants for docker container creation
-export VERSION_TAG=${VERSION_TAG:-"0.13"}
+export VERSION_TAG=${VERSION_TAG:-"0.14"}
 export GPU_PLAYER_CONTAINER=${GPU_PLAYER_CONTAINER:-"minigo-gpu-player"}
 export CPU_PLAYER_CONTAINER=${CPU_PLAYER_CONTAINER:-"minigo-player"}
 
