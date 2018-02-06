@@ -166,7 +166,8 @@ class DualNetwork():
 def get_inference_input():
     return {
         'pos_tensor': tf.placeholder(tf.float32,
-                                     [None, go.N, go.N, features.NEW_FEATURES_PLANES]),
+                                     [None, go.N, go.N, features.NEW_FEATURES_PLANES],
+                                     name='pos_tensor'),
         'pi_tensor': tf.placeholder(tf.float32,
                                     [None, go.N * go.N + 1]),
         'value_tensor': tf.placeholder(tf.float32, [None]),
@@ -223,7 +224,8 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
                                   training=train_mode)
 
     my_conv2d = functools.partial(tf.layers.conv2d,
-                                  filters=hparams['k'], kernel_size=[3, 3], padding="same")
+                                  filters=hparams['k'],
+                                  kernel_size=[3, 3], padding="same")
 
     def my_res_layer(inputs, train_mode):
         int_layer1 = my_batchn(my_conv2d(inputs))
@@ -248,7 +250,7 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
         tf.reshape(policy_conv, [batch_size, go.N * go.N * 2]),
         go.N * go.N + 1)
 
-    policy_output = tf.nn.softmax(logits)
+    policy_output = tf.nn.softmax(logits, name='policy_output')
 
     # value head
     value_conv = tf.nn.relu(my_batchn(
@@ -257,8 +259,9 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
         tf.reshape(value_conv, [batch_size, go.N * go.N]),
         hparams['fc_width']))
-    value_output = value_output = tf.nn.tanh(
-        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [batch_size]))
+    value_output = tf.nn.tanh(
+        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [batch_size]),
+        name='value_output')
     return {
         'logits': logits,
         'policy_output': policy_output,
