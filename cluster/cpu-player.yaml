@@ -21,7 +21,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: player
-        image: gcr.io/$PROJECT/minigo-player:0.10
+        image: gcr.io/$PROJECT/$CPU_PLAYER_CONTAINER:$VERSION_TAG
         imagePullPolicy: Always
         volumeMounts:
         - name: service-credentials

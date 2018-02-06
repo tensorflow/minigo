@@ -1,6 +1,7 @@
 #!/bin/sh
 
 source ./common.sh
+source ./utils.sh
 
 set -e
 
@@ -22,5 +23,8 @@ gcloud beta container clusters create \
 # Fetch its credentials so we can use kubectl locally
 gcloud container clusters get-credentials $CLUSTER_NAME --project=$PROJECT --zone=$ZONE
 
+create_gcs_bucket
+create_service_account_key
+
 # Import the credentials into the cluster as a secret
-kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT}-key.json
+kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT_KEY_LOCATION}

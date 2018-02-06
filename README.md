@@ -63,7 +63,7 @@ This project assumes you have the following:
 - virtualenv / virtualenvwrapper
 - Python 3.5+
 - [Docker](https://docs.docker.com/install/)
-- [gcloud](https://cloud.google.com/sdk/downloads)
+- [Cloud SDK](https://cloud.google.com/sdk/downloads)
 
 The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
@@ -81,10 +81,10 @@ First set up and enter your virtualenv. Then start by installing TensorFlow and
 the dependencies:
 
 ```
-pip3 install -r requirements.txt
+pip3 install -r requirements-gpu.txt
 ```
 
-The `requirements.txt` file assumes you'll use a GPU; if you wish to run on GPU
+The `requirements-gpu.txt` file assumes you'll use a GPU; if you wish to run on GPU
 you must install CUDA 8.0 or later (see TensorFlow documentation).
 
 If you don't want to run on GPU or don't have one, you can downgrade:
