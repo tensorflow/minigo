@@ -22,7 +22,7 @@ import sgf_wrapper
 import coords
 import gtp
 import numpy as np
-from mcts import MCTSNode
+from mcts import MCTSNode, MAX_DEPTH
 
 import go
 
