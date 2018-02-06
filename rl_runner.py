@@ -19,6 +19,7 @@ If the gather job dies more than three times, we quit entirely.
 """
 
 import subprocess
+import sys
 import argh
 from utils import timer
 
