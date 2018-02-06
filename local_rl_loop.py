@@ -23,6 +23,7 @@ import os
 import tempfile
 
 import dual_net
+import preprocessing
 import go
 import main
 
@@ -30,7 +31,12 @@ import main
 def rl_loop():
     # monkeypatch the hyperparams so that we get a quickly executing network.
     dual_net.get_default_hyperparams = lambda **kwargs: {
-        'k': 1, 'fc_width': 2, 'num_shared_layers': 1, 'l2_strength': 2e-4, 'momentum': 0.9}
+        'k': 8, 'fc_width': 16, 'num_shared_layers': 1, 'l2_strength': 1e-4, 'momentum': 0.9}
+
+    dual_net.TRAIN_BATCH_SIZE = 16
+
+    #monkeypatch the shuffle buffer size so we don't spin forever shuffling up positions.
+    preprocessing.SHUFFLE_BUFFER_SIZE = 10000
 
     with tempfile.TemporaryDirectory() as base_dir:
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
@@ -49,16 +55,19 @@ def rl_loop():
             load_file=model_save_file,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
+            holdout_pct=0,
             readouts=10)
         main.selfplay(
             load_file=model_save_file,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
+            holdout_pct=0,
             readouts=10)
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data... (ctrl+C to quit)")
-        main.train(gather_dir, save_file=model_save_file, num_steps=10000)
+        main.train(gather_dir, save_file=model_save_file,
+                   num_steps=10000, verbosity=2)
 
 
 if __name__ == '__main__':
