@@ -26,6 +26,8 @@ import sgf_wrapper
 TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
     tf.python_io.TFRecordCompressionType.ZLIB)
 
+SHUFFLE_BUFFER_SIZE = int(4 * 1e6)
+
 # Constructing tf.Examples
 
 
@@ -137,7 +139,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
     else:
         dataset = dataset.repeat()
     if shuffle_examples:
-        dataset = dataset.shuffle(buffer_size=10000)
+        dataset = dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
     dataset = dataset.batch(batch_size)
     return dataset
 

@@ -29,6 +29,7 @@ import go
 # When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
+
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):
     '''Given current move number and "desired" seconds per move,
@@ -127,13 +128,13 @@ class MCTSPlayerMixin:
         '''
         Notable side effects:
           - finalizes the probability distribution according to
-          this roots visit counts into the class' running tally, `searches`
+          this roots visit counts into the class' running tally, `searches_pi`
           - Makes the node associated with this move the root, for future
             `inject_noise` calls.
         '''
         if not self.two_player_mode:
             self.searches_pi.append(
-                self.root.children_as_pi(self.root.position.n > self.temp_threshold))
+                self.root.children_as_pi(self.root.position.n < self.temp_threshold))
         self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
         self.root = self.root.maybe_add_child(coords.flatten_coords(c))
@@ -185,9 +186,10 @@ class MCTSPlayerMixin:
         diff = node.position.n - self.root.position.n
         if len(pos.recent) == 0:
             return
-        fmt = lambda move: "{}-{}".format('b' if move.color == 1 else 'w',
-                                          coords.to_human_coord(move.move))
-        path = " ".join(fmt(move) for move in pos.recent[-diff:]) 
+
+        def fmt(move): return "{}-{}".format('b' if move.color == 1 else 'w',
+                                             coords.to_human_coord(move.move))
+        path = " ".join(fmt(move) for move in pos.recent[-diff:])
         if node.position.n >= MAX_DEPTH:
             path += " (depth cutoff reached) %0.1f" % node.position.score()
         elif node.position.is_game_over():
