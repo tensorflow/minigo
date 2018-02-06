@@ -82,9 +82,10 @@ class DualNetworkTrainer():
             sess.run(tf.global_variables_initializer())
             tf.train.Saver().save(sess, self.save_file)
 
-    def train(self, tf_records, init_from=None, logdir=None, num_steps=None):
+    def train(self, tf_records, init_from=None, logdir=None, num_steps=None,
+              logging_freq=100):
         def should_log(i):
-            return logdir is not None and i % 100 == 0
+            return logdir is not None and i % logging_freq == 0
         if num_steps is None:
             num_steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
         with self.sess.graph.as_default():
@@ -115,12 +116,12 @@ class DualNetworkTrainer():
                             'combined_cost')})
                 if should_log(i):
                     after_weights = self.sess.run(weight_tensors)
-                    gradient_summaries = compute_gradient_ratio(
+                    weight_update_summaries = compute_update_ratio(
                         weight_tensors, before_weights, after_weights)
                     accuracy_summaries = training_stats.collect()
                     weight_summaries = self.sess.run(weight_summary_op)
                     global_step = tensor_values['global_step']
-                    logger.add_summary(gradient_summaries, global_step)
+                    logger.add_summary(weight_update_summaries, global_step)
                     logger.add_summary(accuracy_summaries, global_step)
                     logger.add_summary(weight_summaries, global_step)
             self.save_weights()
@@ -312,13 +313,14 @@ def logging_ops():
         name="weight_summaries")
 
 
-def compute_gradient_ratio(weight_tensors, before_weights, after_weights):
+def compute_update_ratio(weight_tensors, before_weights, after_weights):
     """Compute the ratio of gradient norm to weight norm."""
     deltas = [after - before for after, before in zip(after_weights, before_weights)]
     delta_norms = [np.linalg.norm(d.ravel()) for d in deltas]
     weight_norms = [np.linalg.norm(w.ravel()) for w in before_weights]
     ratios = [d / w for d, w in zip(delta_norms, weight_norms)]
-    all_summaries = [tf.Summary.Value(tag=tensor.name, simple_value=ratio)
+    all_summaries = [
+        tf.Summary.Value(tag='update_ratios/' + tensor.name, simple_value=ratio)
         for tensor, ratio in zip(weight_tensors, ratios)]
     return tf.Summary(value=all_summaries)
 
