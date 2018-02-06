@@ -122,7 +122,7 @@ def selfplay(
         output_sgf: "Where to write the sgfs"="sgf/",
         readouts: 'How many simulations to run per move'=100,
         verbose: '>=2 will print debug info, >=3 will print boards' = 1,
-        resign_threshold: 'absolute value of threshold to resign at' = 0.95
+        resign_threshold: 'absolute value of threshold to resign at' = 0.95,
         holdout_pct: 'how many games to hold out for evaluation' = 0.05):
     _ensure_dir_exists(output_sgf)
     _ensure_dir_exists(output_dir)
