@@ -118,7 +118,7 @@ def train(logdir=None):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train, selfplay, gather, bootstrap, convert_all])
+argh.add_commands(parser, [train, selfplay, gather, bootstrap, game_counts])
 
 if __name__ == '__main__':
     print_flags()
