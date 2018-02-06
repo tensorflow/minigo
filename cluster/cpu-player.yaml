@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: minigo-player
 spec:
-  parallelism: 16
+  parallelism: $PARALLELISM
   completions: 200000
   template:
     metadata:
