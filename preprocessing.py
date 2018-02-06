@@ -26,6 +26,8 @@ import sgf_wrapper
 TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
     tf.python_io.TFRecordCompressionType.ZLIB)
 
+SHUFFLE_BUFFER_SIZE = int(4 * 1e6)
+
 # Constructing tf.Examples
 
 
@@ -137,7 +139,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
     else:
         dataset = dataset.repeat()
     if shuffle_examples:
-        dataset = dataset.shuffle(buffer_size=10000)
+        dataset = dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
     dataset = dataset.batch(batch_size)
     return dataset
 
@@ -161,15 +163,15 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
 # End-to-end utility functions
 
 
-def make_dataset_from_selfplay(data_extracts, tf_record):
+def make_dataset_from_selfplay(data_extracts):
     '''
+    Returns an iterable of tf.Examples.
     Args:
         data_extracts: An iterable of (position, pi, result) tuples
-        tf_record: name of file to write to
     '''
     tf_examples = (make_tf_example(features_lib.extract_features(pos), pi, result)
                    for pos, pi, result in data_extracts)
-    write_tf_examples(tf_record, tf_examples)
+    return tf_examples
 
 
 def make_dataset_from_sgf(sgf_filename, tf_record):

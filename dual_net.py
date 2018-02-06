@@ -34,8 +34,12 @@ import preprocessing
 import symmetries
 import go
 
+# How many positions to look at per generation.
+# Per AGZ, 2048 minibatch * 1k = 2M positions/generation
 EXAMPLES_PER_GENERATION = 2000000
-TRAIN_BATCH_SIZE = 16
+
+# How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
+TRAIN_BATCH_SIZE = 256
 
 
 class DualNetworkTrainer():
@@ -47,7 +51,7 @@ class DualNetworkTrainer():
         # self.eval_logdir = os.path.join(model_dir, 'logs', 'eval')
 
     def initialize_weights(self, init_from=None):
-        '''Initialize weights from model checkpoint.
+        """Initialize weights from model checkpoint.
 
         If model checkpoint does not exist, fall back to init_from.
         If that doesn't exist either, bootstrap with random weights.
@@ -55,7 +59,8 @@ class DualNetworkTrainer():
         This priority order prevents the mistake where the latest saved
         model exists, but you accidentally init from an older model checkpoint
         and then overwrite the newer model weights.
-        '''
+        """
+        tf.logging.set_verbosity(tf.logging.WARN)  # Hide startup spam
         if self.save_file is not None and os.path.exists(self.save_file + '.meta'):
             tf.train.Saver().restore(self.sess, self.save_file)
             return
@@ -65,6 +70,7 @@ class DualNetworkTrainer():
         else:
             print("Bootstrapping with random weights", file=sys.stderr)
             self.sess.run(tf.global_variables_initializer())
+        tf.logging.set_verbosity(tf.logging.INFO)
 
     def save_weights(self):
         with self.sess.graph.as_default():
@@ -83,7 +89,7 @@ class DualNetworkTrainer():
             tf.train.Saver().save(sess, self.save_file)
 
     def train(self, tf_records, init_from=None, logdir=None, num_steps=None,
-              logging_freq=100):
+              logging_freq=100, verbosity=1):
         def should_log(i):
             return logdir is not None and i % logging_freq == 0
         if num_steps is None:
@@ -109,6 +115,8 @@ class DualNetworkTrainer():
                 except tf.errors.OutOfRangeError:
                     break
 
+                if verbosity > 1 and i % logging_freq == 0:
+                    print(tensor_values)
                 if logdir is not None:
                     training_stats.report(
                         {k: tensor_values[k] for k in (
@@ -178,7 +186,8 @@ class DualNetwork():
 def get_inference_input():
     return {
         'pos_tensor': tf.placeholder(tf.float32,
-                                     [None, go.N, go.N, features.NEW_FEATURES_PLANES]),
+                                     [None, go.N, go.N, features.NEW_FEATURES_PLANES],
+                                     name='pos_tensor'),
         'pi_tensor': tf.placeholder(tf.float32,
                                     [None, go.N * go.N + 1]),
         'value_tensor': tf.placeholder(tf.float32, [None]),
@@ -211,7 +220,7 @@ def get_default_hyperparams(**overrides):
         'k': k,  # Width of each conv layer
         'fc_width': 2 * k,  # Width of each fully connected layer
         'num_shared_layers': go.N,  # Number of shared trunk layers
-        'l2_strength': 2e-4,  # Regularization strength
+        'l2_strength': 1e-4,  # Regularization strength
         'momentum': 0.9,  # Momentum used in SGD
     }
     hparams.update(**overrides)
@@ -235,7 +244,8 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
                                   training=train_mode)
 
     my_conv2d = functools.partial(tf.layers.conv2d,
-                                  filters=hparams['k'], kernel_size=[3, 3], padding="same")
+                                  filters=hparams['k'],
+                                  kernel_size=[3, 3], padding="same")
 
     def my_res_layer(inputs, train_mode):
         int_layer1 = my_batchn(my_conv2d(inputs))
@@ -260,7 +270,7 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
         tf.reshape(policy_conv, [batch_size, go.N * go.N * 2]),
         go.N * go.N + 1)
 
-    policy_output = tf.nn.softmax(logits)
+    policy_output = tf.nn.softmax(logits, name='policy_output')
 
     # value head
     value_conv = tf.nn.relu(my_batchn(
@@ -269,8 +279,9 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
         tf.reshape(value_conv, [batch_size, go.N * go.N]),
         hparams['fc_width']))
-    value_output = value_output = tf.nn.tanh(
-        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [batch_size]))
+    value_output = tf.nn.tanh(
+        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [batch_size]),
+        name='value_output')
     return {
         'logits': logits,
         'policy_output': policy_output,
@@ -286,10 +297,13 @@ def train_ops(input_tensors, output_tensors, **hparams):
             labels=input_tensors['pi_tensor']))
     value_cost = tf.reduce_mean(tf.square(
         output_tensors['value_output'] - input_tensors['value_tensor']))
-    l2_cost = 1e-4 * tf.add_n([tf.nn.l2_loss(v)
-                               for v in tf.trainable_variables() if not 'bias' in v.name])
+    l2_cost = hparams['l2_strength'] * tf.add_n([tf.nn.l2_loss(v)
+                                                 for v in tf.trainable_variables() if not 'bias' in v.name])
     combined_cost = policy_cost + value_cost + l2_cost
-    learning_rate = tf.train.exponential_decay(1e-2, global_step, 10 ** 7, 0.1)
+    boundaries = list(map(int, [1e6, 2 * 1e6]))
+    values = [1e-2, 1e-3, 1e-4]
+    learning_rate = tf.train.piecewise_constant(
+        global_step, boundaries, values)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
         train_op = tf.train.MomentumOptimizer(

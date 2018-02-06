@@ -16,12 +16,14 @@ import go
 import time
 import numpy as np
 import random
+import sys
 
 import coords
 import go
 from gtp_wrapper import MCTSPlayer
 
 SIMULTANEOUS_LEAVES = 8
+
 
 def play(network, readouts, resign_threshold, verbosity=0):
     ''' Plays out a self-play match, returning
@@ -37,7 +39,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
 
     # Disable resign in 5% of games
     if random.random() < 0.05:
-        player.resign_threshold = -0.9999
+        player.resign_threshold = -1.0
 
     player.initialize_game()
 
@@ -60,7 +62,8 @@ def play(network, readouts, resign_threshold, verbosity=0):
             print(player.root.describe())
 
         if player.should_resign():
-            player.set_result(-1 * player.root.position.to_play, was_resign=True)
+            player.set_result(-1 * player.root.position.to_play,
+                              was_resign=True)
             break
         move = player.pick_move()
         player.play_move(move)
@@ -69,10 +72,10 @@ def play(network, readouts, resign_threshold, verbosity=0):
             break
 
         if (verbosity >= 2) or (verbosity >= 1 and player.root.position.n % 10 == 9):
-            print("Q: {}".format(player.root.Q))
+            print("Q: {:.5f}".format(player.root.Q))
             dur = time.time() - start
             print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (
-                player.root.position.n, readouts, dur / readouts / 100.0, dur), flush=True)
+                player.root.position.n, readouts, dur / readouts * 100.0, dur), flush=True)
         if verbosity >= 3:
             print("Played >>",
                   coords.to_human_coord(coords.unflatten_coords(player.root.fmove)))

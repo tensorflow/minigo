@@ -38,6 +38,13 @@ import evaluation
 import sgf_wrapper
 import utils
 
+# How many positions we should aggregate per 'chunk'.
+EXAMPLES_PER_RECORD = 10000
+
+# How many positions to draw from for our training window.
+# AGZ used the most recent 500k games, which, assuming 250 moves/game = 125M
+WINDOW_SIZE = 125000000
+
 
 def _ensure_dir_exists(directory):
     if directory.startswith('gs://'):
@@ -74,15 +81,16 @@ def bootstrap(save_file):
 
 
 def train(chunk_dir, save_file, load_file=None, generation_num=0,
-          logdir=None, num_steps=None):
-    tf_records = gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz'))
-    tf_records = [f for f in tf_records
-                  if (generation_num - 50) < int(os.path.basename(f)[:6]) <= generation_num]
+          logdir=None, num_steps=None, verbosity=1):
+    tf_records = sorted(gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz')))
+    tf_records = tf_records[-1 * (WINDOW_SIZE // EXAMPLES_PER_RECORD):]
+
+    print("Training from:", tf_records[0], "to", tf_records[-1])
 
     n = dual_net.DualNetworkTrainer(save_file)
     with timer("Training"):
         n.train(tf_records, init_from=load_file,
-                logdir=logdir, num_steps=num_steps)
+                logdir=logdir, num_steps=num_steps, verbosity=verbosity)
 
 
 def evaluate(
@@ -118,10 +126,12 @@ def evaluate(
 def selfplay(
         load_file: "The path to the network model files",
         output_dir: "Where to write the games"="data/selfplay",
+        holdout_dir: "Where to write the games"="data/holdout",
         output_sgf: "Where to write the sgfs"="sgf/",
         readouts: 'How many simulations to run per move'=100,
         verbose: '>=2 will print debug info, >=3 will print boards' = 1,
-        resign_threshold: 'absolute value of threshold to resign at' = 0.95):
+        resign_threshold: 'absolute value of threshold to resign at' = 0.95,
+        holdout_pct: 'how many games to hold out for evaluation' = 0.05):
     _ensure_dir_exists(output_sgf)
     _ensure_dir_exists(output_dir)
 
@@ -138,17 +148,24 @@ def selfplay(
     with gfile.GFile(os.path.join(output_sgf, '{}.sgf'.format(output_name)), 'w') as f:
         f.write(player.to_sgf())
 
-    fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
-    preprocessing.make_dataset_from_selfplay(game_data, fname)
+    tf_examples = preprocessing.make_dataset_from_selfplay(game_data)
+
+    # Hold out 5% of games for evaluation.
+    if random.random() < holdout_pct:
+        fname = os.path.join(holdout_dir, "{}.tfrecord.zz".format(output_name))
+    else:
+        fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
+
+    preprocessing.write_tf_examples(fname, tf_examples)
 
 
 def gather(
         input_directory: 'where to look for games'='data/selfplay/',
         output_directory: 'where to put collected games'='data/training_chunks/',
-        examples_per_record: 'how many tf.examples to gather in each chunk'=20000):
+        examples_per_record: 'how many tf.examples to gather in each chunk'=EXAMPLES_PER_RECORD):
     _ensure_dir_exists(output_directory)
     models = [model_dir.strip('/')
-              for model_dir in gfile.ListDirectory(input_directory)]
+              for model_dir in sorted(gfile.ListDirectory(input_directory))[-50:]]
     with timer("Finding existing tfrecords..."):
         model_gamedata = {
             model: gfile.Glob(
@@ -169,17 +186,16 @@ def gather(
     num_already_processed = len(already_processed)
 
     for model_name, record_files in sorted(model_gamedata.items()):
-        with timer("Processing %s" % model_name):
-            if set(record_files) <= already_processed:
-                print("%s is already fully processed" % model_name)
-                continue
-            for i, example_batch in enumerate(
-                    tqdm(preprocessing.shuffle_tf_examples(examples_per_record, record_files))):
-                output_record = os.path.join(output_directory,
-                                             '{}-{}.tfrecord.zz'.format(model_name, str(i)))
-                preprocessing.write_tf_examples(
-                    output_record, example_batch, serialize=False)
-            already_processed.update(record_files)
+        if set(record_files) <= already_processed:
+            continue
+        print("Gathering files for %s:" % model_name)
+        for i, example_batch in enumerate(
+                tqdm(preprocessing.shuffle_tf_examples(examples_per_record, record_files))):
+            output_record = os.path.join(output_directory,
+                                         '{}-{}.tfrecord.zz'.format(model_name, str(i)))
+            preprocessing.write_tf_examples(
+                output_record, example_batch, serialize=False)
+        already_processed.update(record_files)
 
     print("Processed %s new files" %
           (len(already_processed) - num_already_processed))
