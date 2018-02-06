@@ -58,7 +58,7 @@ def rl_loop():
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data... (ctrl+C to quit)")
-        main.train(gather_dir, save_file=model_save_file, num_steps=10000)
+        main.train(gather_dir, save_file=model_save_file, num_steps=10000, logdir="logs")
 
 
 if __name__ == '__main__':
