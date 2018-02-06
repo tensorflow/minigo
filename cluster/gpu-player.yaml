@@ -40,6 +40,8 @@ spec:
           value: $BUCKET_NAME
         - name: BOARD_SIZE
           value: "$BOARD_SIZE"
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
         securityContext:
           privileged: true
       volumes:
@@ -50,6 +52,6 @@ spec:
           path: /home/kubernetes/bin/nvidia/bin
         name: nvidia-debug-tools
       - hostPath:
-          path: /home/kubernetes/bin/nvidia/lib
+          path: /home/kubernetes/bin/nvidia/lib64
         name: nvidia-libraries
       restartPolicy: OnFailure
