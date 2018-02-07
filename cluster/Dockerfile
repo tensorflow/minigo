@@ -35,4 +35,4 @@ RUN pip3 install -r /app/requirements-cpu.txt
 
 ADD staging/ /app
 
-ENTRYPOINT ["/bin/sh", "player_wrapper.sh"]
+CMD ["/bin/sh", "player_wrapper.sh"]
