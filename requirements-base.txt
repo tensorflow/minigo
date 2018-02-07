@@ -1,0 +1,11 @@
+argh
+numpy>=1.14.0
+pygtp>=0.4
+sgf==0.5
+tqdm>=4.17
+autopep8>=1.3
+pylint
+protobuf
+six
+petname
+google.cloud.logging
