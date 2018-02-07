@@ -24,7 +24,7 @@ export CPU_PLAYER_CONTAINER=${CPU_PLAYER_CONTAINER:-"minigo-player"}
 # So, we prefix the project name to avoid collisions
 #
 # For more details, see https://cloud.google.com/storage/docs/best-practices
-export BUCKET_NAME=${BUCKET_NAME:-"${PROJECT}-minigo-v2"}
+export BUCKET_NAME=${BUCKET_NAME:-"${PROJECT}-minigo-v2-${BOARD_SIZE}"}
 
 # By default, buckets are created in us-east1, but for more performance, it's
 # useful to have a region located near the GKE cluster.

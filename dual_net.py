@@ -18,8 +18,10 @@ This helps the intermediate layers extract concepts that are relevant to both
 move prediction and score estimation.
 """
 
+import collections
 import functools
 import math
+import numpy as np
 import os.path
 import itertools
 import sys
@@ -86,7 +88,10 @@ class DualNetworkTrainer():
             sess.run(tf.global_variables_initializer())
             tf.train.Saver().save(sess, self.save_file)
 
-    def train(self, tf_records, init_from=None, logdir=None, num_steps=None, verbosity=1):
+    def train(self, tf_records, init_from=None, logdir=None, num_steps=None,
+              logging_freq=100, verbosity=1):
+        def should_log(i):
+            return logdir is not None and i % logging_freq == 0
         if num_steps is None:
             num_steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
         with self.sess.graph.as_default():
@@ -96,30 +101,37 @@ class DualNetworkTrainer():
                                       train_mode=True, **self.hparams)
             train_tensors = train_ops(
                 input_tensors, output_tensors, **self.hparams)
-            weight_tensors = logging_ops()
+            weight_summary_op = logging_ops()
+            weight_tensors = tf.trainable_variables()
             self.initialize_weights(init_from)
             if logdir is not None:
                 training_stats = StatisticsCollector()
                 logger = tf.summary.FileWriter(logdir, self.sess.graph)
             for i in tqdm(range(num_steps)):
+                if should_log(i):
+                    before_weights = self.sess.run(weight_tensors)
                 try:
                     tensor_values = self.sess.run(train_tensors)
                 except tf.errors.OutOfRangeError:
                     break
-                if verbosity > 1 and i % 100 == 0:
+
+                if verbosity > 1 and i % logging_freq == 0:
                     print(tensor_values)
                 if logdir is not None:
                     training_stats.report(
-                        tensor_values['policy_cost'],
-                        tensor_values['value_cost'],
-                        tensor_values['l2_cost'],
-                        tensor_values['combined_cost'])
-                    if i % 100 == 0 and logdir is not None:
-                        accuracy_summaries = training_stats.collect()
-                        weight_summaries = self.sess.run(weight_tensors)
-                        global_step = tensor_values['global_step']
-                        logger.add_summary(accuracy_summaries, global_step)
-                        logger.add_summary(weight_summaries, global_step)
+                        {k: tensor_values[k] for k in (
+                            'policy_cost', 'value_cost', 'l2_cost',
+                            'combined_cost')})
+                if should_log(i):
+                    after_weights = self.sess.run(weight_tensors)
+                    weight_update_summaries = compute_update_ratio(
+                        weight_tensors, before_weights, after_weights)
+                    accuracy_summaries = training_stats.collect()
+                    weight_summaries = self.sess.run(weight_summary_op)
+                    global_step = tensor_values['global_step']
+                    logger.add_summary(weight_update_summaries, global_step)
+                    logger.add_summary(accuracy_summaries, global_step)
+                    logger.add_summary(weight_summaries, global_step)
             self.save_weights()
 
 
@@ -315,6 +327,18 @@ def logging_ops():
         name="weight_summaries")
 
 
+def compute_update_ratio(weight_tensors, before_weights, after_weights):
+    """Compute the ratio of gradient norm to weight norm."""
+    deltas = [after - before for after, before in zip(after_weights, before_weights)]
+    delta_norms = [np.linalg.norm(d.ravel()) for d in deltas]
+    weight_norms = [np.linalg.norm(w.ravel()) for w in before_weights]
+    ratios = [d / w for d, w in zip(delta_norms, weight_norms)]
+    all_summaries = [
+        tf.Summary.Value(tag='update_ratios/' + tensor.name, simple_value=ratio)
+        for tensor, ratio in zip(weight_tensors, ratios)]
+    return tf.Summary(value=all_summaries)
+
+
 class StatisticsCollector(object):
     """Collect statistics on the runs and create graphs.
 
@@ -322,54 +346,21 @@ class StatisticsCollector(object):
     in one pass, so they must be computed in batches. Unfortunately,
     the built-in TF summary nodes cannot be told to aggregate multiple
     executions. Therefore, we aggregate the accuracy/cost ourselves at
-    the python level, and then shove it through the accuracy/cost summary
-    nodes to generate the appropriate summary protobufs for writing.
+    the python level, and then generate the summary protobufs for writing.
     """
-    graph = tf.Graph()
-    with tf.device("/cpu:0"), graph.as_default():
-        policy_error = tf.placeholder(tf.float32, [])
-        value_error = tf.placeholder(tf.float32, [])
-        reg_error = tf.placeholder(tf.float32, [])
-        cost = tf.placeholder(tf.float32, [])
-        policy_summary = tf.summary.scalar("Policy error", policy_error)
-        value_summary = tf.summary.scalar("Value error", value_error)
-        reg_summary = tf.summary.scalar("Regularization error", reg_error)
-        cost_summary = tf.summary.scalar("Combined cost", cost)
-        accuracy_summaries = tf.summary.merge(
-            [policy_summary, value_summary, reg_summary, cost_summary],
-            name="accuracy_summaries")
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    session = tf.Session(graph=tf.Graph(), config=config)
-
     def __init__(self):
-        self.policy_costs = []
-        self.value_costs = []
-        self.regularization_costs = []
-        self.combined_costs = []
+        self.accums = collections.defaultdict(list)
 
-    def report(self, policy_cost, value_cost, regularization_cost, combined_cost):
-        # TODO refactor this to take a dict, and do something like
-        # self.accums = defaultdict(list) and do self.accums[thing].append(value)
-        # so that it can handle an arbitrary number of values.
-        self.policy_costs.append(policy_cost)
-        self.value_costs.append(value_cost)
-        self.regularization_costs.append(regularization_cost)
-        self.combined_costs.append(combined_cost)
+    def report(self, values):
+        """Take a dict of scalar names to scalars, and aggregate by name."""
+        for key, val in values.items():
+            self.accums[key].append(val)
 
     def collect(self):
-        avg_pol = sum(self.policy_costs) / len(self.policy_costs)
-        avg_val = sum(self.value_costs) / len(self.value_costs)
-        avg_reg = sum(self.regularization_costs) / \
-            len(self.regularization_costs)
-        avg_cost = sum(self.combined_costs) / len(self.combined_costs)
-        self.policy_costs = []
-        self.value_costs = []
-        self.regularization_costs = []
-        self.combined_costs = []
-        summary = self.session.run(self.accuracy_summaries,
-                                   feed_dict={self.policy_error: avg_pol,
-                                              self.value_error: avg_val,
-                                              self.reg_error: avg_reg,
-                                              self.cost: avg_cost})
-        return summary
+        all_summaries = []
+        for summary_name, summary_values in self.accums.items():
+            avg_value = sum(summary_values) / len(summary_values)
+            self.accums[summary_name] = []
+            all_summaries.append(tf.Summary.Value(
+                tag=summary_name, simple_value=avg_value))
+        return tf.Summary(value=all_summaries)
