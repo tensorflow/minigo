@@ -10,6 +10,8 @@ echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
 echo "Number of Nodes:    ${NUM_K8S_NODES}"
+echo "Bucket name:        ${BUCKET_NAME}"
+echo "Bucket location:    ${BUCKET_LOCATION}"
 
 export PARALLELISM="$((4 * ${NUM_K8S_NODES}))"
 

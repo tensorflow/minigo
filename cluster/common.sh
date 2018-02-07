@@ -5,7 +5,7 @@
 export PROJECT=${PROJECT:-"minigo-pub"}
 export LOGGING_PROJECT=${PROJECT:-"$PROJECT"}
 export CLUSTER_NAME=${CLUSTER_NAME:-"minigo2"}
-export BOARD_SIZE=${BOARD_SIZE:-"19"}
+export BOARD_SIZE=${BOARD_SIZE:-"9"}
 export K8S_VERSION=${K8S_VERSION:-"1.9.2-gke.0"}
 export ZONE=${ZONE:-"asia-east1-a"}
 export NUM_K8S_NODES=${NUM_K8S_NODES:-"5"}
@@ -24,7 +24,7 @@ export CPU_PLAYER_CONTAINER=${CPU_PLAYER_CONTAINER:-"minigo-player"}
 # So, we prefix the project name to avoid collisions
 #
 # For more details, see https://cloud.google.com/storage/docs/best-practices
-export BUCKET_NAME=${BUCKET_NAME:-"${PROJECT}-minigo-v2-${BOARD_SIZE}"}
+export BUCKET_NAME=${BUCKET_NAME:-"${PROJECT}-minigo-v3-${BOARD_SIZE}"}
 
 # By default, buckets are created in us-east1, but for more performance, it's
 # useful to have a region located near the GKE cluster.
