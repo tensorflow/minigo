@@ -169,7 +169,7 @@ def gather(
     with timer("Finding existing tfrecords..."):
         model_gamedata = {
             model: gfile.Glob(
-                os.path.join(input_directory, model, '**', '*.tfrecord.zz'))
+                os.path.join(input_directory, model, '*.tfrecord.zz'))
             for model in models
         }
     print("Found %d models" % len(models))

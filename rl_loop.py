@@ -86,11 +86,12 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     model_save_file = os.path.join(MODELS_DIR, model_name)
     game_output_dir = os.path.join(SELFPLAY_DIR, model_name)
     game_holdout_dir = os.path.join(HOLDOUT_DIR, model_name)
+    sgf_dir = os.path.join(SGF_DIR, model_name)
     main.selfplay(
         load_file=model_save_file,
         output_dir=game_output_dir,
         holdout_dir=game_holdout_dir,
-        output_sgf=SGF_DIR,
+        output_sgf=sgf_dir,
         readouts=readouts,
         verbose=verbose,
     )
