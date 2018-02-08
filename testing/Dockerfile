@@ -48,15 +48,19 @@ RUN sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
-COPY bootstrap.sh /usr/local/bin
-RUN chmod a+x /usr/local/bin/bootstrap.sh
+# We don't have go currently installed, but we're optimistic here =)
 
 # We could pre-load requirements to make running the tests
 # faster, but this requires rebuilding every time we have a new dep.
+COPY staging/requirements.txt /tmp/requirements.txt
 COPY staging/requirements.txt /tmp/requirements.txt
 
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /tmp/requirements.txt
 RUN pip3 install "tensorflow>=1.5,<1.6"
 
-ENTRYPOINT ["/usr/local/bin/bootstrap.sh"]
+WORKDIR /testing
+
+COPY bootstrap.sh  /testing/bootstrap.sh
+
+CMD ["/bin/sh", "/testing/bootstrap.sh"]

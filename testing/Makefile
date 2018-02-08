@@ -20,11 +20,14 @@ all: build
 
 build:
 	mkdir -p staging
-	cp ../requirements-cpu.txt staging/requirements-cpu.txt
+	cp ../requirements.txt staging/requirements.txt
+	cp -r ../tests staging/tests
+	cp -r ../sgf staging/sgf
+	cp -r ../oneoffs staging/oneoffs
 	@echo {\"image\": \"$(IMG):$(TAG)\"} > version.json
 	docker build ${DOCKER_BUILD_OPTS} -t $(IMG):$(TAG) .
 	docker tag $(IMG):$(TAG) $(IMG):latest
-	rm staging/*
+	rm -R staging/*
 	rmdir staging
 	@echo Built $(IMG):$(TAG) and tagged with latest
 

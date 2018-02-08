@@ -5,14 +5,12 @@
 # at the commit corresponding to the Prow job. We can then
 # invoke the launcher script at that commit to submit and
 # monitor an Argo workflow
-set -xe
+set -e
 
 mkdir -p /src
 git clone https://github.com/tensorflow/minigo.git /src/minigo
 
 cd /src/minigo
-
-echo $(ls)
 
 echo Job Name = ${JOB_NAME}
 
@@ -36,6 +34,18 @@ export PYTHONPATH=$PYTHONPATH:/src/minigo
 # Note: currently, this is hardcoded for python, but it would be easy to modify
 # this to add other languages
 
-ls *.py | xargs pylint
+set +e
+found_errors=0
+ls *.py | xargs pylint || {
+  found_errors=1
+}
 
-BOARD_SIZE=9 python3 -m unittest discover tests
+BOARD_SIZE=9 python3 -m unittest discover tests || {
+  found_errors=1
+}
+
+if [ "${found_errors}" -eq "1" ]; then
+  echo >&2 "--------------------------------------"
+  echo >&2 "There were errors executing the tests."
+  exit 1
+fi
