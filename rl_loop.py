@@ -103,7 +103,7 @@ def bootstrap():
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
-    games = gfile.Glob(os.path.join(SELFPLAY_DIR, m, '*.zz'))
+    games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
     if len(games) > MAX_GAMES_PER_GENERATION:
         time.sleep(10*60)
         sys.exit(1)
