@@ -21,7 +21,7 @@ import go
 from go import Position
 from coords import kgs_to_flat
 from tests import test_utils
-from mcts import MCTSNode
+from mcts import MCTSNode, MAX_DEPTH
 from strategies import MCTSPlayerMixin, time_recommendation
 
 ALMOST_DONE_BOARD = test_utils.load_board('''
@@ -36,9 +36,22 @@ XXXXXOOOO
 XXXXOOOOO
 ''')
 
+#Tromp taylor means black can win if we hit the move limit.
+TT_FTW_BOARD = test_utils.load_board('''
+.XXOOOOOO
+X.XOO...O
+.XXOO...O
+X.XOO...O
+.XXOO..OO
+X.XOOOOOO
+.XXOOOOOO
+X.XXXXXXX
+XXXXXXXXX
+''')
+
 SEND_TWO_RETURN_ONE = go.Position(
     board=ALMOST_DONE_BOARD,
-    n=75,
+    n=70,
     komi=2.5,
     caps=(1, 4),
     ko=None,
@@ -46,7 +59,6 @@ SEND_TWO_RETURN_ONE = go.Position(
             go.PlayerMove(go.WHITE, (0, 8))),
     to_play=go.BLACK
 )
-
 
 class DummyNet():
     def __init__(self, fake_priors=None, fake_value=0):
@@ -198,6 +210,25 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
             player.tree_search(num_parallel=50)
         self.assertNoPendingVirtualLosses(player.root)
 
+    def test_long_game_tree_search(self):
+        player = MCTSPlayerMixin(DummyNet())
+        endgame = go.Position(
+            board=TT_FTW_BOARD,
+            n=MAX_DEPTH-2,
+            komi=2.5,
+            ko=None,
+            recent=(go.PlayerMove(go.BLACK, (0, 1)),
+                    go.PlayerMove(go.WHITE, (0, 8))),
+            to_play=go.BLACK
+        )
+        player.initialize_game(endgame)
+
+        # Test that an almost complete game
+        for i in range(10):
+            player.tree_search(num_parallel=8)
+        self.assertNoPendingVirtualLosses(player.root)
+        self.assertGreater(player.root.Q, 0)
+
     def test_cold_start_parallel_tree_search(self):
         # Test that parallel tree search doesn't trip on an empty tree
         player = MCTSPlayerMixin(DummyNet(fake_value=0.17))
@@ -246,3 +277,39 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         player.tree_search()
         # check that we didn't visit the pass node any more times.
         self.assertEqual(player.root.child_N[pass_move], 1)
+
+    def test_extract_data_normal_end(self):
+        player = MCTSPlayerMixin(DummyNet())
+        player.initialize_game()
+        player.tree_search()
+        player.play_move(None)
+        player.tree_search()
+        player.play_move(None)
+        self.assertTrue(player.root.is_done())
+        player.set_result(player.root.position.result(), was_resign=False)
+
+        data = list(player.extract_data())
+        self.assertEqual(len(data), 2)
+        position, pi, result = data[0]
+        # White wins by komi
+        self.assertEqual(result, go.WHITE)
+        self.assertEqual(player.result_string, "W+{}".format(player.root.position.komi))
+
+    def test_extract_data_resign_end(self):
+        player = MCTSPlayerMixin(DummyNet())
+        player.initialize_game()
+        player.tree_search()
+        player.play_move((0, 0))
+        player.tree_search()
+        player.play_move(None)
+        player.tree_search()
+        # Black is winning on the board
+        self.assertEqual(player.root.position.result(), go.BLACK)
+        # But if Black resigns
+        player.set_result(go.WHITE, was_resign=True)
+
+        data = list(player.extract_data())
+        position, pi, result = data[0]
+        # Result should say White is the winner
+        self.assertEqual(result, go.WHITE)
+        self.assertEqual(player.result_string, "W+R")

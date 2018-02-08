@@ -26,13 +26,15 @@ import math
 import coords
 import go
 
+MAX_DEPTH = (go.N ** 2) * 1.4  # 505 moves for 19x19, 113 for 9x9
+
 # Exploration constant
 c_PUCT = 1.38
 
 # Dirichlet noise, as a function of go.N
 
 
-def D_NOISE_ALPHA(): return 0.03 * 19 / go.N
+def D_NOISE_ALPHA(): return 0.03 * 361 / (go.N ** 2)
 
 
 class DummyNode(object):
@@ -221,14 +223,25 @@ class MCTSNode(object):
             return
         self.parent.backup_value(value, up_to)
 
+    def is_done(self):
+        '''True if the last two moves were Pass or if the position is at a move
+        greater than the max depth.
+        '''
+        return self.position.is_game_over() or self.position.n >= MAX_DEPTH
+
     def inject_noise(self):
         dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))
         self.child_prior = self.child_prior * 0.75 + dirch * 0.25
 
-    def children_as_pi(self, stretch=False):
+    def children_as_pi(self, squash=False):
+        """Returns the child visit counts as a probability distribution, pi
+        If squash is true, exponentiate the probabilities by a temperature
+        slightly larger than unity to encourage diversity in early play and
+        hopefully to move away from 3-3s
+        """
         probs = self.child_N
-        if stretch:
-            probs = probs ** 8
+        if squash:
+            probs = probs ** .95
         return probs / np.sum(probs)
 
     def most_visited_path(self):

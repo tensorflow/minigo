@@ -22,11 +22,10 @@ import sgf_wrapper
 import coords
 import gtp
 import numpy as np
-from mcts import MCTSNode
+from mcts import MCTSNode, MAX_DEPTH
 
 import go
 
-MAX_GAME_DEPTH = int(go.N * go.N * 1.25)
 # When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
 TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
@@ -84,6 +83,7 @@ class MCTSPlayerMixin:
         self.searches_pi = []
         self.root = None
         self.result = 0
+        self.result_string = None
         self.resign_threshold = -abs(resign_threshold)
         super().__init__()
 
@@ -92,6 +92,7 @@ class MCTSPlayerMixin:
             position = go.Position()
         self.root = MCTSNode(position)
         self.result = 0
+        self.result_string = None
         self.comments = []
         self.searches_pi = []
         self.qs = []
@@ -127,13 +128,13 @@ class MCTSPlayerMixin:
         '''
         Notable side effects:
           - finalizes the probability distribution according to
-          this roots visit counts into the class' running tally, `searches`
+          this roots visit counts into the class' running tally, `searches_pi`
           - Makes the node associated with this move the root, for future
             `inject_noise` calls.
         '''
         if not self.two_player_mode:
             self.searches_pi.append(
-                self.root.children_as_pi(self.root.position.n > self.temp_threshold))
+                self.root.children_as_pi(self.root.position.n < self.temp_threshold))
         self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
         self.root = self.root.maybe_add_child(coords.flatten_coords(c))
@@ -165,9 +166,9 @@ class MCTSPlayerMixin:
             failsafe += 1
             leaf = self.root.select_leaf()
             if self.verbosity >= 4:
-                self.show_path_to_root(leaf)
+                print(self.show_path_to_root(leaf))
             # if game is over, override the value estimate with the true score
-            if leaf.position.is_game_over():
+            if leaf.is_done():
                 value = 1 if leaf.position.score() > 0 else -1
                 leaf.backup_value(value, up_to=self.root)
                 continue
@@ -180,60 +181,49 @@ class MCTSPlayerMixin:
                 leaf.revert_virtual_loss(up_to=self.root)
                 leaf.incorporate_results(move_prob, value, up_to=self.root)
 
-    def is_done(self):
-        '''True if the last two moves were Pass or if the position is at a move
-        greater than the max depth.  False otherwise.
-        '''
-        if self.result != 0:  # Someone's twiddled our result bit!
-            return True
-
-        if self.root.position.is_game_over():
-            return True
-
-        if self.root.position.n >= MAX_GAME_DEPTH:
-            return True
-        return False
-
     def show_path_to_root(self, node):
         pos = node.position
+        diff = node.position.n - self.root.position.n
         if len(pos.recent) == 0:
             return
-        moves = list(map(coords.to_human_coord,
-                         [move.move for move in pos.recent[self.root.position.n:]]))
+
+        def fmt(move): return "{}-{}".format('b' if move.color == 1 else 'w',
+                                             coords.to_human_coord(move.move))
+        path = " ".join(fmt(move) for move in pos.recent[-diff:])
+        if node.position.n >= MAX_DEPTH:
+            path += " (depth cutoff reached) %0.1f" % node.position.score()
+        elif node.position.is_game_over():
+            path += " (game over) %0.1f" % node.position.score()
+        return path
 
     def should_resign(self):
         '''Returns true if the player resigned.  No further moves should be played'''
-        if self.root.Q_perspective < self.resign_threshold:  # Force resign
-            self.result = self.root.position.to_play * -2  # use 2 & -2 as "+resign"
-            if self.verbosity > 1:
-                res = "B+" if self.result is 2 else "W+"
-                print("%sResign: %.3f" % (res, self.root.Q), file=sys.stderr)
-                print(self.root.position,
-                      self.root.position.score(), file=sys.stderr)
-            return True
-        return False
+        return self.root.Q_perspective < self.resign_threshold
 
-    def make_result_string(self, pos):
-        if abs(self.result) == 2:
-            res = "B+Resign" if self.result == 2 else "W+Resign"
+    def set_result(self, winner, was_resign):
+        self.result = winner
+        if was_resign:
+            string = "B+R" if winner == go.BLACK else "W+R"
         else:
-            res = pos.result_string()
-        return res
+            string = self.root.position.result_string()
+        self.result_string = string
 
     def to_sgf(self):
+        assert self.result_string is not None
         pos = self.root.position
-        res = self.make_result_string(pos)
         if self.comments:
             self.comments[0] = ("Resign Threshold: %0.3f\n" %
                                 self.resign_threshold) + self.comments[0]
-        return sgf_wrapper.make_sgf(pos.recent, res,
+        return sgf_wrapper.make_sgf(pos.recent, self.result_string,
                                     white_name=self.network.name or "Unknown",
                                     black_name=self.network.name or "Unknown",
                                     comments=self.comments)
 
     def extract_data(self):
         assert len(self.searches_pi) == self.root.position.n
-        for pwc, pi in zip(go.replay_position(self.root.position), self.searches_pi):
+        assert self.result != 0
+        for pwc, pi in zip(go.replay_position(self.root.position, self.result),
+                           self.searches_pi):
             yield pwc.position, pi, pwc.result
 
     def chat(self, msg_type, sender, text):

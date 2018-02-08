@@ -1,45 +1,40 @@
 # Version and project can be overridden with the following:
 #  make target VERSION=0.XY PROJECT=foo-project
 
-VERSION?=0.12
-PROJECT?=minigo-pub
-
-make echo:
-		echo $(VERSION)
-		echo $(PROJECT)
-
-make gpu-image:
+gpu-image:
+		mkdir -p staging
 		cp ../*.py staging/
 		cp ../requirements-gpu.txt staging/
 		cp player_wrapper.sh staging/
-	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/minigo-gpu-player:$(VERSION)" .
+	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm staging/*.py
 		rm staging/requirements-gpu.txt
 		rm staging/player_wrapper.sh
 
-image:
+cpu-image:
+		mkdir -p staging
 		cp ../*.py staging/
-		cp ../requirements-cpu.txt staging/
+		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
-	    docker build -t "gcr.io/$(PROJECT)/minigo-player:$(VERSION)" .
+	    docker build -t "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm staging/*.py
-		rm staging/requirements-cpu.txt
+		rm staging/requirements.txt
 		rm staging/player_wrapper.sh
 
-image-clean:
+cpu-image-clean:
 		mkdir -p staging/
 		cp ../*.py staging/
-		cp ../requirements-cpu.txt staging/
+		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
-	    docker build --no-cache -t "gcr.io/$(PROJECT)/minigo-player:$(VERSION)" .
+	    docker build --no-cache -t "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm staging/*.py
-		rm staging/requirements-cpu.txt
+		rm staging/requirements.txt
 		rm staging/player_wrapper.sh
 
-push: image
-	    gcloud docker -- push "gcr.io/$(PROJECT)/minigo-player:$(VERSION)"
+cpu-push: cpu-image
+	    gcloud docker -- push "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)"
 
 gpu-push: gpu-image
-	    gcloud docker -- push "gcr.io/$(PROJECT)/minigo-gpu-player:$(VERSION)"
+	    gcloud docker -- push "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)"
 
-.PHONY: image push
+.PHONY: cpu-image image-push

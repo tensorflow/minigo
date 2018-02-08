@@ -68,16 +68,18 @@ def place_stones(board, color, stones):
         board[s] = color
 
 
-def replay_position(position):
+def replay_position(position, result):
     '''
     Wrapper for a go.Position which replays its history.
     Assumes an empty start position! (i.e. no handicap, and history must be exhaustive.)
+
+    Result must be passed in, since a resign cannot be inferred from position
+    history alone.
 
     for position_w_context in replay_position(position):
         print(position_w_context.position)
     '''
     assert position.n == len(position.recent), "Position history is incomplete"
-    result = position.result()
     pos = Position(komi=position.komi)
     for player_move in position.recent:
         color, next_move = player_move
@@ -299,6 +301,7 @@ class Position():
             Should satisfy next_pos.board - next_pos.board_deltas[0] == pos.board
         to_play: BLACK or WHITE
         '''
+        assert type(recent) is tuple
         self.board = board if board is not None else np.copy(EMPTY_BOARD)
         self.n = n
         self.komi = komi
@@ -474,6 +477,7 @@ class Position():
         pos.caps = new_caps
         pos.ko = new_ko
         pos.recent += (PlayerMove(color, c),)
+
         # keep a rolling history of last 7 deltas - that's all we'll need to
         # extract the last 8 board states.
         pos.board_deltas = np.concatenate((
