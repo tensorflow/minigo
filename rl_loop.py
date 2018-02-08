@@ -20,6 +20,7 @@ import logging
 import os
 import main
 import shipname
+import time
 from utils import timer
 from tensorflow import gfile
 
