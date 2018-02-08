@@ -41,8 +41,7 @@ def rl_loop():
     with tempfile.TemporaryDirectory() as base_dir:
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
-        model_selfplay_dir = os.path.join(
-            selfplay_dir, '000000-bootstrap', 'worker1')
+        model_selfplay_dir = os.path.join(selfplay_dir, '000000-bootstrap')
         gather_dir = os.path.join(base_dir, 'data', 'training_chunks')
         sgf_dir = os.path.join(base_dir, 'sgf', '000000-bootstrap')
         os.mkdir(os.path.join(base_dir, 'data'))
