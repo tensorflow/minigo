@@ -1,11 +1,14 @@
 #!/bin/bash
 #
-# This script is used to bootstrap the prow jobs. In other words, this pulls
-# the Minigo repo at some point (i.e., at the a pull request or commit sha) and
-# then runs the Minigo tests.
+# This script is used to bootstrap the [prow
+# jobs](https://github.com/kubernetes/test-infra/tree/master/prow), which is
+# the Kubernetes open source test-runner, rather like Jenkins. In other words,
+# this pulls the Minigo repo at some point (i.e., at the a pull request or
+# commit sha) and then runs the Minigo tests.
 set -e
 
-mkdir -p /src
+mkdir -p /src/minigo
+
 git clone https://github.com/tensorflow/minigo.git /src/minigo
 
 cd /src/minigo
@@ -44,6 +47,6 @@ BOARD_SIZE=9 python3 -m unittest discover tests || {
 
 if [ "${found_errors}" -eq "1" ]; then
   echo >&2 "--------------------------------------"
-  echo >&2 "There were errors executing the tests."
+  echo >&2 "The tests did not pass successfully."
   exit 1
 fi
