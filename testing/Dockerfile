@@ -53,8 +53,10 @@ RUN chmod a+x /usr/local/bin/bootstrap.sh
 
 # We could pre-load requirements to make running the tests
 # faster, but this requires rebuilding every time we have a new dep.
-COPY staging/requirements-cpu.txt /tmp/requirements-cpu.txt
+COPY staging/requirements.txt /tmp/requirements.txt
+
 RUN pip3 install --upgrade pip
-RUN pip3 install -r /tmp/requirements-cpu.txt
+RUN pip3 install -r /tmp/requirements.txt
+RUN pip3 install "tensorflow>=1.5,<1.6"
 
 ENTRYPOINT ["/usr/local/bin/bootstrap.sh"]
