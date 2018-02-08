@@ -27,7 +27,7 @@ RUN apt update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-ADD staging/requirements-gpu.txt /app/requirements-gpu.txt
+ADD staging/requirements.txt /app/requirements.txt
 
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /app/requirements.txt
