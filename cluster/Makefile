@@ -4,11 +4,11 @@
 gpu-image:
 		mkdir -p staging
 		cp ../*.py staging/
-		cp ../requirements-gpu.txt staging/
+		cp ../requirements.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm staging/*.py
-		rm staging/requirements-gpu.txt
+		rm staging/requirements.txt
 		rm staging/player_wrapper.sh
 
 cpu-image:
