@@ -31,7 +31,7 @@ ADD staging/requirements.txt /app/requirements.txt
 
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /app/requirements.txt
-RUN pip3 install tensorflow-gpu>=1.5,<1.6
+RUN pip3 install "tensorflow-gpu>=1.5,<1.6"
 
 ADD staging/ /app
 
