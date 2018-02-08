@@ -68,10 +68,10 @@ RUN ln -s /usr/bin/python3 /usr/bin/python  && tensorflow/tools/ci_build/builds/
 
 WORKDIR /
 
-ADD staging/requirements-cpu.txt /app/requirements-cpu.txt
+ADD staging/requirements.txt /app/requirements.txt
 
 RUN pip3 install --upgrade pip
-RUN pip3 install -r /app/requirements-cpu.txt
+RUN pip3 install -r /app/requirements.txt
 
 ADD staging/ /app
 

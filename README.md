@@ -77,29 +77,19 @@ pip3 install virtualenvwrapper
 
 Install TensorFlow
 ------------------
-First set up and enter your virtualenv. Then start by installing TensorFlow and
-the dependencies:
+First set up and enter your virtualenv and then the shared requirements:
 
 ```
-pip3 install -r requirements-gpu.txt
+pip3 install -r requirements.txt
 ```
 
-The `requirements-gpu.txt` file assumes you'll use a GPU; if you wish to run on GPU
-you must install CUDA 8.0 or later (see TensorFlow documentation).
+Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
-If you don't want to run on GPU or don't have one, you can downgrade:
-
-```
-pip3 uninstall tensorflow-gpu
-pip3 install tensorflow
-```
-
-Or just install the CPU requirements:
-
-```
-pip3 install -r requirements-cpu.txt
-```
-
+- GPU: `pip3 install "tensorflow-gpu>=1.5,<1.6"`. 
+  - *Note*: You must install [CUDA
+    9.0].(https://developer.nvidia.com/cuda-90-download-archive) for Tensorflow
+    1.5.
+- CPU: `pip3 install "tensorflow>=1.5,<1.6"`.
 
 Setting up the Environment
 --------------------------
