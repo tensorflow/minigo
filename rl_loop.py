@@ -20,6 +20,8 @@ import logging
 import os
 import main
 import shipname
+import time
+import sys
 from utils import timer
 from tensorflow import gfile
 
@@ -34,6 +36,7 @@ SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
 GAMES_BEFORE_TRAINING = 4000
+MAX_GAMES_PER_GENERATION = 12000
 
 
 def print_flags():
@@ -100,6 +103,10 @@ def bootstrap():
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
+    games = gfile.Glob(os.path.join(SELFPLAY_DIR, m, '*.zz'))
+    if len(games) > MAX_GAMES_PER_GENERATION:
+        time.sleep(10*60)
+        sys.exit(1)
     print("Playing a game with model {}".format(model_name))
     model_save_file = os.path.join(MODELS_DIR, model_name)
     game_output_dir = os.path.join(SELFPLAY_DIR, model_name)
