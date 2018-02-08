@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# This script is used to bootstrap our prow jobs.
-# The point of this script is to check out the tensorflow/minigo repo
-# at the commit corresponding to the Prow job. We can then
-# invoke the launcher script at that commit to submit and
-# monitor an Argo workflow
+# This script is used to bootstrap the prow jobs. In other words, this pulls
+# the Minigo repo at some point (i.e., at the a pull request or commit sha) and
+# then runs the Minigo tests.
 set -e
 
 mkdir -p /src
