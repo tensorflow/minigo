@@ -20,9 +20,8 @@ import logging
 import os
 import main
 import shipname
-import time
 import sys
-from utils import timer
+import time
 from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
@@ -35,6 +34,13 @@ HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
+"""
+This is dependent on about how long it takes a new model to train and how long
+the cluster can play a new generation's worth of games.  if N is the desired
+number of games per generation, play_time is the time required for the cluster
+to play N games, and train_time is the time taken to train a new model, then this number should be 
+N * max(1, (train_time / play_time))
+"""
 GAMES_BEFORE_TRAINING = 4000
 MAX_GAMES_PER_GENERATION = 12000
 
@@ -55,6 +61,10 @@ def print_flags():
 
 
 def get_models():
+    """Find all models, returning number and name as a tuple
+
+    Returns: [(17, 000017-modelname), (12, 0000012-modelname), ...etc]
+    """
     all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
     model_filenames = [os.path.basename(m) for m in all_models]
     return [(shipname.detect_model_num(m), shipname.detect_model_name(m))
@@ -72,7 +82,15 @@ def get_latest_model():
 
 
 def enough_games_to_train():
+    """Returns True or false if the second most recent model has finished
+    enough games to start training.  
+    
+    See also the definition of GAMES_BEFORE_TRAINING above.
+    """
     model_numbers_names = get_models()
+    
+    # It's ok to train the first model a little early instead of worrying about
+    # the edge case where we have <2 models.
     if len(model_numbers_names) <= 2:
         return True
 
@@ -129,8 +147,9 @@ def gather():
 
 
 def train(logdir=None):
-    while not enough_games_to_train():
+    if not enough_games_to_train():
         time.sleep(60 * 5)
+        sys.exit(1) #from rl_runner, this will re-run gather
     model_num, model_name = get_latest_model()
     print("Training on gathered game data, initializing from {}".format(model_name))
     new_model_name = shipname.generate(model_num + 1)
