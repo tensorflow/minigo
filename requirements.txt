@@ -1,9 +1,8 @@
 argh
-numpy
+numpy>=1.14.0
 pygtp>=0.4
 sgf==0.5
 tqdm>=4.17
-tensorflow-gpu>=1.4,<1.5
 autopep8>=1.3
 pylint
 protobuf

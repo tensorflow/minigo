@@ -1,5 +1,8 @@
 #!/bin/sh
 
 source ./common.sh
+source ./utils.sh
 
-gcloud container clusters delete $CLUSTER_NAME --project=$PROJECT --zone=$ZONE
+check_gcloud_exists
+
+gcloud container clusters delete $CLUSTER_NAME --project=$PROJECT --zone=$ZONE --async

@@ -16,10 +16,12 @@
 import argh
 import argparse
 import cloud_logging
+import logging
 import os
 import main
 import shipname
-from utils import timer
+import sys
+import time
 from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
@@ -32,6 +34,10 @@ HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
+# How many games before the selfplay workers will stop trying to play more.
+
+MAX_GAMES_PER_GENERATION = 12000
+
 
 def print_flags():
     flags = {
@@ -39,6 +45,7 @@ def print_flags():
         'BASE_DIR': BASE_DIR,
         'MODELS_DIR': MODELS_DIR,
         'SELFPLAY_DIR': SELFPLAY_DIR,
+        'HOLDOUT_DIR': HOLDOUT_DIR,
         'SGF_DIR': SGF_DIR,
         'TRAINING_CHUNK_DIR': TRAINING_CHUNK_DIR,
     }
@@ -48,10 +55,10 @@ def print_flags():
 
 
 def get_latest_model():
-    '''Finds the latest model, returning its model number and name
+    """Finds the latest model, returning its model number and name
 
     Returns: (17, 000017-modelname)
-    '''
+    """
     all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
     model_filenames = [os.path.basename(m) for m in all_models]
     model_numbers_names = [
@@ -61,18 +68,14 @@ def get_latest_model():
     return latest_model
 
 
-def convert_all():
+def game_counts(n_back=20):
+    """Prints statistics for the most recent n_back models"""
     all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
-    model_filenames = [os.path.basename(m).split('.')[0] for m in all_models]
-    print(model_filenames)
-    from tqdm import tqdm
-
-    import multiprocessing
-    pool = multiprocessing.Pool(10)
-    for m in tqdm(model_filenames[10:]):
-        p = os.path.join('gs://mugozero-v2/games/', m) + "/**/*.gz"
-        games = gfile.Glob(p)
-        pool.map(main.convert, games)
+    model_filenames = sorted([os.path.basename(m).split('.')[0]
+                              for m in all_models], reverse=True)
+    for m in model_filenames[:n_back]:
+        games = gfile.Glob(os.path.join(SELFPLAY_DIR, m, '*.zz'))
+        print(m, len(games))
 
 
 def bootstrap():
@@ -84,13 +87,21 @@ def bootstrap():
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
+    games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
+    if len(games) > MAX_GAMES_PER_GENERATION:
+        print("{} has enough games ({})".format(model_name, len(games)))
+        time.sleep(10*60)
+        sys.exit(1)
     print("Playing a game with model {}".format(model_name))
     model_save_file = os.path.join(MODELS_DIR, model_name)
+    game_output_dir = os.path.join(SELFPLAY_DIR, model_name)
+    game_holdout_dir = os.path.join(HOLDOUT_DIR, model_name)
+    sgf_dir = os.path.join(SGF_DIR, model_name)
     main.selfplay(
         load_file=model_save_file,
-        output_dir=os.path.join(SELFPLAY_DIR, model_name),
-        holdout_dir=os.path.join(HOLDOUT_DIR, model_name),
-        output_sgf=SGF_DIR,
+        output_dir=game_output_dir,
+        holdout_dir=game_holdout_dir,
+        output_sgf=sgf_dir,
         readouts=readouts,
         verbose=verbose,
     )
@@ -109,12 +120,18 @@ def train(logdir=None):
     print("New model will be {}".format(new_model_name))
     load_file = os.path.join(MODELS_DIR, model_name)
     save_file = os.path.join(MODELS_DIR, new_model_name)
-    main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
-               generation_num=model_num, logdir=logdir)
+    try:
+        main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
+                   generation_num=model_num, logdir=logdir)
+    except:
+        print("Got an error training, muddling on...")
+        logging.exception("Train error")
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train, selfplay, gather, bootstrap, convert_all])
+
+argh.add_commands(parser, [train, selfplay, gather,
+                           bootstrap, game_counts])
 
 if __name__ == '__main__':
     print_flags()

@@ -47,7 +47,7 @@ def detect_model_num(string):
 
 
 def detect_model_name(string):
-    """Takes a string related to a model name and extract its model number.
+    """Takes a string related to a model name and extract its model name.
 
     For example:
         '000000-bootstrap.index' => '000000-bootstrap'
