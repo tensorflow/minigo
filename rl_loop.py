@@ -20,7 +20,8 @@ import logging
 import os
 import main
 import shipname
-from utils import timer
+import sys
+import time
 from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
@@ -32,6 +33,10 @@ SELFPLAY_DIR = os.path.join(BASE_DIR, 'data/selfplay')
 HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
+
+# How many games before the selfplay workers will stop trying to play more.
+
+MAX_GAMES_PER_GENERATION = 12000
 
 
 def print_flags():
@@ -82,6 +87,11 @@ def bootstrap():
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
+    games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
+    if len(games) > MAX_GAMES_PER_GENERATION:
+        print("{} has enough games ({})".format(model_name, len(games)))
+        time.sleep(10*60)
+        sys.exit(1)
     print("Playing a game with model {}".format(model_name))
     model_save_file = os.path.join(MODELS_DIR, model_name)
     game_output_dir = os.path.join(SELFPLAY_DIR, model_name)
@@ -120,7 +130,8 @@ def train(logdir=None):
 
 parser = argparse.ArgumentParser()
 
-argh.add_commands(parser, [train, selfplay, gather, bootstrap, game_counts])
+argh.add_commands(parser, [train, selfplay, gather,
+                           bootstrap, game_counts])
 
 if __name__ == '__main__':
     print_flags()
