@@ -22,7 +22,6 @@ import main
 import shipname
 import sys
 import time
-from utils import timer
 from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
@@ -36,6 +35,7 @@ SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
 # How many games before the selfplay workers will stop trying to play more.
+
 MAX_GAMES_PER_GENERATION = 12000
 
 
@@ -86,7 +86,7 @@ def bootstrap():
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
-    games = gfile.Glob(os.path.join(SELFPLAY_DIR, m, '*.zz'))
+    games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
     if len(games) > MAX_GAMES_PER_GENERATION:
         print("{} has enough games ({})".format(model_name, len(games)))
         time.sleep(10*60)
