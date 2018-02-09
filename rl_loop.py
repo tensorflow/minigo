@@ -20,8 +20,8 @@ import logging
 import os
 import main
 import shipname
-import time
 import sys
+import time
 from utils import timer
 from tensorflow import gfile
 
@@ -35,7 +35,7 @@ HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
-GAMES_BEFORE_TRAINING = 4000
+# How many games before the selfplay workers will stop trying to play more.
 MAX_GAMES_PER_GENERATION = 12000
 
 
@@ -54,34 +54,17 @@ def print_flags():
                     for flag, value in flags.items()))
 
 
-def get_models():
-    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
-    model_filenames = [os.path.basename(m) for m in all_models]
-    return [(shipname.detect_model_num(m), shipname.detect_model_name(m))
-            for m in model_filenames]
-
-
 def get_latest_model():
     """Finds the latest model, returning its model number and name
 
     Returns: (17, 000017-modelname)
     """
-    model_numbers_names = get_models()
+    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
+    model_filenames = [os.path.basename(m) for m in all_models]
+    model_numbers_names = [(shipname.detect_model_num(m), shipname.detect_model_name(m))
+                           for m in model_filenames]
     latest_model = sorted(model_numbers_names, reverse=True)[0]
     return latest_model
-
-
-def enough_games_to_train():
-    model_numbers_names = get_models()
-    if len(model_numbers_names) <= 2:
-        return True
-
-    second_latest_model = sorted(model_numbers_names, reverse=True)[1]
-    games = gfile.Glob(os.path.join(
-        SELFPLAY_DIR, second_latest_model[1], '*.zz'))
-    print("Found", len(games), "from 2nd most recent model,",
-          second_latest_model[1])
-    return len(games) > GAMES_BEFORE_TRAINING
 
 
 def game_counts(n_back=20):
@@ -105,6 +88,7 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
     _, model_name = get_latest_model()
     games = gfile.Glob(os.path.join(SELFPLAY_DIR, m, '*.zz'))
     if len(games) > MAX_GAMES_PER_GENERATION:
+        print("{} has enough games ({})".format(model_name, len(games)))
         time.sleep(10*60)
         sys.exit(1)
     print("Playing a game with model {}".format(model_name))
@@ -129,8 +113,6 @@ def gather():
 
 
 def train(logdir=None):
-    while not enough_games_to_train():
-        time.sleep(60 * 5)
     model_num, model_name = get_latest_model()
     print("Training on gathered game data, initializing from {}".format(model_name))
     new_model_name = shipname.generate(model_num + 1)
