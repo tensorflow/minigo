@@ -16,12 +16,10 @@ import copy
 import unittest
 import numpy as np
 
+import coords
 import go
 from go import Position
 from tests import test_utils
-from coords import parse_kgs_coords
-from coords import kgs_to_flat
-import coords
 
 from mcts import MCTSNode, MAX_DEPTH
 
@@ -79,13 +77,14 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
             black_root.child_action_score, white_root.child_action_score)
 
     def test_select_leaf(self):
+        flattened = coords.to_flat(coords.from_kgs('D9'))
         probs = np.array([.02] * (go.N * go.N + 1))
-        probs[kgs_to_flat('D9')] = 0.4
+        probs[flattened] = 0.4
         root = MCTSNode(SEND_TWO_RETURN_ONE)
         root.select_leaf().incorporate_results(probs, 0, root)
 
         self.assertEqual(root.position.to_play, go.WHITE)
-        self.assertEqual(root.select_leaf(), root.children[kgs_to_flat('D9')])
+        self.assertEqual(root.select_leaf(), root.children[flattened])
 
     def test_backup_incorporate_results(self):
         probs = np.array([.02] * (go.N * go.N + 1))
@@ -134,9 +133,9 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         probs = np.array([0.02] * (go.N * go.N + 1), dtype=np.float32)
         root = MCTSNode(go.Position())
         root.select_leaf().incorporate_results(probs, 0, root)
-        first_pass = root.maybe_add_child(coords.flatten_coords(None))
+        first_pass = root.maybe_add_child(coords.to_flat(None))
         first_pass.incorporate_results(probs, 0, root)
-        second_pass = first_pass.maybe_add_child(coords.flatten_coords(None))
+        second_pass = first_pass.maybe_add_child(coords.to_flat(None))
         with self.assertRaises(AssertionError):
             second_pass.incorporate_results(probs, 0, root)
         node_to_explore = second_pass.select_leaf()

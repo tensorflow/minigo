@@ -19,7 +19,6 @@ import numpy as np
 import coords
 import go
 from go import Position
-from coords import kgs_to_flat
 from tests import test_utils
 from mcts import MCTSNode, MAX_DEPTH
 from strategies import MCTSPlayerMixin, time_recommendation
@@ -166,10 +165,11 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         # print(player.root.describe())
 
         # Search should converge on D9 as only winning move.
+        flattened = coords.to_flat(coords.from_kgs('D9'))
         best_move = np.argmax(player.root.child_N)
-        self.assertEqual(best_move, kgs_to_flat('D9'))
+        self.assertEqual(best_move, flattened)
         # D9 should have a positive value
-        self.assertGreater(player.root.children[kgs_to_flat('D9')].Q, 0)
+        self.assertGreater(player.root.children[flattened].Q, 0)
         self.assertGreaterEqual(player.root.N, 20)
         # passing should be ineffective.
         self.assertLess(player.root.child_Q[-1], 0)
@@ -192,10 +192,11 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         # print(player.root.describe())
 
         # Search should converge on D9 as only winning move.
+        flattened = coords.to_flat(coords.from_kgs('D9'))
         best_move = np.argmax(player.root.child_N)
-        self.assertEqual(best_move, kgs_to_flat('D9'))
+        self.assertEqual(best_move, flattened)
         # D9 should have a positive value
-        self.assertGreater(player.root.children[kgs_to_flat('D9')].Q, 0)
+        self.assertGreater(player.root.children[flattened].Q, 0)
         self.assertGreaterEqual(player.root.N, 20)
         # passing should be ineffective.
         self.assertLess(player.root.child_Q[-1], 0)
