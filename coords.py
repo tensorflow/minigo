@@ -56,26 +56,33 @@ _SGF_COLUMNS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 _KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 
-def _from_minigo_to_sgf(coord):
+def from_flat(coord):
+    """Converts from a flattened coordinate to a Minigo coordinate."""
+    if flat == go.N * go.N:
+        return None
+    return divmod(flat, go.N)
+
+
+def to_flat(coord):
+    """Converts from a MiniGo coordinate to a flattened coordinate."""
     if coord is None:
-        return ''
-    return _SGF_COLUMNS[coord[1]] + _SGF_COLUMNS[coord[0]]
+        return go.N * go.N
+    return go.N * coord[0] + coord[1]
 
 
-def _from_sgf_to_minigo(sgfc):
+def from_sgf(sgfc):
     if sgfc is None or sgfc == '':
         return None
     return _SGF_COLUMNS.index(sgfc[1]), _SGF_COLUMNS.index(sgfc[0])
 
 
-def _from_minigo_to_kgs(coord):
+def to_sgf(coord):
     if coord is None:
-        return 'pass'
-    y, x = coord
-    return '{}{}'.format(_KGS_COLUMNS[x], go.N - y)
+        return ''
+    return _SGF_COLUMNS[coord[1]] + _SGF_COLUMNS[coord[0]]
 
 
-def _from_kgs_to_minigo(kgsc):
+def from_kgs(kgsc):
     if kgsc == 'pass':
         return None
     kgsc = kgsc.upper()
@@ -84,13 +91,14 @@ def _from_kgs_to_minigo(kgsc):
     return go.N - row_from_bottom, col
 
 
-def _from_minigo_to_pygtp(coord):
+def to_kgs(coord):
     if coord is None:
-        return gtp.PASS
-    return coord[1] + 1, go.N - coord[0]
+        return 'pass'
+    y, x = coord
+    return '{}{}'.format(_KGS_COLUMNS[x], go.N - y)
 
 
-def _from_pygtp_to_minigo(pygtpc):
+def from_pygtp(pygtpc):
     # GTP has a notion of both a Pass and a Resign, both of which are mapped to
     # None, so the conversion is not precisely bijective.
     if pygtpc in (gtp.PASS, gtp.RESIGN):
@@ -98,18 +106,10 @@ def _from_pygtp_to_minigo(pygtpc):
     return go.N - pygtpc[1], pygtpc[0] - 1
 
 
-def flatten(coord):
-    """Converts from a MiniGo coordinate to a flattened coordinate."""
+def to_pygtp(coord):
     if coord is None:
-        return go.N * go.N
-    return go.N * coord[0] + coord[1]
-
-
-def unflatten(coord):
-    """Converts from a flattened coordinate to a Minigo coordinate."""
-    if flat == go.N * go.N:
-        return None
-    return divmod(flat, go.N)
+        return gtp.PASS
+    return coord[1] + 1, go.N - coord[0]
 
 
 def convert(coord, from_type, to_type):
@@ -123,22 +123,22 @@ def convert(coord, from_type, to_type):
 
     # First, convert to MiniGo format.
     if from_type == FLAT:
-        coord = unflatten(coord)
+        coord = from_flat(coord)
     elif from_type == SGF:
-        coord = _from_sgf_to_minigo(coord)
+        coord = from_sgf(coord)
     elif from_type == KGS:
-        coord = _from_kgs_to_minigo(coord)
+        coord = from_kgs(coord)
     elif from_type == PYGTP:
-        coord = _from_pygtp_to_minigo(coord)
+        coord = from_pygtp(coord)
 
     # Now convert to the desired format.
     if to_type == FLAT:
-        coord = flatten(coord)
+        coord = to_flat(coord)
     elif to_type == SGF:
-        coord = _from_minigo_to_sgf(coord)
+        coord = to_sgf(coord)
     elif to_type == KGS:
-        coord = _from_minigo_to_kgs(coord)
+        coord = to_kgs(coord)
     elif to_type == PYGTP:
-        coord = _from_minigo_to_pygtp(coord)
+        coord = to_pygtp(coord)
 
     return coord
