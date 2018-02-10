@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 IMG = gcr.io/minigo-testing/minigo-prow-harness
+IMG_V2 = gcr.io/minigo-testing/minigo-prow-harness-v2
 TAG := $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)-$(shell git diff | openssl sha -sha256 | cut -c -6)
 DIR := ${CURDIR}
 
@@ -32,3 +33,14 @@ push: build
 	gcloud docker -- push $(IMG):$(TAG)
 	gcloud docker -- push $(IMG):latest
 	@echo Pushed $(IMG) with :latest and :$(TAG) tags
+
+buildv2:
+	@echo {\"image\": \"$(IMG_V2):$(TAG)\"} > version-v2.json
+	docker build -f Dockerfile.v2 -t $(IMG_V2):$(TAG) .
+	docker tag $(IMG_V2):$(TAG) $(IMG):latest
+	@echo Built $(IMG_V2):$(TAG) and tagged with latest
+
+pushv2: build
+	gcloud docker -- push $(IMG_V2):$(TAG)
+	gcloud docker -- push $(IMG_V2):latest
+	@echo Pushed $(IMG_V2) with :latest and :$(TAG) tags
