@@ -45,19 +45,13 @@ import gtp
 
 import go
 
-MINIGO = 'minigo'
-FLAT = 'flat'
-SGF = 'sgf'
-KGS = 'kgs'
-PYGTP = 'pygtp'
-
 # We provide more than 19 entries here in case of boards larger than 19 x 19.
 _SGF_COLUMNS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 _KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 
 def from_flat(flat):
-    """Converts from a flattened coordinate to a Minigo coordinate."""
+    """Converts from a flattened coordinate to a MiniGo coordinate."""
     if flat == go.N * go.N:
         return None
     return divmod(flat, go.N)
@@ -71,18 +65,21 @@ def to_flat(coord):
 
 
 def from_sgf(sgfc):
+    """Converts from an SGF coordinate to a MiniGo coordinate."""
     if sgfc is None or sgfc == '':
         return None
     return _SGF_COLUMNS.index(sgfc[1]), _SGF_COLUMNS.index(sgfc[0])
 
 
 def to_sgf(coord):
+    """Converts from a MiniGo coordinate to an SGF coordinate."""
     if coord is None:
         return ''
     return _SGF_COLUMNS[coord[1]] + _SGF_COLUMNS[coord[0]]
 
 
 def from_kgs(kgsc):
+    """Converts from a KGS coordinate to a MiniGo coordinate."""
     if kgsc == 'pass':
         return None
     kgsc = kgsc.upper()
@@ -92,6 +89,7 @@ def from_kgs(kgsc):
 
 
 def to_kgs(coord):
+    """Converts from a MiniGo coordinate to a KGS coordinate."""
     if coord is None:
         return 'pass'
     y, x = coord
@@ -99,6 +97,7 @@ def to_kgs(coord):
 
 
 def from_pygtp(pygtpc):
+    """Converts from a pygtp coordinate to a MiniGo coordinate."""
     # GTP has a notion of both a Pass and a Resign, both of which are mapped to
     # None, so the conversion is not precisely bijective.
     if pygtpc in (gtp.PASS, gtp.RESIGN):
@@ -107,38 +106,7 @@ def from_pygtp(pygtpc):
 
 
 def to_pygtp(coord):
+    """Converts from a MiniGo coordinate to a pygtp coordinate."""
     if coord is None:
         return gtp.PASS
     return coord[1] + 1, go.N - coord[0]
-
-
-def convert(coord, from_type, to_type):
-    """Converts from one coordinate format to another.
-
-    Args:
-        coord: The coordinates to convert.
-        from_type: The coordinate type to convert from (e.g., MINIGO).
-        to_type: The coordinate type to convert to (e.g., SGF).
-    """
-
-    # First, convert to MiniGo format.
-    if from_type == FLAT:
-        coord = from_flat(coord)
-    elif from_type == SGF:
-        coord = from_sgf(coord)
-    elif from_type == KGS:
-        coord = from_kgs(coord)
-    elif from_type == PYGTP:
-        coord = from_pygtp(coord)
-
-    # Now convert to the desired format.
-    if to_type == FLAT:
-        coord = to_flat(coord)
-    elif to_type == SGF:
-        coord = to_sgf(coord)
-    elif to_type == KGS:
-        coord = to_kgs(coord)
-    elif to_type == PYGTP:
-        coord = to_pygtp(coord)
-
-    return coord
