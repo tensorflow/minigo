@@ -8,7 +8,10 @@ pip-selfcheck.json
 sgf
 pyvenv.cfg
 .DS_store
+
+# virtualenv folder
 minigo/
+
 # Vim temp files
 *.swp
 *.swo
