@@ -85,7 +85,7 @@ pip3 install -r requirements.txt
 
 Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
-- GPU: `pip3 install "tensorflow-gpu>=1.5,<1.6"`. 
+- GPU: `pip3 install "tensorflow-gpu>=1.5,<1.6"`.
   - *Note*: You must install [CUDA
     9.0].(https://developer.nvidia.com/cuda-90-download-archive) for Tensorflow
     1.5.
@@ -130,7 +130,7 @@ recent model.
 ```bash
 export BUCKET_NAME=your_bucket;
 gcloud auth application-default login
-gsutil ls gs://minigo/models | tail -3
+gsutil ls gs://$BUCKET_NAME/models | tail -3
 ```
 
 Which might look like:
@@ -151,7 +151,7 @@ model to the directory specified by `MINIGO_MODELS`
 ```shell
 MINIGO_MODELS=$HOME/minigo-models
 mkdir -p $MINIGO_MODELS
-gsutil ls gs://minigo/models | tail -3 | xargs -I{} gsutil cp "{}" $MINIGO_MODELS
+gsutil ls gs://$BUCKET_NAME/models | tail -3 | xargs -I{} gsutil cp "{}" $MINIGO_MODELS
 ```
 
 Selfplay
@@ -170,7 +170,7 @@ Playing Against Minigo
 ----------------------
 
 Minigo uses the
-[GTP Protocol](http://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html), 
+[GTP Protocol](http://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html),
 and you can use any gtp-compliant program with it.
 
 ```
