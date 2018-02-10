@@ -73,11 +73,11 @@ class TestSymmetryOperations(test_utils.MiniGoUnitTest):
 
     def test_proper_move_transform(self):
         # Check that the reinterpretation of 362 = 19*19 + 1 during symmetry
-        # application is consistent with coords.unflatten_coords
+        # application is consistent with coords.from_flat
         move_array = np.arange(go.N ** 2 + 1)
         coord_array = np.zeros([go.N, go.N])
         for c in range(go.N ** 2):
-            coord_array[coords.unflatten_coords(c)] = c
+            coord_array[coords.from_flat(c)] = c
         for s in symmetries.SYMMETRIES:
             with self.subTest(symmetry=s):
                 transformed_moves = apply_p(s, move_array)
@@ -85,4 +85,4 @@ class TestSymmetryOperations(test_utils.MiniGoUnitTest):
                 for new_coord, old_coord in enumerate(transformed_moves[:-1]):
                     self.assertEqual(
                         old_coord,
-                        transformed_board[coords.unflatten_coords(new_coord)])
+                        transformed_board[coords.from_flat(new_coord)])

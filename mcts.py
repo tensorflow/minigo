@@ -146,7 +146,7 @@ class MCTSNode(object):
         """ Adds child node for fcoord if it doesn't already exist, and returns it. """
         if fcoord not in self.children:
             new_position = self.position.play_move(
-                coords.unflatten_coords(fcoord))
+                coords.from_flat(fcoord))
             self.children[fcoord] = MCTSNode(
                 new_position, fmove=fcoord, parent=self)
         return self.children[fcoord]
@@ -253,8 +253,8 @@ class MCTSNode(object):
             if node is None:
                 output.append("GAME END")
                 break
-            output.append("%s (%d) ==> " % (coords.to_human_coord(
-                                            coords.unflatten_coords(node.fmove)),
+            output.append("%s (%d) ==> " % (coords.to_kgs(
+                                            coords.from_flat(node.fmove)),
                                             node.N))
         output.append("Q: {:.5f}\n".format(node.Q))
         return ''.join(output)
@@ -266,8 +266,8 @@ class MCTSNode(object):
         while node.children and max(node.child_N) > 1:
             next_kid = np.argmax(node.child_N)
             node = node.children[next_kid]
-            output.append("%s" % coords.to_human_coord(
-                coords.unflatten_coords(node.fmove)))
+            output.append("%s" % coords.to_kgs(
+                coords.from_flat(node.fmove)))
         return ' '.join(output)
 
     def describe(self):
@@ -284,7 +284,7 @@ class MCTSNode(object):
         output.append(
             "move:  action      Q      U      P    P-Dir    N  soft-N  p-delta  p-rel\n")
         output.append("\n".join(["{!s:6}: {: .3f}, {: .3f}, {:.3f}, {:.3f}, {:.3f}, {:4d} {:.4f} {: .5f} {: .2f}".format(
-            coords.to_human_coord(coords.unflatten_coords(key)),
+            coords.to_kgs(coords.from_flat(key)),
             self.child_action_score[key],
             self.child_Q[key],
             self.child_U[key],

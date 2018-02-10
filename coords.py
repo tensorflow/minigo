@@ -56,7 +56,7 @@ _SGF_COLUMNS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 _KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 
-def from_flat(coord):
+def from_flat(flat):
     """Converts from a flattened coordinate to a Minigo coordinate."""
     if flat == go.N * go.N:
         return None

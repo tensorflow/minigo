@@ -99,7 +99,7 @@ def batch_run_many(player, positions, batch_size=100):
   
 def eval_player(player, positions, moves, results):
   probs, values = batch_run_many(player, positions)
-  policy_moves = [coords.unflatten_coords(c) for c in np.argmax(probs, axis=1)]
+  policy_moves = [coords.from_flat(c) for c in np.argmax(probs, axis=1)]
   top_move_agree = [moves[idx] == policy_moves[idx] for idx in range(len(moves))]
   square_err = (values - results)**2/4
   return top_move_agree, square_err

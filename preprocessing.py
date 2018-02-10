@@ -182,7 +182,7 @@ def make_dataset_from_sgf(sgf_filename, tf_record):
 
 def _make_tf_example_from_pwc(position_w_context):
     features = features_lib.extract_features(position_w_context.position)
-    pi = _one_hot(coords.flatten_coords(position_w_context.next_move))
+    pi = _one_hot(coords.to_flat(position_w_context.next_move))
     value = position_w_context.result
     return make_tf_example(features, pi, value)
 

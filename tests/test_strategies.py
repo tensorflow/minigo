@@ -130,9 +130,9 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
     def test_pick_moves(self):
         player = initialize_basic_player()
         root = player.root
-        root.child_N[coords.flatten_coords((2, 0))] = 10
-        root.child_N[coords.flatten_coords((1, 0))] = 5
-        root.child_N[coords.flatten_coords((3, 0))] = 1
+        root.child_N[coords.to_flat((2, 0))] = 10
+        root.child_N[coords.to_flat((1, 0))] = 5
+        root.child_N[coords.to_flat((3, 0))] = 1
 
         root.position.n = go.N ** 2  # move 81, or 361, or... Endgame.
 

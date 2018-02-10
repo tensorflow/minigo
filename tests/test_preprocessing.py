@@ -132,17 +132,17 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
                 sgf_file.name, record_file.name)
             recovered_data = self.extract_data(record_file.name)
         start_pos = go.Position()
-        first_move = coords.parse_sgf_coords('fd')
+        first_move = coords.from_sgf('fd')
         next_pos = start_pos.play_move(first_move)
-        second_move = coords.parse_sgf_coords('cf')
+        second_move = coords.from_sgf('cf')
         expected_data = [
             (
                 features.extract_features(start_pos),
-                preprocessing._one_hot(coords.flatten_coords(first_move)),
+                preprocessing._one_hot(coords.to_flat(first_move)),
                 -1
             ), (
                 features.extract_features(next_pos),
-                preprocessing._one_hot(coords.flatten_coords(second_move)),
+                preprocessing._one_hot(coords.to_flat(second_move)),
                 -1
             )]
         self.assertEqualData(expected_data, recovered_data)
