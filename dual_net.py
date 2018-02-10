@@ -134,6 +134,40 @@ class DualNetworkTrainer():
                     logger.add_summary(weight_summaries, global_step)
             self.save_weights()
 
+    def validate(self, tf_records, batch_size=128, logdir=None, init_from=None, num_steps=1000):
+        if logdir is None:
+            print("Need to run eval with a logdir")
+            return
+        if not logdir.endswith('_eval'):
+            logdir += "_eval"
+
+        with self.sess.graph.as_default():
+            input_tensors = preprocessing.get_input_tensors(
+                TRAIN_BATCH_SIZE, tf_records)
+            output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
+                                      train_mode=False, **self.hparams)
+            train_tensors = train_ops(
+                input_tensors, output_tensors, **self.hparams)
+
+            # just run our cost tensors
+            validate_tensors = {k: train_tensors[k] for k in (
+                'policy_cost', 'value_cost', 'l2_cost',
+                'combined_cost')}
+            self.initialize_weights(init_from)
+            training_stats = StatisticsCollector()
+            logger = tf.summary.FileWriter(logdir, self.sess.graph)
+
+            for i in tqdm(range(num_steps)):
+                try:
+                    tensor_values = self.sess.run(validate_tensors)
+                except tf.errors.OutOfRangeError:
+                    break
+                training_stats.report(tensor_values)
+
+                if i % 10 == 9:
+                    accuracy_summaries = training_stats.collect()
+                    logger.add_summary(accuracy_summaries, i)
+
 
 class DualNetwork():
     def __init__(self, save_file, **hparams):
@@ -329,12 +363,14 @@ def logging_ops():
 
 def compute_update_ratio(weight_tensors, before_weights, after_weights):
     """Compute the ratio of gradient norm to weight norm."""
-    deltas = [after - before for after, before in zip(after_weights, before_weights)]
+    deltas = [after - before for after,
+              before in zip(after_weights, before_weights)]
     delta_norms = [np.linalg.norm(d.ravel()) for d in deltas]
     weight_norms = [np.linalg.norm(w.ravel()) for w in before_weights]
     ratios = [d / w for d, w in zip(delta_norms, weight_norms)]
     all_summaries = [
-        tf.Summary.Value(tag='update_ratios/' + tensor.name, simple_value=ratio)
+        tf.Summary.Value(tag='update_ratios/' +
+                         tensor.name, simple_value=ratio)
         for tensor, ratio in zip(weight_tensors, ratios)]
     return tf.Summary(value=all_summaries)
 
@@ -348,6 +384,7 @@ class StatisticsCollector(object):
     executions. Therefore, we aggregate the accuracy/cost ourselves at
     the python level, and then generate the summary protobufs for writing.
     """
+
     def __init__(self):
         self.accums = collections.defaultdict(list)
 

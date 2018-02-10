@@ -93,6 +93,15 @@ def train(chunk_dir, save_file, load_file=None, generation_num=0,
                 logdir=logdir, num_steps=num_steps, verbosity=verbosity)
 
 
+def validate(holdout_dir, load_file=None, logdir=None, num_steps=1000):
+    tf_records = sorted(gfile.Glob(os.path.join(holdout_dir, '*.tfrecord.zz')))
+    preprocessing.SHUFFLE_BUFFER_SIZE = int(1e5)
+    n = dual_net.DualNetworkTrainer()
+    with timer("Validating on {}".format(holdout_dir)):
+        n.validate(tf_records, batch_size=128, logdir=logdir,
+                   init_from=load_file, num_steps=num_steps)
+
+
 def evaluate(
         black_model: 'The path to the model to play black',
         white_model: 'The path to the model to play white',
@@ -204,7 +213,8 @@ def gather(
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train, selfplay, gather, evaluate])
+argh.add_commands(parser, [gtp, bootstrap, train,
+                           selfplay, gather, evaluate, validate])
 
 if __name__ == '__main__':
     cloud_logging.configure()
