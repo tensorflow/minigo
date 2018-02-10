@@ -22,9 +22,11 @@ Flattened Coordinate: this is a number ranging from 0 - N^2 (so N^2+1
     possible values). The extra value N^2 is used to mark a 'pass' move.
 SGF Coordinate: Coordinate used for SGF serialization format. Coordinates use
     two-letter pairs having the form (column, row) indexed from the upper-left
-    where 0,0 == 'aa'.
+    where 0, 0 = 'aa'.
 KGS Coordinate: Human-readable coordinate string indexed from bottom left, with
-    the first character a capital letter and the second a number from 1-19.
+    the first character a capital letter for the column and the second a number
+    from 1-19 for the row. Note that KGS chooses to skip the letter 'I' due to
+    its similarity with 'l' (lowercase 'L').
 PYGTP Coordinate: Tuple coordinate indexed starting at 1,1 from bottom-left
     in the format (column, row)
 
@@ -43,82 +45,100 @@ import gtp
 
 import go
 
-KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRST'
-SGF_COLUMNS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+MINIGO = 'minigo'
+FLAT = 'flat'
+SGF = 'sgf'
+KGS = 'kgs'
+PYGTP = 'pygtp'
+
+# We provide more than 19 entries here in case of boards larger than 19 x 19.
+_SGF_COLUMNS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+_KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 
-def sgf_to_flat(sgf):
-    """Transforms an SGF coordinate directly into a flattened coordinate."""
-    return flatten_coords(parse_sgf_coords(sgf))
+def _from_minigo_to_sgf(coord):
+    if coord is None:
+        return ''
+    return _SGF_COLUMNS[coord[1]] + _SGF_COLUMNS[coord[0]]
 
 
-def kgs_to_flat(sgf):
-    """Transforms a KGS coordinate directly into a flattened coordinate."""
-    return flatten_coords(parse_kgs_coords(sgf))
+def _from_sgf_to_minigo(sgfc):
+    if sgfc is None or sgfc == '':
+        return None
+    return _SGF_COLUMNS.index(sgfc[1]), _SGF_COLUMNS.index(sgfc[0])
 
 
-def flatten_coords(coord):
-    """Flattens a coordinate tuple from a MiniGo coordinate"""
+def _from_minigo_to_kgs(coord):
+    if coord is None:
+        return 'pass'
+    y, x = coord
+    return '{}{}'.format(_KGS_COLUMNS[x], go.N - y)
+
+
+def _from_kgs_to_minigo(kgsc):
+    if kgsc == 'pass':
+        return None
+    kgsc = kgsc.upper()
+    col = _KGS_COLUMNS.index(kgsc[0])
+    row_from_bottom = int(kgsc[1:])
+    return go.N - row_from_bottom, col
+
+
+def _from_minigo_to_pygtp(coord):
+    if coord is None:
+        return gtp.PASS
+    return coord[1] + 1, go.N - coord[0]
+
+
+def _from_pygtp_to_minigo(pygtpc):
+    # GTP has a notion of both a Pass and a Resign, both of which are mapped to
+    # None, so the conversion is not precisely bijective.
+    if pygtpc in (gtp.PASS, gtp.RESIGN):
+        return None
+    return go.N - pygtpc[1], pygtpc[0] - 1
+
+
+def flatten(coord):
+    """Converts from a MiniGo coordinate to a flattened coordinate."""
     if coord is None:
         return go.N * go.N
     return go.N * coord[0] + coord[1]
 
 
-def unflatten_coords(flat):
-    """Unflattens a flattened coordinate into a Minigo coordinate"""
+def unflatten(coord):
+    """Converts from a flattened coordinate to a Minigo coordinate."""
     if flat == go.N * go.N:
         return None
     return divmod(flat, go.N)
 
 
-def parse_sgf_coords(sgfc):
-    """Transform a SGF coordinate into a coordinate-tuple"""
-    if sgfc is None or sgfc == '':
-        return None
-    return SGF_COLUMNS.index(sgfc[1]), SGF_COLUMNS.index(sgfc[0])
+def convert(coord, from_type, to_type):
+    """Converts from one coordinate format to another.
 
-
-def unparse_sgf_coords(coord):
-    """Turns a MiniGo coordinate tuple into a SGF coordinate."""
-    if coord is None:
-        return ''
-    return SGF_COLUMNS[coord[1]] + SGF_COLUMNS[coord[0]]
-
-
-def parse_kgs_coords(kgsc):
-    """Interprets KGS coordinates returning a minigo coordinate tuple."""
-    if kgsc == 'pass':
-        return None
-    kgsc = kgsc.upper()
-    col = KGS_COLUMNS.index(kgsc[0])
-    row_from_bottom = int(kgsc[1:]) - 1
-    return go.N - row_from_bottom - 1, col
-
-
-def to_human_coord(coord):
-    """Converts from a MiniGo coord to a human readable string.
-
-    This is equivalent to a KGS coordinate.
+    Args:
+        coord: The coordinates to convert.
+        from_type: The coordinate type to convert from (e.g., MINIGO).
+        to_type: The coordinate type to convert to (e.g., SGF).
     """
-    if coord is None:
-        return "pass"
-    y, x = coord
-    return "{}{}".format("ABCDEFGHJKLMNOPQRSTYVWYZ"[x], go.N-y)
 
+    # First, convert to MiniGo format.
+    if from_type == FLAT:
+        coord = unflatten(coord)
+    elif from_type == SGF:
+        coord = _from_sgf_to_minigo(coord)
+    elif from_type == KGS:
+        coord = _from_kgs_to_minigo(coord)
+    elif from_type == PYGTP:
+        coord = _from_pygtp_to_minigo(coord)
 
-def parse_pygtp_coords(vertex):
-    """Transforms a GTP coordinate into a standard MiniGo coordinate.
+    # Now convert to the desired format.
+    if to_type == FLAT:
+        coord = flatten(coord)
+    elif to_type == SGF:
+        coord = _from_minigo_to_sgf(coord)
+    elif to_type == KGS:
+        coord = _from_minigo_to_kgs(coord)
+    elif to_type == PYGTP:
+        coord = _from_minigo_to_pygtp(coord)
 
-    GTP has a notion of both a Pass and a Resign, both of which
-    are mapped to None so the conversion is not precisely bijective.
-    """
-    if vertex in (gtp.PASS, gtp.RESIGN):
-        return None
-    return go.N - vertex[1], vertex[0] - 1
-
-
-def unparse_pygtp_coords(coord):
-    """Transforms a MiniGo Coordinate back into a GTP coordinate."""
-    if coord is None:
-        return gtp.PASS
-    return coord[1] + 1, go.N - coord[0]
+    return coord
