@@ -143,7 +143,7 @@ class GoGuiMixin(gtp.Engine):
 
     def heatmap(self, sort_order, node, prop):
         return "\n".join(["{!s:6} {}".format(
-            coords.to_human_coord(coords.unflatten_coords(key)),
+            coords.to_kgs(coords.from_flat(key)),
             node.__dict__.get(prop)[key])
             for key in sort_order if node.child_N[key] > 0][:20])
 

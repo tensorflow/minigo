@@ -67,7 +67,7 @@ class GtpInterface(object):
             self.position.flip_playerturn(mutate=True)
 
     def make_move(self, color, vertex):
-        c = coords.parse_pygtp_coords(vertex)
+        c = coords.from_pygtp(vertex)
         # let's assume this never happens for now.
         # self.accomodate_out_of_turn(color)
         return self.play_move(c)
@@ -77,7 +77,7 @@ class GtpInterface(object):
         move = self.suggest_move(self.position)
         if self.should_resign():
             return gtp.RESIGN
-        return coords.unparse_pygtp_coords(move)
+        return coords.to_pygtp(move)
 
     def final_score(self):
         return self.position.result_string()

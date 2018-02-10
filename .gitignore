@@ -8,6 +8,8 @@ pip-selfcheck.json
 sgf
 pyvenv.cfg
 .DS_store
+logs/
+
 # Vim temp files
 *.swp
 *.swo
