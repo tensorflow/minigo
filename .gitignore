@@ -10,9 +10,6 @@ pyvenv.cfg
 .DS_store
 logs/
 
-# virtualenv folder
-minigo/
-
 # Vim temp files
 *.swp
 *.swo
