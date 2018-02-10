@@ -8,6 +8,7 @@ pip-selfcheck.json
 sgf
 pyvenv.cfg
 .DS_store
+logs/
 
 # virtualenv folder
 minigo/
