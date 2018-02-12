@@ -41,8 +41,10 @@ EXAMPLES_PER_GENERATION = 2000000
 # How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
 TRAIN_BATCH_SIZE = 256
 
-# The shuffle buffer size determines the max 'distance' an example ends up from
-# where it started.
+# The shuffle buffer size determines how far an example could end up from
+# where it started; this and the interleave parameters in preprocessing can give
+# us an approximation of a uniform sampling.  The default of 4M is used in
+# training, but smaller numbers can be used for aggregation or validation.
 SHUFFLE_BUFFER_SIZE = int(4*1e6)
 
 
@@ -93,7 +95,8 @@ class DualNetworkTrainer():
 
     def train(self, tf_records, init_from=None, num_steps=None,
               logging_freq=100, verbosity=1):
-        logdir = self.logdir + '-train' if self.logdir is not None else None
+        logdir = os.path.join(
+            self.logdir, 'train') if self.logdir is not None else None
 
         def should_log(i):
             return logdir is not None and i % logging_freq == 0
@@ -141,7 +144,7 @@ class DualNetworkTrainer():
 
     def validate(self, tf_records, batch_size=128, init_from=None, num_steps=1000):
         """Compute only the cost components for a set of tf_records, ideally a
-        holdout set, and report them to an 'eval' subdirectory of the logs.
+        holdout set, and report them to an 'test' subdirectory of the logs.
         """
         cost_tensor_names = ['policy_cost', 'value_cost', 'l2_cost',
                              'combined_cost']
@@ -149,7 +152,7 @@ class DualNetworkTrainer():
             print("Error, trainer not initialized with a logdir.")
             return
 
-        logdir = self.logdir + '-eval'
+        logdir = os.path.join(self.logdir, 'test')
 
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
@@ -161,7 +164,7 @@ class DualNetworkTrainer():
 
             # just run our cost tensors
             validate_tensors = {k: train_tensors[k]
-                                for k in cost_tensor_names + ['global_step']}
+                                for k in cost_tensor_names}
             self.initialize_weights(init_from)
             training_stats = StatisticsCollector()
             logger = tf.summary.FileWriter(logdir, self.sess.graph)
@@ -171,12 +174,11 @@ class DualNetworkTrainer():
                     tensor_values = self.sess.run(validate_tensors)
                 except tf.errors.OutOfRangeError:
                     break
-                training_stats.report(
-                    {k: tensor_values[k] for k in cost_tensor_names})
+                training_stats.report(tensor_values)
 
             accuracy_summaries = training_stats.collect()
-            logger.add_summary(accuracy_summaries,
-                               tensor_values['global_step'])
+            global_step = sess.run(train_tensors['global_step'])
+            logger.add_summary(accuracy_summaries, global_step)
 
 
 class DualNetwork():
