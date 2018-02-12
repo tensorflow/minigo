@@ -39,10 +39,10 @@ push: build
 buildv2:
 	@echo {\"image\": \"$(IMG_V2):$(TAG)\"} > version-v2.json
 	docker build -f Dockerfile.v2 -t $(IMG_V2):$(TAG) .
-	docker tag $(IMG_V2):$(TAG) $(IMG):latest
+	docker tag $(IMG_V2):$(TAG) $(IMG_V2):latest
 	@echo Built $(IMG_V2):$(TAG) and tagged with latest
 
-pushv2: build
+pushv2: buildv2
 	gcloud docker -- push $(IMG_V2):$(TAG)
 	gcloud docker -- push $(IMG_V2):latest
 	@echo Pushed $(IMG_V2) with :latest and :$(TAG) tags

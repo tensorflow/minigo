@@ -16,6 +16,9 @@
 #
 # Simple shell script to lint files and run the tests. Could be helpful for
 # users, but largely for automation.
+#
+# NOTE! If this file changes/moves, please change
+# https://github.com/kubernetes/test-infra/blob/master/jobs/config.json
 
 # Ensure we're running from this directory to ensure PYTHONPATH is set
 # correctly.
