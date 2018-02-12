@@ -149,7 +149,7 @@ class DualNetworkTrainer():
         cost_tensor_names = ['policy_cost', 'value_cost', 'l2_cost',
                              'combined_cost']
         if self.logdir is None:
-            print("Error, trainer not initialized with a logdir.")
+            print("Error, trainer not initialized with a logdir.", file=sys.stderr)
             return
 
         logdir = os.path.join(self.logdir, 'test')
@@ -177,8 +177,9 @@ class DualNetworkTrainer():
                 training_stats.report(tensor_values)
 
             accuracy_summaries = training_stats.collect()
-            global_step = sess.run(train_tensors['global_step'])
+            global_step = self.sess.run(train_tensors['global_step'])
             logger.add_summary(accuracy_summaries, global_step)
+            print(accuracy_summaries)
 
 
 class DualNetwork():
