@@ -137,7 +137,7 @@ class MCTSPlayerMixin:
                 self.root.children_as_pi(self.root.position.n < self.temp_threshold))
         self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
-        self.root = self.root.maybe_add_child(coords.flatten_coords(c))
+        self.root = self.root.maybe_add_child(coords.to_flat(c))
         self.position = self.root.position  # for showboard
         del self.root.parent.children
         return True  # GTP requires positive result.
@@ -155,7 +155,7 @@ class MCTSPlayerMixin:
             selection = random.random()
             fcoord = cdf.searchsorted(selection)
             assert self.root.child_N[fcoord] != 0
-        return coords.unflatten_coords(fcoord)
+        return coords.from_flat(fcoord)
 
     def tree_search(self, num_parallel=None):
         if num_parallel is None:
@@ -188,7 +188,7 @@ class MCTSPlayerMixin:
             return
 
         def fmt(move): return "{}-{}".format('b' if move.color == 1 else 'w',
-                                             coords.to_human_coord(move.move))
+                                             coords.to_kgs(move.move))
         path = " ".join(fmt(move) for move in pos.recent[-diff:])
         if node.position.n >= MAX_DEPTH:
             path += " (depth cutoff reached) %0.1f" % node.position.score()

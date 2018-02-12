@@ -19,7 +19,6 @@ import time
 from gtp_wrapper import MCTSPlayer
 
 
-# TODO(kashomon): Change this to play just one game.
 def play_match(black_net, white_net, games, readouts, verbosity):
     """Plays matches between two neural nets.
 

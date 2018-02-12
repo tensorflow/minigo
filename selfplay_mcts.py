@@ -78,7 +78,7 @@ def play(network, readouts, resign_threshold, verbosity=0):
                 player.root.position.n, readouts, dur / readouts * 100.0, dur), flush=True)
         if verbosity >= 3:
             print("Played >>",
-                  coords.to_human_coord(coords.unflatten_coords(player.root.fmove)))
+                  coords.to_kgs(coords.from_flat(player.root.fmove)))
 
     if verbosity >= 2:
         print("%s: %.3f" % (player.result_string, player.root.Q), file=sys.stderr)

@@ -46,7 +46,7 @@ def translate_sgf_move_qs(player_move, q):
 def translate_sgf_move(player_move, comment):
     if player_move.color not in (go.BLACK, go.WHITE):
         raise ValueError("Can't translate color %s to sgf" % player_move.color)
-    c = coords.unparse_sgf_coords(player_move.move)
+    c = coords.to_sgf(player_move.move)
     color = 'B' if player_move.color == go.BLACK else 'W'
     if comment is not None:
         comment = comment.replace(']', r'\]')
@@ -99,18 +99,18 @@ def sgf_prop_get(props, key, default):
 def handle_node(pos, node):
     'A node can either add B+W stones, play as B, or play as W.'
     props = node.properties
-    black_stones_added = [coords.parse_sgf_coords(
+    black_stones_added = [coords.from_sgf(
         c) for c in props.get('AB', [])]
-    white_stones_added = [coords.parse_sgf_coords(
+    white_stones_added = [coords.from_sgf(
         c) for c in props.get('AW', [])]
     if black_stones_added or white_stones_added:
         return add_stones(pos, black_stones_added, white_stones_added)
     # If B/W props are not present, then there is no move. But if it is present and equal to the empty string, then the move was a pass.
     elif 'B' in props:
-        black_move = coords.parse_sgf_coords(props.get('B', [''])[0])
+        black_move = coords.from_sgf(props.get('B', [''])[0])
         return pos.play_move(black_move, color=go.BLACK)
     elif 'W' in props:
-        white_move = coords.parse_sgf_coords(props.get('W', [''])[0])
+        white_move = coords.from_sgf(props.get('W', [''])[0])
         return pos.play_move(white_move, color=go.WHITE)
     else:
         return pos
@@ -128,9 +128,9 @@ def add_stones(pos, black_stones_added, white_stones_added):
 def get_next_move(node):
     props = node.next.properties
     if 'W' in props:
-        return coords.parse_sgf_coords(props['W'][0])
+        return coords.from_sgf(props['W'][0])
     else:
-        return coords.parse_sgf_coords(props['B'][0])
+        return coords.from_sgf(props['B'][0])
 
 
 def maybe_correct_next(pos, next_node):
