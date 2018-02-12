@@ -25,6 +25,7 @@ from utils import timer
 
 
 def loop(logdir=None):
+    """Run gather and train as subprocesses."""
     gather_errors = 0
     while True:
         print("==================================")
