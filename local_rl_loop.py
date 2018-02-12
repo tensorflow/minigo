@@ -34,9 +34,9 @@ def rl_loop():
         'k': 8, 'fc_width': 16, 'num_shared_layers': 1, 'l2_strength': 1e-4, 'momentum': 0.9}
 
     dual_net.TRAIN_BATCH_SIZE = 16
-    dual_net.SHUFFLE_BUFFER_SIZE = 10000
 
     #monkeypatch the shuffle buffer size so we don't spin forever shuffling up positions.
+    dual_net.SHUFFLE_BUFFER_SIZE = 10000
 
     with tempfile.TemporaryDirectory() as base_dir:
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')

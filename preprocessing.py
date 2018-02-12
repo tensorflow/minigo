@@ -148,7 +148,8 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
                       shuffle_records=True, shuffle_examples=True,
                       shuffle_buffer_size=10000,
                       filter_amount=0.05):
-    '''Read tf.Records and prepare them for ingestion by dual_net
+    '''Read tf.Records and prepare them for ingestion by dual_net.  See
+    `read_tf_records` for parameter documentation.
 
     Returns a dict of tensors (see return value of batch_parse_tf_example)
     '''

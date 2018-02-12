@@ -94,8 +94,11 @@ def train(chunk_dir, save_file, load_file=None, generation_num=0,
 
 
 def validate(holdout_dir, load_file=None, logdir=None, num_steps=1000):
+    """Computes the error terms for a set of holdout data specified by
+    `holdout_dir`, using the model specified at `load_file` and logging TB
+    metrics to the dir in `logdir`, using `num_steps` batches of examples
+    """
     tf_records = sorted(gfile.Glob(os.path.join(holdout_dir, '*.tfrecord.zz')))
-    preprocessing.SHUFFLE_BUFFER_SIZE = int(1e5)
     n = dual_net.DualNetworkTrainer(logdir=logdir)
     with timer("Validating on {}".format(holdout_dir)):
         n.validate(tf_records, batch_size=dual_net.TRAIN_BATCH_SIZE,
