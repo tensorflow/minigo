@@ -37,9 +37,13 @@ push: build
 	@echo Pushed $(IMG) with :latest and :$(TAG) tags
 
 buildv2:
+	mkdir -p staging
+	cp ../requirements.txt staging/requirements.txt
 	@echo {\"image\": \"$(IMG_V2):$(TAG)\"} > version-v2.json
 	docker build -f Dockerfile.v2 -t $(IMG_V2):$(TAG) .
 	docker tag $(IMG_V2):$(TAG) $(IMG_V2):latest
+	rm -R staging/*
+	rmdir staging
 	@echo Built $(IMG_V2):$(TAG) and tagged with latest
 
 pushv2: buildv2
