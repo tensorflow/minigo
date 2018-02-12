@@ -29,6 +29,7 @@ import main
 
 
 def rl_loop():
+    """Run the reinforcement learning loop"""
     # monkeypatch the hyperparams so that we get a quickly executing network.
     dual_net.get_default_hyperparams = lambda **kwargs: {
         'k': 8, 'fc_width': 16, 'num_shared_layers': 1, 'l2_strength': 1e-4, 'momentum': 0.9}
