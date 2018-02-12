@@ -15,14 +15,15 @@
 # Docker image test-harness container for running python tests. Based off of
 # https://github.com/kubeflow/kubeflow/tree/master/testing
 
-FROM python:3.6-slim
+FROM ubuntu:16.04
 
 # add env we can debug with the image name:tag
 ARG IMAGE_ARG
 ENV IMAGE=${IMAGE_ARG}
 
 RUN apt-get update && apt-get install -y \
-    python2.7 \
+    python \
+    python3.5 \
     rsync \
     git \
     wget && \
@@ -38,4 +39,4 @@ ENV PATH "/google-cloud-sdk/bin:${PATH}"
 WORKDIR /workspace
 COPY bootstrap_v2.sh /workspace/bootstrap_v2.sh
 
-CMD ["/bin/sh", "/workspace/bootstrap_v2.sh"]
+ENTRYPOINT ["/bin/sh", "/workspace/bootstrap_v2.sh"]
