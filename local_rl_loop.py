@@ -64,6 +64,7 @@ def rl_loop():
             output_sgf=sgf_dir,
             holdout_pct=0,
             readouts=10)
+        # Do one holdout run to test validation
         main.selfplay(
             load_file=model_save_file,
             holdout_dir=holdout_dir,

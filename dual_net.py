@@ -143,7 +143,7 @@ class DualNetworkTrainer():
             self.save_weights()
 
     def validate(self, tf_records, batch_size=128, init_from=None, num_steps=1000):
-        """Compute only the cost components for a set of tf_records, ideally a
+        """Compute only the error terms for a set of tf_records, ideally a
         holdout set, and report them to an 'test' subdirectory of the logs.
         """
         cost_tensor_names = ['policy_cost', 'value_cost', 'l2_cost',
@@ -156,7 +156,7 @@ class DualNetworkTrainer():
 
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
-                batch_size, tf_records, shuffle_buffer_size=10000, filter_amount=0.5)
+                batch_size, tf_records, shuffle_buffer_size=10000, filter_amount=0.05)
             output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=False, **self.hparams)
             train_tensors = train_ops(
