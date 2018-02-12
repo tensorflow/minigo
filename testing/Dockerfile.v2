@@ -22,9 +22,9 @@ ARG IMAGE_ARG
 ENV IMAGE=${IMAGE_ARG}
 
 RUN apt-get update && apt-get install -y \
-    python \
     python2.7 \
     rsync \
+    git \
     wget && \
     apt-get clean
 
@@ -36,6 +36,6 @@ RUN wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud
 ENV PATH "/google-cloud-sdk/bin:${PATH}"
 
 WORKDIR /workspace
-ADD bootstrap_v2.sh /
+COPY bootstrap_v2.sh /workspace/bootstrap_v2.sh
 
-ENTRYPOINT ["/bin/bash", "/bootstrap_v2.sh"]
+CMD ["/bin/sh", "/workspace/bootstrap_v2.sh"]

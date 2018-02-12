@@ -21,12 +21,10 @@
 # commit sha) and then runs the Minigo tests.
 
 set -o errexit
-set -o nounset
-set -o pipefail
 
 git clone https://github.com/kubernetes/test-infra
 
-./test-infra/jenkins/bootstrap.py \
+python2.7 ./test-infra/jenkins/bootstrap.py \
     --job=${JOB_NAME} \
     --service-account=${GOOGLE_APPLICATION_CREDENTIALS} \
     "$@"
