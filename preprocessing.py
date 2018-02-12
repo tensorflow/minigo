@@ -26,8 +26,6 @@ import sgf_wrapper
 TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
     tf.python_io.TFRecordCompressionType.ZLIB)
 
-SHUFFLE_BUFFER_SIZE = int(4 * 1e6)
-
 # Constructing tf.Examples
 
 
@@ -106,6 +104,7 @@ def batch_parse_tf_example(batch_size, example_batch):
 
 def read_tf_records(batch_size, tf_records, num_repeats=None,
                     shuffle_records=True, shuffle_examples=True,
+                    shuffle_buffer_size=10000,
                     filter_amount=1.0):
     '''
     Args:
@@ -114,6 +113,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
         num_repeats: how many times the data should be read (default: infinite)
         shuffle_records: whether to shuffle the order of files read
         shuffle_examples: whether to shuffle the tf.Examples
+        shuffle_buffer_size: how big of a buffer to fill before shuffling.
         filter_amount: what fraction of records to keep
     Returns:
         a tf dataset of batched tensors
@@ -139,13 +139,14 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
     else:
         dataset = dataset.repeat()
     if shuffle_examples:
-        dataset = dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
+        dataset = dataset.shuffle(buffer_size=shuffle_buffer_size)
     dataset = dataset.batch(batch_size)
     return dataset
 
 
 def get_input_tensors(batch_size, tf_records, num_repeats=None,
                       shuffle_records=True, shuffle_examples=True,
+                      shuffle_buffer_size=10000,
                       filter_amount=0.05):
     '''Read tf.Records and prepare them for ingestion by dual_net
 
@@ -154,6 +155,7 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
     dataset = read_tf_records(batch_size, tf_records, num_repeats=num_repeats,
                               shuffle_records=shuffle_records,
                               shuffle_examples=shuffle_examples,
+                              shuffle_buffer_size=shuffle_buffer_size,
                               filter_amount=filter_amount)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
     dataset = dataset.map(functools.partial(

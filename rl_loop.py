@@ -128,10 +128,23 @@ def train(logdir=None):
         logging.exception("Train error")
 
 
+def validate(logdir=None, model_num=None):
+    if model_num is None:
+        model_num, model_name = get_latest_model()
+    else:
+        model_name = get_model(model_num)
+
+    holdout_set = get_model(model_num - 1)
+    if not holdout_set:
+        print("No model found for number {}, unable to validate {}".format(
+            model_num-1, model_name))
+        main.validate()
+
+
 parser = argparse.ArgumentParser()
 
 argh.add_commands(parser, [train, selfplay, gather,
-                           bootstrap, game_counts])
+                           bootstrap, game_counts, validate])
 
 if __name__ == '__main__':
     print_flags()

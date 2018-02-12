@@ -87,18 +87,18 @@ def train(chunk_dir, save_file, load_file=None, generation_num=0,
 
     print("Training from:", tf_records[0], "to", tf_records[-1])
 
-    n = dual_net.DualNetworkTrainer(save_file)
+    n = dual_net.DualNetworkTrainer(save_file, logdir=logdir)
     with timer("Training"):
         n.train(tf_records, init_from=load_file,
-                logdir=logdir, num_steps=num_steps, verbosity=verbosity)
+                num_steps=num_steps, verbosity=verbosity)
 
 
 def validate(holdout_dir, load_file=None, logdir=None, num_steps=1000):
     tf_records = sorted(gfile.Glob(os.path.join(holdout_dir, '*.tfrecord.zz')))
     preprocessing.SHUFFLE_BUFFER_SIZE = int(1e5)
-    n = dual_net.DualNetworkTrainer()
+    n = dual_net.DualNetworkTrainer(logdir=logdir)
     with timer("Validating on {}".format(holdout_dir)):
-        n.validate(tf_records, batch_size=128, logdir=logdir,
+        n.validate(tf_records, batch_size=dual_net.TRAIN_BATCH_SIZE,
                    init_from=load_file, num_steps=num_steps)
 
 
@@ -143,6 +143,7 @@ def selfplay(
         holdout_pct: 'how many games to hold out for evaluation' = 0.05):
     _ensure_dir_exists(output_sgf)
     _ensure_dir_exists(output_dir)
+    _ensure_dir_exists(holdout_dir)
 
     with timer("Loading weights from %s ... " % load_file):
         network = dual_net.DualNetwork(load_file)

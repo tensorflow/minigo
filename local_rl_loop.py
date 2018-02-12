@@ -22,8 +22,8 @@ overfit to a near-zero loss.
 import os
 import tempfile
 
-import dual_net
 import preprocessing
+import dual_net
 import go
 import main
 
@@ -34,15 +34,17 @@ def rl_loop():
         'k': 8, 'fc_width': 16, 'num_shared_layers': 1, 'l2_strength': 1e-4, 'momentum': 0.9}
 
     dual_net.TRAIN_BATCH_SIZE = 16
+    dual_net.SHUFFLE_BUFFER_SIZE = 10000
 
     #monkeypatch the shuffle buffer size so we don't spin forever shuffling up positions.
-    preprocessing.SHUFFLE_BUFFER_SIZE = 10000
 
     with tempfile.TemporaryDirectory() as base_dir:
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
         model_selfplay_dir = os.path.join(selfplay_dir, '000000-bootstrap')
         gather_dir = os.path.join(base_dir, 'data', 'training_chunks')
+        holdout_dir = os.path.join(
+            base_dir, 'data', 'holdout', '000000-bootstrap')
         sgf_dir = os.path.join(base_dir, 'sgf', '000000-bootstrap')
         os.mkdir(os.path.join(base_dir, 'data'))
 
@@ -62,11 +64,21 @@ def rl_loop():
             output_sgf=sgf_dir,
             holdout_pct=0,
             readouts=10)
+        main.selfplay(
+            load_file=model_save_file,
+            holdout_dir=holdout_dir,
+            output_dir=model_selfplay_dir,
+            output_sgf=sgf_dir,
+            holdout_pct=100,
+            readouts=10)
+
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data... (ctrl+C to quit)")
         main.train(gather_dir, save_file=model_save_file,
-                   num_steps=10000, logdir="logs", verbosity=2)
+                   num_steps=100, logdir="logs", verbosity=2)
+        print("Trying validate")
+        main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
 
 
 if __name__ == '__main__':

@@ -41,14 +41,17 @@ EXAMPLES_PER_GENERATION = 2000000
 # How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
 TRAIN_BATCH_SIZE = 256
 
+# The shuffle buffer size determines the max 'distance' an example ends up from
+# where it started.
+SHUFFLE_BUFFER_SIZE = int(4*1e6)
+
 
 class DualNetworkTrainer():
-    def __init__(self, save_file=None, **hparams):
+    def __init__(self, save_file=None, logdir=None, **hparams):
         self.hparams = get_default_hyperparams(**hparams)
         self.save_file = save_file
+        self.logdir = logdir
         self.sess = tf.Session(graph=tf.Graph())
-        # TODO: eval stuff
-        # self.eval_logdir = os.path.join(model_dir, 'logs', 'eval')
 
     def initialize_weights(self, init_from=None):
         """Initialize weights from model checkpoint.
@@ -88,15 +91,17 @@ class DualNetworkTrainer():
             sess.run(tf.global_variables_initializer())
             tf.train.Saver().save(sess, self.save_file)
 
-    def train(self, tf_records, init_from=None, logdir=None, num_steps=None,
+    def train(self, tf_records, init_from=None, num_steps=None,
               logging_freq=100, verbosity=1):
+        logdir = self.logdir + '-train' if self.logdir is not None else None
+
         def should_log(i):
             return logdir is not None and i % logging_freq == 0
         if num_steps is None:
             num_steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
-                TRAIN_BATCH_SIZE, tf_records)
+                TRAIN_BATCH_SIZE, tf_records, shuffle_buffer_size=SHUFFLE_BUFFER_SIZE)
             output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=True, **self.hparams)
             train_tensors = train_ops(
@@ -134,25 +139,29 @@ class DualNetworkTrainer():
                     logger.add_summary(weight_summaries, global_step)
             self.save_weights()
 
-    def validate(self, tf_records, batch_size=128, logdir=None, init_from=None, num_steps=1000):
-        if logdir is None:
-            print("Need to run eval with a logdir")
+    def validate(self, tf_records, batch_size=128, init_from=None, num_steps=1000):
+        """Compute only the cost components for a set of tf_records, ideally a
+        holdout set, and report them to an 'eval' subdirectory of the logs.
+        """
+        cost_tensor_names = ['policy_cost', 'value_cost', 'l2_cost',
+                             'combined_cost']
+        if self.logdir is None:
+            print("Error, trainer not initialized with a logdir.")
             return
-        if not logdir.endswith('_eval'):
-            logdir += "_eval"
+
+        logdir = self.logdir + '-eval'
 
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
-                TRAIN_BATCH_SIZE, tf_records)
+                batch_size, tf_records, shuffle_buffer_size=10000, filter_amount=0.5)
             output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=False, **self.hparams)
             train_tensors = train_ops(
                 input_tensors, output_tensors, **self.hparams)
 
             # just run our cost tensors
-            validate_tensors = {k: train_tensors[k] for k in (
-                'policy_cost', 'value_cost', 'l2_cost',
-                'combined_cost')}
+            validate_tensors = {k: train_tensors[k]
+                                for k in cost_tensor_names + ['global_step']}
             self.initialize_weights(init_from)
             training_stats = StatisticsCollector()
             logger = tf.summary.FileWriter(logdir, self.sess.graph)
@@ -162,11 +171,12 @@ class DualNetworkTrainer():
                     tensor_values = self.sess.run(validate_tensors)
                 except tf.errors.OutOfRangeError:
                     break
-                training_stats.report(tensor_values)
+                training_stats.report(
+                    {k: tensor_values[k] for k in cost_tensor_names})
 
-                if i % 10 == 9:
-                    accuracy_summaries = training_stats.collect()
-                    logger.add_summary(accuracy_summaries, i)
+            accuracy_summaries = training_stats.collect()
+            logger.add_summary(accuracy_summaries,
+                               tensor_values['global_step'])
 
 
 class DualNetwork():
