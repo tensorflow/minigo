@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
 # Simple shell script to lint files and run the tests. Could be helpful for
 # users, but largely for automation.
 #
