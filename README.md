@@ -1,6 +1,8 @@
 Minigo: A minimalist Go engine modeled after AlphaGo Zero, built on MuGo
 ==================================================
 
+[Test Dashboard](https://k8s-testgrid.appspot.com/sig-big-data#tf-minigo-presubmit)
+
 This is a pure Python implementation of a neural-network based Go AI, using
 TensorFlow. While inspired by DeepMind's AlphaGo algorithm, this project is not
 a DeepMind project nor is it affiliated with the official AlphaGo project.
@@ -114,6 +116,20 @@ Running unit tests
 BOARD_SIZE=9 python3 -m unittest discover tests
 ```
 
+Automated Tests
+----------------
+
+To automatically test PRs, Minigo uses
+[Prow](https://github.com/kubernetes/test-infra/tree/master/prow), which is a
+test framework created by the Kubernetes team for testing changes in a hermetic
+environment. We use prow for running unit tests, linting our code, and
+launching our test Minigo Kubernetes clusters.
+
+You can see the status of our automated tests by looking at the Prow and
+Testgrid UIs:
+
+- Testgrid (Test Results Dashboard): https://k8s-testgrid.appspot.com/sig-big-data
+- Prow (Test-runner dashboard): https://prow.k8s.io/?repo=tensorflow%2Fminigo
 
 Basics
 ======

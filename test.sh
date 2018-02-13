@@ -16,7 +16,34 @@
 
 # Simple shell script to lint files and run the tests. Could be helpful for
 # users, but largely for automation.
+#
+# NOTE! If this file changes/moves, please change
+# https://github.com/kubernetes/test-infra/blob/master/jobs/config.json
 
-ls *.py | xargs pylint
+# Ensure we're running from this directory to ensure PYTHONPATH is set
+# correctly.
+cd "$(dirname "$0")"
 
-BOARD_SIZE=9 python3 -m unittest discover tests
+lint_fail=0
+ls *.py | xargs pylint || {
+  lint_fail=1
+}
+
+test_fail=0
+PYTHONPATH= BOARD_SIZE=9 python3 -m unittest discover tests || {
+  test_fail=1
+}
+
+if [ "${lint_fail}" -eq "1" ]; then
+  echo >&2 "--------------------------------------"
+  echo >&2 "Py linting did not pass successfully!"
+fi
+
+if [ "${test_fail}" -eq "1" ]; then
+  echo >&2 "--------------------------------------"
+  echo >&2 "The tests did not pass successfully!"
+fi
+
+if [ "${test_fail}" -eq "1" ] || [ "${lint_fail}" -eq "1" ]; then
+  exit 1
+fi
