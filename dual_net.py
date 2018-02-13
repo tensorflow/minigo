@@ -156,7 +156,7 @@ class DualNetworkTrainer():
 
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
-                batch_size, tf_records, shuffle_buffer_size=10000, filter_amount=0.05)
+                batch_size, tf_records, shuffle_buffer_size=1000, filter_amount=0.05)
             output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=False, **self.hparams)
             train_tensors = train_ops(

@@ -26,6 +26,7 @@ import preprocessing
 import dual_net
 import go
 import main
+from tensorflow import gfile
 
 
 def rl_loop():
@@ -76,10 +77,12 @@ def rl_loop():
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data... (ctrl+C to quit)")
+        # increase num_steps to 1k or 10k to confirm overfitting.
         main.train(gather_dir, save_file=model_save_file,
                    num_steps=100, logdir="logs", verbosity=2)
-        print("Trying validate")
-        main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
+        print("Trying validate on 'holdout' game")
+        holdout_games = gfile.Glob(os.path.join(holdout_dir, '*.zz'))
+        main.validate(holdout_games, load_file=model_save_file, logdir="logs")
 
 
 if __name__ == '__main__':
