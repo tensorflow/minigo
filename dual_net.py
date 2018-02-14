@@ -141,7 +141,9 @@ class DualNetwork():
         self.hparams = get_default_hyperparams(**hparams)
         self.inference_input = None
         self.inference_output = None
-        self.sess = tf.Session(graph=tf.Graph())
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        self.sess = tf.Session(graph=tf.Graph(), config=config)
         self.initialize_graph()
 
     def initialize_graph(self):
