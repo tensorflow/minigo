@@ -41,12 +41,6 @@ EXAMPLES_PER_GENERATION = 2000000
 # How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
 TRAIN_BATCH_SIZE = 256
 
-# The shuffle buffer size determines how far an example could end up from
-# where it started; this and the interleave parameters in preprocessing can give
-# us an approximation of a uniform sampling.  The default of 4M is used in
-# training, but smaller numbers can be used for aggregation or validation.
-SHUFFLE_BUFFER_SIZE = int(4*1e6)
-
 
 class DualNetworkTrainer():
     def __init__(self, save_file=None, logdir=None, **hparams):
@@ -104,7 +98,7 @@ class DualNetworkTrainer():
             num_steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
-                TRAIN_BATCH_SIZE, tf_records, shuffle_buffer_size=SHUFFLE_BUFFER_SIZE)
+                TRAIN_BATCH_SIZE, tf_records)
             output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=True, **self.hparams)
             train_tensors = train_ops(
