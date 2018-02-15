@@ -148,16 +148,22 @@ def train(logdir=None):
 
 
 def validate(logdir=None, model_num=None):
+    """ Runs validate on the directories up to the most recent model, or up to
+    (but not including) the model specified by `model_num`
+    """
     if model_num is None:
         model_num, model_name = get_latest_model()
     else:
+        model_num = int(model_num)
         model_name = get_model(model_num)
 
-    with timer("Getting list of holdout games"):
-        games = gfile.Glob(os.path.join(HOLDOUT_DIR, '**', '*.zz'))
-    # Run on the most recent 20ish generations
-    games = games[-20 * int(MAX_GAMES_PER_GENERATION * HOLDOUT_PCT):]
-    main.validate(games,
+    models = list(
+        filter(lambda num_name: num_name[0] < model_num, get_models()))
+    # Run on the most recent 20 generations,
+    holdout_dirs = [os.path.join(HOLDOUT_DIR, pair[1])
+                    for pair in models[-20:]]
+
+    main.validate(*holdout_dirs,
                   load_file=os.path.join(MODELS_DIR, model_name),
                   logdir=logdir)
 

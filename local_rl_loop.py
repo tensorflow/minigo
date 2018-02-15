@@ -81,8 +81,7 @@ def rl_loop():
         main.train(gather_dir, save_file=model_save_file,
                    num_steps=100, logdir="logs", verbosity=2)
         print("Trying validate on 'holdout' game")
-        holdout_games = gfile.Glob(os.path.join(holdout_dir, '*.zz'))
-        main.validate(holdout_games, load_file=model_save_file, logdir="logs")
+        main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
 
 
 if __name__ == '__main__':
