@@ -162,7 +162,7 @@ def validate(logdir=None, model_num=None):
     # term.
     models = list(
         filter(lambda num_name: num_name[0] < (model_num - 1), get_models()))
-    # Run on the most recent 20 generations,
+    # Run on the most recent 50 generations,
     holdout_dirs = [os.path.join(HOLDOUT_DIR, pair[1])
                     for pair in models[-50:]]
 
