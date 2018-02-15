@@ -44,6 +44,10 @@ def loop(logdir=None):
             subprocess.call(
                 ("python rl_loop.py train --logdir=%s" % logdir).split())
 
+        with timer("validate"):
+            subprocess.call(
+                ("python rl_loop.py validate --logdir=%s" % logdir).split())
+
 
 if __name__ == '__main__':
     argh.dispatch_command(loop)

@@ -157,11 +157,14 @@ def validate(logdir=None, model_num=None):
         model_num = int(model_num)
         model_name = get_model(model_num)
 
+    # Model N was trained on games up through model N-2, so the validation set
+    # should only be for models through N-2 as well, thus the (model_num - 1)
+    # term.
     models = list(
-        filter(lambda num_name: num_name[0] < model_num, get_models()))
-    # Run on the most recent 20 generations,
+        filter(lambda num_name: num_name[0] < (model_num - 1), get_models()))
+    # Run on the most recent 50 generations,
     holdout_dirs = [os.path.join(HOLDOUT_DIR, pair[1])
-                    for pair in models[-20:]]
+                    for pair in models[-50:]]
 
     main.validate(*holdout_dirs,
                   load_file=os.path.join(MODELS_DIR, model_name),

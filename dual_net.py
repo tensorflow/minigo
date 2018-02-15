@@ -161,7 +161,7 @@ class DualNetworkTrainer():
                                 for k in cost_tensor_names}
             self.initialize_weights(init_from)
             training_stats = StatisticsCollector()
-            logger = tf.summary.FileWriter(logdir, self.sess.graph)
+            logger = tf.summary.FileWriter(logdir, None)  # No graph needed.
 
             for i in tqdm(range(num_steps)):
                 try:
@@ -173,6 +173,7 @@ class DualNetworkTrainer():
             accuracy_summaries = training_stats.collect()
             global_step = self.sess.run(train_tensors['global_step'])
             logger.add_summary(accuracy_summaries, global_step)
+            logger.flush()
             print(accuracy_summaries)
 
 
