@@ -79,7 +79,7 @@ def rl_loop():
         print("Training on gathered game data... (ctrl+C to quit)")
         # increase num_steps to 1k or 10k to confirm overfitting.
         main.train(gather_dir, save_file=model_save_file,
-                   num_steps=100, logdir="logs", verbosity=2)
+                   num_steps=200, logdir="logs", verbosity=2)
         print("Trying validate on 'holdout' game")
         main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
 
