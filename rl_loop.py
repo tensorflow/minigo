@@ -22,6 +22,7 @@ import main
 import shipname
 import sys
 import time
+from utils import timer
 from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
@@ -35,8 +36,10 @@ SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
 # How many games before the selfplay workers will stop trying to play more.
+MAX_GAMES_PER_GENERATION = 10000
 
-MAX_GAMES_PER_GENERATION = 12000
+# What percent of games to holdout from training per generation
+HOLDOUT_PCT = 0.05
 
 
 def print_flags():
@@ -54,18 +57,33 @@ def print_flags():
                     for flag, value in flags.items()))
 
 
+def get_models():
+    """Finds all models, returning a list of model number and names
+    sorted increasing.
+
+    Returns: [(13, 000013-modelname), (17, 000017-modelname), ...etc]
+    """
+    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
+    model_filenames = [os.path.basename(m) for m in all_models]
+    model_numbers_names = sorted([
+        (shipname.detect_model_num(m), shipname.detect_model_name(m))
+        for m in model_filenames])
+    return model_numbers_names
+
+
 def get_latest_model():
     """Finds the latest model, returning its model number and name
 
     Returns: (17, 000017-modelname)
     """
-    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
-    model_filenames = [os.path.basename(m) for m in all_models]
-    model_numbers_names = [
-        (shipname.detect_model_num(m), shipname.detect_model_name(m))
-        for m in model_filenames]
-    latest_model = sorted(model_numbers_names, reverse=True)[0]
-    return latest_model
+    return get_models()[-1]
+
+
+def get_model(model_num):
+    models = {k: v for k, v in get_models()}
+    if not model_num in models:
+        raise ValueError("Model {} not found!".format(model_num))
+    return models[model_num]
 
 
 def game_counts(n_back=20):
@@ -103,6 +121,7 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         holdout_dir=game_holdout_dir,
         output_sgf=sgf_dir,
         readouts=readouts,
+        holdout_pct=HOLDOUT_PCT,
         verbose=verbose,
     )
 
@@ -128,10 +147,31 @@ def train(logdir=None):
         logging.exception("Train error")
 
 
+def validate(logdir=None, model_num=None):
+    """ Runs validate on the directories up to the most recent model, or up to
+    (but not including) the model specified by `model_num`
+    """
+    if model_num is None:
+        model_num, model_name = get_latest_model()
+    else:
+        model_num = int(model_num)
+        model_name = get_model(model_num)
+
+    models = list(
+        filter(lambda num_name: num_name[0] < model_num, get_models()))
+    # Run on the most recent 20 generations,
+    holdout_dirs = [os.path.join(HOLDOUT_DIR, pair[1])
+                    for pair in models[-20:]]
+
+    main.validate(*holdout_dirs,
+                  load_file=os.path.join(MODELS_DIR, model_name),
+                  logdir=logdir)
+
+
 parser = argparse.ArgumentParser()
 
 argh.add_commands(parser, [train, selfplay, gather,
-                           bootstrap, game_counts])
+                           bootstrap, game_counts, validate])
 
 if __name__ == '__main__':
     print_flags()

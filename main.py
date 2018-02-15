@@ -87,10 +87,27 @@ def train(chunk_dir, save_file, load_file=None, generation_num=0,
 
     print("Training from:", tf_records[0], "to", tf_records[-1])
 
-    n = dual_net.DualNetworkTrainer(save_file)
+    n = dual_net.DualNetworkTrainer(save_file, logdir=logdir)
     with timer("Training"):
         n.train(tf_records, init_from=load_file,
-                logdir=logdir, num_steps=num_steps, verbosity=verbosity)
+                num_steps=num_steps, verbosity=verbosity)
+
+
+def validate(*tf_record_dirs, load_file=None, logdir=None, num_steps=1000):
+    """Computes the error terms for a set of holdout data specified by
+    `holdout_dir`, using the model specified at `load_file` and logging TB
+    metrics to the dir in `logdir`, using `num_steps` batches of examples
+    """
+    n = dual_net.DualNetworkTrainer(logdir=logdir)
+
+    with timer("Building lists of holdout files"):
+        tf_records = [item for sublist in map(lambda path: gfile.Glob(
+            os.path.join(path, '*.zz')), tf_record_dirs) for item in sublist]
+
+    with timer("Validating from {} to {}".format(os.path.basename(tf_records[0]),
+                                                 os.path.basename(tf_records[-1]))):
+        n.validate(tf_records, batch_size=dual_net.TRAIN_BATCH_SIZE,
+                   init_from=load_file, num_steps=num_steps)
 
 
 def evaluate(
@@ -131,9 +148,10 @@ def selfplay(
         readouts: 'How many simulations to run per move'=100,
         verbose: '>=2 will print debug info, >=3 will print boards' = 1,
         resign_threshold: 'absolute value of threshold to resign at' = 0.95,
-        holdout_pct: 'how many games to hold out for evaluation' = 0.05):
+        holdout_pct: 'how many games to hold out for validation' = 0.05):
     _ensure_dir_exists(output_sgf)
     _ensure_dir_exists(output_dir)
+    _ensure_dir_exists(holdout_dir)
 
     with timer("Loading weights from %s ... " % load_file):
         network = dual_net.DualNetwork(load_file)
@@ -204,7 +222,8 @@ def gather(
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train, selfplay, gather, evaluate])
+argh.add_commands(parser, [gtp, bootstrap, train,
+                           selfplay, gather, evaluate, validate])
 
 if __name__ == '__main__':
     cloud_logging.configure()
