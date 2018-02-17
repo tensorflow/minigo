@@ -149,7 +149,10 @@ def selfplay(
         verbose: '>=2 will print debug info, >=3 will print boards' = 1,
         resign_threshold: 'absolute value of threshold to resign at' = 0.95,
         holdout_pct: 'how many games to hold out for validation' = 0.05):
-    _ensure_dir_exists(output_sgf)
+    clean_sgf = os.path.join(output_sgf, 'clean')
+    full_sgf = os.path.join(output_sgf, 'full')
+    _ensure_dir_exists(clean_sgf)
+    _ensure_dir_exists(full_sgf)
     _ensure_dir_exists(output_dir)
     _ensure_dir_exists(holdout_dir)
 
@@ -163,7 +166,9 @@ def selfplay(
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
     game_data = player.extract_data()
-    with gfile.GFile(os.path.join(output_sgf, '{}.sgf'.format(output_name)), 'w') as f:
+    with gfile.GFile(os.path.join(clean_sgf, '{}.sgf'.format(output_name)), 'w') as f:
+        f.write(player.to_sgf(use_comments=False))
+    with gfile.GFile(os.path.join(full_sgf, '{}.sgf'.format(output_name)), 'w') as f:
         f.write(player.to_sgf())
 
     tf_examples = preprocessing.make_dataset_from_selfplay(game_data)
