@@ -208,16 +208,20 @@ class MCTSPlayerMixin:
             string = self.root.position.result_string()
         self.result_string = string
 
-    def to_sgf(self):
+    def to_sgf(self, use_comments=True):
         assert self.result_string is not None
         pos = self.root.position
-        if self.comments:
-            self.comments[0] = ("Resign Threshold: %0.3f\n" %
-                                self.resign_threshold) + self.comments[0]
+        if use_comments:
+            comments = self.comments or ['No comments.']
+            comments[0] = ("Resign Threshold: %0.3f\n" %
+                                    self.resign_threshold) + comments[0]
+        else:
+            comments = []
         return sgf_wrapper.make_sgf(pos.recent, self.result_string,
                                     white_name=self.network.name or "Unknown",
                                     black_name=self.network.name or "Unknown",
-                                    comments=self.comments)
+                                    comments=comments) 
+
 
     def extract_data(self):
         assert len(self.searches_pi) == self.root.position.n
