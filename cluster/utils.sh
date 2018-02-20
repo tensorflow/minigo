@@ -75,7 +75,7 @@ function create_service_account_key() {
   fi
 
   # Make sure the service account can actually read the existing model entries
-  gsutil ls gs://$BUCKET_NAME/models >/dev/null 2>&1 && {{
+  gsutil ls gs://$BUCKET_NAME/models >/dev/null 2>&1 && {
     gsutil acl ch -R -m -u "${SERVICE_ACCOUNT_EMAIL}":R gs://${BUCKET_NAME}/models
   }
 
