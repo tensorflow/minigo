@@ -360,7 +360,7 @@ for f in filenames:
          preprocessing.make_dataset_from_sgf(f, f + ".tfrecord.zz")
      except:
          print(f)
-```py
+```python
 
 Once you've collected all the files in a directory, producing validation is as
 easy as
