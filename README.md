@@ -357,7 +357,7 @@ import preprocessing
 filenames = [generate a list of filenames here]
 for f in filenames:
      try:
-         preprocessing.make_dataset_from_sgf(f, f + ".tfrecord.zz")
+         preprocessing.make_dataset_from_sgf(f, f.replace(".sgf", ".tfrecord.zz"))
      except:
          print(f)
 ```
