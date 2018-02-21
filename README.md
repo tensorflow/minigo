@@ -325,6 +325,55 @@ Additionally, you can follow along with the training progress with TensorBoard -
 tensorboard --logdir=path/to/tensorboard/logs/
 ```
 
+Validation
+----------
+
+It can be useful to set aside some games to use as a 'validation set' for
+tracking the model overfitting.  One way to do this is with the `validate`
+command.
+
+### Validating on holdout data
+
+By default, Minigo will hold out 5% of selfplay games for validation, and write
+them to `gs://$BUCKET_NAME/data/holdout/<model_name>`.  This can be changed by
+adjusting the `holdout-pct` flag on the `selfplay` command.
+
+With this setup, `python rl_loop.py validate --logdir=<logdir> --` will figure out
+the most recent model, grab the holdout data from the fifty models prior to that
+one, and calculate the validation error, writing the tensorboard logs to
+`logdir`.
+
+
+### Validating on a different set of data
+
+This might be useful if you have some known set of 'good data' to test your
+netowrk against, e.g., a set of pro games.
+Assuming you've got a set of .sgfs with the proper komi & boardsizes, you'll
+want to preprocess them into the .tfrecord files, by running something similar
+to
+
+```python
+import preprocessing
+filenames = [generate a list of filenames here]
+for f in filenames:
+     try:
+         preprocessing.make_dataset_from_sgf(f, f.replace(".sgf", ".tfrecord.zz"))
+     except:
+         print(f)
+```
+
+Once you've collected all the files in a directory, producing validation is as
+easy as
+
+```
+python main.py validate path/to/validation/files/ --load-file=/path/to/model
+--logdir=path/to/tb/logs --num-steps=<number of positions to run validation on>
+```
+
+the `main.py validate` command will glob all the .tfrecord.zz files under the
+directories given as positional arguments and compute the validation error for
+`num_steps * TRAINING_BATCH_SIZE` positions from those files.
+
 Running Minigo on a Kubernetes Cluster
 ==============================
 
