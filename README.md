@@ -352,7 +352,7 @@ Assuming you've got a set of .sgfs with the proper komi & boardsizes, you'll
 want to preprocess them into the .tfrecord files, by running something similar
 to
 
-```
+```python
 import preprocessing
 filenames = [generate a list of filenames here]
 for f in filenames:
@@ -360,7 +360,7 @@ for f in filenames:
          preprocessing.make_dataset_from_sgf(f, f + ".tfrecord.zz")
      except:
          print(f)
-```python
+```
 
 Once you've collected all the files in a directory, producing validation is as
 easy as
