@@ -335,7 +335,8 @@ command.
 ### Validating on holdout data
 
 By default, Minigo will hold out 5% of selfplay games for validation, and write
-them to `gs://$BUCKET_NAME/data/holdout/<model_name>`.
+them to `gs://$BUCKET_NAME/data/holdout/<model_name>`.  This can be changed by
+adjusting the `holdout-pct` flag on the `selfplay` command.
 
 With this setup, `python rl_loop.py validate --logdir=<logdir> --` will figure out
 the most recent model, grab the holdout data from the fifty models prior to that
