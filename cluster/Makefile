@@ -1,5 +1,5 @@
 # Version and project can be overridden with the following:
-#  make target VERSION=0.XY PROJECT=foo-project
+#  make target VERSION_TAG=0.XY PROJECT=foo-project
 
 gpu-image:
 		mkdir -p staging

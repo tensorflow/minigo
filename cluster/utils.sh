@@ -76,11 +76,11 @@ function create_service_account_key() {
 
   # Make sure the service account can actually read the existing model entries
   gsutil ls gs://$BUCKET_NAME/models >/dev/null 2>&1 && {
-    gsutil acl ch -R -m -u "${SERVICE_ACCOUNT_EMAIL}":R gs://${BUCKET_NAME}/models
+    gsutil -m acl ch -r -u "${SERVICE_ACCOUNT_EMAIL}":R gs://${BUCKET_NAME}/models
   }
 
   # Grant it write permissions on our bucket. Should be safe to do multiple times
-  gsutil acl ch -R -u "${SERVICE_ACCOUNT_EMAIL}":W gs://${BUCKET_NAME}
+  gsutil acl ch -r -u "${SERVICE_ACCOUNT_EMAIL}":W gs://${BUCKET_NAME}
 
   if [[ ! -f "${SERVICE_ACCOUNT_KEY_LOCATION}" ]]; then
     echo >&2 "Service account key file doesn't exist."
