@@ -36,7 +36,7 @@ SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
 # How many games before the selfplay workers will stop trying to play more.
-MAX_GAMES_PER_GENERATION = 10000
+MAX_GAMES_PER_GENERATION = 150000
 
 # What percent of games to holdout from training per generation
 HOLDOUT_PCT = 0.05
@@ -122,6 +122,7 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         output_sgf=sgf_dir,
         readouts=readouts,
         holdout_pct=HOLDOUT_PCT,
+        resign_threshold=resign_threshold,
         verbose=verbose,
     )
 
