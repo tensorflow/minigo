@@ -122,6 +122,7 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         output_sgf=sgf_dir,
         readouts=readouts,
         holdout_pct=HOLDOUT_PCT,
+        resign_threshold=resign_threshold,
         verbose=verbose,
     )
 
