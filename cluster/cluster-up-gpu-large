@@ -10,7 +10,7 @@ echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
 
-export NUM_K8S_NODES=600
+export NUM_K8S_NODES=700
 echo "Overriding num nodes to: $NUM_K8S_NODES"
 
 check_gcloud_exists
