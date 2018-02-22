@@ -3,28 +3,20 @@ kind: Job
 metadata:
   name: minigo-gpu-player
 spec:
-  parallelism: $NUM_K8S_NODES
+  parallelism: 10
   completions: 200000
   template:
     metadata:
       name: gpu-player
     spec:
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: job-label
-                operator: In
-                values:
-                - minigo-gpu-player
-            topologyKey: kubernetes.io/hostname
       containers:
       - name: player
         image: gcr.io/$PROJECT/$GPU_PLAYER_CONTAINER:$VERSION_TAG
         imagePullPolicy: Always
         resources:
           limits:
+            beta.kubernetes.io/nvidia-gpu: 1
+          requests:
             beta.kubernetes.io/nvidia-gpu: 1
         volumeMounts:
         - name: service-credentials
