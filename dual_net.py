@@ -123,7 +123,7 @@ class DualNetworkTrainer():
                     training_stats.report(
                         {k: tensor_values[k] for k in (
                             'policy_cost', 'value_cost', 'l2_cost',
-                            'combined_cost')})
+                            'combined_cost', 'policy_entropy')})
                 if should_log(i):
                     after_weights = self.sess.run(weight_tensors)
                     weight_update_summaries = compute_update_ratio(
@@ -344,6 +344,9 @@ def train_ops(input_tensors, output_tensors, **hparams):
     l2_cost = hparams['l2_strength'] * tf.add_n([tf.nn.l2_loss(v)
                                                  for v in tf.trainable_variables() if not 'bias' in v.name])
     combined_cost = policy_cost + value_cost + l2_cost
+    policy_output = output_tensors['policy_output']
+    policy_entropy = -tf.reduce_mean(tf.reduce_sum(
+        policy_output * tf.log(policy_output), axis=1))
     boundaries = list(map(int, [1e6, 2 * 1e6]))
     values = [1e-2, 1e-3, 1e-4]
     learning_rate = tf.train.piecewise_constant(
@@ -359,6 +362,7 @@ def train_ops(input_tensors, output_tensors, **hparams):
         'value_cost': value_cost,
         'l2_cost': l2_cost,
         'combined_cost': combined_cost,
+        'policy_entropy': policy_entropy,
         'global_step': global_step,
         'train_op': train_op,
     }
