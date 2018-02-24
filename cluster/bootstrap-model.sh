@@ -1,3 +1,4 @@
+#!/bin/sh
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,20 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/sh
-
-# Added to the player image.
-# Wraps our call to main.py
+# Create bootstrap data
 
 set -e
 
-echo creds: $GOOGLE_APPLICATION_CREDENTIALS
-echo bucket: $BUCKET_NAME
-echo board_size: $BOARD_SIZE
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source ${SCRIPT_DIR}/common.sh
+source ${SCRIPT_DIR}/utils.sh
 
-python3 rl_loop.py selfplay \
-  --resign-threshold=0.99 \
-  --readouts=600
+echo "Bootstrapping a Minigo model!"
+echo "Bucket name:      ${BUCKET_NAME}"
+echo "Bucket location:  ${MODEL_NAME}"
+echo "Board Size:       ${BOARD_SIZE}"
 
+MODEL_NAME=000000-bootstrap
+PYTHONPATH=$SCRIPT_DIR/..
 
-echo Finished a set of games!
+python3 ../main.py bootstrap gs://$BUCKET_NAME/models/$MODEL_NAME

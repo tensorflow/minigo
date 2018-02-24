@@ -16,3 +16,6 @@ logs/
 *~
 
 .mypy_cache
+
+# Ignore any staging directory. We use this directory for docker-file creation.
+staging/
