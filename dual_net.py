@@ -36,10 +36,10 @@ import go
 
 # How many positions to look at per generation.
 # Per AGZ, 2048 minibatch * 1k = 2M positions/generation
-EXAMPLES_PER_GENERATION = 2000000
+EXAMPLES_PER_GENERATION = 2000
 
 # How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
-TRAIN_BATCH_SIZE = 256
+TRAIN_BATCH_SIZE = 16
 
 
 class DualNetworkTrainer():
@@ -80,7 +80,7 @@ class DualNetworkTrainer():
         sess = tf.Session(graph=tf.Graph())
         with sess.graph.as_default():
             input_tensors = get_inference_input()
-            output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
+            output_tensors = model_fn(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=True, **self.hparams)
             train_tensors = train_ops(
                 input_tensors, output_tensors, **self.hparams)
@@ -99,7 +99,7 @@ class DualNetworkTrainer():
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
                 TRAIN_BATCH_SIZE, tf_records)
-            output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
+            output_tensors = model_fn(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=True, **self.hparams)
             train_tensors = train_ops(
                 input_tensors, output_tensors, **self.hparams)
@@ -151,7 +151,7 @@ class DualNetworkTrainer():
         with self.sess.graph.as_default():
             input_tensors = preprocessing.get_input_tensors(
                 batch_size, tf_records, shuffle_buffer_size=1000, filter_amount=0.05)
-            output_tensors = dual_net(input_tensors, TRAIN_BATCH_SIZE,
+            output_tensors = model_fn(input_tensors, TRAIN_BATCH_SIZE,
                                       train_mode=False, **self.hparams)
             train_tensors = train_ops(
                 input_tensors, output_tensors, **self.hparams)
@@ -190,11 +190,11 @@ class DualNetwork():
 
     def initialize_graph(self):
         with self.sess.graph.as_default():
-            input_tensors = get_inference_input()
-            output_tensors = dual_net(input_tensors, batch_size=-1,
-                                      train_mode=False, **self.hparams)
-            self.inference_input = input_tensors
-            self.inference_output = output_tensors
+            features, labels = get_inference_input()
+            estimator_spec = model_fn(features, labels,
+                tf.estimator.ModeKeys.PREDICT, self.hparams, None)
+            self.inference_input = features
+            self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
                 self.initialize_weights(self.save_file)
             else:
@@ -219,7 +219,7 @@ class DualNetwork():
             syms_used, processed = symmetries.randomize_symmetries_feat(
                 processed)
         outputs = self.sess.run(self.inference_output,
-                                feed_dict={self.inference_input['pos_tensor']: processed})
+                                feed_dict={self.inference_input: processed})
         probabilities, value = outputs['policy_output'], outputs['value_output']
         if use_random_symmetry:
             probabilities = symmetries.invert_symmetries_pi(
@@ -228,14 +228,11 @@ class DualNetwork():
 
 
 def get_inference_input():
-    return {
-        'pos_tensor': tf.placeholder(tf.float32,
-                                     [None, go.N, go.N, features.NEW_FEATURES_PLANES],
-                                     name='pos_tensor'),
-        'pi_tensor': tf.placeholder(tf.float32,
-                                    [None, go.N * go.N + 1]),
-        'value_tensor': tf.placeholder(tf.float32, [None]),
-    }
+    return (tf.placeholder(tf.float32,
+                [None, go.N, go.N, features.NEW_FEATURES_PLANES],
+                name='pos_tensor'),
+            {'pi_tensor': tf.placeholder(tf.float32, [None, go.N * go.N + 1]),
+             'value_tensor': tf.placeholder(tf.float32, [None])})
 
 
 def _round_power_of_two(n):
@@ -271,47 +268,57 @@ def get_default_hyperparams(**overrides):
     return hparams
 
 
-def dual_net(input_tensors, batch_size, train_mode, **hparams):
+def model_fn(features, labels, mode, params, config):
     '''
-    Given dict of batched tensors
-        pos_tensor: [BATCH_SIZE, go.N, go.N, features.NEW_FEATURES_PLANES]
-        pi_tensor: [BATCH_SIZE, go.N * go.N + 1]
-        value_tensor: [BATCH_SIZE]
+    Args:
+        features: tensor with shape
+            [BATCH_SIZE, go.N, go.N, features.NEW_FEATURES_PLANES]
+        labels: dict from string to tensor with shape
+            'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
+            'value_tensor': [BATCH_SIZE]
+        mode: a tf.estimator.ModeKeys
+        params: a dict of hyperparams
+        config: ignored
+    Returns: tf.estimator.EstimatorSpec with props
+        mode: same as mode arg
+        predictions: dict of tensors
+            'policy': [BATCH_SIZE, go.N * go.N + 1]
+            'value': [BATCH_SIZE]
+        loss: a single value tensor
+        train_op: train op
+        eval_metric_ops
     return dict of tensors
         logits: [BATCH_SIZE, go.N * go.N + 1]
-        policy: [BATCH_SIZE, go.N * go.N + 1]
-        value: [BATCH_SIZE]
     '''
-    my_batchn = functools.partial(tf.layers.batch_normalization,
-                                  momentum=.997, epsilon=1e-5,
-                                  fused=True, center=True, scale=True,
-                                  training=train_mode)
+    my_batchn = functools.partial(
+        tf.layers.batch_normalization,
+        momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,
+        training=(mode == tf.estimator.ModeKeys.TRAIN))
 
-    my_conv2d = functools.partial(tf.layers.conv2d,
-                                  filters=hparams['k'],
-                                  kernel_size=[3, 3], padding="same")
+    my_conv2d = functools.partial(
+        tf.layers.conv2d,
+        filters=params['k'], kernel_size=[3, 3], padding="same")
 
-    def my_res_layer(inputs, train_mode):
+    def my_res_layer(inputs):
         int_layer1 = my_batchn(my_conv2d(inputs))
         initial_output = tf.nn.relu(int_layer1)
         int_layer2 = my_batchn(my_conv2d(initial_output))
         output = tf.nn.relu(inputs + int_layer2)
         return output
 
-    initial_output = tf.nn.relu(my_batchn(
-        my_conv2d(input_tensors['pos_tensor'])))
+    initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
 
     # the shared stack
     shared_output = initial_output
-    for i in range(hparams['num_shared_layers']):
-        shared_output = my_res_layer(shared_output, train_mode)
+    for i in range(params['num_shared_layers']):
+        shared_output = my_res_layer(shared_output)
 
     # policy head
     policy_conv = tf.nn.relu(my_batchn(
         my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
         center=False, scale=False))
     logits = tf.layers.dense(
-        tf.reshape(policy_conv, [batch_size, go.N * go.N * 2]),
+        tf.reshape(policy_conv, [-1, go.N * go.N * 2]),
         go.N * go.N + 1)
 
     policy_output = tf.nn.softmax(logits, name='policy_output')
@@ -321,58 +328,121 @@ def dual_net(input_tensors, batch_size, train_mode, **hparams):
         my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
         center=False, scale=False))
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
-        tf.reshape(value_conv, [batch_size, go.N * go.N]),
-        hparams['fc_width']))
+        tf.reshape(value_conv, [-1, go.N * go.N]),
+        params['fc_width']))
     value_output = tf.nn.tanh(
-        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [batch_size]),
+        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
         name='value_output')
-    return {
-        'logits': logits,
-        'policy_output': policy_output,
-        'value_output': value_output,
-    }
 
-
-def train_ops(input_tensors, output_tensors, **hparams):
-    global_step = tf.Variable(0, name="global_step", trainable=False)
+    # train ops
+    global_step = tf.train.get_or_create_global_step()
     policy_cost = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(
-            logits=output_tensors['logits'],
-            labels=input_tensors['pi_tensor']))
-    value_cost = tf.reduce_mean(tf.square(
-        output_tensors['value_output'] - input_tensors['value_tensor']))
-    l2_cost = hparams['l2_strength'] * tf.add_n([tf.nn.l2_loss(v)
-                                                 for v in tf.trainable_variables() if not 'bias' in v.name])
+            logits=logits, labels=labels['pi_tensor']))
+    value_cost = tf.reduce_mean(
+        tf.square(value_output - labels['value_tensor']))
+    l2_cost = params['l2_strength'] * tf.add_n([tf.nn.l2_loss(v)
+        for v in tf.trainable_variables() if not 'bias' in v.name])
     combined_cost = policy_cost + value_cost + l2_cost
-    policy_output = output_tensors['policy_output']
     policy_entropy = -tf.reduce_mean(tf.reduce_sum(
         policy_output * tf.log(policy_output), axis=1))
-    boundaries = list(map(int, [1e6, 2 * 1e6]))
+    boundaries = [int(1e6), int(2e6)]
     values = [1e-2, 1e-3, 1e-4]
     learning_rate = tf.train.piecewise_constant(
         global_step, boundaries, values)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
         train_op = tf.train.MomentumOptimizer(
-            learning_rate, hparams['momentum']).minimize(
+            learning_rate, params['momentum']).minimize(
                 combined_cost, global_step=global_step)
 
-    return {
-        'policy_cost': policy_cost,
-        'value_cost': value_cost,
-        'l2_cost': l2_cost,
-        'combined_cost': combined_cost,
-        'policy_entropy': policy_entropy,
-        'global_step': global_step,
-        'train_op': train_op,
+
+    metric_ops = {
+        'policy_cost': tf.metrics.mean(policy_cost),
+        'value_cost': tf.metrics.mean(value_cost),
+        'l2_cost': tf.metrics.mean(l2_cost),
+        'policy_entropy': tf.metrics.mean(policy_entropy),
+        'combined_cost': tf.metrics.mean(combined_cost),
     }
+    # Register metrics as tf.summary to make them show up during training
+    for metric_name, metric_op in metric_ops.items():
+        tf.summary.scalar(metric_name, metric_op[1])
+
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        predictions={
+            'policy_output': policy_output,
+            'value_output': value_output,
+        },
+        loss=combined_cost,
+        train_op=train_op,
+        eval_metric_ops=metric_ops,
+        )
+
+def bootstrap(training_dir, **hparams):
+    """Initialize a tf.Estimator run with random initial weights.
+
+    Args:
+        training_dir: The directory where tf.estimator will drop logs,
+            checkpoints, and so on
+        hparams: hyperparams of the model.
+    """
+    hparams = get_default_hyperparams(**hparams)
+    # a bit hacky - forge an initial checkpoint with the name that subsequent
+    # Estimator runs will expect to find.
+    #
+    # Estimator will do this automatically when you call train(), but calling
+    # train() requires data, and I didn't feel like creating training data in
+    # order to run the full train pipeline for 1 step.
+    estimator_initial_checkpoint_name = 'model.ckpt-1'
+    save_file = os.path.join(training_dir, estimator_initial_checkpoint_name)
+    sess = tf.Session(graph=tf.Graph())
+    with sess.graph.as_default():
+        features, labels = get_inference_input()
+        model_fn(features, labels, tf.estimator.ModeKeys.PREDICT, hparams, None)
+        sess.run(tf.global_variables_initializer())
+        tf.train.Saver().save(sess, save_file)
 
 
-def logging_ops():
-    return tf.summary.merge([
-        tf.summary.histogram(weight_var.name, weight_var)
-        for weight_var in tf.trainable_variables()],
-        name="weight_summaries")
+def export_model(training_dir, model_path):
+    """Take the latest checkpoint and export it to model_path for selfplay.
+
+    Assumes that all relevant model files are prefixed by the same name.
+    (For example, foo.index, foo.meta and foo.data-00000-of-00001).
+
+    Args:
+        training_dir: The directory where tf.estimator keeps its checkpoints
+        model_path: The path (can be a gs:// path) to export model to
+    """
+    estimator = tf.estimator.Estimator(model_fn, model_dir=training_dir,
+        params='ignored')
+    latest_checkpoint = estimator.latest_checkpoint()
+    all_checkpoint_files = tf.gfile.Glob(latest_checkpoint + '*')
+    for filename in all_checkpoint_files:
+        suffix = filename.partition(latest_checkpoint)[2]
+        destination_path = model_path + suffix
+        print("Copying {} to {}".format(filename, destination_path))
+        tf.gfile.Copy(filename, destination_path)
+
+
+def train(training_dir, tf_records, generation_num, **hparams):
+    assert generation_num > 0, "Model 0 is random weights"
+    hparams = get_default_hyperparams(**hparams)
+    estimator = tf.estimator.Estimator(
+        model_fn,
+        model_dir=training_dir,
+        params=hparams
+    )
+    current_step = estimator.get_variable_value('global_step')
+    max_steps = generation_num * EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
+    if current_step > max_steps:
+        raise ValueError("Generation {} would have happened at step {}, "
+            "but training is already at step {}".format(
+                generation_num, max_steps, current_step))
+    print(current_step, max_steps)
+    input_fn = lambda: preprocessing.get_input_tensors(
+        TRAIN_BATCH_SIZE, tf_records)
+    estimator.train(input_fn, max_steps=max_steps)
 
 
 def compute_update_ratio(weight_tensors, before_weights, after_weights):
@@ -415,3 +485,6 @@ class StatisticsCollector(object):
             all_summaries.append(tf.Summary.Value(
                 tag=summary_name, simple_value=avg_value))
         return tf.Summary(value=all_summaries)
+
+if __name__ == '__main__':
+    train('training', ['1516423825-minigo-gpu-player-7v901.tfrecord.zz'], 0)

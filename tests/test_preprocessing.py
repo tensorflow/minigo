@@ -39,18 +39,18 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
         return raw_data
 
     def extract_data(self, tf_record, filter_amount=1):
-        tf_example_tensor = preprocessing.get_input_tensors(
+        pos_tensor, label_tensors = preprocessing.get_input_tensors(
             1, [tf_record], num_repeats=1, shuffle_records=False,
             shuffle_examples=False, filter_amount=filter_amount)
         recovered_data = []
         with tf.Session() as sess:
             while True:
                 try:
-                    values = sess.run(tf_example_tensor)
+                    pos_value, label_values = sess.run([pos_tensor, label_tensors])
                     recovered_data.append((
-                        values['pos_tensor'],
-                        values['pi_tensor'],
-                        values['value_tensor']))
+                        pos_value,
+                        label_values['pi_tensor'],
+                        label_values['value_tensor']))
                 except tf.errors.OutOfRangeError:
                     break
         return recovered_data

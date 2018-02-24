@@ -40,22 +40,25 @@ def rl_loop():
         'k': 8, 'fc_width': 16, 'num_shared_layers': 1, 'l2_strength': 1e-4, 'momentum': 0.9}
 
     dual_net.TRAIN_BATCH_SIZE = 16
+    dual_net.EXAMPLES_PER_GENERATION = 64
 
     #monkeypatch the shuffle buffer size so we don't spin forever shuffling up positions.
-    preprocessing.SHUFFLE_BUFFER_SIZE = 10000
+    preprocessing.SHUFFLE_BUFFER_SIZE = 1000
 
     with tempfile.TemporaryDirectory() as base_dir:
+        training_dir = os.path.join(base_dir, 'models_in_training')
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
+        next_model_save_file = os.path.join(base_dir, 'models', '000001-nextmodel')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
         model_selfplay_dir = os.path.join(selfplay_dir, '000000-bootstrap')
         gather_dir = os.path.join(base_dir, 'data', 'training_chunks')
         holdout_dir = os.path.join(
             base_dir, 'data', 'holdout', '000000-bootstrap')
         sgf_dir = os.path.join(base_dir, 'sgf', '000000-bootstrap')
-        os.mkdir(os.path.join(base_dir, 'data'))
+        os.makedirs(os.path.join(base_dir, 'data'), exist_ok=True)
 
         print("Creating random initial weights...")
-        dual_net.DualNetworkTrainer(model_save_file).bootstrap()
+        main.bootstrap(training_dir, model_save_file)
         print("Playing some games...")
         # Do two selfplay runs to test gather functionality
         main.selfplay(
@@ -81,12 +84,18 @@ def rl_loop():
 
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
-        print("Training on gathered game data... (ctrl+C to quit)")
-        # increase num_steps to 1k or 10k to confirm overfitting.
-        main.train(gather_dir, save_file=model_save_file,
-                   num_steps=200, logdir="logs", verbosity=2)
-        print("Trying validate on 'holdout' game")
-        main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
+        print("Training on gathered game data...")
+        main.train(training_dir, gather_dir, next_model_save_file, generation_num=1)
+        # print("Trying validate on 'holdout' game...")
+        # main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
+        print("Checking that newest checkpoint is usable...")
+        main.selfplay(
+            load_file=next_model_save_file,
+            holdout_dir=holdout_dir,
+            output_dir=model_selfplay_dir,
+            output_sgf=sgf_dir,
+            readouts=10)
+
 
 
 if __name__ == '__main__':
