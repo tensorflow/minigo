@@ -113,31 +113,19 @@ def validate(*tf_record_dirs, load_file=None, logdir=None, num_steps=100):
 def evaluate(
         black_model: 'The path to the model to play black',
         white_model: 'The path to the model to play white',
-        output_dir: 'Where to write the evaluation results'='data/evaluate/sgf',
+        output_dir: 'Where to write the evaluation results'='sgf/evaluate',
         readouts: 'How many readouts to make per move.'=400,
         games: 'the number of games to play'=16,
         verbose: 'How verbose the players should be (see selfplay)' = 1):
-
-    black_model = os.path.abspath(black_model)
-    white_model = os.path.abspath(white_model)
+    _ensure_dir_exists(output_dir)
 
     with timer("Loading weights"):
         black_net = dual_net.DualNetwork(black_model)
         white_net = dual_net.DualNetwork(white_model)
 
     with timer("%d games" % games):
-        players = evaluation.play_match(
-            black_net, white_net, games, readouts, verbose)
-
-    for idx, p in enumerate(players):
-        fname = "{:s}-vs-{:s}-{:d}".format(black_net.name, white_net.name, idx)
-        with open(os.path.join(output_dir, fname + '.sgf'), 'w') as f:
-            f.write(sgf_wrapper.make_sgf(p[0].position.recent,
-                                         p[0].make_result_string(
-                                             p[0].position),
-                                         black_name=os.path.basename(
-                                             black_model),
-                                         white_name=os.path.basename(white_model)))
+        evaluation.play_match(
+            black_net, white_net, games, readouts, output_dir, verbose)
 
 
 def selfplay(
@@ -158,7 +146,6 @@ def selfplay(
 
     with timer("Loading weights from %s ... " % load_file):
         network = dual_net.DualNetwork(load_file)
-        network.name = os.path.basename(load_file)
 
     with timer("Playing game"):
         player = selfplay_mcts.play(
