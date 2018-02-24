@@ -358,6 +358,9 @@ def model_fn(features, labels, mode, params, config):
 
 
     metric_ops = {
+        'accuracy': tf.metrics.accuracy(labels=labels['pi_tensor'],
+                                        predictions=policy_output,
+                                        name='accuracy_op'),
         'policy_cost': tf.metrics.mean(policy_cost),
         'value_cost': tf.metrics.mean(value_cost),
         'l2_cost': tf.metrics.mean(l2_cost),
