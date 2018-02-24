@@ -42,7 +42,7 @@ def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
     white_name = os.path.basename(white_net.save_file)
 
     for i in range(games):
-        num_move = 0 # The move number of the current game
+        num_move = 0  # The move number of the current game
 
         black.initialize_game()
         white.initialize_game()
@@ -50,9 +50,9 @@ def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
         while True:
             start = time.time()
             for _ in range(readouts):
-                player = white  if num_move % 2 else black
+                player = white if num_move % 2 else black
                 player.tree_search()
-                
+
             # print some stats on the search
             if verbosity >= 3:
                 print(player.root.position)
@@ -61,19 +61,21 @@ def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
             inactive = black if num_move % 2 else white
             # First, check the roots for hopeless games.
             if active.should_resign():  # Force resign
-                active.set_result(-1 * active.root.position.to_play, was_resign=True)
-                inactive.set_result(active.root.position.to_play, was_resign=True)
+                active.set_result(-1 *
+                                  active.root.position.to_play, was_resign=True)
+                inactive.set_result(
+                    active.root.position.to_play, was_resign=True)
 
             if active.is_done():
-                fname = "{:d}-{:s}-vs-{:s}-{:d}.sgf".format(int(time.time()), 
-                        white_name, black_name, i)
+                fname = "{:d}-{:s}-vs-{:s}-{:d}.sgf".format(int(time.time()),
+                                                            white_name, black_name, i)
                 with open(os.path.join(sgf_dir, fname), 'w') as _file:
-                    sgfstr = sgf_wrapper.make_sgf(active.position.recent, 
-                            active.result_string, black_name=black_name,
-                            white_name=white_name)
+                    sgfstr = sgf_wrapper.make_sgf(active.position.recent,
+                                                  active.result_string, black_name=black_name,
+                                                  white_name=white_name)
                     _file.write(sgfstr)
-                print ("Finished game", i, active.result_string)
-                break 
+                print("Finished game", i, active.result_string)
+                break
 
             move = active.pick_move()
             active.play_move(move)
