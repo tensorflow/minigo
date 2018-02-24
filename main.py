@@ -76,14 +76,14 @@ def gtp(load_file: "The path to the network model files"=None,
             sys.stdout.flush()
 
 
-def bootstrap(training_dir, model_save_file):
+def bootstrap(working_dir, model_save_file):
     _ensure_dir_exists(os.path.dirname(model_save_file))
-    dual_net.bootstrap(training_dir)
-    dual_net.export_model(training_dir, model_save_file)
+    dual_net.bootstrap(working_dir)
+    dual_net.export_model(working_dir, model_save_file)
 
 
 def train(
-    training_dir: 'tf.estimator working directory.',
+    working_dir: 'tf.estimator working directory.',
     chunk_dir: 'Directory where gathered training chunks are.',
     model_save_file: 'Where to export the completed generation.',
     generation_num: 'Which generation you are training.'=0):
@@ -93,8 +93,8 @@ def train(
     print("Training from:", tf_records[0], "to", tf_records[-1])
 
     with timer("Training"):
-        dual_net.train(training_dir, tf_records, generation_num)
-        dual_net.export_model(training_dir, model_save_file)
+        dual_net.train(working_dir, tf_records, generation_num)
+        dual_net.export_model(working_dir, model_save_file)
 
 
 def validate(*tf_record_dirs, load_file=None, logdir=None, num_steps=100):

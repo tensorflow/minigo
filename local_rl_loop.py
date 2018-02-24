@@ -46,7 +46,7 @@ def rl_loop():
     preprocessing.SHUFFLE_BUFFER_SIZE = 1000
 
     with tempfile.TemporaryDirectory() as base_dir:
-        training_dir = os.path.join(base_dir, 'models_in_training')
+        working_dir = os.path.join(base_dir, 'models_in_training')
         model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
         next_model_save_file = os.path.join(base_dir, 'models', '000001-nextmodel')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
@@ -58,7 +58,7 @@ def rl_loop():
         os.makedirs(os.path.join(base_dir, 'data'), exist_ok=True)
 
         print("Creating random initial weights...")
-        main.bootstrap(training_dir, model_save_file)
+        main.bootstrap(working_dir, model_save_file)
         print("Playing some games...")
         # Do two selfplay runs to test gather functionality
         main.selfplay(
@@ -85,7 +85,7 @@ def rl_loop():
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data...")
-        main.train(training_dir, gather_dir, next_model_save_file, generation_num=1)
+        main.train(working_dir, gather_dir, next_model_save_file, generation_num=1)
         # print("Trying validate on 'holdout' game...")
         # main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
         print("Checking that newest checkpoint is usable...")

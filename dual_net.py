@@ -382,11 +382,11 @@ def model_fn(features, labels, mode, params, config):
         eval_metric_ops=metric_ops,
         )
 
-def bootstrap(training_dir, **hparams):
+def bootstrap(working_dir, **hparams):
     """Initialize a tf.Estimator run with random initial weights.
 
     Args:
-        training_dir: The directory where tf.estimator will drop logs,
+        working_dir: The directory where tf.estimator will drop logs,
             checkpoints, and so on
         hparams: hyperparams of the model.
     """
@@ -398,7 +398,7 @@ def bootstrap(training_dir, **hparams):
     # train() requires data, and I didn't feel like creating training data in
     # order to run the full train pipeline for 1 step.
     estimator_initial_checkpoint_name = 'model.ckpt-1'
-    save_file = os.path.join(training_dir, estimator_initial_checkpoint_name)
+    save_file = os.path.join(working_dir, estimator_initial_checkpoint_name)
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()
@@ -407,17 +407,17 @@ def bootstrap(training_dir, **hparams):
         tf.train.Saver().save(sess, save_file)
 
 
-def export_model(training_dir, model_path):
+def export_model(working_dir, model_path):
     """Take the latest checkpoint and export it to model_path for selfplay.
 
     Assumes that all relevant model files are prefixed by the same name.
     (For example, foo.index, foo.meta and foo.data-00000-of-00001).
 
     Args:
-        training_dir: The directory where tf.estimator keeps its checkpoints
+        working_dir: The directory where tf.estimator keeps its checkpoints
         model_path: The path (can be a gs:// path) to export model to
     """
-    estimator = tf.estimator.Estimator(model_fn, model_dir=training_dir,
+    estimator = tf.estimator.Estimator(model_fn, model_dir=working_dir,
         params='ignored')
     latest_checkpoint = estimator.latest_checkpoint()
     all_checkpoint_files = tf.gfile.Glob(latest_checkpoint + '*')
@@ -428,12 +428,12 @@ def export_model(training_dir, model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def train(training_dir, tf_records, generation_num, **hparams):
+def train(working_dir, tf_records, generation_num, **hparams):
     assert generation_num > 0, "Model 0 is random weights"
     hparams = get_default_hyperparams(**hparams)
     estimator = tf.estimator.Estimator(
         model_fn,
-        model_dir=training_dir,
+        model_dir=working_dir,
         params=hparams
     )
     current_step = estimator.get_variable_value('global_step')
