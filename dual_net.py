@@ -382,6 +382,15 @@ def model_fn(features, labels, mode, params, config):
         eval_metric_ops=metric_ops,
         )
 
+
+def get_estimator(working_dir, **hparams):
+    hparams = get_default_hyperparams(**hparams)
+    return tf.estimator.Estimator(
+        model_fn,
+        model_dir=working_dir,
+        params=hparams)
+
+
 def bootstrap(working_dir, **hparams):
     """Initialize a tf.Estimator run with random initial weights.
 
@@ -430,30 +439,15 @@ def export_model(working_dir, model_path):
 
 def train(working_dir, tf_records, generation_num, **hparams):
     assert generation_num > 0, "Model 0 is random weights"
-    hparams = get_default_hyperparams(**hparams)
-    estimator = tf.estimator.Estimator(
-        model_fn,
-        model_dir=working_dir,
-        params=hparams
-    )
-    current_step = estimator.get_variable_value('global_step')
+    estimator = get_estimator(working_dir, **hparams)
     max_steps = generation_num * EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
-    if current_step > max_steps:
-        raise ValueError("Generation {} would have happened at step {}, "
-            "but training is already at step {}".format(
-                generation_num, max_steps, current_step))
-    print(current_step, max_steps)
     input_fn = lambda: preprocessing.get_input_tensors(
         TRAIN_BATCH_SIZE, tf_records)
     estimator.train(input_fn, max_steps=max_steps)
 
 
 def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
-    hparams = get_default_hyperparams(**hparams)
-    estimator = tf.estimator.Estimator(
-        model_fn,
-        model_dir=working_dir,
-        params=hparams)
+    estimator = get_estimator(working_dir, **hparams)
     if checkpoint_name is None:
         checkpoint_name = estimator.latest_checkpoint()
     input_fn = lambda: preprocessing.get_input_tensors(
