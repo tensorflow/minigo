@@ -20,6 +20,8 @@ import sgf_wrapper
 
 from gtp_wrapper import MCTSPlayer
 
+SIMULTANEOUS_LEAVES = 8
+
 
 def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
     """Plays matches between two neural nets.
@@ -34,9 +36,9 @@ def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
 
     # For n games, we create lists of n black and n white players
     black = MCTSPlayer(
-        black_net, verbosity=verbosity, two_player_mode=True)
+        black_net, verbosity=verbosity, two_player_mode=True, num_parallel=SIMULTANEOUS_LEAVES)
     white = MCTSPlayer(
-        white_net, verbosity=verbosity, two_player_mode=True)
+        white_net, verbosity=verbosity, two_player_mode=True, num_parallel=SIMULTANEOUS_LEAVES)
 
     black_name = os.path.basename(black_net.save_file)
     white_name = os.path.basename(white_net.save_file)
@@ -78,13 +80,13 @@ def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
             move = active.pick_move()
             active.play_move(move)
             inactive.play_move(move)
-            print(active.root.position)
 
             dur = time.time() - start
             num_move += 1
 
             if (verbosity > 1) or (verbosity == 1 and num_move % 10 == 9):
                 timeper = (dur / readouts) * 100.0
+                print(active.root.position)
                 print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (num_move,
                                                                    readouts,
                                                                    timeper,
