@@ -14,6 +14,7 @@
 
 import copy
 import math
+import os
 import random
 import sys
 import time
@@ -218,9 +219,12 @@ class MCTSPlayerMixin:
         else:
             comments = []
         return sgf_wrapper.make_sgf(pos.recent, self.result_string,
-                                    white_name=self.network.name or "Unknown",
-                                    black_name=self.network.name or "Unknown",
+                                    white_name=os.path.basename(self.network.save_file) or "Unknown",
+                                    black_name=os.path.basename(self.network.save_file) or "Unknown",
                                     comments=comments) 
+
+    def is_done(self):
+        return self.result != 0 or self.root.is_done()
 
 
     def extract_data(self):

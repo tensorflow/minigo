@@ -27,6 +27,7 @@ import dual_net
 import go
 import main
 from tensorflow import gfile
+import subprocess
 
 
 def rl_loop():
@@ -78,6 +79,10 @@ def rl_loop():
             output_sgf=sgf_dir,
             holdout_pct=100,
             readouts=10)
+
+        print("See sgf files here?")
+        sgf_listing = subprocess.check_output("ls -l {}/full".format(sgf_dir).split())
+        print(sgf_listing.decode("utf-8"))
 
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)

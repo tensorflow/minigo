@@ -75,7 +75,8 @@ confidence=
 # --disable=W"
 
 disable=bare-except,
-        too-many-locals
+        too-many-locals,
+        too-many-arguments
         # print-statement,
         # parameter-unpacking,
         # unpacking-in-except,
