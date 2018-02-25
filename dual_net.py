@@ -448,6 +448,20 @@ def train(working_dir, tf_records, generation_num, **hparams):
     estimator.train(input_fn, max_steps=max_steps)
 
 
+def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
+    hparams = get_default_hyperparams(**hparams)
+    estimator = tf.estimator.Estimator(
+        model_fn,
+        model_dir=working_dir,
+        params=hparams)
+    if checkpoint_name is None:
+        checkpoint_name = estimator.latest_checkpoint()
+    input_fn = lambda: preprocessing.get_input_tensors(
+        TRAIN_BATCH_SIZE, tf_records, shuffle_buffer_size=1000,
+        filter_amount=0.05)
+    estimator.evaluate(input_fn, steps=1000)
+
+
 def compute_update_ratio(weight_tensors, before_weights, after_weights):
     """Compute the ratio of gradient norm to weight norm."""
     deltas = [after - before for after,

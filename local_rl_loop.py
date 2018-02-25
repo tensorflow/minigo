@@ -86,9 +86,9 @@ def rl_loop():
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data...")
         main.train(working_dir, gather_dir, next_model_save_file, generation_num=1)
-        # print("Trying validate on 'holdout' game...")
-        # main.validate(holdout_dir, load_file=model_save_file, logdir="logs")
-        print("Checking that newest checkpoint is usable...")
+        print("Trying validate on 'holdout' game...")
+        main.validate(working_dir, holdout_dir)
+        print("Verifying that new checkpoint is playable...")
         main.selfplay(
             load_file=next_model_save_file,
             holdout_dir=holdout_dir,
