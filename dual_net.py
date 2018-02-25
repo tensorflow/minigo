@@ -26,6 +26,7 @@ import os.path
 import itertools
 import sys
 import tensorflow as tf
+from tensorflow.python.training.summary_io import SummaryWriterCache
 from tqdm import tqdm
 from typing import Dict
 
@@ -40,142 +41,6 @@ EXAMPLES_PER_GENERATION = 2000
 
 # How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
 TRAIN_BATCH_SIZE = 16
-
-
-class DualNetworkTrainer():
-    def __init__(self, save_file=None, logdir=None, **hparams):
-        self.hparams = get_default_hyperparams(**hparams)
-        self.save_file = save_file
-        self.logdir = logdir
-        self.sess = tf.Session(graph=tf.Graph())
-
-    def initialize_weights(self, init_from=None):
-        """Initialize weights from model checkpoint.
-
-        If model checkpoint does not exist, fall back to init_from.
-        If that doesn't exist either, bootstrap with random weights.
-
-        This priority order prevents the mistake where the latest saved
-        model exists, but you accidentally init from an older model checkpoint
-        and then overwrite the newer model weights.
-        """
-        tf.logging.set_verbosity(tf.logging.WARN)  # Hide startup spam
-        if self.save_file is not None and os.path.exists(self.save_file + '.meta'):
-            tf.train.Saver().restore(self.sess, self.save_file)
-            return
-        if init_from is not None:
-            print("Initializing from {}".format(init_from), file=sys.stderr)
-            tf.train.Saver().restore(self.sess, init_from)
-        else:
-            print("Bootstrapping with random weights", file=sys.stderr)
-            self.sess.run(tf.global_variables_initializer())
-        tf.logging.set_verbosity(tf.logging.INFO)
-
-    def save_weights(self):
-        with self.sess.graph.as_default():
-            tf.train.Saver().save(self.sess, self.save_file)
-
-    def bootstrap(self):
-        'Create a save file with random initial weights.'
-        sess = tf.Session(graph=tf.Graph())
-        with sess.graph.as_default():
-            input_tensors = get_inference_input()
-            output_tensors = model_fn(input_tensors, TRAIN_BATCH_SIZE,
-                                      train_mode=True, **self.hparams)
-            train_tensors = train_ops(
-                input_tensors, output_tensors, **self.hparams)
-            sess.run(tf.global_variables_initializer())
-            tf.train.Saver().save(sess, self.save_file)
-
-    def train(self, tf_records, init_from=None, num_steps=None,
-              logging_freq=100, verbosity=1):
-        logdir = os.path.join(
-            self.logdir, 'train') if self.logdir is not None else None
-
-        def should_log(i):
-            return logdir is not None and i % logging_freq == 0
-        if num_steps is None:
-            num_steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
-        with self.sess.graph.as_default():
-            input_tensors = preprocessing.get_input_tensors(
-                TRAIN_BATCH_SIZE, tf_records)
-            output_tensors = model_fn(input_tensors, TRAIN_BATCH_SIZE,
-                                      train_mode=True, **self.hparams)
-            train_tensors = train_ops(
-                input_tensors, output_tensors, **self.hparams)
-            weight_summary_op = logging_ops()
-            weight_tensors = tf.trainable_variables()
-            self.initialize_weights(init_from)
-            if logdir is not None:
-                training_stats = StatisticsCollector()
-                logger = tf.summary.FileWriter(logdir, self.sess.graph)
-            for i in tqdm(range(num_steps)):
-                if should_log(i):
-                    before_weights = self.sess.run(weight_tensors)
-                try:
-                    tensor_values = self.sess.run(train_tensors)
-                except tf.errors.OutOfRangeError:
-                    break
-
-                if verbosity > 1 and i % logging_freq == 0:
-                    print(tensor_values)
-                if logdir is not None:
-                    training_stats.report(
-                        {k: tensor_values[k] for k in (
-                            'policy_cost', 'value_cost', 'l2_cost',
-                            'combined_cost', 'policy_entropy')})
-                if should_log(i):
-                    after_weights = self.sess.run(weight_tensors)
-                    weight_update_summaries = compute_update_ratio(
-                        weight_tensors, before_weights, after_weights)
-                    accuracy_summaries = training_stats.collect()
-                    weight_summaries = self.sess.run(weight_summary_op)
-                    global_step = tensor_values['global_step']
-                    logger.add_summary(weight_update_summaries, global_step)
-                    logger.add_summary(accuracy_summaries, global_step)
-                    logger.add_summary(weight_summaries, global_step)
-            self.save_weights()
-
-    def validate(self, tf_records, batch_size=128, init_from=None, num_steps=1000):
-        """Compute only the error terms for a set of tf_records, ideally a
-        holdout set, and report them to an 'test' subdirectory of the logs.
-        """
-        cost_tensor_names = ['policy_cost', 'value_cost', 'l2_cost',
-                             'combined_cost']
-        if self.logdir is None:
-            print("Error, trainer not initialized with a logdir.", file=sys.stderr)
-            return
-
-        logdir = os.path.join(self.logdir, 'test')
-
-        with self.sess.graph.as_default():
-            input_tensors = preprocessing.get_input_tensors(
-                batch_size, tf_records, shuffle_buffer_size=1000, filter_amount=0.05)
-            output_tensors = model_fn(input_tensors, TRAIN_BATCH_SIZE,
-                                      train_mode=False, **self.hparams)
-            train_tensors = train_ops(
-                input_tensors, output_tensors, **self.hparams)
-
-            # just run our cost tensors
-            validate_tensors = {k: train_tensors[k]
-                                for k in cost_tensor_names}
-            self.initialize_weights(init_from)
-            training_stats = StatisticsCollector()
-            logger = tf.summary.FileWriter(logdir, None)  # No graph needed.
-
-            for i in tqdm(range(num_steps)):
-                try:
-                    tensor_values = self.sess.run(validate_tensors)
-                except tf.errors.OutOfRangeError:
-                    break
-                training_stats.report(tensor_values)
-
-            accuracy_summaries = training_stats.collect()
-            global_step = self.sess.run(train_tensors['global_step'])
-            logger.add_summary(accuracy_summaries, global_step)
-            logger.flush()
-            print(accuracy_summaries)
-
 
 class DualNetwork():
     def __init__(self, save_file, **hparams):
@@ -443,7 +308,8 @@ def train(working_dir, tf_records, generation_num, **hparams):
     max_steps = generation_num * EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
     input_fn = lambda: preprocessing.get_input_tensors(
         TRAIN_BATCH_SIZE, tf_records)
-    estimator.train(input_fn, max_steps=max_steps)
+    update_ratio_hook = UpdateRatioSessionHook(working_dir)
+    estimator.train(input_fn, hooks=[update_ratio_hook], max_steps=max_steps)
 
 
 def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
@@ -470,32 +336,30 @@ def compute_update_ratio(weight_tensors, before_weights, after_weights):
     return tf.Summary(value=all_summaries)
 
 
-class StatisticsCollector(object):
-    """Collect statistics on the runs and create graphs.
+class UpdateRatioSessionHook(tf.train.SessionRunHook):
+    def __init__(self, working_dir, every_n_steps=100):
+        self.working_dir = working_dir
+        self.every_n_steps = every_n_steps
 
-    Accuracy and cost cannot be calculated with the full test dataset
-    in one pass, so they must be computed in batches. Unfortunately,
-    the built-in TF summary nodes cannot be told to aggregate multiple
-    executions. Therefore, we aggregate the accuracy/cost ourselves at
-    the python level, and then generate the summary protobufs for writing.
-    """
+    def begin(self):
+        # These calls only works because the SessionRunHook api guarantees this
+        # will get called within a graph context containing our model graph.
 
-    def __init__(self):
-        self.accums = collections.defaultdict(list)
+        self.summary_writer = SummaryWriterCache.get(self.working_dir)
+        self.weight_tensors = tf.trainable_variables()
+        self.global_step = tf.train.get_or_create_global_step()
 
-    def report(self, values):
-        """Take a dict of scalar names to scalars, and aggregate by name."""
-        for key, val in values.items():
-            self.accums[key].append(val)
+    def before_run(self, run_context):
+        global_step = run_context.session.run(self.global_step)
+        if global_step % self.every_n_steps == 0:
+            self.before_weights = run_context.session.run(self.weight_tensors)
 
-    def collect(self):
-        all_summaries = []
-        for summary_name, summary_values in self.accums.items():
-            avg_value = sum(summary_values) / len(summary_values)
-            self.accums[summary_name] = []
-            all_summaries.append(tf.Summary.Value(
-                tag=summary_name, simple_value=avg_value))
-        return tf.Summary(value=all_summaries)
+    def after_run(self, run_context, run_values):
+        global_step = run_context.session.run(self.global_step)
+        if global_step % self.every_n_steps == 0:
+            after_weights = run_context.session.run(self.weight_tensors)
+            weight_update_summaries = compute_update_ratio(
+                self.weight_tensors, self.before_weights, after_weights)
+            self.summary_writer.add_summary(weight_update_summaries, global_step)
+            self.before_weights = None
 
-if __name__ == '__main__':
-    train('training', ['1516423825-minigo-gpu-player-7v901.tfrecord.zz'], 0)
