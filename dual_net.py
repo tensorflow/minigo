@@ -57,7 +57,7 @@ class DualNetwork():
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
             estimator_spec = model_fn(features, labels,
-                tf.estimator.ModeKeys.PREDICT, self.hparams, None)
+                tf.estimator.ModeKeys.PREDICT, self.hparams)
             self.inference_input = features
             self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
@@ -93,6 +93,9 @@ class DualNetwork():
 
 
 def get_inference_input():
+    """Set up placeholders for input features/labels.
+
+    Returns the feature, output tensors that get passed into model_fn."""
     return (tf.placeholder(tf.float32,
                 [None, go.N, go.N, features.NEW_FEATURES_PLANES],
                 name='pos_tensor'),
@@ -133,7 +136,7 @@ def get_default_hyperparams(**overrides):
     return hparams
 
 
-def model_fn(features, labels, mode, params, config):
+def model_fn(features, labels, mode, params, config=None):
     '''
     Args:
         features: tensor with shape
@@ -141,9 +144,9 @@ def model_fn(features, labels, mode, params, config):
         labels: dict from string to tensor with shape
             'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
             'value_tensor': [BATCH_SIZE]
-        mode: a tf.estimator.ModeKeys
+        mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
         params: a dict of hyperparams
-        config: ignored
+        config: ignored; is required by Estimator API.
     Returns: tf.estimator.EstimatorSpec with props
         mode: same as mode arg
         predictions: dict of tensors
@@ -232,7 +235,8 @@ def model_fn(features, labels, mode, params, config):
         'policy_entropy': tf.metrics.mean(policy_entropy),
         'combined_cost': tf.metrics.mean(combined_cost),
     }
-    # Register metrics as tf.summary to make them show up during training
+    # Create summary ops so that they show up in SUMMARIES collection
+    # That way, they get logged automatically during training
     for metric_name, metric_op in metric_ops.items():
         tf.summary.scalar(metric_name, metric_op[1])
 
@@ -276,7 +280,7 @@ def bootstrap(working_dir, **hparams):
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()
-        model_fn(features, labels, tf.estimator.ModeKeys.PREDICT, hparams, None)
+        model_fn(features, labels, tf.estimator.ModeKeys.PREDICT, hparams)
         sess.run(tf.global_variables_initializer())
         tf.train.Saver().save(sess, save_file)
 

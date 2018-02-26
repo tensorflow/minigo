@@ -85,7 +85,7 @@ def batch_parse_tf_example(batch_size, example_batch):
     Args:
         example_batch: a batch of tf.Example
     Returns:
-        A tuple (feature_tensor, dict of label_tensors)
+        A tuple (feature_tensor, dict of output tensors)
     '''
     features = {
         'x': tf.FixedLenFeature([], tf.string),

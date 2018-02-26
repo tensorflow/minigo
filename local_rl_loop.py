@@ -47,7 +47,7 @@ def rl_loop():
 
     with tempfile.TemporaryDirectory() as base_dir:
         working_dir = os.path.join(base_dir, 'models_in_training')
-        model_save_file = os.path.join(base_dir, 'models', '000000-bootstrap')
+        model_save_path = os.path.join(base_dir, 'models', '000000-bootstrap')
         next_model_save_file = os.path.join(base_dir, 'models', '000001-nextmodel')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
         model_selfplay_dir = os.path.join(selfplay_dir, '000000-bootstrap')
@@ -58,24 +58,24 @@ def rl_loop():
         os.makedirs(os.path.join(base_dir, 'data'), exist_ok=True)
 
         print("Creating random initial weights...")
-        main.bootstrap(working_dir, model_save_file)
+        main.bootstrap(working_dir, model_save_path)
         print("Playing some games...")
         # Do two selfplay runs to test gather functionality
         main.selfplay(
-            load_file=model_save_file,
+            load_file=model_save_path,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
             holdout_pct=0,
             readouts=10)
         main.selfplay(
-            load_file=model_save_file,
+            load_file=model_save_path,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
             holdout_pct=0,
             readouts=10)
         # Do one holdout run to test validation
         main.selfplay(
-            load_file=model_save_file,
+            load_file=model_save_path,
             holdout_dir=holdout_dir,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,

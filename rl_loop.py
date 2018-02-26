@@ -102,7 +102,8 @@ def game_counts(n_back=20):
 def bootstrap():
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(MODELS_DIR, bootstrap_name)
-    print("Bootstrapping model at {}".format(bootstrap_model_path))
+    print("Bootstrapping with working dir {}\n Model 0 exported to {}".format(
+        ESTIMATOR_WORKING_DIR, bootstrap_model_path))
     main.bootstrap(ESTIMATOR_WORKING_DIR, bootstrap_model_path)
 
 
@@ -114,12 +115,12 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         time.sleep(10*60)
         sys.exit(1)
     print("Playing a game with model {}".format(model_name))
-    model_save_file = os.path.join(MODELS_DIR, model_name)
+    model_save_path = os.path.join(MODELS_DIR, model_name)
     game_output_dir = os.path.join(SELFPLAY_DIR, model_name)
     game_holdout_dir = os.path.join(HOLDOUT_DIR, model_name)
     sgf_dir = os.path.join(SGF_DIR, model_name)
     main.selfplay(
-        load_file=model_save_file,
+        load_file=model_save_path,
         output_dir=game_output_dir,
         holdout_dir=game_holdout_dir,
         output_sgf=sgf_dir,
