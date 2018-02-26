@@ -51,16 +51,17 @@ def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
 
         while True:
             start = time.time()
-            for _ in range(readouts):
-                player = white if num_move % 2 else black
-                player.tree_search()
+            active = white if num_move % 2 else black
+            inactive = black if num_move % 2 else white
+
+            current_readouts = active.root.N
+            while active.root.N < current_readouts + readouts:
+                active.tree_search()
 
             # print some stats on the search
             if verbosity >= 3:
-                print(player.root.position)
+                print(active.root.position)
 
-            active = white if num_move % 2 else black
-            inactive = black if num_move % 2 else white
             # First, check the roots for hopeless games.
             if active.should_resign():  # Force resign
                 active.set_result(-1 *

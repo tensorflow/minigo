@@ -81,7 +81,7 @@ def rl_loop():
             readouts=10)
 
         print("See sgf files here?")
-        sgf_listing = subprocess.check_output("ls -l {}/full".format(sgf_dir).split())
+        sgf_listing = subprocess.check_output(["ls", "-l", sgf_dir + "/full"])
         print(sgf_listing.decode("utf-8"))
 
         print("Gathering game output...")
