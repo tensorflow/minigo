@@ -85,7 +85,7 @@ def batch_parse_tf_example(batch_size, example_batch):
     Args:
         example_batch: a batch of tf.Example
     Returns:
-        A dict of batched tensors
+        A tuple (feature_tensor, dict of output tensors)
     '''
     features = {
         'x': tf.FixedLenFeature([], tf.string),
@@ -101,11 +101,7 @@ def batch_parse_tf_example(batch_size, example_batch):
     pi = tf.reshape(pi, [batch_size, go.N * go.N + 1])
     outcome = parsed['outcome']
     outcome.set_shape([batch_size])
-    return {
-        'pos_tensor': x,
-        'pi_tensor': pi,
-        'value_tensor': outcome,
-    }
+    return (x, {'pi_tensor': pi, 'value_tensor': outcome})
 
 
 def read_tf_records(batch_size, tf_records, num_repeats=None,

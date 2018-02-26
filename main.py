@@ -76,38 +76,44 @@ def gtp(load_file: "The path to the network model files"=None,
             sys.stdout.flush()
 
 
-def bootstrap(save_file):
-    dual_net.DualNetworkTrainer(save_file).bootstrap()
+def bootstrap(
+    working_dir: 'tf.estimator working directory.',
+    model_save_path: 'Where to export the first bootstrapped generation'):
+    _ensure_dir_exists(working_dir)
+    _ensure_dir_exists(os.path.dirname(model_save_path))
+    dual_net.bootstrap(working_dir)
+    dual_net.export_model(working_dir, model_save_path)
 
 
-def train(chunk_dir, save_file, load_file=None, generation_num=0,
-          logdir=None, num_steps=None, verbosity=1):
+def train(
+    working_dir: 'tf.estimator working directory.',
+    chunk_dir: 'Directory where gathered training chunks are.',
+    model_save_path: 'Where to export the completed generation.',
+    generation_num: 'Which generation you are training.'=0):
     tf_records = sorted(gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz')))
     tf_records = tf_records[-1 * (WINDOW_SIZE // EXAMPLES_PER_RECORD):]
 
     print("Training from:", tf_records[0], "to", tf_records[-1])
 
-    n = dual_net.DualNetworkTrainer(save_file, logdir=logdir)
     with timer("Training"):
-        n.train(tf_records, init_from=load_file,
-                num_steps=num_steps, verbosity=verbosity)
+        dual_net.train(working_dir, tf_records, generation_num)
+        dual_net.export_model(working_dir, model_save_path)
 
 
-def validate(*tf_record_dirs, load_file=None, logdir=None, num_steps=100):
-    """Computes the error terms for a set of holdout data specified by
-    `holdout_dir`, using the model specified at `load_file` and logging TB
-    metrics to the dir in `logdir`, using `num_steps` batches of examples
-    """
-    n = dual_net.DualNetworkTrainer(logdir=logdir)
-
+def validate(
+    working_dir: 'tf.estimator working directory',
+    *tf_record_dirs: 'Directories where holdout data are',
+    checkpoint_name: 'Which checkpoint to evaluate (None=latest)'=None,
+    validate_name: 'Name for validation set (i.e. selfplay or human)'=None):
+    tf_records = []
     with timer("Building lists of holdout files"):
-        tf_records = [item for sublist in map(lambda path: gfile.Glob(
-            os.path.join(path, '*.zz')), tf_record_dirs) for item in sublist]
+        for record_dir in tf_record_dirs:
+            tf_records.extend(gfile.Glob(os.path.join(record_dir, '*.zz')))
 
     with timer("Validating from {} to {}".format(os.path.basename(tf_records[0]),
                                                  os.path.basename(tf_records[-1]))):
-        n.validate(tf_records, batch_size=dual_net.TRAIN_BATCH_SIZE,
-                   init_from=load_file, num_steps=num_steps)
+        dual_net.validate(working_dir, tf_records, checkpoint_name=checkpoint_name,
+            name=validate_name)
 
 
 def evaluate(

@@ -35,6 +35,8 @@ HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
 
+ESTIMATOR_WORKING_DIR = 'estimator_working_dir'
+
 # How many games before the selfplay workers will stop trying to play more.
 MAX_GAMES_PER_GENERATION = 10000
 
@@ -51,6 +53,7 @@ def print_flags():
         'HOLDOUT_DIR': HOLDOUT_DIR,
         'SGF_DIR': SGF_DIR,
         'TRAINING_CHUNK_DIR': TRAINING_CHUNK_DIR,
+        'ESTIMATOR_WORKING_DIR': ESTIMATOR_WORKING_DIR,
     }
     print("Computed variables are:")
     print('\n'.join('--{}={}'.format(flag, value)
@@ -99,8 +102,9 @@ def game_counts(n_back=20):
 def bootstrap():
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(MODELS_DIR, bootstrap_name)
-    print("Bootstrapping model at {}".format(bootstrap_model_path))
-    main.bootstrap(bootstrap_model_path)
+    print("Bootstrapping with working dir {}\n Model 0 exported to {}".format(
+        ESTIMATOR_WORKING_DIR, bootstrap_model_path))
+    main.bootstrap(ESTIMATOR_WORKING_DIR, bootstrap_model_path)
 
 
 def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
@@ -111,12 +115,12 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         time.sleep(10*60)
         sys.exit(1)
     print("Playing a game with model {}".format(model_name))
-    model_save_file = os.path.join(MODELS_DIR, model_name)
+    model_save_path = os.path.join(MODELS_DIR, model_name)
     game_output_dir = os.path.join(SELFPLAY_DIR, model_name)
     game_holdout_dir = os.path.join(HOLDOUT_DIR, model_name)
     sgf_dir = os.path.join(SGF_DIR, model_name)
     main.selfplay(
-        load_file=model_save_file,
+        load_file=model_save_path,
         output_dir=game_output_dir,
         holdout_dir=game_holdout_dir,
         output_sgf=sgf_dir,
@@ -133,7 +137,7 @@ def gather():
                 output_directory=TRAINING_CHUNK_DIR)
 
 
-def train(logdir=None):
+def train():
     model_num, model_name = get_latest_model()
     print("Training on gathered game data, initializing from {}".format(model_name))
     new_model_name = shipname.generate(model_num + 1)
@@ -141,14 +145,14 @@ def train(logdir=None):
     load_file = os.path.join(MODELS_DIR, model_name)
     save_file = os.path.join(MODELS_DIR, new_model_name)
     try:
-        main.train(TRAINING_CHUNK_DIR, save_file=save_file, load_file=load_file,
-                   generation_num=model_num, logdir=logdir)
+        main.train(ESTIMATOR_WORKING_DIR, TRAINING_CHUNK_DIR, save_file,
+                   generation_num=model_num + 1)
     except:
         print("Got an error training, muddling on...")
         logging.exception("Train error")
 
 
-def validate(logdir=None, model_num=None):
+def validate(model_num=None, validate_name=None):
     """ Runs validate on the directories up to the most recent model, or up to
     (but not including) the model specified by `model_num`
     """
@@ -164,12 +168,13 @@ def validate(logdir=None, model_num=None):
     models = list(
         filter(lambda num_name: num_name[0] < (model_num - 1), get_models()))
     # Run on the most recent 50 generations,
+    # TODO(brianklee): make this hyperparameter dependency explicit/not hardcoded
     holdout_dirs = [os.path.join(HOLDOUT_DIR, pair[1])
                     for pair in models[-50:]]
 
-    main.validate(*holdout_dirs,
-                  load_file=os.path.join(MODELS_DIR, model_name),
-                  logdir=logdir)
+    main.validate(ESTIMATOR_WORKING_DIR, *holdout_dirs,
+                  checkpoint_name=os.path.join(MODELS_DIR, model_name),
+                  validate_name=validate_name)
 
 
 parser = argparse.ArgumentParser()
