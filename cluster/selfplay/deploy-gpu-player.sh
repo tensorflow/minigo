@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-source ./common.sh
+source ${SCRIPT_DIR}/../common.sh
 
 # envsubst doesn't exist for OSX. needs to be brew-installed
 # via gettext. Should probably warn the user about that.
@@ -29,4 +30,4 @@ command -v envsubst >/dev/null 2>&1 || {
   exit 1;
 }
 
-cat gpu-player.yaml | envsubst | kubectl apply -f -
+cat ${SCRIPT_DIR}/gpu-player.yaml | envsubst | kubectl apply -f -

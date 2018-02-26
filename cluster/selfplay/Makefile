@@ -3,8 +3,8 @@
 
 gpu-image:
 		mkdir -p staging
-		cp ../*.py staging/
-		cp ../requirements.txt staging/
+		cp ../../*.py staging/
+		cp ../../requirements.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm staging/*.py
@@ -13,8 +13,8 @@ gpu-image:
 
 cpu-image:
 		mkdir -p staging
-		cp ../*.py staging/
-		cp ../requirements.txt staging/
+		cp ../../*.py staging/
+		cp ../../requirements.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build -t "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm staging/*.py
@@ -23,8 +23,8 @@ cpu-image:
 
 cpu-image-clean:
 		mkdir -p staging/
-		cp ../*.py staging/
-		cp ../requirements.txt staging/
+		cp ../../*.py staging/
+		cp ../../requirements.txt staging/
 		cp player_wrapper.sh staging/
 	    docker build --no-cache -t "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm staging/*.py
