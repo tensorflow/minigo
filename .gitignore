@@ -19,3 +19,6 @@ logs/
 
 # Ignore any staging directory. We use this directory for docker-file creation.
 staging/
+
+bazel-*
+cc/tensorflow/
