@@ -177,10 +177,14 @@ def validate(model_num=None, validate_name=None):
                   validate_name=validate_name)
 
 
+def echo():
+    pass  # Flags are echo'd in the ifmain block below.
+
+
 parser = argparse.ArgumentParser()
 
 argh.add_commands(parser, [train, selfplay, gather,
-                           bootstrap, game_counts, validate])
+                           bootstrap, game_counts, validate, echo])
 
 if __name__ == '__main__':
     print_flags()
