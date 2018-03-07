@@ -27,6 +27,7 @@ from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
 BUCKET_NAME = os.environ['BUCKET_NAME']
+BOARD_SIZE = os.environ['BOARD_SIZE']
 
 BASE_DIR = "gs://{}".format(BUCKET_NAME)
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
@@ -54,6 +55,7 @@ def print_flags():
         'SGF_DIR': SGF_DIR,
         'TRAINING_CHUNK_DIR': TRAINING_CHUNK_DIR,
         'ESTIMATOR_WORKING_DIR': ESTIMATOR_WORKING_DIR,
+        'BOARD_SIZE': BOARD_SIZE,
     }
     print("Computed variables are:")
     print('\n'.join('--{}={}'.format(flag, value)
@@ -177,10 +179,59 @@ def validate(model_num=None, validate_name=None):
                   validate_name=validate_name)
 
 
+def backfill():
+    models = [m[1] for m in get_models()]
+
+    import dual_net
+    import tensorflow as tf
+    from tensorflow.python.framework import meta_graph
+    features, labels = dual_net.get_inference_input()
+    dual_net.model_fn(features, labels, tf.estimator.ModeKeys.PREDICT,
+                      dual_net.get_default_hyperparams())
+
+    for model_name in models:
+        if model_name.endswith('-upgrade'):
+            continue
+        try:
+            load_file = os.path.join(MODELS_DIR, model_name)
+            dest_file = os.path.join(MODELS_DIR, model_name)
+            sess = tf.Session()
+
+            # retrieve the global step as a python value
+            ckpt = tf.train.load_checkpoint(load_file)
+            global_step_value = ckpt.get_tensor('global_step')
+
+            # restore all saved weights, except global_step
+            meta_graph_def = meta_graph.read_meta_graph_file(
+                load_file + '.meta')
+            stored_var_names = set([n.name
+                                    for n in meta_graph_def.graph_def.node
+                                    if n.op == 'VariableV2'])
+            stored_var_names.remove('global_step')
+            var_list = [v for v in tf.global_variables()
+                        if v.op.name in stored_var_names]
+            tf.train.Saver(var_list=var_list).restore(sess, load_file)
+
+            # manually set the global step
+            global_step_tensor = tf.train.get_or_create_global_step()
+            assign_op = tf.assign(global_step_tensor, global_step_value)
+            sess.run(assign_op)
+        except:
+            print('failed on', model_name)
+            continue
+
+        # export a new savedmodel that has the right global step type
+        tf.train.Saver().save(sess, dest_file)
+
+
+def echo():
+    pass  # flags printed in ifmain block below.
+
+
 parser = argparse.ArgumentParser()
 
-argh.add_commands(parser, [train, selfplay, gather,
-                           bootstrap, game_counts, validate])
+argh.add_commands(parser, [echo, train, selfplay, gather,
+                           bootstrap, game_counts, validate, backfill])
 
 if __name__ == '__main__':
     print_flags()
