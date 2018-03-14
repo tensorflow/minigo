@@ -138,7 +138,15 @@ class MCTSPlayerMixin:
                 self.root.children_as_pi(self.root.position.n < self.temp_threshold))
         self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
-        self.root = self.root.maybe_add_child(coords.to_flat(c))
+        try:
+            self.root = self.root.maybe_add_child(coords.to_flat(c))
+        except go.IllegalMove:
+            print("Illegal move")
+            if not self.two_player_mode:
+                self.searches_pi.pop()
+            self.qs.pop()
+            self.comments.pop()
+            return False
         self.position = self.root.position  # for showboard
         del self.root.parent.children
         return True  # GTP requires positive result.
@@ -215,17 +223,18 @@ class MCTSPlayerMixin:
         if use_comments:
             comments = self.comments or ['No comments.']
             comments[0] = ("Resign Threshold: %0.3f\n" %
-                                    self.resign_threshold) + comments[0]
+                           self.resign_threshold) + comments[0]
         else:
             comments = []
         return sgf_wrapper.make_sgf(pos.recent, self.result_string,
-                                    white_name=os.path.basename(self.network.save_file) or "Unknown",
-                                    black_name=os.path.basename(self.network.save_file) or "Unknown",
-                                    comments=comments) 
+                                    white_name=os.path.basename(
+                                        self.network.save_file) or "Unknown",
+                                    black_name=os.path.basename(
+                                        self.network.save_file) or "Unknown",
+                                    comments=comments)
 
     def is_done(self):
         return self.result != 0 or self.root.is_done()
-
 
     def extract_data(self):
         assert len(self.searches_pi) == self.root.position.n
