@@ -20,7 +20,7 @@ export PROJECT=${PROJECT:-"minigo-pub"}
 export LOGGING_PROJECT=${PROJECT:-"$PROJECT"}
 export CLUSTER_NAME=${CLUSTER_NAME:-"minigo-v5"}
 export BOARD_SIZE=${BOARD_SIZE:-"19"}
-export K8S_VERSION=${K8S_VERSION:-"1.9.2-gke.1"}
+export K8S_VERSION=${K8S_VERSION:-"1.9"}
 export ZONE=${ZONE:-"asia-east1-a"}
 export NUM_K8S_NODES=${NUM_K8S_NODES:-"5"}
 

@@ -251,7 +251,7 @@ This command creates a random model, which appears at .
 
 ```bash
 export MODEL_NAME=000000-bootstrap
-python3 main.py bootstrap gs://$BUCKET_NAME/models/$MODEL_NAME
+python3 main.py bootstrap --model-save-path="gs://$BUCKET_NAME/models/$MODEL_NAME"
 ```
 
 Self-play
