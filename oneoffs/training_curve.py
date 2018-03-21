@@ -152,10 +152,10 @@ def find_and_filter_sgf_files(base_dir, min_year = None, komi = None):
   sgf_files = []
   count = 0
   print("Finding all sgf files in {} with year >= {} and komi = {}".format(base_dir, min_year, komi))
-  for i, (dirpath, dirnames, filenames) in tqdm(enumerate(os.walk(base_dir))):
+  for i, (dirpath, dirnames, filenames) in enumerate(tqdm(os.walk(base_dir))):
     for filename in filenames:
-      count+=1
-      if count%5000 == 0:
+      count += 1
+      if count % 5000 == 0:
         print("Parsed {}, Found {}".format(count, len(sgf_files)))
       if filename.endswith('.sgf'):
         path = os.sep.join([dirpath, filename])
@@ -172,15 +172,13 @@ def sample_positions_from_games(sgf_files, num_positions=1):
   move_idxs = []
 
   fail_count = 0
-  for i, path in tqdm(enumerate(sgf_files)):
-    if i % 1000 == 0:
-      print(i)
+  for i, path in enumerate(tqdm(sgf_files, desc="loading sgfs", unit="games")):
     try:
       positions, moves, result, props = parse_sgf(path)
+    except KeyboardInterrupt:
+      raise
     except:
-      fail_count+=1
-      print("Fail count: {}".format(fail_count))
-
+      fail_count += 1
       continue
 
     #add entire game
@@ -215,7 +213,7 @@ def get_training_curve_data(model_dir, pos_data, move_data, result_data, idx_sta
 
     avg_acc = np.mean(correct)
     avg_mse = np.mean(squared_errors)
-    print("Model: {}, acc: {}, mse: {}".format(model_paths[idx], avg_acc, avg_mse))
+    print("Model: {}, acc: {:.4f}, mse: {:.4f}".format(model_paths[idx], avg_acc, avg_mse))
     df = df.append({"num": idx, "acc": avg_acc, "mse": avg_mse}, ignore_index=True)
   return df
 
