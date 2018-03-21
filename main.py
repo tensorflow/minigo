@@ -81,18 +81,17 @@ def gtp(load_file: "The path to the network model files"=None,
 def bootstrap(
         working_dir: 'tf.estimator working directory. If not set, defaults to a random tmp dir'=None,
         model_save_path: 'Where to export the first bootstrapped generation'=None):
-    is_temp_dir = False
-    if working_dir is None:
-        working_dir = tempfile.mkdtemp()
-        is_temp_dir = True
-
-    _ensure_dir_exists(working_dir)
-    _ensure_dir_exists(os.path.dirname(model_save_path))
-    dual_net.bootstrap(working_dir)
-    dual_net.export_model(working_dir, model_save_path)
-
-    if is_temp_dir:
-        shutil.rmtree(working_dir)
+    if working_dir is None
+        with tempfile.TemporaryDirectory() as working_dir is None:
+            _ensure_dir_exists(working_dir)
+            _ensure_dir_exists(os.path.dirname(model_save_path))
+            dual_net.bootstrap(working_dir)
+            dual_net.export_model(working_dir, model_save_path)
+    else:
+        _ensure_dir_exists(working_dir)
+        _ensure_dir_exists(os.path.dirname(model_save_path))
+        dual_net.bootstrap(working_dir)
+        dual_net.export_model(working_dir, model_save_path)
 
 
 def train(
