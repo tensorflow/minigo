@@ -18,8 +18,10 @@ import os.path
 import collections
 import random
 import re
+import shutil
 import socket
 import sys
+import tempfile
 import time
 import cloud_logging
 from tqdm import tqdm
@@ -77,19 +79,26 @@ def gtp(load_file: "The path to the network model files"=None,
 
 
 def bootstrap(
-    working_dir: 'tf.estimator working directory.',
-    model_save_path: 'Where to export the first bootstrapped generation'):
-    _ensure_dir_exists(working_dir)
-    _ensure_dir_exists(os.path.dirname(model_save_path))
-    dual_net.bootstrap(working_dir)
-    dual_net.export_model(working_dir, model_save_path)
+        working_dir: 'tf.estimator working directory. If not set, defaults to a random tmp dir'=None,
+        model_save_path: 'Where to export the first bootstrapped generation'=None):
+    if working_dir is None:
+        with tempfile.TemporaryDirectory() as working_dir:
+            _ensure_dir_exists(working_dir)
+            _ensure_dir_exists(os.path.dirname(model_save_path))
+            dual_net.bootstrap(working_dir)
+            dual_net.export_model(working_dir, model_save_path)
+    else:
+        _ensure_dir_exists(working_dir)
+        _ensure_dir_exists(os.path.dirname(model_save_path))
+        dual_net.bootstrap(working_dir)
+        dual_net.export_model(working_dir, model_save_path)
 
 
 def train(
-    working_dir: 'tf.estimator working directory.',
-    chunk_dir: 'Directory where gathered training chunks are.',
-    model_save_path: 'Where to export the completed generation.',
-    generation_num: 'Which generation you are training.'=0):
+        working_dir: 'tf.estimator working directory.',
+        chunk_dir: 'Directory where gathered training chunks are.',
+        model_save_path: 'Where to export the completed generation.',
+        generation_num: 'Which generation you are training.'=0):
     tf_records = sorted(gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz')))
     tf_records = tf_records[-1 * (WINDOW_SIZE // EXAMPLES_PER_RECORD):]
 
@@ -101,10 +110,10 @@ def train(
 
 
 def validate(
-    working_dir: 'tf.estimator working directory',
-    *tf_record_dirs: 'Directories where holdout data are',
-    checkpoint_name: 'Which checkpoint to evaluate (None=latest)'=None,
-    validate_name: 'Name for validation set (i.e. selfplay or human)'=None):
+        working_dir: 'tf.estimator working directory',
+        *tf_record_dirs: 'Directories where holdout data are',
+        checkpoint_name: 'Which checkpoint to evaluate (None=latest)'=None,
+        validate_name: 'Name for validation set (i.e. selfplay or human)'=None):
     tf_records = []
     with timer("Building lists of holdout files"):
         for record_dir in tf_record_dirs:
@@ -113,7 +122,7 @@ def validate(
     with timer("Validating from {} to {}".format(os.path.basename(tf_records[0]),
                                                  os.path.basename(tf_records[-1]))):
         dual_net.validate(working_dir, tf_records, checkpoint_name=checkpoint_name,
-            name=validate_name)
+                          name=validate_name)
 
 
 def evaluate(
