@@ -42,6 +42,7 @@ EXAMPLES_PER_GENERATION = 2000000
 # How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
 TRAIN_BATCH_SIZE = 16
 
+
 class DualNetwork():
     def __init__(self, save_file, **hparams):
         self.save_file = save_file
@@ -57,7 +58,7 @@ class DualNetwork():
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
             estimator_spec = model_fn(features, labels,
-                tf.estimator.ModeKeys.PREDICT, self.hparams)
+                                      tf.estimator.ModeKeys.PREDICT, self.hparams)
             self.inference_input = features
             self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
@@ -97,8 +98,8 @@ def get_inference_input():
 
     Returns the feature, output tensors that get passed into model_fn."""
     return (tf.placeholder(tf.float32,
-                [None, go.N, go.N, features.NEW_FEATURES_PLANES],
-                name='pos_tensor'),
+                           [None, go.N, go.N, features.NEW_FEATURES_PLANES],
+                           name='pos_tensor'),
             {'pi_tensor': tf.placeholder(tf.float32, [None, go.N * go.N + 1]),
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
@@ -210,7 +211,7 @@ def model_fn(features, labels, mode, params, config=None):
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
     l2_cost = params['l2_strength'] * tf.add_n([tf.nn.l2_loss(v)
-        for v in tf.trainable_variables() if not 'bias' in v.name])
+                                                for v in tf.trainable_variables() if not 'bias' in v.name])
     combined_cost = policy_cost + value_cost + l2_cost
     policy_entropy = -tf.reduce_mean(tf.reduce_sum(
         policy_output * tf.log(policy_output), axis=1))
@@ -223,7 +224,6 @@ def model_fn(features, labels, mode, params, config=None):
         train_op = tf.train.MomentumOptimizer(
             learning_rate, params['momentum']).minimize(
                 combined_cost, global_step=global_step)
-
 
     metric_ops = {
         'accuracy': tf.metrics.accuracy(labels=labels['pi_tensor'],
@@ -249,7 +249,7 @@ def model_fn(features, labels, mode, params, config=None):
         loss=combined_cost,
         train_op=train_op,
         eval_metric_ops=metric_ops,
-        )
+    )
 
 
 def get_estimator(working_dir, **hparams):
@@ -296,7 +296,7 @@ def export_model(working_dir, model_path):
         model_path: The path (can be a gs:// path) to export model to
     """
     estimator = tf.estimator.Estimator(model_fn, model_dir=working_dir,
-        params='ignored')
+                                       params='ignored')
     latest_checkpoint = estimator.latest_checkpoint()
     all_checkpoint_files = tf.gfile.Glob(latest_checkpoint + '*')
     for filename in all_checkpoint_files:
@@ -310,7 +310,8 @@ def train(working_dir, tf_records, generation_num, **hparams):
     assert generation_num > 0, "Model 0 is random weights"
     estimator = get_estimator(working_dir, **hparams)
     max_steps = generation_num * EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
-    input_fn = lambda: preprocessing.get_input_tensors(
+
+    def input_fn(): return preprocessing.get_input_tensors(
         TRAIN_BATCH_SIZE, tf_records)
     update_ratio_hook = UpdateRatioSessionHook(working_dir)
     estimator.train(input_fn, hooks=[update_ratio_hook], max_steps=max_steps)
@@ -320,7 +321,8 @@ def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
     estimator = get_estimator(working_dir, **hparams)
     if checkpoint_name is None:
         checkpoint_name = estimator.latest_checkpoint()
-    input_fn = lambda: preprocessing.get_input_tensors(
+
+    def input_fn(): return preprocessing.get_input_tensors(
         TRAIN_BATCH_SIZE, tf_records, shuffle_buffer_size=1000,
         filter_amount=0.05)
     estimator.evaluate(input_fn, steps=1000)
@@ -364,6 +366,6 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
             after_weights = run_context.session.run(self.weight_tensors)
             weight_update_summaries = compute_update_ratio(
                 self.weight_tensors, self.before_weights, after_weights)
-            self.summary_writer.add_summary(weight_update_summaries, global_step)
+            self.summary_writer.add_summary(
+                weight_update_summaries, global_step)
             self.before_weights = None
-

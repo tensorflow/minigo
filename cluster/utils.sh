@@ -82,6 +82,10 @@ function create_service_account_key() {
     echo >&2 "SERVICE_ACCOUNT_KEY_LOCATION is not defined"
     return 1
   fi
+  if [[ -z "${BUCKET_NAME}" ]]; then
+    echo >&2 "BUCKET_NAME is not defined"
+    return 1
+  fi
 
   if ! gcloud iam service-accounts list --project=$PROJECT | grep -q ${SERVICE_ACCOUNT}; then
     echo >&2 "SERVICE_ACCOUNT doesn't exist: creating"
