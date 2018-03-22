@@ -113,16 +113,18 @@ def validate(
         working_dir: 'tf.estimator working directory',
         *tf_record_dirs: 'Directories where holdout data are',
         checkpoint_name: 'Which checkpoint to evaluate (None=latest)'=None,
-        validate_name: 'Name for validation set (i.e. selfplay or human)'=None):
+        validate_name: 'Name for validation set (i.e., selfplay or human)'=None):
     tf_records = []
     with timer("Building lists of holdout files"):
         for record_dir in tf_record_dirs:
             tf_records.extend(gfile.Glob(os.path.join(record_dir, '*.zz')))
 
-    with timer("Validating from {} to {}".format(os.path.basename(tf_records[0]),
-                                                 os.path.basename(tf_records[-1]))):
-        dual_net.validate(working_dir, tf_records, checkpoint_name=checkpoint_name,
-                          name=validate_name)
+    first_record = os.path.basename(tf_records[0])
+    last_record = os.path.basename(tf_records[-1])
+    with timer("Validating from {} to {}".format(first_record, last_record)):
+        dual_net.validate(
+            working_dir, tf_records, checkpoint_name=checkpoint_name,
+            name=validate_name)
 
 
 def evaluate(

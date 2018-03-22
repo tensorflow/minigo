@@ -33,39 +33,36 @@ TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):
-    '''Given current move number and "desired" seconds per move,
-    return how much time should actually be used. To be used specifically
-    for CGOS time controls, which are absolute 15 minute time.
+    '''Given the current move number and the 'desired' seconds per move, return
+    how much time should actually be used. This is intended specifically for
+    CGOS time controls, which has an absolute 15-minute time limit.
 
-    The strategy is to spend the maximum time possible using seconds_per_move,
+    The strategy is to spend the maximum possible moves using seconds_per_move,
     and then switch to an exponentially decaying time usage, calibrated so that
     we have enough time for an infinite number of moves.'''
 
-    # divide by two since you only play half the moves in a game.
+    # Divide by two since you only play half the moves in a game.
     player_move_num = move_num / 2
 
-    # sum of geometric series maxes out at endgame_time seconds.
+    # Sum of geometric series maxes out at endgame_time seconds.
     endgame_time = seconds_per_move / (1 - decay_factor)
 
     if endgame_time > time_limit:
-        # there is so little main time that we're already in "endgame" mode.
+        # There is so little main time that we're already in 'endgame' mode.
         base_time = time_limit * (1 - decay_factor)
-        return base_time * decay_factor ** player_move_num
-
-    # leave over endgame_time seconds for the end, and play at seconds_per_move
-    # for as long as possible
-    core_time = time_limit - endgame_time
-    core_moves = core_time / seconds_per_move
-
-    if player_move_num < core_moves:
-        return seconds_per_move
+        core_moves = 0
     else:
-        return seconds_per_move * decay_factor ** (player_move_num - core_moves)
+        # Leave over endgame_time seconds for the end, and play at
+        # seconds_per_move for as long as possible.
+        base_time = seconds_per_move
+        core_moves = (time_limit - endgame_time) / seconds_per_move
+
+    return base_time * decay_factor ** max(player_move_num - core_moves, 0)
 
 
 class MCTSPlayerMixin:
-    # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
-    # Otherwise, it uses 'seconds_per_move' of wall time'
+    # If `simulations_per_move` is nonzero, it will perform that many reads
+    # before playing. Otherwise, it uses `seconds_per_move` of wall time.
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
                  resign_threshold=-0.90, verbosity=0, two_player_mode=False,
                  num_parallel=8):

@@ -42,7 +42,7 @@ EMPTY_BOARD = np.zeros([N, N], dtype=np.int8)
 
 
 def _check_bounds(c):
-    return c[0] % N == c[0] and c[1] % N == c[1]
+    return 0 <= c[0] < N and 0 <= c[1] < N
 
 
 NEIGHBORS = {(x, y): list(filter(_check_bounds, [

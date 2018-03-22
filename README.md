@@ -266,7 +266,7 @@ gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
 ```
 
 ```bash
-python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
+BOARD_SIZE=19 python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
   --readouts 10 \
   -v 3 \
   --output-dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
@@ -347,7 +347,7 @@ one, and calculate the validation error, writing the tensorboard logs to
 ### Validating on a different set of data
 
 This might be useful if you have some known set of 'good data' to test your
-netowrk against, e.g., a set of pro games.
+network against, e.g., a set of pro games.
 Assuming you've got a set of .sgfs with the proper komi & boardsizes, you'll
 want to preprocess them into the .tfrecord files, by running something similar
 to
@@ -366,7 +366,7 @@ Once you've collected all the files in a directory, producing validation is as
 easy as
 
 ```
-python main.py validate path/to/validation/files/ --load-file=/path/to/model
+BOARD_SIZE=19 python main.py validate path/to/validation/files/ --load-file=/path/to/model
 --logdir=path/to/tb/logs --num-steps=<number of positions to run validation on>
 ```
 
