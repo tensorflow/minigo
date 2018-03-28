@@ -20,86 +20,15 @@
 #include <vector>
 
 #include "absl/strings/ascii.h"
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
-#include "absl/strings/string_view.h"
 #include "cc/constants.h"
+#include "cc/test_utils.h"
 #include "gtest/gtest.h"
 
 namespace minigo {
 namespace {
 
-// A version of the Position class that exposes some protected methods as public
-// for testing purposes.
-class TestablePosition : public Position {
- public:
-  explicit TestablePosition(float komi = 0)
-      : Position(&board_visitor, &group_visitor, komi) {}
-
-  // Convenience functions that automatically parse coords.
-  void PlayMove(absl::string_view str, Color color = Color::kEmpty) {
-    Position::PlayMove(Coord::FromString(str), color);
-  }
-  Group GroupAt(absl::string_view str) const {
-    return Position::GroupAt(Coord::FromString(str));
-  }
-  Color IsKoish(absl::string_view str) const {
-    return Position::IsKoish(Coord::FromString(str));
-  }
-  bool IsMoveSuicidal(absl::string_view str, Color color) const {
-    return Position::IsMoveSuicidal(Coord::FromString(str), color);
-  }
-
-  using Position::PlayMove;
-
-  BoardVisitor board_visitor;
-  GroupVisitor group_visitor;
-};
-
-// Splits a simple board representation into multiple lines, stripping
-// whitespace. Lines are padded with '.' to ensure a kN * kN board.
-std::vector<std::string> SplitBoardString(absl::string_view str) {
-  std::vector<std::string> lines;
-  for (const auto& line : absl::StrSplit(str, '\n')) {
-    std::string stripped(absl::StripAsciiWhitespace(line));
-    if (stripped.empty()) {
-      continue;
-    }
-    assert(stripped.size() <= kN);
-    stripped.resize(kN, '.');
-    lines.push_back(std::move(stripped));
-  }
-  assert(lines.size() <= kN);
-  while (lines.size() < kN) {
-    lines.emplace_back(kN, '.');
-  }
-  return lines;
-}
-
-// Removes extraneous whitespace from a board string and returns it in the same
-// format as Position::ToSimpleString().
-std::string CleanBoardString(absl::string_view str) {
-  return absl::StrJoin(SplitBoardString(str), "\n") + "\n";
-}
-
-TestablePosition ParseBoard(absl::string_view str, float komi = 0) {
-  auto lines = SplitBoardString(str);
-
-  TestablePosition board(komi);
-  for (int row = 0; row < kN; ++row) {
-    for (int col = 0; col < kN; ++col) {
-      if (lines[row][col] == 'X') {
-        board.PlayMove({row, col}, Color::kBlack);
-      } else if (lines[row][col] == 'O') {
-        board.PlayMove({row, col}, Color::kWhite);
-      }
-    }
-  }
-  return board;
-}
-
 TEST(PositionTest, TestIsKoish) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       .X.O.O.O.
       X...O...O
       ...O.....
@@ -130,7 +59,7 @@ TEST(PositionTest, TestIsKoish) {
 }
 
 TEST(PositionTest, TestMergeGroups1) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       .X.
       X.X
       .X.)");
@@ -154,7 +83,7 @@ TEST(PositionTest, TestMergeGroups1) {
 }
 
 TEST(PositionTest, TestMergeGroups2) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       .........
       .........
       .........
@@ -188,7 +117,7 @@ TEST(PositionTest, TestMergeGroups2) {
 }
 
 TEST(PositionTest, TestCaptureStone) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       .........
       .........
       .........
@@ -218,7 +147,7 @@ TEST(PositionTest, TestCaptureStone) {
 }
 
 TEST(PositionTest, TestCaptureMany1) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       .....
       .....
       ..XX.
@@ -250,7 +179,7 @@ TEST(PositionTest, TestCaptureMany1) {
 }
 
 TEST(PositionTest, TestCaptureMany2) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       ..X..
       .XOX.
       XO.OX
@@ -280,7 +209,7 @@ TEST(PositionTest, TestCaptureMany2) {
 }
 
 TEST(PositionTest, TestCaptureMultipleGroups) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       .OX
       OXX
       XX.)");
@@ -301,7 +230,7 @@ TEST(PositionTest, TestCaptureMultipleGroups) {
 }
 
 TEST(PositionTest, TestSameFriendlyGroupNeighboringTwice) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       OO
       O.)");
 
@@ -318,7 +247,7 @@ TEST(PositionTest, TestSameFriendlyGroupNeighboringTwice) {
 }
 
 TEST(PositionTest, TestSameOpponentGroupNeighboringTwice) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       OO
       O.)");
 
@@ -339,7 +268,7 @@ TEST(PositionTest, TestSameOpponentGroupNeighboringTwice) {
 }
 
 TEST(PositionTest, IsMoveSuicidal) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       ...O.O...
       ....O....
       XO.....O.
@@ -361,7 +290,7 @@ TEST(PositionTest, IsMoveSuicidal) {
 
 // Tests ko tracking.
 TEST(PositionTest, TestKoTracking) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
       XOXO.....
       .........)");
 
@@ -403,7 +332,7 @@ TEST(PositionTest, TestKoTracking) {
 }
 
 TEST(PositionTest, TestSeki) {
-  auto board = ParseBoard(R"(
+  auto board = TestablePosition(R"(
     O....XXXX
     .....XOOO
     .....XOX.
@@ -418,17 +347,20 @@ TEST(PositionTest, TestSeki) {
 }
 
 TEST(PositionTest, TestScoring) {
-  EXPECT_EQ(0, TestablePosition().CalculateScore());
-  EXPECT_EQ(-42, TestablePosition(42).CalculateScore());
-  EXPECT_EQ(kN * kN, ParseBoard("X").CalculateScore());
-  EXPECT_EQ(-kN * kN, ParseBoard("O").CalculateScore());
+  EXPECT_EQ(0, TestablePosition("").CalculateScore());
+  EXPECT_EQ(-42, TestablePosition("", 42).CalculateScore());
+  EXPECT_EQ(kN * kN, TestablePosition("X").CalculateScore());
+  EXPECT_EQ(-kN * kN, TestablePosition("O").CalculateScore());
 
-  auto board = ParseBoard(R"(
+  {
+    auto board = TestablePosition(R"(
     .X.
     X.O)");
-  EXPECT_EQ(2, board.CalculateScore());
+    EXPECT_EQ(2, board.CalculateScore());
+  }
 
-  board = ParseBoard(R"(
+  {
+    auto board = TestablePosition(R"(
    .XX......
    OOXX.....
    OOOX...X.
@@ -438,10 +370,12 @@ TEST(PositionTest, TestScoring) {
    .O.OOXOOX
    .O.O.OOXX
    ......OOO)",
-                     6.5);
-  EXPECT_EQ(1.5, board.CalculateScore());
+                                  6.5);
+    EXPECT_EQ(1.5, board.CalculateScore());
+  }
 
-  board = ParseBoard(R"(
+  {
+    auto board = TestablePosition(R"(
    XXX......
    OOXX.....
    OOOX...X.
@@ -451,8 +385,9 @@ TEST(PositionTest, TestScoring) {
    .O.OOXOOX
    .O.O.OOXX
    ......OOO)",
-                     6.5);
-  EXPECT_EQ(2.5, board.CalculateScore());
+                                  6.5);
+    EXPECT_EQ(2.5, board.CalculateScore());
+  }
 }
 
 // Plays through an example game and verifies that the outcome is as expected.
@@ -467,7 +402,7 @@ TEST(PositionTest, PlayGame) {
       "hh", "ba", "ai", "ac", "bi", "da", "di", "ab", "eh", "bc", "gh",
   };
 
-  TestablePosition board(7.5);
+  TestablePosition board("", kDefaultKomi);
   for (const auto& move : moves) {
     board.PlayMove(move);
     // std::cout << board.ToPrettyString() << std::endl;

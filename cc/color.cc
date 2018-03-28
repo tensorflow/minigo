@@ -23,9 +23,9 @@ std::ostream& operator<<(std::ostream& os, Color color) {
     case Color::kEmpty:
       return os << ".";
     case Color::kBlack:
-      return os << "X";
+      return os << "B";
     case Color::kWhite:
-      return os << "O";
+      return os << "W";
     default:
       assert(false);
       return os << "<" << static_cast<int>(color) << ">";

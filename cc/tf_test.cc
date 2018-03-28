@@ -15,110 +15,59 @@
 #include <memory>
 #include <vector>
 
-#include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/dual_net.h"
-#include "cc/position.h"
+#include "cc/mcts_player.h"
+#include "gflags/gflags.h"
 
-constexpr char kPrintWhite[] = "\x1b[0;31;47m";
-constexpr char kPrintBlack[] = "\x1b[0;31;40m";
-constexpr char kPrintEmpty[] = "\x1b[0;31;43m";
-constexpr char kPrintNormal[] = "\x1b[0m";
+DEFINE_uint64(seed, 0,
+              "Random seed. Use default value of 0 to use a time-based seed.");
+DEFINE_double(resign_threshold, -0.9, "Resign threshold.");
+DEFINE_double(komi, minigo::kDefaultKomi, "Komi.");
+DEFINE_bool(inject_noise, true,
+            "If true, inject noise into the root position at the start of "
+            "each tree search.");
+DEFINE_bool(soft_pick, true,
+            "If true, choose moves early in the game with a probability "
+            "proportional to the number of times visited during tree search. "
+            "If false, always play the best move.");
+DEFINE_bool(random_symmetry, true,
+            "If true, randomly flip & rotate the board features before running "
+            "the model and apply the inverse transform to the results.");
+DEFINE_string(model, "",
+              "Path to a minigo model serialized as a GraphDef proto.");
+DEFINE_int32(num_readouts, 100,
+             "Number of readouts to make during tree search for each move.");
+DEFINE_int32(batch_size, 8,
+             "Number of readouts to run inference on in parallel.");
 
-namespace minigo {
+// Self play flags:
+//   --inject_noise=true
+//   --soft_pick=true
+//   --random_symmetery=true
+//
+// Two player flags:
+//   --inject_noise=false
+//   --soft_pick=false
+//   --random_symmetry=true
 
-class SimplePlayer {
- public:
-  SimplePlayer() : position_(&bv_, &gv_) {
-    dual_net_.Initialize("/tmp/graph/test.pb");
-  }
+int main(int argc, char* argv[]) {
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  bool PlayMove() {
-    // Run the network.
-    auto output = dual_net_.Run(position_);
-    if (!output.status.ok()) {
-      return false;
-    }
+  minigo::DualNet dual_net;
+  dual_net.Initialize(FLAGS_model);
 
-    // Clear the screen.
-    printf("\e[1;1H\e[2J");
+  minigo::MctsPlayer::Options options;
+  options.random_seed = FLAGS_seed;
+  options.resign_threshold = FLAGS_resign_threshold;
+  options.komi = FLAGS_komi;
+  options.inject_noise = FLAGS_inject_noise;
+  options.soft_pick = FLAGS_soft_pick;
+  options.random_symmetry = FLAGS_random_symmetry;
+  options.batch_size = FLAGS_batch_size;
 
-    // Print the output of the network.
-    for (int row = 0; row < kN; ++row) {
-      for (int col = 0; col < kN; ++col) {
-        auto color = position_.stones()[row * kN + col].color();
-        if (color == Color::kEmpty) {
-          printf(kPrintEmpty);
-        } else if (color == Color::kBlack) {
-          printf(kPrintBlack);
-        } else if (color == Color::kWhite) {
-          printf(kPrintWhite);
-        }
-        float policy = output.policy.tensor<float, 2>()(0, row * kN + col);
-        if (policy > 0.001) {
-          printf(" %04.1f", 100 * policy);
-        } else {
-          printf(" .   ");
-        }
-      }
-      printf("\n");
-      for (int col = 0; col < kN; ++col) {
-        auto color = position_.stones()[row * kN + col].color();
-        if (color == Color::kEmpty) {
-          printf(kPrintEmpty);
-        } else if (color == Color::kBlack) {
-          printf(kPrintBlack);
-        } else if (color == Color::kWhite) {
-          printf(kPrintWhite);
-        }
-        printf("     ");
-      }
-      printf("\n");
-    }
-    printf(kPrintNormal);
-    printf("pass: %04.1f\n",
-           100 * output.policy.tensor<float, 2>()(0, kN * kN));
-    printf("value: %+f\n", output.value.scalar<float>()());
+  minigo::MctsPlayer player(&dual_net, options);
+  player.SelfPlay(FLAGS_num_readouts);
 
-    // Find the best move.
-    Coord best_move = Coord::kPass;
-    float best_policy = output.policy.tensor<float, 2>()(0, kN * kN);
-    for (int row = 0; row < kN; ++row) {
-      for (int col = 0; col < kN; ++col) {
-        auto color = position_.stones()[row * kN + col].color();
-        float policy = output.policy.tensor<float, 2>()(0, row * kN + col);
-        if (color == Color::kEmpty && policy > best_policy &&
-            position_.IsMoveLegal({row, col}, position_.to_play())) {
-          best_policy = policy;
-          best_move = Coord(row, col);
-        }
-      }
-    }
-
-    // Play the best move.
-    auto best_move_str = best_move.ToKgs();
-    printf("\n=== To play: %s\n",
-           position_.to_play() == Color::kBlack ? "B" : "W");
-    printf("=== Playing move: %s\n\n", best_move_str.c_str());
-    position_.PlayMove(best_move);
-    fflush(stdout);
-
-    return true;
-  }
-
- private:
-  DualNet dual_net_;
-  BoardVisitor bv_;
-  GroupVisitor gv_;
-  Position position_;
-};
-
-}  // namespace minigo
-
-int main() {
-  minigo::SimplePlayer player;
-  for (int i = 0; i < 500; ++i) {
-    player.PlayMove();
-  }
   return 0;
 }

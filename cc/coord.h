@@ -29,7 +29,8 @@ namespace minigo {
 // Coord::kPass, a pass move.
 class Coord {
  public:
-  static constexpr uint16_t kPass = 0xffff;
+  static constexpr uint16_t kPass = kN * kN;
+  static constexpr uint16_t kInvalid = 0xffff;
   static constexpr char kKgsColumns[] = "ABCDEFGHJKLMNOPQRST";
 
   Coord(uint16_t value) : value_(value) {}  // NOLINT(runtime/explicit)

@@ -20,37 +20,80 @@
 #include <utility>
 #include <vector>
 
+#include "cc/constants.h"
 #include "cc/position.h"
+#include "cc/random.h"
+#include "cc/symmetries.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/public/session.h"
 
 namespace minigo {
 
+// The input features to the DualNet neural network have 17 binary feature
+// planes. 8 feature planes X_t indicate the presence of the current player's
+// stones at time t. A further 8 feature planes Y_t indicate the presence of
+// the opposing player's stones at time t. The final feature plane C holds all
+// 1s if black is to play, or 0s if white is to play. The planes are
+// concatenated together to give input features:
+//   [X_t, Y_t, X_t-1, Y_t-1, ..., X_t-7, Y_t-7, C].
 class DualNet {
  public:
+  // Number of features per stone.
+  static constexpr int kNumStoneFeatures = 17;
+
+  // Index of the per-stone feature that describes whether the black or white
+  // player is to play next.
+  static constexpr int kPlayerFeature = 16;
+
+  // Total number of features for the board.
+  static constexpr int kNumBoardFeatures = kN * kN * kNumStoneFeatures;
+
+  using StoneFeatures = std::array<float, kNumStoneFeatures>;
+  using BoardFeatures = std::array<float, kNumBoardFeatures>;
+
+  // Initializes the input features so that the C feature plane is taken from
+  // position.to_play(), and position.stones() are copied into all X and Y
+  // feature planes (that is: X_t .. X_t-7 are identical and Y_t .. Y_t-7 are
+  // identical).
+  static void InitializeFeatures(const Position& position,
+                                 BoardFeatures* features);
+
+  // Updates the input features after the move position.previous_move() was
+  // played.
+  // old_features holds the input features for the network prior to
+  // position.previous_move() being played.
+  // position.stones() holds the board state after position.previous_move() was
+  // played.
+  // The updated input features for the network are written to new_features.
+  // old_features and new_features are allowed to be the same object.
+  static void UpdateFeatures(const BoardFeatures& old_features,
+                             const Position& position,
+                             BoardFeatures* new_features);
+
   struct Output {
-    tensorflow::Status status;
-    tensorflow::Tensor policy;
-    tensorflow::Tensor value;
+    std::array<float, kNumMoves> policy;
+    float value;
   };
 
   DualNet();
-  ~DualNet();
+  virtual ~DualNet();
 
   tensorflow::Status Initialize(const std::string& graph_path);
 
-  Output Run(const Position& position);
-
-  const tensorflow::Tensor& features() const { return inputs_[0].second; }
+  // Runs the model on a batch of input features.
+  // If rnd != nullptr, the features will be randomly rotated and mirrored
+  // before running the model, then the inverse transform applied to the
+  // returned policy array.
+  virtual void RunMany(absl::Span<const BoardFeatures* const> features,
+                       absl::Span<Output> outputs, Random* rnd = nullptr);
 
  private:
-  void UpdateFeatures(const Position& position);
-
   std::unique_ptr<tensorflow::Session> session_;
   std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
   std::vector<std::string> output_names_;
   std::vector<tensorflow::Tensor> outputs_;
+  std::vector<symmetry::Symmetry> symmetries_used_;
 };
 
 }  // namespace minigo

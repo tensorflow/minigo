@@ -22,6 +22,7 @@
 namespace minigo {
 
 constexpr uint16_t Coord::kPass;
+constexpr uint16_t Coord::kInvalid;
 constexpr char Coord::kKgsColumns[];
 
 namespace {
@@ -92,6 +93,8 @@ Coord Coord::FromString(absl::string_view str) {
 std::string Coord::ToKgs() const {
   if (*this == kPass) {
     return "pass";
+  } else if (*this == kInvalid) {
+    return "invalid";
   }
   int row = value_ / kN;
   int col = value_ % kN;
@@ -102,6 +105,8 @@ std::string Coord::ToKgs() const {
 std::ostream& operator<<(std::ostream& os, Coord c) {
   if (c == Coord::kPass) {
     return os << "pass";
+  } else if (c == Coord::kInvalid) {
+    return os << "invalid";
   } else {
     uint16_t value = c;
     int row = value / kN;

@@ -20,8 +20,10 @@
 #include "cc/position.h"
 
 using minigo::BoardVisitor;
+using minigo::Color;
 using minigo::Coord;
 using minigo::GroupVisitor;
+using minigo::kDefaultKomi;
 using minigo::Position;
 
 namespace {
@@ -66,7 +68,7 @@ void BM_PlayGame(benchmark::State& state) {  // NOLINT(runtime/references)
       // For a fair comparison with the Python performance, create a new board
       // for each move.
       boards.clear();
-      boards.emplace_back(&bv, &gv, 7.5);
+      boards.emplace_back(&bv, &gv, kDefaultKomi, Color::kBlack);
       for (const auto& move : moves) {
         boards.push_back(boards.back());
         boards.back().PlayMove(move);

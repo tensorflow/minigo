@@ -128,12 +128,25 @@ class GroupVisitor {
 // instances of the Position class.
 class Position {
  public:
-  Position(BoardVisitor* bv, GroupVisitor* gv, float komi = 0)
-      : board_visitor_(bv), group_visitor_(gv), komi_(komi) {}
+  Position(BoardVisitor* bv, GroupVisitor* gv, float komi, Color to_play,
+           int n = 0);
+
+  // Copies the position's state from another instance, while preserving the
+  // BoardVisitor and GroupVisitor it was constructed with.
+  Position(BoardVisitor* bv, GroupVisitor* gv, const Position& other);
+
   Position(const Position&) = default;
   Position& operator=(const Position&) = default;
 
   void PlayMove(Coord c, Color color = Color::kEmpty);
+
+  // Adds the stone to the board.
+  // Removes newly surrounded opponent groups.
+  // Updates liberty counts of remaining groups.
+  // Updates num_captures_.
+  // If the move captures a single stone, sets ko_ to the coordinate of that
+  // stone. Sets ko_ to kInvalid otherwise.
+  void AddStoneToBoard(Coord c, Color color);
 
   const std::array<int, 2>& num_captures() const { return num_captures_; }
 
@@ -142,14 +155,17 @@ class Position {
   float CalculateScore();
 
   // Returns true if playing this move is legal.
-  bool IsMoveLegal(Coord c, Color color) const;
+  bool IsMoveLegal(Coord c) const;
 
   std::string ToSimpleString() const;
   std::string ToGroupString() const;
   std::string ToPrettyString() const;
 
   Color to_play() const { return to_play_; }
+  Coord previous_move() const { return previous_move_; }
   const std::array<Stone, kN * kN>& stones() const { return stones_; }
+  int n() const { return n_; }
+  bool is_game_over() const { return num_consecutive_passes_ >= 2; }
 
   // The following methods are protected to enable direct testing by unit tests.
  protected:
@@ -163,14 +179,6 @@ class Position {
   // sides by stones of color C.
   // Returns Color::kEmpty otherwise.
   Color IsKoish(Coord c) const;
-
-  // Adds the stone to the board.
-  // Removes newly surrounded opponent groups.
-  // Updates liberty counts of remaining groups.
-  // Updates num_captures_.
-  // If the move captures a single stone, sets ko_ to the coordinate of that
-  // stone. Sets ko_ to kPass otherwise.
-  void AddStoneToBoard(Coord c, Color color);
 
   // Returns true if playing this move is suicidal.
   bool IsMoveSuicidal(Coord c, Color color) const;
@@ -196,13 +204,15 @@ class Position {
   GroupVisitor* group_visitor_;
   GroupPool groups_;
 
-  Color to_play_ = Color::kBlack;
-  Coord ko_ = Coord::kPass;
+  Color to_play_;
+  Coord previous_move_ = Coord::kInvalid;
+  Coord ko_ = Coord::kInvalid;
 
   // Number of captures for (B, W).
   std::array<int, 2> num_captures_ = {0, 0};
 
-  int n_ = 0;
+  int n_;
+  int num_consecutive_passes_ = 0;
   float komi_;
 };
 

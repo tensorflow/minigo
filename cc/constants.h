@@ -27,6 +27,13 @@ constexpr int kN = MINIGO_BOARD_SIZE;
 // kN * kN possible points on the board, plus pass.
 constexpr int kNumMoves = kN * kN + 1;
 
+// 505 moves for 19x19, 113 for 9x9.
+constexpr int kMaxSearchDepth = static_cast<int>(kN * kN * 1.4);
+
+constexpr float kDefaultKomi = 7.5;
+
+constexpr float kDirichletAlpha = 0.03f * 361 / (kN * kN);
+
 }  // namespace minigo
 
 #endif  //  CC_CONSTANTS_H_

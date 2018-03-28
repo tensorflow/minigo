@@ -29,11 +29,6 @@ constexpr char kPrintBlack[] = "\x1b[0;31;40m";
 constexpr char kPrintEmpty[] = "\x1b[0;31;43m";
 constexpr char kPrintNormal[] = "\x1b[0m";
 
-inline Color OtherColor(Color color) {
-  assert(color != Color::kEmpty);
-  return color == Color::kWhite ? Color::kBlack : Color::kWhite;
-}
-
 std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
   std::array<inline_vector<Coord, 4>, kN * kN> result;
   for (int row = 0; row < kN; ++row) {
@@ -59,23 +54,42 @@ std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
 inline const inline_vector<Coord, 4>& GetNeighborCoords(Coord c) {
   return kNeighborCoords[c];
 }
+
 }  // namespace
 
+Position::Position(BoardVisitor* bv, GroupVisitor* gv, float komi,
+                   Color to_play, int n)
+    : board_visitor_(bv),
+      group_visitor_(gv),
+      to_play_(to_play),
+      n_(n),
+      komi_(komi) {}
+
+Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
+    : Position(position) {
+  board_visitor_ = bv;
+  group_visitor_ = gv;
+}
+
 void Position::PlayMove(Coord c, Color color) {
-  if (color == Color::kEmpty) {
-    color = to_play_;
-  }
   if (c == Coord::kPass) {
     PassMove();
     return;
   }
 
-  assert(IsMoveLegal(c, color));
+  if (color == Color::kEmpty) {
+    color = to_play_;
+  } else {
+    to_play_ = color;
+  }
+  assert(IsMoveLegal(c));
 
   AddStoneToBoard(c, color);
 
   n_ += 1;
+  num_consecutive_passes_ = 0;
   to_play_ = OtherColor(to_play_);
+  previous_move_ = c;
 }
 
 std::string Position::ToSimpleString() const {
@@ -151,8 +165,10 @@ std::string Position::ToPrettyString() const {
 
 void Position::PassMove() {
   n_ += 1;
-  ko_ = Coord::kPass;
+  num_consecutive_passes_ += 1;
+  ko_ = Coord::kInvalid;
   to_play_ = OtherColor(to_play_);
+  previous_move_ = Coord::kPass;
 }
 
 void Position::AddStoneToBoard(Coord c, Color color) {
@@ -240,7 +256,7 @@ void Position::AddStoneToBoard(Coord c, Color color) {
       potential_ko == opponent_color) {
     ko_ = captured_groups[0].second;
   } else {
-    ko_ = Coord::kPass;
+    ko_ = Coord::kInvalid;
   }
 }
 
@@ -327,7 +343,7 @@ Color Position::IsKoish(Coord c) const {
   return ko_color;
 }
 
-bool Position::IsMoveLegal(Coord c, Color color) const {
+bool Position::IsMoveLegal(Coord c) const {
   if (c == Coord::kPass) {
     return true;
   }
@@ -337,7 +353,7 @@ bool Position::IsMoveLegal(Coord c, Color color) const {
   if (c == ko_) {
     return false;
   }
-  if (IsMoveSuicidal(c, color)) {
+  if (IsMoveSuicidal(c, to_play_)) {
     return false;
   }
   return true;

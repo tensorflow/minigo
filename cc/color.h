@@ -15,6 +15,7 @@
 #ifndef CC_COLOR_H_
 #define CC_COLOR_H_
 
+#include <cassert>
 #include <iostream>
 
 namespace minigo {
@@ -27,6 +28,11 @@ enum class Color {
   kBlack,
   kWhite,
 };
+
+inline Color OtherColor(Color color) {
+  assert(color == Color::kWhite || color == Color::kBlack);
+  return color == Color::kWhite ? Color::kBlack : Color::kWhite;
+}
 
 std::ostream& operator<<(std::ostream& os, Color color);
 
