@@ -16,7 +16,6 @@
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/span.h"
 
 namespace minigo {
 

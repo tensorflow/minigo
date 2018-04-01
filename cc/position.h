@@ -26,6 +26,7 @@
 #include "cc/constants.h"
 #include "cc/coord.h"
 #include "cc/group.h"
+#include "cc/inline_vector.h"
 #include "cc/stone.h"
 
 namespace minigo {

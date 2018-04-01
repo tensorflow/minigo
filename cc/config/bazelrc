@@ -1,0 +1,3 @@
+build:minigo9 --copt=-DMINIGO_BOARD_SIZE=9
+build:minigo19 --copt=-DMINIGO_BOARD_SIZE=19
+

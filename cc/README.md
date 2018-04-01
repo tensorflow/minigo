@@ -23,10 +23,20 @@ directory. The tensorflow cc\_library build target in cc/BUILD pulls these
 header & library files together into a format the Bazel understands how to link
 against.
 
+## Building
+
+The C++ Minigo implementation requires that the board size be defined at compile
+time, using the MINIGO\_BOARD\_SIZE preprocessor define. To support this, the
+Bazel build rules provide two configurations: minigo9 and minigo19.
+
+Pass --config=minigo9 when invoking bazel to build Minigo for a 9x9 board.
+Pass --config=minigo19 when invoking bazel to build Minigo for a 19x19 board.
+
 ## Running the unit tests
 
 ```shell
-bazel test cc:all
+bazel test --config=minigo9 cc/...
+bazel test --config=minigo19 cc/...
 ```
 
 ## Design
