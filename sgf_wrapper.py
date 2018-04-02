@@ -160,7 +160,7 @@ def replay_sgf(sgf_contents):
     komi = 0
     if props.get('KM') != None:
         komi = float(sgf_prop(props.get('KM')))
-    result = utils.parse_game_result(sgf_prop(props.get('RE')))
+    result = utils.parse_game_result(sgf_prop(props.get('RE', '')))
 
     pos = Position(komi=komi)
     current_node = game.root

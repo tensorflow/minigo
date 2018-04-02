@@ -17,23 +17,17 @@ import sys
 sys.path.insert(0, '.')
 
 import go
-import dual_net
-import evaluation
-import utils
-import rl_loop
-import os
-import shipname
+import os.path
+
 import numpy as np
 import matplotlib.pyplot as plt
-import coords
 import pandas as pd
 import tensorflow as tf
-import oneoff_utils
-
 from tqdm import tqdm
+
+import coords
 from gtp_wrapper import MCTSPlayer
-from utils import logged_timer as timer
-from tensorflow import gfile
+import oneoff_utils
 
 tf.app.flags.DEFINE_string("sgf_dir", "sgf/baduk_db/", "sgf database")
 
@@ -52,31 +46,6 @@ tf.app.flags.DEFINE_integer("eval_every", 5,
                             "Eval every k models to generate the curve")
 
 FLAGS = tf.app.flags.FLAGS
-
-
-def get_model_paths(model_dir):
-    '''Returns all model paths in the model_dir.'''
-    all_models = gfile.Glob(os.path.join(model_dir, '*.meta'))
-    model_filenames = [os.path.basename(m) for m in all_models]
-    model_numbers_names = [
-        (shipname.detect_model_num(m), shipname.detect_model_name(m))
-        for m in model_filenames]
-    model_names = sorted(model_numbers_names)
-    return [os.path.join(model_dir, name[1]) for name in model_names]
-
-
-def load_player(model_path):
-    print("Loading weights from %s ... " % model_path)
-    with timer("Loading weights from %s ... " % model_path):
-        network = dual_net.DualNetwork(model_path)
-        network.name = os.path.basename(model_path)
-    player = MCTSPlayer(network, verbosity=2)
-    return player
-
-
-def restore_params(model_path, player):
-    with player.network.sess.graph.as_default():
-        player.network.initialize_weights(model_path)
 
 
 def batch_run_many(player, positions, batch_size=100):
@@ -108,7 +77,7 @@ def sample_positions_from_games(sgf_files, num_positions=1):
     move_idxs = []
 
     fail_count = 0
-    for i, path in enumerate(tqdm(sgf_files, desc="loading sgfs", unit="games")):
+    for path in tqdm(sgf_files, desc="loading sgfs", unit="games"):
         try:
             positions, moves, result, props = parse_sgf(path)
         except KeyboardInterrupt:
@@ -134,21 +103,23 @@ def sample_positions_from_games(sgf_files, num_positions=1):
     return pos_data, move_data, result_data, move_idxs
 
 
-def get_training_curve_data(model_dir, pos_data, move_data, result_data, idx_start=150, eval_every=10):
-    model_paths = get_model_paths(model_dir)
+def get_training_curve_data(
+        model_dir, pos_data, move_data, result_data, idx_start, eval_every):
+    model_paths = oneoff_utils.get_model_paths(model_dir)
     df = pd.DataFrame()
     player = None
 
-    print("Evaluating models {}-{}, eval_every={}".format(idx_start,
-                                                          len(model_paths), eval_every))
+    print("Evaluating models {}-{}, eval_every={}".format(
+        idx_start, len(model_paths), eval_every))
     for idx in tqdm(range(idx_start, len(model_paths), eval_every)):
         if player:
-            restore_params(model_paths[idx], player)
+            oneoff_utils.restore_params(model_paths[idx], player)
         else:
-            player = load_player(model_paths[idx])
+            player = oneoff_utils.load_player(model_paths[idx])
 
         correct, squared_errors = eval_player(
-            player=player, positions=pos_data, moves=move_data, results=result_data)
+            player=player, positions=pos_data,
+            moves=move_data, results=result_data)
 
         avg_acc = np.mean(correct)
         avg_mse = np.mean(squared_errors)
@@ -164,7 +135,7 @@ def save_plots(data_dir, df):
     plt.xlabel("Model idx")
     plt.ylabel("Accuracy")
     plt.title("Accuracy in Predicting Professional Moves")
-    plot_path = os.sep.join([data_dir, "move_acc.pdf"])
+    plot_path = os.path.join(data_dir, "move_acc.pdf")
     plt.savefig(plot_path)
 
     plt.figure()
@@ -173,7 +144,7 @@ def save_plots(data_dir, df):
     plt.xlabel("Model idx")
     plt.ylabel("MSE/4")
     plt.title("MSE in predicting outcome")
-    plot_path = os.sep.join([data_dir, "value_mse.pdf"])
+    plot_path = os.path.join(data_dir, "value_mse.pdf")
     plt.savefig(plot_path)
 
 
@@ -183,7 +154,7 @@ def main(unusedargv):
     pos_data, move_data, result_data, move_idxs = sample_positions_from_games(
         sgf_files=sgf_files, num_positions=FLAGS.num_positions)
     df = get_training_curve_data(FLAGS.model_dir, pos_data, move_data,
-                                 result_data, FLAGS.idx_start, eval_every=FLAGS.eval_every)
+                                 result_data, FLAGS.idx_start, FLAGS.eval_every)
     save_plots(FLAGS.plot_dir, df)
 
 
