@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<html>
+  <head>
+    <title>minigo</title>
+    <link href="style.css" rel="stylesheet">
+    <script type="text/javascript" src="socketio/socket.io.min.js"></script>
+    <script data-main="minigui" src="require/require.js"></script>
+  </head>
+  <body>
+    <div id="ui-container" class="hidden">
+      <div id="main-board"></div>
+      <div class="sp-30"></div>
+      <div class="fs-0">
+        <div id="search-board"></div>
+        <div class="sp-30"></div>
+        <div id="n-board"></div>
+        <div class="sp-30"></div>
+        <div id="q-board"></div>
+      </div>
+      <div class="sp-30"></div>
+      <div class="fs-0">
+        <div class="fs-0">
+          <div id="black-player" class="button">Human</div>
+          <div class="sp-20"></div>
+          <div id="white-player" class="button">Human</div>
+          <div class="sp-20"></div>
+          <div id="pass" class="grey button">Pass</div>
+          <div class="sp-20"></div>
+          <div id="reset" class="grey button">Reset</div>
+        </div>
+        <div class="sp-30"></div>
+        <div id="q-graph"></div>
+        <div class="sp-30"></div>
+        <div class="log-container">
+          <div id="log"></div>
+          <div class="console-wrapper">
+            <div class="console-prompt">&gt;</div><div contenteditable id="console"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="mode">play</div>
+  </body>
+</html>

@@ -1,0 +1,135 @@
+// Copyright 2018 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Let's not worry about Socket.io type safety for now.
+declare var io: any;
+
+type DebugHandler = (msg: string) => void;
+type CmdHandler = (cmd: string, result: string) => void;
+type StderrHandler = (line: string) => void;
+type ConnectCallback = () => void;
+
+// The GtpSocket serializes all calls to send so that only one call is ever
+// outstanding at a time. This isn't strictly necessary, but it makes reading
+// the debug logs easier because we don't end up with request and result logs
+// all jumbled up.
+class Socket {
+  private sock: any;
+  private cmdQueue = new Array<{cmd: string, callback: CmdHandler | null}>();
+  private gameToken: string;
+  private handshakeComplete = false;
+  private connectCallback: ConnectCallback | null = null;
+
+  private stderrHandlers = new Array<{prefix: string, handler: StderrHandler}>();
+
+  constructor(uri: string, private debugHandler: DebugHandler) {
+    this.sock = io.connect(uri)
+    this.debugHandler = debugHandler;
+
+    this.sock.on('connect', () => {
+      this.newSession();
+      if (this.connectCallback) {
+        this.connectCallback();
+      }
+     });
+
+    this.sock.on('json', (msg: string) => {
+      let obj = JSON.parse(msg);
+      if (obj.token != this.gameToken) {
+        console.log('ignoring', obj, `${obj.token} != ${this.gameToken}`);
+        return;
+      }
+
+      if (obj.stdout !== undefined) {
+        if (obj.stdout.trim() != '') {
+          this.cmdHandler(obj.stdout);
+        }
+      } else if (obj.stderr !== undefined) {
+        this.stderrHandler(obj.stderr);
+      }
+    });
+  }
+
+  onConnect(callback: ConnectCallback) {
+    this.connectCallback = callback;
+  }
+
+  addStderrHandler(prefix: string, handler: StderrHandler) {
+    this.stderrHandlers.push({prefix: prefix, handler: handler});
+  }
+
+  send(cmd: string, callback?: CmdHandler) {
+    this.cmdQueue.push({cmd: cmd, callback: callback || null});
+    if (this.cmdQueue.length == 1) {
+      this.sendNext();
+    }
+  }
+
+  newSession() {
+    // Generates a new, unique session token and sends it to the server via
+    // a special echo __NEW_TOKEN__ command. The server forwards this on to its
+    // child Minigo process, which echos it back to the server after finishing
+    // processing any other outstanding work. The server's stdout/stderr
+    // handling logic in std_bg_thread looks for the __NEW_TOKEN__ string,
+    // extracts the session token and then attaches that token to all subsequent
+    // messages sent to the frontend.
+    this.cmdQueue = [];
+    let token = `session-id-${Date.now()}`;
+    this.gameToken = token;
+    let cmd = `echo __NEW_TOKEN__ ${token}`;
+    this.sock.emit('gtpcmd', {data: cmd});
+  }
+
+  private cmdHandler(result: string) {
+    let {cmd, callback} = this.cmdQueue[0];
+    this.cmdQueue = this.cmdQueue.slice(1);
+
+    if (this.debugHandler) {
+      this.debugHandler(`<- ${cmd} ${result == "=" ? "= 👍" : result}`);
+    }
+
+    if (this.cmdQueue.length > 0) {
+      this.sendNext();
+    }
+
+    if (callback) {
+      result = result.substr(1).trim();
+      callback(cmd, result);
+    }
+  }
+
+  private stderrHandler(line: string) {
+    for (let {prefix, handler} of this.stderrHandlers) {
+      if (line.substr(0, prefix.length) == prefix) {
+        handler(line.substr(prefix.length));
+        break;
+      }
+    }
+  }
+
+  private sendNext() {
+    let {cmd, callback} = this.cmdQueue[0];
+    if (this.debugHandler) {
+      this.debugHandler(`-> ${cmd}`);
+    }
+    this.sock.emit('gtpcmd', {data: cmd});
+  }
+}
+
+export {
+  CmdHandler,
+  DebugHandler,
+  Socket,
+  StderrHandler,
+};

@@ -186,6 +186,7 @@ class MCTSPlayerMixin:
             for leaf, move_prob, value in zip(leaves, move_probs, values):
                 leaf.revert_virtual_loss(up_to=self.root)
                 leaf.incorporate_results(move_prob, value, up_to=self.root)
+        return leaves
 
     def show_path_to_root(self, node):
         pos = node.position

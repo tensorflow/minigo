@@ -50,7 +50,7 @@ class GtpInterface(object):
         self.position.komi = komi
 
     def clear(self):
-        if self.position and len(self.position.recent) > 1:
+        if self.position and self.result_string and len(self.position.recent) > 1:
             try:
                 sgf = self.to_sgf()
                 with open(datetime.datetime.now().strftime("%Y-%m-%d-%H:%M.sgf"), 'w') as f:
@@ -118,9 +118,6 @@ class CGOSPlayer(CGOSPlayerMixin, GtpInterface):
 
 def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1, cgos_mode=False):
     n = DualNetwork(read_file)
-    instance = MCTSPlayer(n, simulations_per_move=readouts_per_move,
-                          verbosity=verbosity, two_player_mode=True)
-    gtp_engine = gtp.Engine(instance)
     if cgos_mode:
         instance = CGOSPlayer(n, seconds_per_move=5,
                               verbosity=verbosity, two_player_mode=True)

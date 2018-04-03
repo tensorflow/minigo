@@ -18,8 +18,10 @@ import gtp
 import sys
 import sgf_wrapper
 import itertools
+import json
 import go
 import coords
+import time
 
 
 def parse_message(message):
@@ -37,6 +39,10 @@ def parse_message(message):
 
     command = command.replace("-", "_")  # for kgs extensions.
     return message_id, command, arguments
+
+
+def dbg(fmt, *args):
+    print(fmt % args, file=sys.stderr, flush=True)
 
 
 class KgsExtensionsMixin(gtp.Engine):
@@ -118,11 +124,13 @@ class GoGuiMixin(gtp.Engine):
 
     def __init__(self, game_obj, name="gtp (python, gogui extensions)", version="0.1"):
         super().__init__(game_obj=game_obj, name=name, version=version)
+        self.session_id = ""
         self.known_commands += ["gogui-analyze_commands"]
 
     def cmd_gogui_analyze_commands(self, arguments):
         return "\n".join(["var/Most Read Variation/nextplay",
                           "var/Think a spell/spin",
+                          "var/Final score/final_score",
                           "pspairs/Visit Heatmap/visit_heatmap",
                           "pspairs/Q Heatmap/q_heatmap"])
 
@@ -160,6 +168,143 @@ class GoGuiMixin(gtp.Engine):
                 self._game.root.Q, self._game.root.N), file=sys.stderr, flush=True)
             print("gogui-gfx: VAR", moves_cols, file=sys.stderr, flush=True)
         return self.cmd_nextplay(None)
+
+    def _minigui_report_search_status(self, leaves):
+        """Prints the current MCTS search status to stderr.
+
+        Reports the current search path, root node's child_Q, root node's
+        child_N, the most visited path in a format that can be parsed by
+        one of the STDERR_HANDLERS in minigui.ts.
+
+        Args:
+          leaves: list of leaf MCTSNodes returned by game.tree_search.
+         """
+        if leaves:
+            path = []
+            leaf = leaves[0]
+            while leaf != self._game.root:
+                path.append(leaf.fmove)
+                leaf = leaf.parent
+            path = [coords.to_kgs(coords.from_flat(m)) for m in reversed(path)]
+            dbg("mg-search:%s", " ".join(path))
+
+        q = self._game.root.child_Q - self._game.root.Q
+        q = ['%.3f' % x for x in q]
+        dbg("mg-q:%s", " ".join(q))
+
+        n = ['%d' % x for x in self._game.root.child_N]
+        dbg("mg-n:%s", " ".join(n))
+
+        nodes = self._game.root.most_visited_path_nodes()
+        path = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
+        dbg("mg-pv:%s", " ".join(path))
+
+    def _dbg_game_state(self):
+        position = self._game.position
+        msg = {}
+        board = []
+        for row in range(go.N):
+            for col in range(go.N):
+                stone = position.board[row, col]
+                if stone == go.BLACK:
+                    board.append("X")
+                elif stone == go.WHITE:
+                    board.append("O")
+                else:
+                    board.append(".")
+        msg["board"] = "".join(board)
+        msg["toPlay"] = "Black" if position.to_play == 1 else "White"
+        if position.recent:
+            msg["lastMove"] = coords.to_kgs(position.recent[-1].move)
+        else:
+            msg["lastMove"] = None
+        msg["session"] = self.session_id
+        msg["n"] = position.n
+        if self._game.root.parent and self._game.root.parent.parent:
+            msg["q"] = self._game.root.parent.Q
+        else:
+            msg["q"] = 0
+        dbg("mg-gamestate:%s", json.dumps(msg, sort_keys=True))
+
+    def cmd_echo(self, arguments):
+        return arguments
+
+    def cmd_mg_genmove(self, arguments):
+        """Like regular genmove but reports the MCTS status periodically.
+
+        Args:
+          arguments: A string containing how many calls to tree_search should be
+                     made between reporting the MCTS status.
+        """
+
+        game = self._game
+
+        start = time.time()
+        debug_interval = int(arguments)
+        current_readouts = game.root.N
+        # This rather strange initial value means that the search status will
+        # be reported after the very first call to tree_search, rather than
+        # after debug_interval calls.
+        last_dbg = -debug_interval
+        leaves = None
+        num_readouts = game.simulations_per_move
+        while game.root.N < current_readouts + num_readouts:
+            search_result = game.tree_search()
+            if search_result:
+                leaves = search_result
+            if game.root.N - last_dbg > debug_interval:
+                last_dbg = game.root.N
+                self._minigui_report_search_status(leaves)
+
+        move = game.pick_move()
+
+        duration = time.time() - start
+
+        self._minigui_report_search_status(leaves)
+
+        dbg("")
+        dbg(game.root.describe())
+        if game.should_resign():
+            game.set_result(-1 * game.root.position.to_play, was_resign=True)
+            # Tell the game object that we're passing to update the root node.
+            # This is required to ensure that subsequents calls to gamestate
+            # return the correct information.
+            game.play_move(None)
+            return gtp.RESIGN
+        game.play_move(move)
+        if game.root.is_done():
+            game.set_result(game.root.position.result(), was_resign=False)
+        dbg("")
+        dbg(game.root.position.__str__(colors=False))
+        dbg("%d readouts, %.3f s/100. (%.2f sec)",
+            num_readouts, duration / num_readouts * 100.0, duration)
+        dbg("")
+        return gtp.gtp_vertex(coords.to_pygtp(move))
+
+    def cmd_readouts(self, arguments):
+        try:
+            reads = max(8, int(arguments))
+            self._game.simulations_per_move = reads
+            return reads
+        except:
+            return False
+
+    def cmd_mg_gamestate(self, arguments):
+        self._dbg_game_state()
+
+    def cmd_play(self, arguments):
+        try:
+            super().cmd_play(arguments)
+            game = self._game
+            if game.root.is_done():
+                game.set_result(game.root.position.result(), was_resign=False)
+            return True
+        except:
+            dbg("ILLEGAL MOVE: %s", arguments)
+            return False
+
+    def cmd_final_score(self, arguments):
+        return self._game.result_string
 
 
 class GTPDeluxe(KgsExtensionsMixin, RegressionsMixin, GoGuiMixin):

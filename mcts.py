@@ -25,6 +25,7 @@ import math
 
 import coords
 import go
+import sys
 
 MAX_DEPTH = (go.N ** 2) * 1.4  # 505 moves for 19x19, 113 for 9x9
 
@@ -244,6 +245,17 @@ class MCTSNode(object):
             probs = probs ** .95
         return probs / np.sum(probs)
 
+    def most_visited_path_nodes(self):
+        node = self
+        output = []
+        while node.children:
+            next_kid = np.argmax(node.child_N)
+            node = node.children.get(next_kid)
+            if node is None:
+                break
+            output.append(node)
+        return output
+
     def most_visited_path(self):
         node = self
         output = []
@@ -274,16 +286,17 @@ class MCTSNode(object):
         sort_order = list(range(go.N * go.N + 1))
         sort_order.sort(key=lambda i: (
             self.child_N[i], self.child_action_score[i]), reverse=True)
-        soft_n = self.child_N / sum(self.child_N)
-        p_delta = soft_n - self.child_prior
-        p_rel = p_delta / self.child_prior
+        soft_n = self.child_N / max(1, sum(self.child_N))
+        prior = self.child_prior
+        p_delta = soft_n - prior
+        p_rel = np.divide(p_delta, prior, out=np.zeros_like(p_delta), where=prior!=0)
         # Dump out some statistics
         output = []
         output.append("{q:.4f}\n".format(q=self.Q))
         output.append(self.most_visited_path())
         output.append(
-            "move:  action      Q      U      P    P-Dir    N  soft-N  p-delta  p-rel\n")
-        output.append("\n".join(["{!s:6}: {: .3f}, {: .3f}, {:.3f}, {:.3f}, {:.3f}, {:4d} {:.4f} {: .5f} {: .2f}".format(
+            "move:  action     Q      U      P    P-Dir     N  soft-N   p-delta  p-rel\n")
+        output.append("\n".join(["{!s:4}:  {: .3f}  {: .3f}  {:.3f}  {:.3f}  {:.3f}  {:4d}  {:.4f}  {: .5f}  {: .2f}".format(
             coords.to_kgs(coords.from_flat(key)),
             self.child_action_score[key],
             self.child_Q[key],
