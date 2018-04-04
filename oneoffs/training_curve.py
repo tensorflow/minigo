@@ -42,10 +42,9 @@ from gtp_wrapper import make_gtp_instance, MCTSPlayer
 from utils import logged_timer as timer
 from tensorflow import gfile
 
-tf.app.flags.DEFINE_string(
-    "sgf_dir", "sgf/baduk_db/", "sgf database")
+tf.app.flags.DEFINE_string("sgf_dir", "sgf/baduk_db/", "sgf database")
 
-tf.app.flags.DEFINE_string("model_dir", "saved_models", 
+tf.app.flags.DEFINE_string("model_dir", "saved_models",
                            "Where the model files are saved")
 tf.app.flags.DEFINE_string("plot_dir", "data", "Where to save the plots.")
 tf.app.flags.DEFINE_integer("min_year", "2000",
@@ -91,12 +90,12 @@ def batch_run_many(player, positions, batch_size=100):
   prob_list = []
   value_list = []
   for idx in range(0, len(positions), batch_size):
-    probs, values = player.network.run_many(positions[idx:idx+batch_size])  
+    probs, values = player.network.run_many(positions[idx:idx+batch_size])
     prob_list.append(probs)
     value_list.append(values)
   return np.concatenate(prob_list, axis=0), np.concatenate(value_list, axis=0)
 
-  
+
 def eval_player(player, positions, moves, results):
   probs, values = batch_run_many(player, positions)
   policy_moves = [coords.from_flat(c) for c in np.argmax(probs, axis=1)]
@@ -131,7 +130,7 @@ def check_year(props, year):
     return True
   if props.get('DT') is None:
     return False
-  
+
   try:
     #Most sgf files in this database have dates of the form
     #"2005-01-15", but there are some rare exceptions like
@@ -150,14 +149,13 @@ def check_komi(props, komi_str):
   return props.get('KM')[0] == komi_str
 
 def find_and_filter_sgf_files(base_dir, min_year = None, komi = None):
-  base_dir = "sgf/baduk_db"
   sgf_files = []
   count = 0
   print("Finding all sgf files in {} with year >= {} and komi = {}".format(base_dir, min_year, komi))
-  for i, (dirpath, dirnames, filenames) in tqdm(enumerate(os.walk(base_dir))):
+  for i, (dirpath, dirnames, filenames) in enumerate(tqdm(os.walk(base_dir))):
     for filename in filenames:
-      count+=1
-      if count%5000 == 0:
+      count += 1
+      if count % 5000 == 0:
         print("Parsed {}, Found {}".format(count, len(sgf_files)))
       if filename.endswith('.sgf'):
         path = os.sep.join([dirpath, filename])
@@ -172,19 +170,17 @@ def sample_positions_from_games(sgf_files, num_positions=1):
   move_data = []
   result_data = []
   move_idxs = []
-  
+
   fail_count = 0
-  for i, path in tqdm(enumerate(sgf_files)):
-    if i % 1000 == 0:
-      print(i)
+  for i, path in enumerate(tqdm(sgf_files, desc="loading sgfs", unit="games")):
     try:
       positions, moves, result, props = parse_sgf(path)
+    except KeyboardInterrupt:
+      raise
     except:
-      fail_count+=1
-      print("Fail count: {}".format(fail_count))
-
+      fail_count += 1
       continue
-    
+
     #add entire game
     if num_positions== -1:
       pos_data.extend(positions)
@@ -205,7 +201,7 @@ def get_training_curve_data(model_dir, pos_data, move_data, result_data, idx_sta
   model_paths = get_model_paths(model_dir)
   df = pd.DataFrame()
   player=None
-  
+
   print("Evaluating models {}-{}, eval_every={}".format(idx_start, len(model_paths), eval_every))
   for idx in tqdm(range(idx_start, len(model_paths), eval_every)):
     if player:
@@ -217,7 +213,7 @@ def get_training_curve_data(model_dir, pos_data, move_data, result_data, idx_sta
 
     avg_acc = np.mean(correct)
     avg_mse = np.mean(squared_errors)
-    print("Model: {}, acc: {}, mse: {}".format(model_paths[idx], avg_acc, avg_mse))
+    print("Model: {}, acc: {:.4f}, mse: {:.4f}".format(model_paths[idx], avg_acc, avg_mse))
     df = df.append({"num": idx, "acc": avg_acc, "mse": avg_mse}, ignore_index=True)
   return df
 
@@ -229,9 +225,9 @@ def save_plots(data_dir, df):
   plt.title("Accuracy in Predicting Professional Moves")
   plot_path = os.sep.join([data_dir, "move_acc.pdf"])
   plt.savefig(plot_path)
-  
+
   plt.figure()
-  
+
   plt.plot(df["num"], df["mse"])
   plt.xlabel("Model idx")
   plt.ylabel("MSE/4")

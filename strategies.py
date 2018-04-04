@@ -33,39 +33,36 @@ TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
 
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):
-    '''Given current move number and "desired" seconds per move,
-    return how much time should actually be used. To be used specifically
-    for CGOS time controls, which are absolute 15 minute time.
+    '''Given the current move number and the 'desired' seconds per move, return
+    how much time should actually be used. This is intended specifically for
+    CGOS time controls, which has an absolute 15-minute time limit.
 
-    The strategy is to spend the maximum time possible using seconds_per_move,
+    The strategy is to spend the maximum possible moves using seconds_per_move,
     and then switch to an exponentially decaying time usage, calibrated so that
     we have enough time for an infinite number of moves.'''
 
-    # divide by two since you only play half the moves in a game.
+    # Divide by two since you only play half the moves in a game.
     player_move_num = move_num / 2
 
-    # sum of geometric series maxes out at endgame_time seconds.
+    # Sum of geometric series maxes out at endgame_time seconds.
     endgame_time = seconds_per_move / (1 - decay_factor)
 
     if endgame_time > time_limit:
-        # there is so little main time that we're already in "endgame" mode.
+        # There is so little main time that we're already in 'endgame' mode.
         base_time = time_limit * (1 - decay_factor)
-        return base_time * decay_factor ** player_move_num
-
-    # leave over endgame_time seconds for the end, and play at seconds_per_move
-    # for as long as possible
-    core_time = time_limit - endgame_time
-    core_moves = core_time / seconds_per_move
-
-    if player_move_num < core_moves:
-        return seconds_per_move
+        core_moves = 0
     else:
-        return seconds_per_move * decay_factor ** (player_move_num - core_moves)
+        # Leave over endgame_time seconds for the end, and play at
+        # seconds_per_move for as long as possible.
+        base_time = seconds_per_move
+        core_moves = (time_limit - endgame_time) / seconds_per_move
+
+    return base_time * decay_factor ** max(player_move_num - core_moves, 0)
 
 
 class MCTSPlayerMixin:
-    # If 'simulations_per_move' is nonzero, it will perform that many reads before playing.
-    # Otherwise, it uses 'seconds_per_move' of wall time'
+    # If `simulations_per_move` is nonzero, it will perform that many reads
+    # before playing. Otherwise, it uses `seconds_per_move` of wall time.
     def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
                  resign_threshold=-0.90, verbosity=0, two_player_mode=False,
                  num_parallel=8):
@@ -138,7 +135,15 @@ class MCTSPlayerMixin:
                 self.root.children_as_pi(self.root.position.n < self.temp_threshold))
         self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
-        self.root = self.root.maybe_add_child(coords.to_flat(c))
+        try:
+            self.root = self.root.maybe_add_child(coords.to_flat(c))
+        except go.IllegalMove:
+            print("Illegal move")
+            if not self.two_player_mode:
+                self.searches_pi.pop()
+            self.qs.pop()
+            self.comments.pop()
+            return False
         self.position = self.root.position  # for showboard
         del self.root.parent.children
         return True  # GTP requires positive result.
@@ -215,17 +220,18 @@ class MCTSPlayerMixin:
         if use_comments:
             comments = self.comments or ['No comments.']
             comments[0] = ("Resign Threshold: %0.3f\n" %
-                                    self.resign_threshold) + comments[0]
+                           self.resign_threshold) + comments[0]
         else:
             comments = []
         return sgf_wrapper.make_sgf(pos.recent, self.result_string,
-                                    white_name=os.path.basename(self.network.save_file) or "Unknown",
-                                    black_name=os.path.basename(self.network.save_file) or "Unknown",
-                                    comments=comments) 
+                                    white_name=os.path.basename(
+                                        self.network.save_file) or "Unknown",
+                                    black_name=os.path.basename(
+                                        self.network.save_file) or "Unknown",
+                                    comments=comments)
 
     def is_done(self):
         return self.result != 0 or self.root.is_done()
-
 
     def extract_data(self):
         assert len(self.searches_pi) == self.root.position.n

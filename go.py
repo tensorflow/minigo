@@ -42,7 +42,7 @@ EMPTY_BOARD = np.zeros([N, N], dtype=np.int8)
 
 
 def _check_bounds(c):
-    return c[0] % N == c[0] and c[1] % N == c[1]
+    return 0 <= c[0] < N and 0 <= c[1] < N
 
 
 NEIGHBORS = {(x, y): list(filter(_check_bounds, [
@@ -319,14 +319,23 @@ class Position():
         new_lib_tracker = copy.deepcopy(self.lib_tracker)
         return Position(new_board, self.n, self.komi, self.caps, new_lib_tracker, self.ko, self.recent, self.board_deltas, self.to_play)
 
-    def __str__(self):
-        pretty_print_map = {
-            WHITE: '\x1b[0;31;47mO',
-            EMPTY: '\x1b[0;31;43m.',
-            BLACK: '\x1b[0;31;40mX',
-            FILL: '#',
-            KO: '*',
-        }
+    def __str__(self, colors=True):
+        if colors:
+            pretty_print_map = {
+                WHITE: '\x1b[0;31;47mO',
+                EMPTY: '\x1b[0;31;43m.',
+                BLACK: '\x1b[0;31;40mX',
+                FILL: '#',
+                KO: '*',
+            }
+        else:
+            pretty_print_map = {
+                WHITE: 'O',
+                EMPTY: '.',
+                BLACK: 'X',
+                FILL: '#',
+                KO: '*',
+            }
         board = np.copy(self.board)
         captures = self.caps
         if self.ko is not None:
@@ -338,7 +347,9 @@ class Position():
                 appended = '<' if (self.recent and (i, j) ==
                                    self.recent[-1].move) else ' '
                 row.append(pretty_print_map[board[i, j]] + appended)
-                row.append('\x1b[0m')
+                if colors:
+                    row.append('\x1b[0m')
+
             raw_board_contents.append(''.join(row))
 
         row_labels = ['%2d ' % i for i in range(N, 0, -1)]

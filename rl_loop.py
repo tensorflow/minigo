@@ -195,43 +195,20 @@ def backfill():
         try:
             load_file = os.path.join(MODELS_DIR, model_name)
             dest_file = os.path.join(MODELS_DIR, model_name)
-            sess = tf.Session()
-
-            # retrieve the global step as a python value
-            ckpt = tf.train.load_checkpoint(load_file)
-            global_step_value = ckpt.get_tensor('global_step')
-
-            # restore all saved weights, except global_step
-            meta_graph_def = meta_graph.read_meta_graph_file(
-                load_file + '.meta')
-            stored_var_names = set([n.name
-                                    for n in meta_graph_def.graph_def.node
-                                    if n.op == 'VariableV2'])
-            stored_var_names.remove('global_step')
-            var_list = [v for v in tf.global_variables()
-                        if v.op.name in stored_var_names]
-            tf.train.Saver(var_list=var_list).restore(sess, load_file)
-
-            # manually set the global step
-            global_step_tensor = tf.train.get_or_create_global_step()
-            assign_op = tf.assign(global_step_tensor, global_step_value)
-            sess.run(assign_op)
+            main.convert(load_file, dest_file)
         except:
             print('failed on', model_name)
             continue
 
-        # export a new savedmodel that has the right global step type
-        tf.train.Saver().save(sess, dest_file)
-
 
 def echo():
-    pass  # flags printed in ifmain block below.
+    pass  # Flags are echo'd in the ifmain block below.
 
 
 parser = argparse.ArgumentParser()
 
 argh.add_commands(parser, [echo, train, selfplay, gather,
-                           bootstrap, game_counts, validate, backfill])
+                           bootstrap, game_counts, validate, backfill, echo])
 
 if __name__ == '__main__':
     print_flags()

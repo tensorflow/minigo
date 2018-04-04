@@ -125,7 +125,7 @@ left us in a local minima with 3-3s that D-noise & etc. are not able to
 overcome.
 
 
-## Third run, Minigo, v250-..., Jan 20th ongoing
+## Third run, Minigo, v250-..., Jan 20th-Feb 1st (ish)
 
 As our fiddling about after v250 didn't seem to get us anywhere, and due to our
 reconsidering about whether or not to one-hot the policy network target ('pi'), we rolled
@@ -167,9 +167,35 @@ Results: After a few days a few troublesome signs appeared.
 These could also have been exacerbated by our computed value for the learning
 rate decay schedule being incorrect.
 
-This run is halted while we:
+This run was halted after discovering a pretty major bug in our huge Dataset
+rewrite that left it training towards what was effectively noise.  Read the gory
+details
+[here](https://github.com/tensorflow/minigo/commit/9c6e013293d415e90b92097327dfaca94a81a6da).
+
+Our [milestones](https://github.com/tensorflow/minigo/milestone/1?closed=1) to hit before running a new 19x19 pipeline:
   - add random transformations to the training pipeline
   - More completely shuffle our training data.
   - Figure out an equivalent learning rate decay schedule to the one described
     in the paper.
 
+
+### Fourth run, 9x9s.  Feb 7-
+
+Since our 19x19 run seemed irrepairable, we decided to work on instrumentation
+to better understand when things were going off the rails while it would still
+be possible to make adjustments.
+
+These [improvements](https://github.com/tensorflow/minigo/milestone/2?closed=1) included:
+ - Logging the [magnitude of the
+   updates](https://github.com/tensorflow/minigo/commit/360e056f218833938d845b454b4e24158034b58a)
+   that training would make to our weights.
+ - [Setting aside a
+   set of positions](https://github.com/tensorflow/minigo/commit/f941f5ac72d860f1f583392cbeb69d0694373824) to use to detect
+overfitting.
+ - Improvements to setting up clusters and setting up automated testing/CI.
+
+
+The results were very promising, reaching pro strength after about a week.
+
+Our models and training data can be found in [the GCS bucket
+here](https://console.cloud.google.com/storage/browser/minigo-pub/v3-9x9).

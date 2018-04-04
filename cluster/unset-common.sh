@@ -14,6 +14,7 @@
 # limitations under the License.
 
 # Reset all the envinornment variables used by the cluster configuration.
+# To use, run: source unset-common.sh
 
 unset PROJECT
 unset LOGGING_PROJECT
