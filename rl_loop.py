@@ -207,8 +207,8 @@ def echo():
 
 parser = argparse.ArgumentParser()
 
-argh.add_commands(parser, [echo, train, selfplay, gather,
-                           bootstrap, game_counts, validate, backfill, echo])
+argh.add_commands(parser, [train, selfplay, gather, echo, backfill,
+                           bootstrap, game_counts, validate])
 
 if __name__ == '__main__':
     print_flags()
