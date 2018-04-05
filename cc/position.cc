@@ -394,9 +394,9 @@ bool Position::HasNeighboringGroup(Coord c, GroupId group_id) const {
 float Position::CalculateScore() {
   int score = 0;
 
-  static_assert(static_cast<int>(Color::kEmpty) == 0);
-  static_assert(static_cast<int>(Color::kBlack) == 1);
-  static_assert(static_cast<int>(Color::kWhite) == 2);
+  static_assert(static_cast<int>(Color::kEmpty) == 0, "Color::kEmpty != 0");
+  static_assert(static_cast<int>(Color::kBlack) == 1, "Color::kBlack != 1");
+  static_assert(static_cast<int>(Color::kWhite) == 2, "Color::kWhite != 2");
 
   auto score_empty_area = [this](Coord c) {
     int num_visited = 0;

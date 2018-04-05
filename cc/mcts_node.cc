@@ -56,7 +56,7 @@ std::string MctsNode::Describe() const {
   using SortInfo = std::tuple<float, float, int>;
   std::array<SortInfo, kNumMoves> sort_order;
   for (int i = 0; i < kNumMoves; ++i) {
-    sort_order[i] = {child_N(i), child_action_score[i], i};
+    sort_order[i] = SortInfo(child_N(i), child_action_score[i], i);
   }
   std::sort(sort_order.begin(), sort_order.end(), std::greater<SortInfo>());
 

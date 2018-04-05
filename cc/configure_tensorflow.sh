@@ -5,12 +5,17 @@ set -e
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dst_dir="${script_dir}/tensorflow"
 tmp_dir="$(mktemp -d -p /tmp minigo_tf.XXXXXX)"
+version_tag="v1.6.0-rc1"
 
 echo "Cloning tensorflow to ${tmp_dir}"
 git clone https://github.com/tensorflow/tensorflow "${tmp_dir}"
 
-echo "Configuring tensorflow"
 pushd "${tmp_dir}"
+
+echo "Checking out ${version_tag}"
+git checkout "tags/${version_tag}"
+
+echo "Configuring tensorflow"
 ./configure
 
 echo "Building tensorflow package"

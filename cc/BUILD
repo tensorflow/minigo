@@ -216,28 +216,6 @@ cc_test(
     ],
 )
 
-cc_test(
-    name = "random_test",
-    size = "small",
-    srcs = ["random_test.cc"],
-    deps = [
-        ":minigo_9",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "symmetries_test",
-    size = "small",
-    srcs = ["symmetries_test.cc"],
-    deps = [
-        # TODO(tommadams): Break minigo into smaller libraries so small tests
-        # like this don't have to transitively depend on stuff like Tensorflow.
-        ":minigo_9",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
 cc_binary(
     name = "tf_test",
     srcs = ["tf_test.cc"],
