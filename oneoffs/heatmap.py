@@ -75,7 +75,7 @@ def positions_from_sgfs(sgf_files, include_empty_position=True):
         data.append(("empty", go.Position(komi=7.5)))
     for sgf in sgf_files:
         sgf_name = os.path.basename(sgf).replace(".sgf", "")
-        positions, moves, _, _ = oneoff_utils.parse_sgf(sgf)
+        positions, moves, _ = oneoff_utils.parse_sgf(sgf)
         final = positions[-1].play_move(moves[-1])
         data.append((sgf_name, final))
     return data

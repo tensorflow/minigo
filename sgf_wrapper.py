@@ -139,6 +139,12 @@ def maybe_correct_next(pos, next_node):
         pos.flip_playerturn(mutate=True)
 
 
+def get_sgf_root_node(sgf_contents):
+    collection = sgf.parse(sgf_contents)
+    game = collection.children[0]
+    return game.root
+
+
 def replay_sgf(sgf_contents):
     '''
     Wrapper for sgf files, returning go.PositionWithContext instances.
@@ -152,9 +158,8 @@ def replay_sgf(sgf_contents):
         for position_w_context in replay_sgf(f.read()):
             print(position_w_context.position)
     '''
-    collection = sgf.parse(sgf_contents)
-    game = collection.children[0]
-    props = game.root.properties
+    root_node = get_sgf_root_node(sgf_contents)
+    props = root_node.properties
     assert int(sgf_prop(props.get('GM', ['1']))) == 1, "Not a Go SGF!"
 
     komi = 0
@@ -163,7 +168,7 @@ def replay_sgf(sgf_contents):
     result = utils.parse_game_result(sgf_prop(props.get('RE', '')))
 
     pos = Position(komi=komi)
-    current_node = game.root
+    current_node = root_node
     while pos is not None and current_node.next is not None:
         pos = handle_node(pos, current_node)
         maybe_correct_next(pos, current_node.next)

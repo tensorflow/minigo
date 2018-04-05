@@ -7,35 +7,16 @@ from tqdm import tqdm
 import dual_net
 import shipname
 from gtp_wrapper import MCTSPlayer
-from sgf_wrapper import replay_sgf, sgf_prop_get
+import sgf_wrapper
 from utils import parse_game_result, logged_timer
 
 
-def get_sgf_props(sgf_path):
-    # TODO(sethtroisi): move this to sgf_wrapper.
-    with open(sgf_path) as f:
-        sgf_contents = f.read()
-    collection = sgf.parse(sgf_contents)
-    game = collection.children[0]
-    props = game.root.properties
-    return props
-
-
 def parse_sgf(sgf_path):
-    # TODO(sethtroisi): Replace uses with call to sgf_wrapper.
     with open(sgf_path) as f:
         sgf_contents = f.read()
 
-    collection = sgf.parse(sgf_contents)
-    game = collection.children[0]
-    props = game.root.properties
-    assert int(sgf_prop_get(props, 'GM', '1')) == 1, "Not a Go SGF!"
-
-    result = parse_game_result(sgf_prop_get(props, 'RE', ''))
-
-    positions, moves = zip(*[(p.position, p.next_move)
-                             for p in replay_sgf(sgf_contents)])
-    return positions, moves, result, props
+    return zip(*[(p.position, p.next_move, p.result)
+                 for p in sgf_wrapper.replay_sgf(sgf_contents)])
 
 
 def check_year(props, year):
@@ -74,7 +55,9 @@ def find_and_filter_sgf_files(base_dir, min_year=None, komi=None):
                 print("Parsed {}, Found {}".format(count, len(sgf_files)))
             if filename.endswith('.sgf'):
                 path = os.path.join(dirpath, filename)
-                props = get_sgf_props(path)
+                with open(path) as f:
+                    sgf_contents = f.read()
+                props = sgf_wrapper.get_sgf_root_node(sgf_contents).properties
                 if check_year(props, min_year) and check_komi(props, komi):
                     sgf_files.append(path)
     print("Found {} sgf files matching filters".format(len(sgf_files)))

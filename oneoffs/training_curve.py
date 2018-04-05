@@ -79,7 +79,7 @@ def sample_positions_from_games(sgf_files, num_positions=1):
     fail_count = 0
     for path in tqdm(sgf_files, desc="loading sgfs", unit="games"):
         try:
-            positions, moves, result, props = parse_sgf(path)
+            positions, moves, results = parse_sgf(path)
         except KeyboardInterrupt:
             raise
         except:
@@ -91,12 +91,12 @@ def sample_positions_from_games(sgf_files, num_positions=1):
             pos_data.extend(positions)
             move_data.extend(moves)
             move_idxs.extend(range(len(positions)))
-            result_data.extend([result for i in range(len(positions))])
+            result_data.extend(results)
         else:
             for idx in np.random.choice(len(positions), num_positions):
                 pos_data.append(positions[idx])
                 move_data.append(moves[idx])
-                result_data.append(result)
+                result_data.append(results[idx])
                 move_idxs.append(idx)
     print("Sampled {} positions, failed to parse {} files".format(
         len(pos_data), fail_count))
