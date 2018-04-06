@@ -102,6 +102,20 @@ std::string Coord::ToKgs() const {
   return absl::StrCat(col_str.substr(col, 1), kN - row);
 }
 
+std::string Coord::ToSgf() const {
+  if (*this == kPass) {
+    return "";
+  } else if (*this == kInvalid) {
+    return "invalid";
+  }
+  int row = value_ / kN;
+  int col = value_ % kN;
+  char buffer[2];
+  buffer[0] = 'a' + col;
+  buffer[1] = 'a' + row;
+  return {buffer, 2};
+}
+
 std::ostream& operator<<(std::ostream& os, Coord c) {
   if (c == Coord::kPass) {
     return os << "pass";

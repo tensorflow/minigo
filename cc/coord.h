@@ -53,6 +53,9 @@ class Coord {
   // Format the Coord as a KGS string.
   std::string ToKgs() const;
 
+  // Format the Coord as an SGF string.
+  std::string ToSgf() const;
+
   operator uint16_t() const { return value_; }
 
  private:

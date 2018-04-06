@@ -40,5 +40,25 @@ TEST(CoordTest, TestFromKgs) {
   }
 }
 
+TEST(CoordTest, KgsRoundTrip) {
+  EXPECT_EQ(Coord::kPass, Coord::FromKgs(Coord(Coord::kPass).ToKgs()));
+  for (int row = 0; row < kN; ++row) {
+    for (int col = 0; col < kN; ++col) {
+      Coord c(row, col);
+      EXPECT_EQ(c, Coord::FromKgs(c.ToKgs()));
+    }
+  }
+}
+
+TEST(CoordTest, SgfRoundTrip) {
+  EXPECT_EQ(Coord::kPass, Coord::FromSgf(Coord(Coord::kPass).ToSgf()));
+  for (int row = 0; row < kN; ++row) {
+    for (int col = 0; col < kN; ++col) {
+      Coord c(row, col);
+      EXPECT_EQ(c, Coord::FromSgf(c.ToSgf()));
+    }
+  }
+}
+
 }  // namespace
 }  // namespace minigo

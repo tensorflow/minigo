@@ -13,7 +13,7 @@ def minigo_9_test(name, srcs, size="small", deps=[], **kwargs):
           "//conditions:default": [],
       }),
       deps = select({
-          "//cc/config:minigo9": deps + ["@com_google_googletest//:gtest_main"],
+          "//cc/config:minigo9": deps,
           "//conditions:default": ["@com_google_googletest//:gtest_main"],
       }),
       **kwargs)
@@ -33,7 +33,7 @@ def minigo_19_test(name, srcs, size="small", deps=[], **kwargs):
           "//conditions:default": [],
       }),
       deps = select({
-          "//cc/config:minigo19": deps + ["@com_google_googletest//:gtest_main"],
+          "//cc/config:minigo19": deps,
           "//conditions:default": ["@com_google_googletest//:gtest_main"],
       }),
       **kwargs)

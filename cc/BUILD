@@ -21,12 +21,14 @@ cc_library(
     srcs = [
         "color.cc",
         "coord.cc",
+        "move.cc",
     ],
     hdrs = [
         "algorithm.h",
         "color.h",
         "constants.h",
         "coord.h",
+        "move.h",
         "stone.h",
     ],
     deps = [
@@ -101,6 +103,17 @@ cc_library(
 )
 
 cc_library(
+    name = "sgf",
+    srcs = ["sgf.cc"],
+    hdrs = ["sgf.h"],
+    deps = [
+        ":base",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
     name = "symmetries",
     hdrs = ["symmetries.h"],
 )
@@ -123,22 +136,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "test_utils_9",
-    testonly = 1,
-    srcs = ["test_utils.cc"],
-    hdrs = ["test_utils.h"],
-    deps = [":minigo_9"],
-)
-
-cc_library(
-    name = "test_utils_19",
-    testonly = 1,
-    srcs = ["test_utils.cc"],
-    hdrs = ["test_utils.h"],
-    deps = [":minigo_19"],
-)
-
 cc_test(
     name = "coord_test",
     size = "small",
@@ -157,6 +154,7 @@ minigo_9_test(
         ":dual_net",
         ":position",
         ":test_utils",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -169,6 +167,7 @@ minigo_9_test(
         ":position",
         ":random",
         ":test_utils",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -181,6 +180,7 @@ minigo_9_test(
         ":dual_net",
         ":mcts",
         ":test_utils",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -193,6 +193,7 @@ minigo_9_test(
         ":position",
         ":test_utils",
         "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -202,6 +203,17 @@ cc_test(
     srcs = ["random_test.cc"],
     deps = [
         ":random",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+minigo_19_test(
+    name = "sgf_test",
+    size = "small",
+    srcs = ["sgf_test.cc"],
+    deps = [
+        ":sgf",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )
