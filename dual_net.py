@@ -314,7 +314,9 @@ def train(working_dir, tf_records, generation_num, **hparams):
     def input_fn(): return preprocessing.get_input_tensors(
         TRAIN_BATCH_SIZE, tf_records)
     update_ratio_hook = UpdateRatioSessionHook(working_dir)
-    estimator.train(input_fn, hooks=[update_ratio_hook], max_steps=max_steps)
+    step_counter_hook = EchoStepCounterHook(output_dir=working_dir)
+    estimator.train(input_fn, hooks=[
+                    update_ratio_hook, step_counter_hook], max_steps=max_steps)
 
 
 def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
@@ -340,6 +342,13 @@ def compute_update_ratio(weight_tensors, before_weights, after_weights):
                          tensor.name, simple_value=ratio)
         for tensor, ratio in zip(weight_tensors, ratios)]
     return tf.Summary(value=all_summaries)
+
+
+class EchoStepCounterHook(tf.train.StepCounterHook):
+    def _log_and_record(self, elapsed_steps, elapsed_time, global_step):
+        s_per_sec = elapsed_steps / elapsed_time
+        print("{:.3f} steps per second".format(s_per_sec))
+        super()._log_and_record(elapsed_steps, elapsed_time, global_step)
 
 
 class UpdateRatioSessionHook(tf.train.SessionRunHook):
