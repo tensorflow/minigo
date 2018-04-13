@@ -1,3 +1,4 @@
+import os
 import sys
 sys.path.insert(0, ".")  # to run from minigo/ dir
 
@@ -16,7 +17,9 @@ app.config["SECRET_KEY"] = "woo"
 socketio = SocketIO(app)
 
 #TODO(amj) extract to flag
-MODEL_PATH = "saved_models/000496-polite-ray-upgrade"
+MODEL_PATH = "saved_models/000427-super-lion"
+BOARD_SIZE = "9" # Models are hardcoded to a board size.
+
 GTP_COMMAND = ["python",  "-u",  # turn off buffering
                "main.py", "gtp",
                "--load-file", MODEL_PATH,
@@ -28,7 +31,8 @@ def _open_pipes():
     return subprocess.Popen(GTP_COMMAND,
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
+                            stderr=subprocess.PIPE,
+                            env=dict(os.environ, BOARD_SIZE=BOARD_SIZE))
 
 
 p = _open_pipes()
