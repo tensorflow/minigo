@@ -27,6 +27,7 @@ from tensorflow import gfile
 
 # Pull in environment variables. Run `source ./cluster/common` to set these.
 BUCKET_NAME = os.environ['BUCKET_NAME']
+BOARD_SIZE = os.environ['BOARD_SIZE']
 
 BASE_DIR = "gs://{}".format(BUCKET_NAME)
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
@@ -54,6 +55,7 @@ def print_flags():
         'SGF_DIR': SGF_DIR,
         'TRAINING_CHUNK_DIR': TRAINING_CHUNK_DIR,
         'ESTIMATOR_WORKING_DIR': ESTIMATOR_WORKING_DIR,
+        'BOARD_SIZE': BOARD_SIZE,
     }
     print("Computed variables are:")
     print('\n'.join('--{}={}'.format(flag, value)
@@ -177,14 +179,37 @@ def validate(model_num=None, validate_name=None):
                   validate_name=validate_name)
 
 
+def backfill():
+    models = [m[1] for m in get_models()]
+
+    import dual_net
+    import tensorflow as tf
+    from tqdm import tqdm
+    from tensorflow.python.framework import meta_graph
+    features, labels = dual_net.get_inference_input()
+    dual_net.model_fn(features, labels, tf.estimator.ModeKeys.PREDICT,
+                      dual_net.get_default_hyperparams())
+
+    for model_name in tqdm(models):
+        if model_name.endswith('-upgrade'):
+            continue
+        try:
+            load_file = os.path.join(MODELS_DIR, model_name)
+            dest_file = os.path.join(MODELS_DIR, model_name)
+            main.convert(load_file, dest_file)
+        except:
+            print('failed on', model_name)
+            continue
+
+
 def echo():
     pass  # Flags are echo'd in the ifmain block below.
 
 
 parser = argparse.ArgumentParser()
 
-argh.add_commands(parser, [train, selfplay, gather,
-                           bootstrap, game_counts, validate, echo])
+argh.add_commands(parser, [train, selfplay, gather, echo, backfill,
+                           bootstrap, game_counts, validate])
 
 if __name__ == '__main__':
     print_flags()
