@@ -12,20 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/move.h"
+#ifndef CC_MINIGO_FILE_HELPERS_H_
+
+#include <string>
 
 namespace minigo {
+namespace file {
 
-std::ostream& operator<<(std::ostream& os, const Move& move) {
-  if (move.color == Color::kBlack) {
-    os << "B";
-  } else if (move.color == Color::kWhite) {
-    os << "W";
-  } else {
-    os << "<" << static_cast<int>(move.color) << ">";
-  }
-  os << "[" << move.c.ToSgf() << "]";
-  return os;
-}
+__attribute__((warn_unused_result)) bool SetContents(
+    const std::string& path, const std::string& contents);
 
+}  // namespace file
 }  // namespace minigo
+
+#endif  // CC_MINIGO_FILE_HELPERS_H_

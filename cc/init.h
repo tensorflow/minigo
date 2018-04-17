@@ -12,31 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_COLOR_H_
-#define CC_COLOR_H_
-
-#include <iostream>
-
-#include "cc/check.h"
+#ifndef CC_INIT_H_
+#define CC_INIT_H_
 
 namespace minigo {
 
-// Color represents the stone color of each point on the board.
-// The position code relies on the values of kEmpty, kBlack and kWhite being
-// 0, 1, 2 respectively for some of its bit twiddling.
-enum class Color {
-  kEmpty,
-  kBlack,
-  kWhite,
-};
-
-inline Color OtherColor(Color color) {
-  MG_CHECK(color == Color::kWhite || color == Color::kBlack);
-  return color == Color::kWhite ? Color::kBlack : Color::kWhite;
-}
-
-std::ostream& operator<<(std::ostream& os, Color color);
+// Initializes base libraries like gflags and symbolizer.
+// Call at the very top of main.
+void Init(int* pargc, char*** pargv);
 
 }  // namespace minigo
 
-#endif  // CC_COLOR_H_
+#endif  // CC_INIT_H_

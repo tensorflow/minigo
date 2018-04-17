@@ -289,23 +289,26 @@ class MCTSNode(object):
         soft_n = self.child_N / max(1, sum(self.child_N))
         prior = self.child_prior
         p_delta = soft_n - prior
-        p_rel = np.divide(p_delta, prior, out=np.zeros_like(p_delta), where=prior!=0)
+        p_rel = np.divide(p_delta, prior, out=np.zeros_like(
+            p_delta), where=prior != 0)
         # Dump out some statistics
         output = []
         output.append("{q:.4f}\n".format(q=self.Q))
         output.append(self.most_visited_path())
         output.append(
-            "move:  action     Q      U      P    P-Dir     N  soft-N   p-delta  p-rel\n")
-        output.append("\n".join(["{!s:4}:  {: .3f}  {: .3f}  {:.3f}  {:.3f}  {:.3f}  {:4d}  {:.4f}  {: .5f}  {: .2f}".format(
-            coords.to_kgs(coords.from_flat(key)),
-            self.child_action_score[key],
-            self.child_Q[key],
-            self.child_U[key],
-            self.child_prior[key],
-            self.original_prior[key],
-            int(self.child_N[key]),
-            soft_n[key],
-            p_delta[key],
-            p_rel[key])
-            for key in sort_order][:15]))
+            "move : action    Q     U     P   P-Dir    N  soft-N  p-delta  p-rel")
+        for key in sort_order[:15]:
+            if self.child_N[key] == 0:
+                break
+            output.append("\n{!s:4} : {: .3f} {: .3f} {:.3f} {:.3f} {:.3f} {:5d} {:.4f} {: .5f} {: .2f}".format(
+                coords.to_kgs(coords.from_flat(key)),
+                self.child_action_score[key],
+                self.child_Q[key],
+                self.child_U[key],
+                self.child_prior[key],
+                self.original_prior[key],
+                int(self.child_N[key]),
+                soft_n[key],
+                p_delta[key],
+                p_rel[key]))
         return ''.join(output)

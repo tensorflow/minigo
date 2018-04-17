@@ -1,3 +1,4 @@
+
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,31 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_COLOR_H_
-#define CC_COLOR_H_
+#include "cc/init.h"
 
-#include <iostream>
-
-#include "cc/check.h"
+#include "absl/debugging/symbolize.h"
+#include "gflags/gflags.h"
 
 namespace minigo {
 
-// Color represents the stone color of each point on the board.
-// The position code relies on the values of kEmpty, kBlack and kWhite being
-// 0, 1, 2 respectively for some of its bit twiddling.
-enum class Color {
-  kEmpty,
-  kBlack,
-  kWhite,
-};
-
-inline Color OtherColor(Color color) {
-  MG_CHECK(color == Color::kWhite || color == Color::kBlack);
-  return color == Color::kWhite ? Color::kBlack : Color::kWhite;
+void Init(int* pargc, char*** pargv) {
+  absl::InitializeSymbolizer((*pargv)[0]);
+  gflags::ParseCommandLineFlags(pargc, pargv, true);
 }
 
-std::ostream& operator<<(std::ostream& os, Color color);
-
 }  // namespace minigo
-
-#endif  // CC_COLOR_H_

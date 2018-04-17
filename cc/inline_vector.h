@@ -15,10 +15,11 @@
 #ifndef CC_INLINE_VECTOR_H_
 #define CC_INLINE_VECTOR_H_
 
-#include <cassert>
 #include <cstdint>
 #include <new>
 #include <utility>
+
+#include "cc/check.h"
 
 namespace minigo {
 
@@ -66,25 +67,25 @@ class inline_vector {
   const T* end() const { return data() + size_; }
 
   T& operator[](int idx) {
-    assert(idx >= 0);
-    assert(idx < size_);
+    MG_DCHECK(idx >= 0);
+    MG_DCHECK(idx < size_);
     return data()[idx];
   }
   const T& operator[](int idx) const {
-    assert(idx >= 0);
-    assert(idx < size_);
+    MG_DCHECK(idx >= 0);
+    MG_DCHECK(idx < size_);
     return data()[idx];
   }
 
   void push_back(const T& t) {
-    assert(size_ < Capacity);
+    MG_DCHECK(size_ < Capacity);
     new (data() + size_) T(t);
     ++size_;
   }
 
   template <typename... Args>
   void emplace_back(Args&&... args) {
-    assert(size_ < Capacity);
+    MG_DCHECK(size_ < Capacity);
     new (data() + size_) T(std::forward<Args>(args)...);
     ++size_;
   }
@@ -93,7 +94,7 @@ class inline_vector {
   const T& back() const { return data()[size_ - 1]; }
 
   void pop_back() {
-    assert(size_ > 0);
+    MG_DCHECK(size_ > 0);
     --size_;
   }
 

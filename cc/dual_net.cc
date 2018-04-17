@@ -14,6 +14,7 @@
 
 #include "cc/dual_net.h"
 
+#include "cc/check.h"
 #include "cc/constants.h"
 #include "cc/symmetries.h"
 #include "tensorflow/core/framework/graph.pb.h"
@@ -122,11 +123,11 @@ DualNet::~DualNet() {
   }
 }
 
-Status DualNet::Initialize(const std::string& graph_path) {
+void DualNet::Initialize(const std::string& graph_path) {
   GraphDef graph_def;
-  TF_RETURN_IF_ERROR(ReadBinaryProto(Env::Default(), graph_path, &graph_def));
+  TF_CHECK_OK(ReadBinaryProto(Env::Default(), graph_path, &graph_def));
   session_.reset(NewSession(SessionOptions()));
-  TF_RETURN_IF_ERROR(session_->Create(graph_def));
+  TF_CHECK_OK(session_->Create(graph_def));
 
   inputs_.clear();
   inputs_.emplace_back(
@@ -136,13 +137,11 @@ Status DualNet::Initialize(const std::string& graph_path) {
   output_names_.clear();
   output_names_.push_back("policy_output");
   output_names_.push_back("value_output");
-
-  return Status::OK();
 }
 
 void DualNet::RunMany(absl::Span<const BoardFeatures* const> features,
                       absl::Span<Output> outputs, Random* rnd) {
-  assert(features.size() == outputs.size());
+  MG_DCHECK(features.size() == outputs.size());
 
   int batch_size = static_cast<int>(features.size());
   auto& feature_tensor = inputs_[0].second;
@@ -171,8 +170,7 @@ void DualNet::RunMany(absl::Span<const BoardFeatures* const> features,
   }
 
   // Run the model.
-  auto status = session_->Run(inputs_, output_names_, {}, &outputs_);
-  assert(status.ok());
+  TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
 
   // Copy the policy and value out of the output tensors.
   const auto& policy_tensor = outputs_[0].flat<float>();

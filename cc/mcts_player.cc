@@ -22,6 +22,7 @@
 
 #include "absl/memory/memory.h"
 #include "absl/time/clock.h"
+#include "cc/check.h"
 #include "cc/random.h"
 
 namespace minigo {
@@ -44,7 +45,7 @@ void MctsPlayer::InitializeGame(const Position& position) {
 
 void MctsPlayer::SelfPlay(int num_readouts) {
   auto* first_node = root_->SelectLeaf();
-  assert(first_node != nullptr);
+  MG_CHECK(first_node != nullptr);
   auto output = Run(&first_node->features);
   first_node->IncorporateResults(output.policy, output.value, first_node);
 
@@ -65,7 +66,7 @@ void MctsPlayer::SelfPlay(int num_readouts) {
               << "\n";
 
     std::cout << root_->position.ToPrettyString();
-    std::cout << root_->Describe();
+    std::cout << root_->Describe() << "\n";
 
     if (ShouldResign()) {
       SetResult(root_->position.to_play() == Color::kBlack ? -1 : 1,
@@ -117,7 +118,7 @@ Coord MctsPlayer::PickMove() {
   float e = rnd_();
   Coord c = SearchSorted(cdf, e);
   std::cout << "Picked rnd(" << e << ") " << c << "\n";
-  assert(root_->child_N(c) != 0);
+  MG_DCHECK(root_->child_N(c) != 0);
   return c;
 }
 
@@ -171,7 +172,7 @@ bool MctsPlayer::ShouldResign() const {
 }
 
 void MctsPlayer::PlayMove(Coord c) {
-  PushHistory();
+  PushHistory(c);
 
   root_ = root_->MaybeAddChild(c);
   // Don't need to keep the parent's children around anymore because we'll
@@ -179,11 +180,12 @@ void MctsPlayer::PlayMove(Coord c) {
   root_->parent->PruneChildren(c);
 }
 
-void MctsPlayer::PushHistory() {
+void MctsPlayer::PushHistory(Coord c) {
   history_.emplace_back();
   History& history = history_.back();
+  history.c = c;
   history.comment = root_->Describe();
-  history.Q = root_->Q();
+  history.node = root_;
 
   // Convert child visit counts to a probability distribution, pi.
   // For moves before the temperature cutoff, exponentiate the probabilities by

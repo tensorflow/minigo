@@ -51,8 +51,9 @@ class MctsPlayer {
 
   struct History {
     std::array<float, kNumMoves> search_pi;
+    Coord c = Coord::kPass;
     std::string comment;
-    float Q;
+    const MctsNode* node = nullptr;
   };
 
   enum class GameOverReason {
@@ -73,6 +74,7 @@ class MctsPlayer {
 
   void SelfPlay(int num_readouts);
 
+  const Options& options() const { return options_; }
   float result() const { return result_; }
   const std::string& result_string() const { return result_string_; }
   const std::vector<History>& history() const { return history_; }
@@ -100,7 +102,7 @@ class MctsPlayer {
   Random* rnd() { return &rnd_; }
 
  private:
-  void PushHistory();
+  void PushHistory(Coord c);
 
   bool ShouldResign() const;
 

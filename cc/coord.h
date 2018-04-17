@@ -15,12 +15,12 @@
 #ifndef CC_COORD_H_
 #define CC_COORD_H_
 
-#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <string>
 
 #include "absl/strings/string_view.h"
+#include "cc/check.h"
 #include "cc/constants.h"
 
 namespace minigo {
@@ -36,8 +36,8 @@ class Coord {
   Coord(uint16_t value) : value_(value) {}  // NOLINT(runtime/explicit)
 
   Coord(int row, int col) {
-    assert(row >= 0 && row < kN);
-    assert(col >= 0 && col < kN);
+    MG_DCHECK(row >= 0 && row < kN);
+    MG_DCHECK(col >= 0 && col < kN);
     value_ = row * kN + col;
   }
 

@@ -1,13 +1,13 @@
 http_archive(
     name = "com_github_gflags_gflags",
-    strip_prefix = "gflags-2.2.1",
-    urls = ["https://github.com/gflags/gflags/archive/v2.2.1.zip"],
+    strip_prefix = "gflags-e292e0452fcfd5a8ae055b59052fc041cbab4abf",
+    urls = ["https://github.com/gflags/gflags/archive/e292e0452fcfd5a8ae055b59052fc041cbab4abf.zip"],
 )
 
 http_archive(
     name = "com_google_absl",
-    strip_prefix = "abseil-cpp-da336a84e9c1f86409b21996164ae9602b37f9ca",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/da336a84e9c1f86409b21996164ae9602b37f9ca.zip"],
+    strip_prefix = "abseil-cpp-a7e522daf1ec9cda69b356472f662142dd0c1215",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/a7e522daf1ec9cda69b356472f662142dd0c1215.zip"],
 )
 
 new_http_archive(

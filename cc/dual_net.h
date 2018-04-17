@@ -79,7 +79,7 @@ class DualNet {
   DualNet();
   virtual ~DualNet();
 
-  tensorflow::Status Initialize(const std::string& graph_path);
+  void Initialize(const std::string& graph_path);
 
   // Runs the model on a batch of input features.
   // If rnd != nullptr, the features will be randomly rotated and mirrored

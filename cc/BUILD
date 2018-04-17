@@ -21,7 +21,6 @@ cc_library(
     srcs = [
         "color.cc",
         "coord.cc",
-        "move.cc",
     ],
     hdrs = [
         "algorithm.h",
@@ -32,7 +31,23 @@ cc_library(
         "stone.h",
     ],
     deps = [
+        ":check",
         "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "check",
+    srcs = [
+        "check.cc",
+    ],
+    hdrs = [
+        "check.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_absl//absl/debugging:symbolize",
     ],
 )
 
@@ -50,8 +65,21 @@ cc_library(
 )
 
 cc_library(
+    name = "init",
+    srcs = ["init.cc"],
+    hdrs = ["init.h"],
+    deps = [
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/debugging:symbolize",
+    ],
+)
+
+cc_library(
     name = "inline_vector",
     hdrs = ["inline_vector.h"],
+    deps = [
+        ":check",
+    ],
 )
 
 cc_library(
@@ -116,6 +144,21 @@ cc_library(
 cc_library(
     name = "symmetries",
     hdrs = ["symmetries.h"],
+    deps = [
+        ":check",
+    ],
+)
+
+cc_library(
+    name = "tf_utils",
+    srcs = ["tf_utils.cc"],
+    hdrs = ["tf_utils.h"],
+    deps = [
+        ":base",
+        ":dual_net",
+        ":tensorflow",
+        "@com_google_absl//absl/types:span",
+    ],
 )
 
 cc_library(
@@ -229,13 +272,20 @@ cc_test(
 )
 
 cc_binary(
-    name = "tf_test",
-    srcs = ["tf_test.cc"],
+    name = "self_play",
+    srcs = ["self_play.cc"],
     deps = [
         ":base",
         ":dual_net",
+        ":init",
         ":mcts",
+        ":random",
+        ":sgf",
+        ":tf_utils",
+        "//cc/file",
         "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
     ],
 )
 

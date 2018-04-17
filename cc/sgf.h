@@ -60,7 +60,7 @@ class Ast {
   };
 
   // Parses the SGF file.
-  bool Parse(std::string contents);
+  __attribute__((warn_unused_result)) bool Parse(std::string contents);
 
   // Returns a non-empty string containing error information if the most recent
   // call to Parse returned false.
@@ -114,7 +114,7 @@ std::vector<Move> GetMainLineMoves(const Ast::Tree& tree);
 
 // Extracts the main line series of moves from the first tree in an SGF file.
 // Returns an empty vector if the AST has no trees.
-std::vector<Move> GetMainLineMoves(const Ast& ast) {
+inline std::vector<Move> GetMainLineMoves(const Ast& ast) {
   if (ast.trees().empty()) {
     return {};
   }

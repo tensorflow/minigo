@@ -34,8 +34,6 @@ struct Move {
   }
 };
 
-std::ostream& operator<<(std::ostream& ios, const Move& move);
-
 }  // namespace minigo
 
 #endif  // CC_MOVE_H_

@@ -15,8 +15,9 @@
 #ifndef CC_SYMMETRIES_H_
 #define CC_SYMMETRIES_H_
 
-#include <cassert>
 #include <cstring>
+
+#include "cc/check.h"
 
 namespace minigo {
 namespace symmetry {
@@ -68,20 +69,20 @@ inline Symmetry Inverse(Symmetry sym) {
     case kFlipRot270:
       return kFlipRot270;
     default:
-      assert(false);
+      MG_CHECK(false);
       return kNumSymmetries;
   }
 }
 
 template <typename T, int N, int num_channels>
 inline void Identity(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   memcpy(dst, src, N * N * num_channels * sizeof(T));
 }
 
 template <typename T, int N, int num_channels>
 inline void Rot90(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   const int col_stride = num_channels;
   const int row_stride = col_stride * N;
   for (int j = 0; j < N; ++j) {
@@ -97,7 +98,7 @@ inline void Rot90(const T* src, T* dst) {
 
 template <typename T, int N, int num_channels>
 inline void Rot180(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   const int col_stride = num_channels;
   const int row_stride = col_stride * N;
   for (int j = 0; j < N; ++j) {
@@ -113,7 +114,7 @@ inline void Rot180(const T* src, T* dst) {
 
 template <typename T, int N, int num_channels>
 inline void Rot270(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   const int col_stride = num_channels;
   const int row_stride = col_stride * N;
   for (int j = 0; j < N; ++j) {
@@ -129,7 +130,7 @@ inline void Rot270(const T* src, T* dst) {
 
 template <typename T, int N, int num_channels>
 inline void Flip(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   const int col_stride = num_channels;
   const int row_stride = col_stride * N;
   for (int j = 0; j < N; ++j) {
@@ -145,7 +146,7 @@ inline void Flip(const T* src, T* dst) {
 
 template <typename T, int N, int num_channels>
 inline void FlipRot90(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   const int col_stride = num_channels;
   const int row_stride = col_stride * N;
   for (int j = 0; j < N; ++j) {
@@ -161,7 +162,7 @@ inline void FlipRot90(const T* src, T* dst) {
 
 template <typename T, int N, int num_channels>
 inline void FlipRot180(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   const int col_stride = num_channels;
   const int row_stride = col_stride * N;
   for (int j = 0; j < N; ++j) {
@@ -177,7 +178,7 @@ inline void FlipRot180(const T* src, T* dst) {
 
 template <typename T, int N, int num_channels>
 inline void FlipRot270(const T* src, T* dst) {
-  assert(src != dst);
+  MG_CHECK(src != dst);
   const int col_stride = num_channels;
   const int row_stride = col_stride * N;
   for (int j = 0; j < N; ++j) {
@@ -219,7 +220,7 @@ inline void ApplySymmetry(Symmetry sym, const T* src, T* dst) {
       FlipRot270<T, N, num_channels>(src, dst);
       break;
     default:
-      assert(false);
+      MG_CHECK(false);
       break;
   }
 }

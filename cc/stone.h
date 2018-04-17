@@ -15,9 +15,9 @@
 #ifndef CC_STONE_H_
 #define CC_STONE_H_
 
-#include <cassert>
 #include <cstdint>
 
+#include "cc/check.h"
 #include "cc/color.h"
 #include "cc/group.h"
 
@@ -33,7 +33,7 @@ class Stone {
   Stone(const Stone& other) = default;
   Stone(Color color, GroupId group_id)
       : value_(static_cast<uint16_t>(color) | (group_id << 2)) {
-    assert(color != Color::kEmpty);
+    MG_DCHECK(color != Color::kEmpty);
   }
 
   Stone& operator=(const Stone& other) = default;

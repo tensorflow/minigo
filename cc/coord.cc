@@ -74,19 +74,19 @@ std::pair<bool, Coord> TryParseString(absl::string_view str) {
 
 Coord Coord::FromKgs(absl::string_view str) {
   auto result = TryParseKgs(str);
-  assert(result.first);
+  MG_CHECK(result.first);
   return result.second;
 }
 
 Coord Coord::FromSgf(absl::string_view str) {
   auto result = TryParseSgf(str);
-  assert(result.first);
+  MG_CHECK(result.first);
   return result.second;
 }
 
 Coord Coord::FromString(absl::string_view str) {
   auto result = TryParseString(str);
-  assert(result.first);
+  MG_CHECK(result.first);
   return result.second;
 }
 

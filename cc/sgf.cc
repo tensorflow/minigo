@@ -21,6 +21,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "cc/check.h"
 #include "cc/constants.h"
 
 namespace minigo {
@@ -239,21 +240,21 @@ std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
   // formatting functions.
   absl::StrAppend(
       &str, absl::StrCat(";GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[",
-                         options.ruleset, "]", "SZ[", kN, "]KM[", options.komi,
-                         "]PW[", options.white_name, "]PB[", options.black_name,
-                         "]RE[", options.result, "]"));
+                         options.ruleset, "]\n", "SZ[", kN, "]KM[",
+                         options.komi, "]PW[", options.white_name, "]PB[",
+                         options.black_name, "]RE[", options.result, "]\n"));
 
   for (const auto& move_with_comment : moves) {
     Move move = move_with_comment.move;
-    assert(move.color == Color::kBlack || move.color == Color::kWhite);
+    MG_CHECK(move.color == Color::kBlack || move.color == Color::kWhite);
     const char* color = move.color == Color::kBlack ? "B" : "W";
-    absl::StrAppend(&str, absl::StrCat("\n;", color, "[", move.c.ToSgf(), "]"));
+    absl::StrAppend(&str, absl::StrCat(";", color, "[", move.c.ToSgf(), "]"));
     if (!move_with_comment.comment.empty()) {
       absl::StrAppend(&str, absl::StrCat("C[", move_with_comment.comment, "]"));
     }
   }
 
-  absl::StrAppend(&str, ")");
+  absl::StrAppend(&str, ")\n");
 
   return str;
 }
@@ -297,7 +298,15 @@ std::vector<Move> GetMainLineMoves(const Ast::Tree& tree) {
 }
 
 std::ostream& operator<<(std::ostream& os, const MoveWithComment& move) {
-  os << move.move;
+  MG_CHECK(move.move.color == Color::kBlack ||
+           move.move.color == Color::kWhite);
+  if (move.move.color == Color::kBlack) {
+    os << "B";
+  } else {
+    os << "W";
+  }
+  os << "[" << move.move.c.ToSgf() << "]";
+
   if (!move.comment.empty()) {
     os << "C[" << move.comment << "]";
   }

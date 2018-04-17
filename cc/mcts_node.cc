@@ -65,7 +65,7 @@ std::string MctsNode::Describe() const {
   oss << setprecision(4) << Q() << "\n";
   oss << MostVisitedPath() << "\n";
   oss << "move : action    Q     U     P   P-Dir    N  soft-N  p-delta  "
-         "p-rel\n";
+         "p-rel";
 
   float child_N_sum = 0;
   for (const auto& e : edges) {
@@ -80,7 +80,7 @@ std::string MctsNode::Describe() const {
     float p_delta = soft_N - child_P(i);
     float p_rel = p_delta / child_P(i);
     // clang-format off
-    oss << std::left << setw(5) << i.ToKgs() << std::right
+    oss << "\n" << std::left << setw(5) << i.ToKgs() << std::right
         << ": " << setw(6) << setprecision(3) << child_action_score[i]
         << " " << setw(6) << child_Q(i)
         << " " << setw(5) << child_U(i)
@@ -89,7 +89,7 @@ std::string MctsNode::Describe() const {
         << " " << setw(5) << static_cast<int>(child_N(i))
         << " " << setw(5) << setprecision(4) << soft_N
         << " " << setw(8) << setprecision(5) << p_delta
-        << " " << setw(5) << setprecision(2) << p_rel << "\n";
+        << " " << setw(5) << setprecision(2) << p_rel;
     // clang-format on
   }
   return oss.str();
@@ -112,7 +112,7 @@ std::string MctsNode::MostVisitedPath() const {
     oss << node->move.ToKgs() << " (" << static_cast<int>(node->N())
         << ") ==> ";
   }
-  oss << std::setprecision(5) << "Q: " << node->Q();
+  oss << std::fixed << std::setprecision(5) << "Q: " << node->Q();
   return oss.str();
 }
 

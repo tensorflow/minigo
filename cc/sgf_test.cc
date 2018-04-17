@@ -109,9 +109,9 @@ TEST_F(AstTest, NodesMustComeBeforeChildren) {
 TEST(SgfTest, CreateSgfStringDefaults) {
   CreateSgfOptions options;
   options.result = "W+R";
-  auto expected =
-      absl::StrCat("(;GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[Chinese]SZ[",
-                   kN, "]KM[7.5]PW[Minigo]PB[Minigo]RE[W+R])");
+  auto expected = absl::StrCat(
+      "(;GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[Chinese]\nSZ[", kN,
+      "]KM[7.5]PW[Minigo]PB[Minigo]RE[W+R]\n)\n");
   EXPECT_EQ(expected, CreateSgfString({}, options));
 }
 
@@ -124,8 +124,8 @@ TEST(SgfTest, CreateSgfStringOptions) {
   options.komi = 101;
 
   auto expected = absl::StrCat(
-      "(;GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[Some rules]SZ[", kN,
-      "]KM[101]PW[Bob]PB[Alice]RE[B+5])");
+      "(;GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[Some rules]\nSZ[", kN,
+      "]KM[101]PW[Bob]PB[Alice]RE[B+5]\n)\n");
   EXPECT_EQ(expected, CreateSgfString({}, options));
 }
 
@@ -143,13 +143,13 @@ TEST(SgfTest, CreateSgfStringMoves) {
 
   // clang-format off
   auto expected = absl::StrCat(
-      "(;GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[Chinese]SZ[", kN,
+      "(;GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[Chinese]\nSZ[", kN,
       "]KM[7.5]PW[Minigo]PB[Minigo]RE[B+R]\n",
-      ";B[be]\n",
-      ";W[aa]C[Hello there]\n",
-      ";B[hb]\n",
-      ";W[ge]C[General Kenobi]\n",
-      ";B[]C[You are a bold one])");
+      ";B[be]",
+      ";W[aa]C[Hello there]",
+      ";B[hb]",
+      ";W[ge]C[General Kenobi]",
+      ";B[]C[You are a bold one])\n");
   // clang-format on
   EXPECT_EQ(expected, CreateSgfString(moves, options));
 }
@@ -166,7 +166,7 @@ TEST(SgfTest, GetMainLineMoves) {
    */
   std::string sgf =
       "(;FF[4](;B[aa];W[ab]C[hello!](;B[ac])(;B[ad];W[ae]))"
-      "(;B[af](;W[ag];B[ah])(;W[ai])))";
+      "(;B[af](;W[ag];B[ah])(;W[ai])))\n";
 
   std::vector<Move> expected_main_line = {
       {Color::kBlack, Coord::FromSgf("aa")},

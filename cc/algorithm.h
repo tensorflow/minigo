@@ -16,14 +16,15 @@
 #define CC_ALGORITHM_H_
 
 #include <algorithm>
-#include <cassert>
 #include <utility>
+
+#include "cc/check.h"
 
 namespace minigo {
 
 template <typename T>
 inline int ArgMax(const T& container) {
-  assert(!container.empty());
+  MG_CHECK(!container.empty());
   return std::distance(
       std::begin(container),
       std::max_element(std::begin(container), std::end(container)));
@@ -31,7 +32,7 @@ inline int ArgMax(const T& container) {
 
 template <typename T, typename Compare>
 inline int ArgMax(const T& container, Compare cmp) {
-  assert(!container.empty());
+  MG_CHECK(!container.empty());
   return std::distance(std::begin(container),
                        std::max_element(std::begin(container),
                                         std::end(container), std::move(cmp)));
@@ -39,7 +40,7 @@ inline int ArgMax(const T& container, Compare cmp) {
 
 template <typename T, typename U>
 inline int SearchSorted(const T& container, const U& value) {
-  assert(!container.empty());
+  MG_CHECK(!container.empty());
   return std::distance(
       container.begin(),
       std::lower_bound(container.begin(), container.end(), value));

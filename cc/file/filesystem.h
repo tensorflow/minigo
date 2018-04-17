@@ -12,31 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_COLOR_H_
-#define CC_COLOR_H_
+#ifndef CC_MINIGO_FILE_FILESYSTEM_H_
 
-#include <iostream>
-
-#include "cc/check.h"
+#include "absl/strings/string_view.h"
 
 namespace minigo {
+namespace file {
 
-// Color represents the stone color of each point on the board.
-// The position code relies on the values of kEmpty, kBlack and kWhite being
-// 0, 1, 2 respectively for some of its bit twiddling.
-enum class Color {
-  kEmpty,
-  kBlack,
-  kWhite,
-};
+__attribute__((warn_unused_result)) bool RecursivelyCreateDir(
+    absl::string_view path);
 
-inline Color OtherColor(Color color) {
-  MG_CHECK(color == Color::kWhite || color == Color::kBlack);
-  return color == Color::kWhite ? Color::kBlack : Color::kWhite;
-}
-
-std::ostream& operator<<(std::ostream& os, Color color);
-
+}  // namespace file
 }  // namespace minigo
 
-#endif  // CC_COLOR_H_
+#endif  //  CC_MINIGO_FILE_FILESYSTEM_H_
