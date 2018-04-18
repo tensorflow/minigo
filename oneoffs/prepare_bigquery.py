@@ -1,5 +1,12 @@
 '''
 Script to process debug SGFs for upload to BigQuery.
+
+Handles one generation per invocation, for easy sharding of work.
+
+Usage:
+python oneoffs/prepare_bigquery.py 000017-generation-number
+
+
 The load commands look like:
 bq load --project_id=$PROJECT_ID \
     --source_format=NEWLINE_DELIMITED_JSON \
