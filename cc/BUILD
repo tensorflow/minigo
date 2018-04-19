@@ -65,6 +65,18 @@ cc_library(
 )
 
 cc_library(
+    name = "gtp_player",
+    srcs = ["gtp_player.cc"],
+    hdrs = ["gtp_player.h"],
+    deps = [
+        ":dual_net",
+        ":mcts",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+cc_library(
     name = "init",
     srcs = ["init.cc"],
     hdrs = ["init.h"],
@@ -272,11 +284,12 @@ cc_test(
 )
 
 cc_binary(
-    name = "self_play",
-    srcs = ["self_play.cc"],
+    name = "main",
+    srcs = ["main.cc"],
     deps = [
         ":base",
         ":dual_net",
+        ":gtp_player",
         ":init",
         ":mcts",
         ":random",
@@ -284,6 +297,7 @@ cc_binary(
         ":tf_utils",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],

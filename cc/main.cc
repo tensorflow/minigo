@@ -14,12 +14,18 @@
 
 #include <unistd.h>
 #include <cstring>
+#include <iostream>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
+#include "absl/memory/memory.h"
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -29,6 +35,7 @@
 #include "cc/file/filesystem.h"
 #include "cc/file/helpers.h"
 #include "cc/file/path.h"
+#include "cc/gtp_player.h"
 #include "cc/init.h"
 #include "cc/mcts_player.h"
 #include "cc/random.h"
@@ -37,7 +44,9 @@
 #include "gflags/gflags.h"
 
 DEFINE_uint64(seed, 0,
-              "Random seed. Use default value of 0 to use a time-based seed.");
+              "Random seed. Use default value of 0 to use a time-based seed. "
+              "This seed is used to control the moves played, not whether a "
+              "game has resignation disabled or is a holdout.");
 DEFINE_double(resign_threshold, -0.95, "Resign threshold.");
 DEFINE_double(komi, minigo::kDefaultKomi, "Komi.");
 DEFINE_bool(inject_noise, true,
@@ -52,11 +61,11 @@ DEFINE_bool(random_symmetry, true,
             "the model and apply the inverse transform to the results.");
 DEFINE_string(model, "",
               "Path to a minigo model serialized as a GraphDef proto.");
-DEFINE_string(output_dir, "data/selfplay",
+DEFINE_string(output_dir, "",
               "Output directory. If empty, no examples are written.");
-DEFINE_string(holdout_dir, "data/holdout",
+DEFINE_string(holdout_dir, "",
               "Holdout directory. If empty, no examples are written.");
-DEFINE_string(sgf_dir, "sgf", "SGF directory. If empty, no SGF is written.");
+DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
 DEFINE_double(holdout_pct, 0.05,
               "Fraction of games to hold out for validation.");
 DEFINE_double(disable_resign_pct, 0.05,
@@ -65,6 +74,8 @@ DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
 DEFINE_int32(batch_size, 8,
              "Number of readouts to run inference on in parallel.");
+
+DEFINE_string(mode, "", "Mode to run in: \"selfplay\" or \"gtp\"");
 
 // Self play flags:
 //   --inject_noise=true
@@ -142,33 +153,35 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
   MG_CHECK(file::SetContents(output_path, sgf_str));
 }
 
-}  // namespace
+void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
+  options->inject_noise = FLAGS_inject_noise;
+  options->soft_pick = FLAGS_soft_pick;
+  options->random_symmetry = FLAGS_random_symmetry;
+  options->resign_threshold = FLAGS_resign_threshold;
+  options->batch_size = FLAGS_batch_size;
+  options->komi = FLAGS_komi;
+  options->random_seed = FLAGS_seed;
+}
 
 void SelfPlay() {
-  Random rnd;
+  auto dual_net = absl::make_unique<DualNet>();
+  dual_net->Initialize(FLAGS_model);
 
-  // Initialize the network.
-  DualNet dual_net;
-  dual_net.Initialize(FLAGS_model);
-
-  // Initialize the MCTS player.
   MctsPlayer::Options options;
-  options.random_seed = FLAGS_seed;
-  options.komi = FLAGS_komi;
-  options.inject_noise = FLAGS_inject_noise;
-  options.soft_pick = FLAGS_soft_pick;
-  options.random_symmetry = FLAGS_random_symmetry;
-  options.batch_size = FLAGS_batch_size;
-  if (rnd() < FLAGS_holdout_pct) {
+  ParseMctsPlayerOptionsFromFlags(&options);
+  Random rnd;
+  if (rnd() < FLAGS_disable_resign_pct) {
     options.resign_threshold = -1;
-  } else {
-    options.resign_threshold = FLAGS_resign_threshold;
   }
+  auto player = absl::make_unique<MctsPlayer>(std::move(dual_net), options);
 
-  MctsPlayer player(&dual_net, options);
-
-  // Play the game.
-  player.SelfPlay(FLAGS_num_readouts);
+  while (!player->game_over()) {
+    auto move = player->SuggestMove(FLAGS_num_readouts);
+    std::cerr << player->root()->position.ToPrettyString();
+    std::cerr << player->root()->Describe() << "\n";
+    player->PlayMove(move);
+  }
+  std::cerr << player->result_string() << "\n";
 
   std::string output_name = GetOutputName();
   std::string output_dir =
@@ -176,21 +189,48 @@ void SelfPlay() {
 
   // Write example outputs.
   if (!output_dir.empty()) {
-    WriteExample(output_dir, output_name, player);
+    WriteExample(output_dir, output_name, *player);
   }
 
   // Write SGF.
   if (!FLAGS_sgf_dir.empty()) {
-    WriteSgf(file::JoinPath(FLAGS_sgf_dir, "clean"), output_name, player,
+    WriteSgf(file::JoinPath(FLAGS_sgf_dir, "clean"), output_name, *player,
              false);
-    WriteSgf(file::JoinPath(FLAGS_sgf_dir, "full"), output_name, player, true);
+    WriteSgf(file::JoinPath(FLAGS_sgf_dir, "full"), output_name, *player, true);
   }
 }
+
+void Gtp() {
+  auto dual_net = absl::make_unique<DualNet>();
+  dual_net->Initialize(FLAGS_model);
+
+  GtpPlayer::Options options;
+  ParseMctsPlayerOptionsFromFlags(&options);
+  options.num_readouts = FLAGS_num_readouts;
+  options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
+  auto player = absl::make_unique<GtpPlayer>(std::move(dual_net), options);
+
+  std::string line;
+  do {
+    std::getline(std::cin, line);
+  } while (!std::cin.eof() && player->HandleCmd(line));
+}
+
+}  // namespace
 
 }  // namespace minigo
 
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
-  minigo::SelfPlay();
+
+  if (FLAGS_mode == "selfplay") {
+    minigo::SelfPlay();
+  } else if (FLAGS_mode == "gtp") {
+    minigo::Gtp();
+  } else {
+    std::cerr << "Unrecognized mode \"" << FLAGS_mode << "\"\n";
+    return 1;
+  }
+
   return 0;
 }

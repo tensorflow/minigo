@@ -63,9 +63,9 @@ class Graph {
     this.draw();
   }
 
-  // Sets the graph value for the given move number (move >= 1).
+  // Sets the graph value for the given move number.
   setMoveScore(move: number, value: number) {
-    this.points[move - 1] = [move, value];
+    this.points[move] = [move, value];
   }
 
   onMoveChanged(callback: MoveChangedCallback) {

@@ -34,6 +34,8 @@ constexpr float kDefaultKomi = 7.5;
 
 constexpr float kDirichletAlpha = 0.03f * 361 / (kN * kN);
 
+static constexpr float kPuct = 1.38;
+
 }  // namespace minigo
 
 #endif  //  CC_CONSTANTS_H_

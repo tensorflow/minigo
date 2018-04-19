@@ -67,18 +67,18 @@ class FakeNet : public DualNet {
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(const Options& options)
-      : MctsPlayer(&network_, options), network_({}, 0) {}
+      : MctsPlayer(absl::make_unique<FakeNet>(absl::Span<const float>(), 0),
+                   options) {}
 
   TestablePlayer(absl::Span<const float> fake_priors, float fake_value,
                  const Options& options)
-      : MctsPlayer(&network_, options), network_(fake_priors, fake_value) {}
+      : MctsPlayer(absl::make_unique<FakeNet>(fake_priors, fake_value),
+                   options) {}
 
   using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;
   using MctsPlayer::rnd;
-  using MctsPlayer::root;
   using MctsPlayer::Run;
-  using MctsPlayer::SetResult;
   using MctsPlayer::TreeSearch;
 
   std::array<float, kNumMoves> Noise() {
@@ -86,9 +86,6 @@ class TestablePlayer : public MctsPlayer {
     rnd()->Dirichlet(kDirichletAlpha, &noise);
     return noise;
   }
-
- private:
-  FakeNet network_;
 };
 
 std::unique_ptr<TestablePlayer> CreateBasicPlayer(MctsPlayer::Options options) {
@@ -350,8 +347,6 @@ TEST(MctsPlayerTest, ExtractDataNormalEnd) {
   auto* root = player->root();
   EXPECT_TRUE(root->position.is_game_over());
   EXPECT_EQ(Color::kBlack, root->position.to_play());
-  player->SetResult(-1, root->position.CalculateScore(),
-                    MctsPlayer::GameOverReason::kBothPassed);
 
   ASSERT_EQ(2, player->history().size());
 
@@ -367,15 +362,13 @@ TEST(MctsPlayerTest, ExtractDataResignEnd) {
   player->TreeSearch(1);
   player->PlayMove(Coord::kPass);
   player->TreeSearch(1);
+  player->PlayMove(Coord::kResign);
 
   auto* root = player->root();
 
   // Black is winning on the board.
   EXPECT_LT(0, root->position.CalculateScore());
 
-  // Result should say White is the winner if Black resigns.
-  player->SetResult(-1, root->position.CalculateScore(),
-                    MctsPlayer::GameOverReason::kOpponentResigned);
   EXPECT_EQ(-1, player->result());
   EXPECT_EQ("W+R", player->result_string());
 }

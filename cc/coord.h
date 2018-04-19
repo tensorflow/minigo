@@ -25,11 +25,12 @@
 
 namespace minigo {
 
-// Coord represents the coordinates of a point on the board or, in the case of
-// Coord::kPass, a pass move.
+// Coord represents the coordinates of a point on the board, a pass, or a
+// resign.
 class Coord {
  public:
   static constexpr uint16_t kPass = kN * kN;
+  static constexpr uint16_t kResign = kPass + 1;
   static constexpr uint16_t kInvalid = 0xffff;
   static constexpr char kKgsColumns[] = "ABCDEFGHJKLMNOPQRST";
 
@@ -42,13 +43,13 @@ class Coord {
   }
 
   // Parse a Coord from a KGS string.
-  static Coord FromKgs(absl::string_view str);
+  static Coord FromKgs(absl::string_view str, bool allow_invalid = false);
 
   // Parse a Coord from a SGF string.
-  static Coord FromSgf(absl::string_view str);
+  static Coord FromSgf(absl::string_view str, bool allow_invalid = false);
 
   // Parse a Coord from one of the above string representations.
-  static Coord FromString(absl::string_view str);
+  static Coord FromString(absl::string_view str, bool allow_invalid = false);
 
   // Format the Coord as a KGS string.
   std::string ToKgs() const;

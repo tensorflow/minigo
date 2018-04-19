@@ -16,7 +16,7 @@
 declare var io: any;
 
 type DebugHandler = (msg: string) => void;
-type CmdHandler = (cmd: string, result: string) => void;
+type CmdHandler = (cmd: string, result: string, ok: boolean) => void;
 type StderrHandler = (line: string) => void;
 type ConnectCallback = () => void;
 
@@ -91,21 +91,26 @@ class Socket {
     this.sock.emit('gtpcmd', {data: cmd});
   }
 
-  private cmdHandler(result: string) {
+  private cmdHandler(line: string) {
     let {cmd, callback} = this.cmdQueue[0];
-    this.cmdQueue = this.cmdQueue.slice(1);
 
     if (this.debugHandler) {
-      this.debugHandler(`<- ${cmd} ${result == "=" ? "= 👍" : result}`);
+      this.debugHandler(`${cmd} ${line}`);
     }
 
-    if (this.cmdQueue.length > 0) {
-      this.sendNext();
+    if (line[0] == '=' || line[0] == '?') {
+      // This line contains the response from a GTP command; pop the command off
+      // the queue.
+      this.cmdQueue = this.cmdQueue.slice(1);
+      if (this.cmdQueue.length > 0) {
+        this.sendNext();
+      }
     }
 
     if (callback) {
-      result = result.substr(1).trim();
-      callback(cmd, result);
+      let ok = line[0] == '=';
+      let result = line.substr(1).trim();
+      callback(cmd, result, ok);
     }
   }
 
@@ -121,7 +126,7 @@ class Socket {
   private sendNext() {
     let {cmd, callback} = this.cmdQueue[0];
     if (this.debugHandler) {
-      this.debugHandler(`-> ${cmd}`);
+      this.debugHandler(`${cmd}`);
     }
     this.sock.emit('gtpcmd', {data: cmd});
   }

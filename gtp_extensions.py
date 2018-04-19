@@ -218,7 +218,6 @@ class GoGuiMixin(gtp.Engine):
             msg["lastMove"] = coords.to_kgs(position.recent[-1].move)
         else:
             msg["lastMove"] = None
-        msg["session"] = self.session_id
         msg["n"] = position.n
         if self._game.root.parent and self._game.root.parent.parent:
             msg["q"] = self._game.root.parent.Q
@@ -298,10 +297,8 @@ class GoGuiMixin(gtp.Engine):
             game = self._game
             if game.root.is_done():
                 game.set_result(game.root.position.result(), was_resign=False)
-            return True
         except:
-            dbg("ILLEGAL MOVE: %s", arguments)
-            return False
+            raise ValueError("illegal move")
 
     def cmd_final_score(self, arguments):
         return self._game.result_string

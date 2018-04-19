@@ -17,7 +17,6 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <utility>
 
 #include "absl/memory/memory.h"
@@ -27,7 +26,17 @@
 
 namespace minigo {
 
-MctsPlayer::MctsPlayer(DualNet* network, const Options& options)
+std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
+  os << "inject_noise:" << options.inject_noise
+     << " soft_pick:" << options.soft_pick
+     << " random_symmetry:" << options.random_symmetry
+     << " resign_threshold:" << options.resign_threshold
+     << " batch_size:" << options.batch_size << " komi:" << options.komi
+     << " random_seed:" << options.random_seed;
+  return os;
+}
+
+MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : network_(std::move(network)),
       game_root_(&dummy_stats_, {&bv_, &gv_, options.komi, Color::kBlack}),
       rnd_(options.random_seed),
@@ -36,70 +45,61 @@ MctsPlayer::MctsPlayer(DualNet* network, const Options& options)
   // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.
   temperature_cutoff_ = kN * kN / 12;
   root_ = &game_root_;
-  std::cout << "Using random seed " << rnd_.seed() << "\n";
+
+  InitializeGame({&bv_, &gv_, options.komi, Color::kBlack});
 }
 
 void MctsPlayer::InitializeGame(const Position& position) {
   game_root_ = {&dummy_stats_, Position(&bv_, &gv_, position)};
+  root_ = &game_root_;
+  game_over_ = false;
 }
 
-void MctsPlayer::SelfPlay(int num_readouts) {
-  auto* first_node = root_->SelectLeaf();
-  MG_CHECK(first_node != nullptr);
-  auto output = Run(&first_node->features);
-  first_node->IncorporateResults(output.policy, output.value, first_node);
+void MctsPlayer::NewGame() {
+  game_root_ =
+      MctsNode(&dummy_stats_, {&bv_, &gv_, options_.komi, Color::kBlack});
+  root_ = &game_root_;
+  game_over_ = false;
+}
 
+Coord MctsPlayer::SuggestMove(int num_readouts) {
   std::array<float, kNumMoves> noise;
-  for (;;) {
-    if (options_.inject_noise) {
-      rnd_.Dirichlet(kDirichletAlpha, &noise);
-      root_->InjectNoise(noise);
-    }
-    int current_readouts = root_->N();
-
-    auto start = absl::Now();
-    while (root_->N() < current_readouts + num_readouts) {
-      TreeSearch(options_.batch_size);
-    }
-    auto elapsed = absl::Now() - start;
-    std::cout << "Seconds per 100 reads: " << elapsed * 100 / num_readouts
-              << "\n";
-
-    std::cout << root_->position.ToPrettyString();
-    std::cout << root_->Describe() << "\n";
-
-    if (ShouldResign()) {
-      SetResult(root_->position.to_play() == Color::kBlack ? -1 : 1,
-                root_->position.CalculateScore(),
-                GameOverReason::kOpponentResigned);
-      break;
+  if (options_.inject_noise) {
+    // In order to be able to inject noise into the root node, we need to first
+    // expand it. This should be the only time when SuggestMove is called when
+    // the root isn't expanded.
+    if (root_->state != MctsNode::State::kExpanded) {
+      MG_CHECK(root_ == &game_root_);
+      auto* first_node = root_->SelectLeaf();
+      auto output = Run(&first_node->features);
+      first_node->IncorporateResults(output.policy, output.value, first_node);
     }
 
-    auto move = PickMove();
-    PlayMove(move);
-    if (root_->position.is_game_over()) {
-      float score = root_->position.CalculateScore();
-      float result = score < 0 ? -1 : score > 0 ? 1 : 0;
-      SetResult(result, score, GameOverReason::kBothPassed);
-      break;
-    } else if (root_->position.n() >= kMaxSearchDepth) {
-      float score = root_->position.CalculateScore();
-      float result = score < 0 ? -1 : score > 0 ? 1 : 0;
-      SetResult(result, score, GameOverReason::kMoveLimitReached);
-      break;
-    }
-
-    std::cout << "Q: " << std::setw(8) << std::setprecision(5) << root_->Q()
-              << "\n";
-    std::cout << "Played >>" << move << std::endl;
+    rnd_.Dirichlet(kDirichletAlpha, &noise);
+    root_->InjectNoise(noise);
   }
+  int current_readouts = root_->N();
+
+  auto start = absl::Now();
+  while (root_->N() < current_readouts + num_readouts) {
+    TreeSearch(options_.batch_size);
+  }
+  auto elapsed = absl::Now() - start;
+  std::cerr << "Seconds per 100 reads: " << elapsed * 100 / num_readouts
+            << std::endl;
+
+  if (ShouldResign()) {
+    return Coord::kResign;
+  }
+
+  return PickMove();
 }
 
 Coord MctsPlayer::PickMove() {
   if (!options_.soft_pick || root_->position.n() > temperature_cutoff_) {
     // Choose the most visited node.
     Coord c = ArgMax(root_->edges, MctsNode::CmpN);
-    std::cout << "Picked arg_max " << c << "\n";
+    std::cerr << "Picked arg_max " << c << "\n";
     return c;
   }
 
@@ -117,16 +117,16 @@ Coord MctsPlayer::PickMove() {
   }
   float e = rnd_();
   Coord c = SearchSorted(cdf, e);
-  std::cout << "Picked rnd(" << e << ") " << c << "\n";
+  std::cerr << "Picked rnd(" << e << ") " << c << "\n";
   MG_DCHECK(root_->child_N(c) != 0);
   return c;
 }
 
-void MctsPlayer::TreeSearch(int batch_size) {
+absl::Span<MctsNode* const> MctsPlayer::TreeSearch(int batch_size) {
   int max_iterations = batch_size * 2;
 
   // TODO(tommadams): Avoid creating this vector each time.
-  std::vector<MctsNode*> leaves;
+  leaves_.clear();
   for (int i = 0; i < max_iterations; ++i) {
     auto* leaf = root_->SelectLeaf();
     if (leaf == nullptr) {
@@ -138,33 +138,32 @@ void MctsPlayer::TreeSearch(int batch_size) {
       leaf->IncorporateEndGameResult(value, root_);
     } else {
       leaf->AddVirtualLoss(root_);
-      leaves.push_back(leaf);
-      if (static_cast<int>(leaves.size()) == batch_size) {
+      leaves_.push_back(leaf);
+      if (static_cast<int>(leaves_.size()) == batch_size) {
         break;
       }
     }
   }
 
-  if (!leaves.empty()) {
-    // TODO(tommadams): Avoid creating these vectors each time.
-    std::vector<const DualNet::BoardFeatures*> features;
-    features.reserve(leaves.size());
-    for (auto* leaf : leaves) {
-      features.push_back(&leaf->features);
+  if (!leaves_.empty()) {
+    features_.clear();
+    features_.reserve(leaves_.size());
+    for (auto* leaf : leaves_) {
+      features_.push_back(&leaf->features);
     }
 
-    std::vector<DualNet::Output> outputs;
-    outputs.resize(leaves.size());
+    outputs_.resize(leaves_.size());
+    RunMany(features_, {outputs_.data(), outputs_.size()});
 
-    RunMany(features, {outputs.data(), outputs.size()});
-
-    for (size_t i = 0; i < leaves.size(); ++i) {
-      MctsNode* leaf = leaves[i];
-      const auto& output = outputs[i];
+    for (size_t i = 0; i < leaves_.size(); ++i) {
+      MctsNode* leaf = leaves_[i];
+      const auto& output = outputs_[i];
       leaf->RevertVirtualLoss(root_);
       leaf->IncorporateResults(output.policy, output.value, root_);
     }
   }
+
+  return absl::MakeConstSpan(leaves_);
 }
 
 bool MctsPlayer::ShouldResign() const {
@@ -172,12 +171,55 @@ bool MctsPlayer::ShouldResign() const {
 }
 
 void MctsPlayer::PlayMove(Coord c) {
+  if (game_over_) {
+    std::cerr << "ERROR: can't play move " << c << ", game is over"
+              << std::endl;
+    return;
+  }
+
+  // Handle resignations.
+  if (c == Coord::kResign) {
+    if (root_->position.to_play() == Color::kBlack) {
+      result_ = -1;
+      result_string_ = "W+R";
+    } else {
+      result_ = 1;
+      result_string_ = "B+R";
+    }
+    game_over_ = true;
+    return;
+  }
+
   PushHistory(c);
 
   root_ = root_->MaybeAddChild(c);
   // Don't need to keep the parent's children around anymore because we'll
   // never revisit them.
   root_->parent->PruneChildren(c);
+
+  std::cerr << "Q: " << std::setw(8) << std::setprecision(5) << root_->Q()
+            << "\n";
+  std::cerr << "Played >>" << c << std::endl;
+
+  // Handle consecutive passing.
+  if (root_->position.is_game_over() ||
+      root_->position.n() >= kMaxSearchDepth) {
+    float score = root_->position.CalculateScore();
+    result_string_ = FormatScore(score);
+    result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
+    game_over_ = true;
+  }
+}
+
+std::string MctsPlayer::FormatScore(float score) const {
+  std::ostringstream oss;
+  oss << std::fixed;
+  if (score > 0) {
+    oss << "B+" << std::setprecision(1) << score;
+  } else {
+    oss << "W+" << std::setprecision(1) << -score;
+  }
+  return oss.str();
 }
 
 void MctsPlayer::PushHistory(Coord c) {
@@ -209,28 +251,6 @@ void MctsPlayer::PushHistory(Coord c) {
   for (int i = 0; i < kNumMoves; ++i) {
     history.search_pi[i] /= sum;
   }
-}
-
-void MctsPlayer::SetResult(float result, float score, GameOverReason reason) {
-  result_ = result;
-  score_ = score;
-  game_over_reason_ = reason;
-  if (reason == GameOverReason::kOpponentResigned) {
-    result_string_ = result_ == 1 ? "B+R" : "W+R";
-  } else if (score == 0) {
-    result_string_ = "DRAW";
-  } else {
-    std::ostringstream oss;
-    oss << std::fixed;
-    if (result > 0) {
-      oss << "B+" << std::setprecision(1) << score;
-    } else {
-      oss << "W+" << std::setprecision(1) << -score;
-    }
-    result_string_ = oss.str();
-  }
-
-  std::cout << result_string_ << "\n";
 }
 
 DualNet::Output MctsPlayer::Run(const DualNet::BoardFeatures* features) {

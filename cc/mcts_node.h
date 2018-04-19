@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
@@ -31,9 +32,8 @@ namespace minigo {
 
 class MctsNode {
  public:
-  static constexpr float kPuct = 1.38;
-
   struct EdgeStats {
+    // TODO(tom): consider moving N into the MctsNode to save memory.
     float N = 0;
     float W = 0;
     float P = 0;
@@ -81,7 +81,8 @@ class MctsNode {
   }
 
   std::string Describe() const;
-  std::string MostVisitedPath() const;
+  std::string MostVisitedPathString() const;
+  std::vector<Coord> MostVisitedPath() const;
 
   void InjectNoise(const std::array<float, kNumMoves>& noise);
 

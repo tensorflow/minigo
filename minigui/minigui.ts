@@ -18,7 +18,7 @@ import {Log} from './log'
 import * as gtpsock from './gtp_socket'
 import {Graph} from './graph'
 
-const N = board.BoardSize.Nine;
+const N = board.BoardSize.Nineteen;
 
 namespace BoardState {
   export type Move = board.Point | 'pass' | 'resign';
@@ -67,12 +67,6 @@ consoleElem.addEventListener('keypress', (e) => {
   if (e.keyCode == 13) {
     let cmd = consoleElem.innerText.trim();
     if (cmd != '') {
-      switch (cmd.split(' ', 1)[0]) {
-        case 'genmove':
-        case 'gamestate':
-          cmd = 'mg_' + cmd;
-          break;
-      }
       gtp.send(cmd, () => { log.scroll(); });
     }
     consoleElem.innerHTML = '';
@@ -105,6 +99,8 @@ let gtp = new gtpsock.Socket(
 gtp.onConnect(() => {
   gtp.send('clear_board');
   gtp.send('mg_gamestate');
+  gtp.send('report_search_interval 100');
+  gtp.send('info');
   gameState.gameOver = false;
   util.getElement('ui-container').classList.remove('hidden');
 });
@@ -184,7 +180,10 @@ function onMovePlayed(move: string) {
   if (gameOver && !gameState.gameOver) {
     gameState.gameOver = true;
 
-    gtp.send('final_score', (cmd: string, result: string) => {
+    gtp.send('final_score', (cmd: string, result: string, ok: boolean) => {
+      if (!ok) {
+        return;
+      }
       let prettyResult: string;
       if (result[0] == 'W') {
         prettyResult = 'White wins by ';
@@ -261,6 +260,7 @@ function resetGame(delay?: number) {
   gtp.newSession();
   gtp.send('clear_board', () => { gameState.gameOver = false; });
   gtp.send('mg_gamestate');
+  gtp.send('info');
 }
 
 function isSelfPlay() {
@@ -269,12 +269,12 @@ function isSelfPlay() {
 }
 
 function searchHandler(line: string) {
-  let variation = util.parseVariation(line, N, mainBoard.toPlay);
+  let variation = util.parseVariation(line.trim(), N, mainBoard.toPlay);
   currentVariationBoard.setVariation(variation);
 }
 
 function principalVariationHandler(line: string) {
-  let variation = util.parseVariation(line, N, mainBoard.toPlay);
+  let variation = util.parseVariation(line.trim(), N, mainBoard.toPlay);
   gameState.history[gameState.moveNumber].principalVariation = variation;
   if (gameState.hoveredMove == null) {
     mainBoard.setVariation(variation);
@@ -283,7 +283,7 @@ function principalVariationHandler(line: string) {
 
 function qHandler(line: string) {
   let heatMap = [];
-  for (let s of line.split(' ')) {
+  for (let s of line.trim().split(' ')) {
     let x = parseFloat(s);
     if (x > 0) {
       x = Math.sqrt(x);
@@ -304,7 +304,7 @@ function qHandler(line: string) {
 function nHandler(line: string) {
   let ns = new Array<number>();
   let nSum = 0;
-  for (let s of line.split(' ')) {
+  for (let s of line.trim().split(' ')) {
     let n = parseInt(s);
     nSum += n;
     ns.push(n);
@@ -435,9 +435,8 @@ mainBoard.onClick((p) => {
   let row = N - p.row;
   let col = board.COL_LABELS[p.col];
   let move = `${col}${row}`;
-  gtp.send(`play ${player} ${move}`, (cmd: string, result: string) => {
-    // The play command returns False if the move isn't valid.
-    if (result.toLowerCase() == 'true') {
+  gtp.send(`play ${player} ${move}`, (cmd: string, result: string, ok: boolean) => {
+    if (ok) {
       onMovePlayed(move);
     }
   });
