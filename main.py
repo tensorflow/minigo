@@ -23,6 +23,7 @@ import socket
 import sys
 import tempfile
 import time
+from absl import flags
 import cloud_logging
 from tqdm import tqdm
 import gzip
@@ -269,4 +270,8 @@ argh.add_commands(parser, [gtp, bootstrap, train,
 
 if __name__ == '__main__':
     cloud_logging.configure()
-    argh.dispatch(parser)
+    # Let absl.flags parse known flags from argv, then pass the remaining flags
+    # into argh for dispatching.
+    remaining_argv = flags.FLAGS(sys.argv, known_only=True)
+    print(remaining_argv)
+    argh.dispatch(parser, argv=remaining_argv[1:])
