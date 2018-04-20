@@ -13,16 +13,19 @@
 # limitations under the License.
 
 import itertools
-import tensorflow as tf
-import numpy as np
+import random
 import tempfile
 
 import coords
 import preprocessing
 import features
 import go
-
+import symmetries
 from tests import test_utils
+
+import numpy as np
+import tensorflow as tf
+
 
 TEST_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf])"
 
@@ -38,10 +41,11 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             raw_data.append((feature, pi, value))
         return raw_data
 
-    def extract_data(self, tf_record, filter_amount=1):
+    def extract_data(self, tf_record, filter_amount=1, random_rotation=False):
         pos_tensor, label_tensors = preprocessing.get_input_tensors(
             1, [tf_record], num_repeats=1, shuffle_records=False,
-            shuffle_examples=False, filter_amount=filter_amount)
+            shuffle_examples=False, filter_amount=filter_amount,
+            random_rotation=random_rotation)
         recovered_data = []
         with tf.Session() as sess:
             while True:
@@ -67,6 +71,7 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             self.assertEqualNPArray(datum1[1], datum2[1])
             # value
             self.assertEqual(datum1[2], datum2[2])
+
 
     def test_serialize_round_trip(self):
         np.random.seed(1)
@@ -123,6 +128,7 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
 
         self.assertEqualData(original_data, recovered_data)
 
+
     def test_make_dataset_from_sgf(self):
         with tempfile.NamedTemporaryFile() as sgf_file, \
                 tempfile.NamedTemporaryFile() as record_file:
@@ -146,3 +152,58 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
                 -1
             )]
         self.assertEqualData(expected_data, recovered_data)
+
+
+    def test_rotate_pyfunc(self):
+        def reset_random():
+            np.random.seed(1)
+            random.seed(1)
+            tf.set_random_seed(1)
+
+        def find_symmetry(x1, pi1, x2, pi2):
+            for sym in symmetries.SYMMETRIES:
+                x_equal = (x1 == symmetries.apply_symmetry_feat(sym, x2)).all()
+                pi_equal = (pi1 == symmetries.apply_symmetry_pi(sym, pi2)).all()
+                if x_equal and pi_equal:
+                    return sym
+
+            assert False, "No rotation makes {} equal {}".format(
+                pi1.reshape((go.N, go.N)), pi2((go.N, go.N)))
+
+        def x_and_pi_same(run_a, run_b):
+            x_a, pi_a, values_a = zip(*run_a)
+            x_b, pi_b, values_b = zip(*run_b)
+            assert values_a == values_b, "Values are not same"
+            return np.array_equal(x_a, x_b) and np.array_equal(pi_a, pi_b)
+
+        num_records = 20
+        raw_data = self.create_random_data(num_records)
+        tfexamples = list(map(preprocessing.make_tf_example, *zip(*raw_data)))
+
+        with tempfile.NamedTemporaryFile() as f:
+            preprocessing.write_tf_examples(f.name, tfexamples)
+
+            reset_random()
+            run_one = self.extract_data(
+                f.name, filter_amount=1, random_rotation=False)
+
+            reset_random()
+            run_two = self.extract_data(
+                f.name, filter_amount=1, random_rotation=True)
+
+            reset_random()
+            run_three = self.extract_data(
+                f.name, filter_amount=1, random_rotation=True)
+
+        assert x_and_pi_same(run_two, run_three), "Not deterministic"
+        assert not x_and_pi_same(run_one, run_two), "Should have been rotated"
+
+        syms = []
+        for (x1, pi1, v1), (x2, pi2, v2) in zip(run_one, run_two):
+            assert v1 == v2, "Values not the same"
+            # For each record find the symmetry that makes them equal
+            syms.extend(map(lambda r: find_symmetry(*r), zip(x1, pi1, x2, pi2)))
+
+        difference = set(symmetries.SYMMETRIES) - set(syms)
+        assert len(syms) == num_records, (len(syms), num_records)
+        assert len(difference) == 0, "Didn't find {}".format(difference)

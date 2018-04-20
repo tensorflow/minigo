@@ -22,6 +22,7 @@ import coords
 import features as features_lib
 import go
 import sgf_wrapper
+import symmetries
 
 TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
     tf.python_io.TFRecordCompressionType.ZLIB)
@@ -31,8 +32,6 @@ TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
 # us an approximation of a uniform sampling.  The default of 4M is used in
 # training, but smaller numbers can be used for aggregation or validation.
 SHUFFLE_BUFFER_SIZE = int(2*1e6)
-
-# Constructing tf.Examples
 
 
 def _one_hot(index):
@@ -59,8 +58,6 @@ def make_tf_example(features, pi, value):
             float_list=tf.train.FloatList(
                 value=[value]))}))
 
-# Write tf.Example to files
-
 
 def write_tf_examples(filename, tf_examples, serialize=True):
     '''
@@ -76,8 +73,6 @@ def write_tf_examples(filename, tf_examples, serialize=True):
                 writer.write(ex.SerializeToString())
             else:
                 writer.write(ex)
-
-# Read tf.Example from files
 
 
 def batch_parse_tf_example(batch_size, example_batch):
@@ -101,7 +96,7 @@ def batch_parse_tf_example(batch_size, example_batch):
     pi = tf.reshape(pi, [batch_size, go.N * go.N + 1])
     outcome = parsed['outcome']
     outcome.set_shape([batch_size])
-    return (x, {'pi_tensor': pi, 'value_tensor': outcome})
+    return x, {'pi_tensor': pi, 'value_tensor': outcome}
 
 
 def read_tf_records(batch_size, tf_records, num_repeats=None,
@@ -139,7 +134,6 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
                                      cycle_length=64, block_length=16)
     dataset = dataset.filter(lambda x: tf.less(
         tf.random_uniform([1]), filter_amount)[0])
-    # TODO(amj): apply py_func for transforms here.
     if num_repeats is not None:
         dataset = dataset.repeat(num_repeats)
     else:
@@ -150,10 +144,31 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
     return dataset
 
 
+def _random_rotation(x_tensor, outcome_tensor):
+    def rotate_py_func(x, pi):
+        syms, x_rot = symmetries.randomize_symmetries_feat(x)
+        pi_rot = [symmetries.apply_symmetry_pi(s, p) for s, p in zip(syms, pi)]
+        return x_rot, pi_rot
+
+    pi_tensor = outcome_tensor['pi_tensor']
+
+    x_rot_tensor, pi_rot_tensor = tuple(tf.py_func(
+            rotate_py_func,
+            [x_tensor, pi_tensor],
+            [tf.float32, tf.float32],
+            stateful=False))
+
+    x_rot_tensor.set_shape(x_tensor.get_shape())
+    pi_rot_tensor.set_shape(pi_tensor.get_shape())
+
+    outcome_tensor['pi_tensor'] = pi_rot_tensor
+    return x_rot_tensor, outcome_tensor
+
+
 def get_input_tensors(batch_size, tf_records, num_repeats=None,
                       shuffle_records=True, shuffle_examples=True,
                       shuffle_buffer_size=None,
-                      filter_amount=0.05):
+                      filter_amount=0.05, random_rotation=False):
     '''Read tf.Records and prepare them for ingestion by dual_net.  See
     `read_tf_records` for parameter documentation.
 
@@ -167,11 +182,11 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
                               shuffle_buffer_size=shuffle_buffer_size,
                               filter_amount=filter_amount)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
-    dataset = dataset.map(functools.partial(
-        batch_parse_tf_example, batch_size))
-    return dataset.make_one_shot_iterator().get_next()
+    dataset = dataset.map(functools.partial(batch_parse_tf_example, batch_size))
+    if random_rotation:
+        dataset = dataset.map(_random_rotation)
 
-# End-to-end utility functions
+    return dataset.make_one_shot_iterator().get_next()
 
 
 def make_dataset_from_selfplay(data_extracts):
