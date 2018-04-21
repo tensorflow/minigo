@@ -25,14 +25,14 @@ from gtp_wrapper import MCTSPlayer
 SIMULTANEOUS_LEAVES = 8
 
 
-def play(network, readouts, resign_threshold, verbosity=0):
+def play(network, verbosity=0):
     ''' Plays out a self-play match, returning
     - the final position
     - the n x 362 tensor of floats representing the mcts search probabilities
     - the n-ary tensor of floats representing the original value-net estimate
     where n is the number of moves in the game'''
+    readouts = FLAGS.readouts  # defined in strategies.py
     player = MCTSPlayer(network,
-                        resign_threshold=resign_threshold,
                         verbosity=verbosity,
                         num_parallel=SIMULTANEOUS_LEAVES)
     global_n = 0

@@ -33,6 +33,15 @@ flags.DEFINE_integer('softpick_move_cutoff', (go.N * go.N // 12) // 2 * 2,
 # Ensure that both white and black have an equal number of softpicked moves.
 flags.register_validator('softpick_move_cutoff', lambda x: x % 2 == 0)
 
+flags.DEFINE_float('resign_threshold', -0.9,
+    'The post-search Q evaluation at which resign should happen.'
+    'A threshold of -1 implies resign is disabled.')
+flags.register_validator('resign_threshold', lambda x: -1 <= x < 0)
+
+flags.DEFINE_integer('num_readouts', 800,
+    'Number of searches to add to the MCTS search tree before playing a move.')
+flags.register_validator('num_readouts', lambda x: x > 0)
+
 FLAGS = flags.FLAGS
 
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
@@ -65,14 +74,12 @@ def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
 
 
 class MCTSPlayerMixin:
-    # If `simulations_per_move` is nonzero, it will perform that many reads
-    # before playing. Otherwise, it uses `seconds_per_move` of wall time.
-    def __init__(self, network, seconds_per_move=5, simulations_per_move=0,
-                 resign_threshold=-0.90, verbosity=0, two_player_mode=False,
-                 num_parallel=8):
+    def __init__(self, network, seconds_per_move=5, num_readouts=0,
+                 resign_threshold=None, verbosity=0, two_player_mode=False,
+                 num_parallel=8, timed_match=False):
         self.network = network
         self.seconds_per_move = seconds_per_move
-        self.simulations_per_move = simulations_per_move
+        self.num_readouts = num_readouts or FLAGS.num_readouts
         self.verbosity = verbosity
         self.two_player_mode = two_player_mode
         if two_player_mode:
@@ -86,7 +93,8 @@ class MCTSPlayerMixin:
         self.root = None
         self.result = 0
         self.result_string = None
-        self.resign_threshold = -abs(resign_threshold)
+        self.resign_threshold = resign_threshold or FLAGS.resign_threshold
+        self.timed_match = timed_match
         super().__init__()
 
     def initialize_game(self, position=None):
@@ -106,16 +114,16 @@ class MCTSPlayerMixin:
         '''
         start = time.time()
 
-        if self.simulations_per_move == 0:
+        if self.timed_match:
             while time.time() - start < self.seconds_per_move:
                 self.tree_search()
         else:
             current_readouts = self.root.N
-            while self.root.N < current_readouts + self.simulations_per_move:
+            while self.root.N < current_readouts + self.num_readouts:
                 self.tree_search()
             if self.verbosity > 0:
                 print("%d: Searched %d times in %s seconds\n\n" % (
-                    position.n, self.simulations_per_move, time.time() - start), file=sys.stderr)
+                    position.n, self.num_readouts, time.time() - start), file=sys.stderr)
 
         # print some stats on anything with probability > 1%
         if self.verbosity > 2:

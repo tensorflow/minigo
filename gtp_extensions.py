@@ -246,7 +246,7 @@ class GoGuiMixin(gtp.Engine):
         # after debug_interval calls.
         last_dbg = -debug_interval
         leaves = None
-        num_readouts = game.simulations_per_move
+        num_readouts = game.num_readouts
         while game.root.N < current_readouts + num_readouts:
             search_result = game.tree_search()
             if search_result:
@@ -283,7 +283,7 @@ class GoGuiMixin(gtp.Engine):
     def cmd_readouts(self, arguments):
         try:
             reads = max(8, int(arguments))
-            self._game.simulations_per_move = reads
+            self._game.num_readouts = reads
             return reads
         except:
             return False
