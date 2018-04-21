@@ -30,7 +30,7 @@ ls *.py | xargs pylint || {
 }
 
 test_fail=0
-PYTHONPATH= BOARD_SIZE=9 python3 -m unittest discover tests || {
+PYTHONPATH= BOARD_SIZE=9 python3 tests/run_tests.py || {
   test_fail=1
 }
 

@@ -19,9 +19,9 @@ import numpy as np
 import coords
 import go
 from go import Position
+import mcts
 from tests import test_utils
 
-from mcts import MCTSNode, MAX_DEPTH
 
 ALMOST_DONE_BOARD = test_utils.load_board('''
 .XO.XO.OO
@@ -64,8 +64,8 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         np.random.seed(1)
         probs = np.array([.02] * (go.N * go.N + 1))
         probs = probs + np.random.random([go.N * go.N + 1]) * 0.001
-        black_root = MCTSNode(go.Position())
-        white_root = MCTSNode(go.Position(to_play=go.WHITE))
+        black_root = mcts.MCTSNode(go.Position())
+        white_root = mcts.MCTSNode(go.Position(to_play=go.WHITE))
         black_root.select_leaf().incorporate_results(probs, 0, black_root)
         white_root.select_leaf().incorporate_results(probs, 0, white_root)
         # No matter who is to play, when we know nothing else, the priors
@@ -80,7 +80,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         flattened = coords.to_flat(coords.from_kgs('D9'))
         probs = np.array([.02] * (go.N * go.N + 1))
         probs[flattened] = 0.4
-        root = MCTSNode(SEND_TWO_RETURN_ONE)
+        root = mcts.MCTSNode(SEND_TWO_RETURN_ONE)
         root.select_leaf().incorporate_results(probs, 0, root)
 
         self.assertEqual(root.position.to_play, go.WHITE)
@@ -88,7 +88,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
 
     def test_backup_incorporate_results(self):
         probs = np.array([.02] * (go.N * go.N + 1))
-        root = MCTSNode(SEND_TWO_RETURN_ONE)
+        root = mcts.MCTSNode(SEND_TWO_RETURN_ONE)
         root.select_leaf().incorporate_results(probs, 0, root)
 
         leaf = root.select_leaf()
@@ -131,7 +131,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
 
     def test_do_not_explore_past_finish(self):
         probs = np.array([0.02] * (go.N * go.N + 1), dtype=np.float32)
-        root = MCTSNode(go.Position())
+        root = mcts.MCTSNode(go.Position())
         root.select_leaf().incorporate_results(probs, 0, root)
         first_pass = root.maybe_add_child(coords.to_flat(None))
         first_pass.incorporate_results(probs, 0, root)
@@ -143,14 +143,14 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         self.assertEqual(node_to_explore, second_pass)
 
     def test_add_child(self):
-        root = MCTSNode(go.Position())
+        root = mcts.MCTSNode(go.Position())
         child = root.maybe_add_child(17)
         self.assertIn(17, root.children)
         self.assertEqual(child.parent, root)
         self.assertEqual(child.fmove, 17)
 
     def test_add_child_idempotency(self):
-        root = MCTSNode(go.Position())
+        root = mcts.MCTSNode(go.Position())
         child = root.maybe_add_child(17)
         current_children = copy.copy(root.children)
         child2 = root.maybe_add_child(17)
@@ -161,7 +161,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         probs = np.array([0.02] * (go.N * go.N + 1))
         # let's say the NN were to accidentally put a high weight on an illegal move
         probs[1] = 0.99
-        root = MCTSNode(SEND_TWO_RETURN_ONE)
+        root = mcts.MCTSNode(SEND_TWO_RETURN_ONE)
         root.incorporate_results(probs, 0, root)
         # and let's say the root were visited a lot of times, which pumps up the
         # action score for unvisited moves...
@@ -183,7 +183,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # make one move really likely so that tree search goes down that path twice
         # even with a virtual loss
         probs[17] = 0.999
-        root = MCTSNode(go.Position())
+        root = mcts.MCTSNode(go.Position())
         root.incorporate_results(probs, 0, root)
         leaf1 = root.select_leaf()
         self.assertEqual(leaf1.fmove, 17)

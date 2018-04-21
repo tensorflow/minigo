@@ -20,8 +20,10 @@ overfit to a near-zero loss.
 """
 
 import os
+import sys
 import tempfile
 
+from absl import flags
 import preprocessing
 import dual_net
 import go
@@ -104,4 +106,5 @@ def rl_loop():
 
 
 if __name__ == '__main__':
+    remaining_argv = flags.FLAGS(sys.argv, known_only=True)
     rl_loop()

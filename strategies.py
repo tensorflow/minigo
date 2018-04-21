@@ -18,18 +18,22 @@ import os
 import random
 import sys
 import time
-import sgf_wrapper
 
-import coords
+from absl import flags
 import gtp
 import numpy as np
-from mcts import MCTSNode, MAX_DEPTH
 
+import coords
 import go
+import mcts
+import sgf_wrapper
 
-# When to do deterministic move selection.  ~30 moves on a 19x19, ~8 on 9x9
-TEMPERATURE_CUTOFF = int((go.N * go.N) / 12)
+flags.DEFINE_integer('softpick_move_cutoff', (go.N * go.N // 12) // 2 * 2,
+    'The move number (<=) up to which moves are softpicked from MCTS visits.')
+# Ensure that both white and black have an equal number of softpicked moves.
+flags.register_validator('softpick_move_cutoff', lambda x: x % 2 == 0)
 
+FLAGS = flags.FLAGS
 
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):
@@ -74,7 +78,7 @@ class MCTSPlayerMixin:
         if two_player_mode:
             self.temp_threshold = -1
         else:
-            self.temp_threshold = TEMPERATURE_CUTOFF
+            self.temp_threshold = FLAGS.softpick_move_cutoff
         self.num_parallel = num_parallel
         self.qs = []
         self.comments = []
@@ -88,7 +92,7 @@ class MCTSPlayerMixin:
     def initialize_game(self, position=None):
         if position is None:
             position = go.Position()
-        self.root = MCTSNode(position)
+        self.root = mcts.MCTSNode(position)
         self.result = 0
         self.result_string = None
         self.comments = []
@@ -153,7 +157,7 @@ class MCTSPlayerMixin:
 
         Highest N is most robust indicator. In the early stage of the game, pick
         a move weighted by visit count; later on, pick the absolute max.'''
-        if self.root.position.n > self.temp_threshold:
+        if self.root.position.n >= self.temp_threshold:
             fcoord = np.argmax(self.root.child_N)
         else:
             cdf = self.root.child_N.cumsum()
@@ -197,7 +201,7 @@ class MCTSPlayerMixin:
         def fmt(move): return "{}-{}".format('b' if move.color == 1 else 'w',
                                              coords.to_kgs(move.move))
         path = " ".join(fmt(move) for move in pos.recent[-diff:])
-        if node.position.n >= MAX_DEPTH:
+        if node.position.n >= FLAGS.max_game_length:
             path += " (depth cutoff reached) %0.1f" % node.position.score()
         elif node.position.is_game_over():
             path += " (game over) %0.1f" % node.position.score()

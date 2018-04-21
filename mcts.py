@@ -18,24 +18,33 @@ All terminology here (Q, U, N, p_UCT) uses the same notation as in the
 AlphaGo (AG) paper.
 """
 
-import numpy as np
 import collections
-import random
 import math
+import random
+
+from absl import flags
+import numpy as np
 
 import coords
 import go
 import sys
 
-MAX_DEPTH = (go.N ** 2) * 1.4  # 505 moves for 19x19, 113 for 9x9
+# 505 moves for 19x19, 113 for 9x9
+flags.DEFINE_integer('max_game_length', int(go.N ** 2 * 1.4),
+    'Move number at which game is forcibly terminated')
 
-# Exploration constant
-c_PUCT = 1.38
+flags.DEFINE_float('c_puct', 1.38,
+    'Exploration constant balancing priors vs. value net output.')
 
-# Dirichlet noise, as a function of go.N
+flags.DEFINE_float('dirichlet_noise_alpha', 0.03 * 361 / (go.N ** 2),
+    'Concentrated-ness of the noise being injected into priors.')
+flags.register_validator('dirichlet_noise_alpha', lambda x: 0 <= x < 1)
 
+flags.DEFINE_float('dirichlet_noise_weight', 0.25,
+    'How much to weight the priors vs. dirichlet noise when mixing')
+flags.register_validator('dirichlet_noise_weight', lambda x: 0 <= x < 1)
 
-def D_NOISE_ALPHA(): return 0.03 * 361 / (go.N ** 2)
+FLAGS = flags.FLAGS
 
 
 class DummyNode(object):
@@ -95,7 +104,7 @@ class MCTSNode(object):
 
     @property
     def child_U(self):
-        return (c_PUCT * math.sqrt(1 + self.N) *
+        return (FLAGS.c_puct * math.sqrt(1 + self.N) *
                 self.child_prior / (1 + self.child_N))
 
     @property
@@ -228,11 +237,13 @@ class MCTSNode(object):
         '''True if the last two moves were Pass or if the position is at a move
         greater than the max depth.
         '''
-        return self.position.is_game_over() or self.position.n >= MAX_DEPTH
+        return self.position.is_game_over() or self.position.n >= FLAGS.max_game_length
 
     def inject_noise(self):
-        dirch = np.random.dirichlet([D_NOISE_ALPHA()] * ((go.N * go.N) + 1))
-        self.child_prior = self.child_prior * 0.75 + dirch * 0.25
+        dirch = np.random.dirichlet(
+            [FLAGS.dirichlet_noise_alpha] * ((go.N * go.N) + 1))
+        self.child_prior = (self.child_prior * (1 - FLAGS.dirichlet_noise_weight) +
+            dirch * FLAGS.dirichlet_noise_weight)
 
     def children_as_pi(self, squash=False):
         """Returns the child visit counts as a probability distribution, pi

@@ -16,11 +16,12 @@ import unittest
 import unittest.mock as mock
 import numpy as np
 
+from absl import flags
+
 import coords
 import go
 from go import Position
 from tests import test_utils
-from mcts import MCTSNode, MAX_DEPTH
 from strategies import MCTSPlayerMixin, time_recommendation
 
 ALMOST_DONE_BOARD = test_utils.load_board('''
@@ -215,7 +216,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         player = MCTSPlayerMixin(DummyNet())
         endgame = go.Position(
             board=TT_FTW_BOARD,
-            n=MAX_DEPTH-2,
+            n=flags.FLAGS.max_game_length - 2,
             komi=2.5,
             ko=None,
             recent=(go.PlayerMove(go.BLACK, (0, 1)),

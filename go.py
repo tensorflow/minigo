@@ -303,7 +303,7 @@ class Position():
         '''
         assert type(recent) is tuple
         self.board = board if board is not None else np.copy(EMPTY_BOARD)
-        self.n = n
+        self.n = n  # With a full history, self.n == len(self.recent) == num moves played
         self.komi = komi
         self.caps = caps
         self.lib_tracker = lib_tracker or LibertyTracker.from_board(self.board)

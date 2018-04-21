@@ -273,5 +273,4 @@ if __name__ == '__main__':
     # Let absl.flags parse known flags from argv, then pass the remaining flags
     # into argh for dispatching.
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    print(remaining_argv)
     argh.dispatch(parser, argv=remaining_argv[1:])
