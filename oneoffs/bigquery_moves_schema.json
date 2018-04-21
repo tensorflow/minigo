@@ -1,0 +1,62 @@
+[
+    {
+        "name": "worker_id",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "completed_time",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "move_num",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "turn_to_play",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "move",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "move_kgs",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "prior_Q",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "post_Q",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "policy_prior",
+        "type": "FLOAT",
+        "mode": "REPEATED"
+    },
+    {
+        "name": "policy_prior_orig",
+        "type": "FLOAT",
+        "mode": "REPEATED"
+    },
+    {
+        "name": "mcts_visit_counts",
+        "type": "FLOAT",
+        "mode": "REPEATED"
+    },
+    {
+        "name": "mcts_visit_counts_norm",
+        "type": "FLOAT",
+        "mode": "REPEATED"
+    }
+]
