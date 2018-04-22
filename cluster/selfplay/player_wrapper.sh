@@ -23,6 +23,7 @@ echo bucket: $BUCKET_NAME
 echo board_size: $BOARD_SIZE
 
 python3 rl_loop.py selfplay \
+  --resign_threshold=0.99
   --num_readouts=600
 
 

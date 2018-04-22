@@ -20,14 +20,12 @@ AlphaGo (AG) paper.
 
 import collections
 import math
-import random
 
 from absl import flags
 import numpy as np
 
 import coords
 import go
-import sys
 
 # 505 moves for 19x19, 113 for 9x9
 flags.DEFINE_integer('max_game_length', int(go.N ** 2 * 1.4),

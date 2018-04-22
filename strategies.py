@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import math
 import os
 import random
 import sys
 import time
 
 from absl import flags
-import gtp
 import numpy as np
 
 import coords
@@ -95,6 +92,7 @@ class MCTSPlayerMixin:
         self.result_string = None
         self.resign_threshold = resign_threshold or FLAGS.resign_threshold
         self.timed_match = timed_match
+        assert (self.timed_match and self.seconds_per_move > 0) or self.num_readouts > 0
         super().__init__()
 
     def initialize_game(self, position=None):
