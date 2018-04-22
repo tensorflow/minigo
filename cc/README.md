@@ -26,17 +26,54 @@ against.
 ## Building
 
 The C++ Minigo implementation requires that the board size be defined at compile
-time, using the MINIGO\_BOARD\_SIZE preprocessor define. To support this, the
-Bazel build rules provide two configurations: minigo9 and minigo19.
+time, using the MINIGO\_BOARD\_SIZE preprocessor define. This allows us to
+significantly reduce the number of heap allocations performed. However, it does
+mean that you must specify the board size when compiling by invoking Bazel with
+either `--define=board_size=9` or `--define=board_size=19`.
+This defines MINIGO\_BOARD\_SIZE when compiling the Minigo sources, but none of
+their dependencies, which avoids unnecessarily recompiling Minigo's
+dependencies when switching board size.
 
-Pass --config=minigo9 when invoking bazel to build Minigo for a 9x9 board.
-Pass --config=minigo19 when invoking bazel to build Minigo for a 19x19 board.
+Pass `--define=board_size=9` when invoking Bazel to build Minigo for a 9x9
+board.
+
+Pass `--define=board_size=19` when invoking Bazel to build Minigo for a 19x19
+board.
 
 ## Running the unit tests
 
+Minigo's C++ unit tests operate on both 9x9 and 19x19, and some tests are only
+enabled for a particular board size. Consequently, you must run the tests
+multiple times:
+
 ```shell
-bazel test --config=minigo9 cc/...
-bazel test --config=minigo19 cc/...
+bazel test --define=board_size=9 cc/...  &&  bazel test --define=board_size=19 cc/...
+```
+
+## Running self play:
+
+The C++ Minigo binary requires the model to be provided in GraphDef binary
+proto format.
+
+To run Minigo with a 9x9 model:
+
+```shell
+bazel build --config=minigo9 -c opt cc:main
+bazel-bin/cc/main --model=$MODEL_PATH
+```
+
+To run Minigo with a 19x19 model:
+
+```shell
+bazel build --config=minigo9 -c opt cc:main
+bazel-bin/cc/main --model=$MODEL_PATH
+```
+
+The Minigo binary has a lot of command line arguments that configure its
+behavior, run it with --helpshort to see the full list.
+
+```shell
+bazel-bin/cc/main --helpshort
 ```
 
 ## Design

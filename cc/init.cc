@@ -21,6 +21,7 @@
 namespace minigo {
 
 void Init(int* pargc, char*** pargv) {
+  gflags::SetUsageMessage((*pargv)[0]);
   absl::InitializeSymbolizer((*pargv)[0]);
   gflags::ParseCommandLineFlags(pargc, pargv, true);
 }
