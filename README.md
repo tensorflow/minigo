@@ -87,11 +87,11 @@ pip3 install -r requirements.txt
 
 Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
-- GPU: `pip3 install "tensorflow-gpu>=1.5,<1.6"`.
+- GPU: `pip3 install "tensorflow-gpu>=1.7,<1.8"`.
   - *Note*: You must install [CUDA
     9.0].(https://developer.nvidia.com/cuda-90-download-archive) for Tensorflow
     1.5.
-- CPU: `pip3 install "tensorflow>=1.5,<1.6"`.
+- CPU: `pip3 install "tensorflow>=1.7,<1.8"`.
 
 Setting up the Environment
 --------------------------
@@ -113,7 +113,7 @@ will set up other environment variables defaults.
 Running unit tests
 ------------------
 ```
-BOARD_SIZE=9 python3 -m unittest discover tests
+./test.sh
 ```
 
 Automated Tests
@@ -243,6 +243,10 @@ The commands are
  - train: trains a new model with the selfplay results from the most recent N
    generations.
 
+Training works via tf.Estimator; a local directory keeps track of training
+progress, and the latest checkpoint is periodically exported to GCS, where it
+gets picked up by selfplay workers.
+
 Bootstrap
 ---------
 
@@ -251,7 +255,9 @@ This command creates a random model, which appears at .
 
 ```bash
 export MODEL_NAME=000000-bootstrap
-python3 main.py bootstrap --model-save-path="gs://$BUCKET_NAME/models/$MODEL_NAME"
+python3 main.py bootstrap \
+  --working-dir=estimator_working_dir
+  --model-save-path="gs://$BUCKET_NAME/models/$MODEL_NAME"
 ```
 
 Self-play
@@ -309,20 +315,20 @@ model, starting from the latest model weights.
 
 Run the training job:
 ```
-python3 main.py train gs://$BUCKET_NAME/data/training_chunks \
-    gs://$BUCKET_NAME/models/000001-somename \
-    --load-file=gs://$BUCKET_NAME/models/000000-bootstrap \
-    --generation-num=1 \
-    --logdir=path/to/tensorboard/logs \
+python3 main.py train\
+  estimator_working_dir
+  gs://$BUCKET_NAME/data/training_chunks \
+  gs://$BUCKET_NAME/models/000001-somename \
+  --generation-num=1 \
 ```
 
-The updated model weights will be saved at the end. (TODO: implement some sort
-of local checkpointing based on `global_step` that will resume appropriately.)
-
-Additionally, you can follow along with the training progress with TensorBoard - if you give each run a different name (`logs/my_training_run`, `logs/my_training_run2`), you can overlay the runs on top of each other.
+At the end of training, the latest checkpoint will be exported to the named
+directory. Additionally, you can follow along with the training progress with
+TensorBoard - if you point TensorBoard at the estimator working dir, it will
+find the training log files and display them.
 
 ```
-tensorboard --logdir=path/to/tensorboard/logs/
+tensorboard --logdir=estimator_working_dir
 ```
 
 Validation
@@ -338,7 +344,7 @@ By default, Minigo will hold out 5% of selfplay games for validation, and write
 them to `gs://$BUCKET_NAME/data/holdout/<model_name>`.  This can be changed by
 adjusting the `holdout-pct` flag on the `selfplay` command.
 
-With this setup, `python rl_loop.py validate --logdir=<logdir> --` will figure out
+With this setup, `python rl_loop.py validate --logdir=estimator_working_dir --` will figure out
 the most recent model, grab the holdout data from the fifty models prior to that
 one, and calculate the validation error, writing the tensorboard logs to
 `logdir`.

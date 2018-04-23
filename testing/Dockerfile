@@ -57,7 +57,7 @@ COPY staging/requirements.txt /src/requirements.txt
 
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /src/requirements.txt
-RUN pip3 install "tensorflow>=1.5,<1.6"
+RUN pip3 install "tensorflow>=1.7,<1.8"
 
 
 COPY bootstrap.sh  /src/bootstrap.sh
