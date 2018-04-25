@@ -90,7 +90,7 @@ Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 - GPU: `pip3 install "tensorflow-gpu>=1.7,<1.8"`.
   - *Note*: You must install [CUDA
     9.0].(https://developer.nvidia.com/cuda-90-download-archive) for Tensorflow
-    1.5.
+    1.5+.
 - CPU: `pip3 install "tensorflow>=1.7,<1.8"`.
 
 Setting up the Environment
@@ -250,8 +250,11 @@ gets picked up by selfplay workers.
 Bootstrap
 ---------
 
-This command creates a random model, which appears at .
-`gs://$BUCKET_NAME/models/$MODEL_NAME(.index|.meta|.data-00000-of-00001)`
+This command initializes your working directory for the trainer and a random
+model. This random model is also exported to `--model-save-path` so that 
+selfplay can immediately start playing with this random model.
+
+If these directories don't exist, bootstrap will create them for you.
 
 ```bash
 export MODEL_NAME=000000-bootstrap
