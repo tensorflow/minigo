@@ -23,22 +23,24 @@ socketio = SocketIO(app)
 
 #TODO(amj) extract to flag
 MODEL_PATH = "saved_models/000483-indus-upgrade"
+# If you change this BOARD_SIZE variable, also change the line at the top of
+# minigui.ts that says const N = board.BoardSize.Nine
 BOARD_SIZE = "19"  # Models are hardcoded to a board size.
 
-# GTP_COMMAND = ["python",  "-u",  # turn off buffering
-#                "main.py", "gtp",
-#                "--load-file", MODEL_PATH,
-#                "--readouts", "1000",
-#                "-v", "2"]
+GTP_COMMAND = ["python",  "-u",  # turn off buffering
+               "main.py", "gtp",
+               "--load-file", MODEL_PATH,
+               "--readouts", "1000",
+               "-v", "2"]
 
-GTP_COMMAND = [
-    "bazel-bin/cc/main",
-    "--model=" + MODEL_PATH + ".pb",
-    "--num_readouts=100",
-    "--soft_pick=false",
-    "--inject_noise=false",
-    "--disable_resign_pct=0",
-    "--mode=gtp"]
+# GTP_COMMAND = [
+#     "bazel-bin/cc/main",
+#     "--model=" + MODEL_PATH + ".pb",
+#     "--num_readouts=100",
+#     "--soft_pick=false",
+#     "--inject_noise=false",
+#     "--disable_resign_pct=0",
+#     "--mode=gtp"]
 
 
 def _open_pipes():
