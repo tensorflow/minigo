@@ -213,10 +213,8 @@ class LibertyTracker():
             else:
                 empty_neighbors.add(n)
 
-        new_group = self._create_group(color, c, empty_neighbors)
-
-        for group_id in friendly_neighboring_group_ids:
-            new_group = self._merge_groups(group_id, new_group.id)
+        new_group = self._merge_from_played(
+            color, c, empty_neighbors, friendly_neighboring_group_ids)
 
         # new_group becomes stale as _update_liberties and
         # _handle_captures are called; must refetch with self.groups[new_group.id]
@@ -236,31 +234,33 @@ class LibertyTracker():
 
         return captured_stones
 
-    def _create_group(self, color, c, liberties):
+    def _merge_from_played(self, color, played, libs, other_group_ids):
+        stones = {played}
+        liberties = set(libs)
+        for group_id in other_group_ids:
+            other = self.groups.pop(group_id)
+            stones.update(other.stones)
+            liberties.update(other.liberties)
+
+        if other_group_ids:
+            liberties.remove(played)
+        assert stones.isdisjoint(liberties)
         self.max_group_id += 1
-        new_group = Group(self.max_group_id, frozenset([c]), liberties, color)
-        self.groups[new_group.id] = new_group
-        self.group_index[c] = new_group.id
-        self.liberty_cache[c] = len(liberties)
-        return new_group
+        result = Group(
+            self.max_group_id,
+            frozenset(stones),
+            frozenset(liberties),
+            color)
+        self.groups[result.id] = result
 
-    def _merge_groups(self, group1_id, group2_id):
-        group1 = self.groups[group1_id]
-        group2 = self.groups[group2_id]
-        self.groups[group1_id] = Group(
-            group1_id, group1.stones | group2.stones, group1.liberties, group1.color)
-        del self.groups[group2_id]
-        for s in group2.stones:
-            self.group_index[s] = group1_id
+        for s in result.stones:
+            self.group_index[s] = result.id
+            self.liberty_cache[s] = len(result.liberties)
 
-        self._update_liberties(
-            group1_id, add=group2.liberties, remove=group2.stones)
-
-        return group1
+        return result
 
     def _capture_group(self, group_id):
-        dead_group = self.groups[group_id]
-        del self.groups[group_id]
+        dead_group = self.groups.pop(group_id)
         for s in dead_group.stones:
             self.group_index[s] = MISSING_GROUP_ID
             self.liberty_cache[s] = 0
