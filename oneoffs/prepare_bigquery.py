@@ -1,10 +1,10 @@
 '''
 Script to process debug SGFs for upload to BigQuery.
 
-Handles one generation per invocation, for easy sharding of work.
+Handles one model per invocation, for easy sharding of work.
 
 Usage:
-python oneoffs/prepare_bigquery.py 000017-generation-number
+python oneoffs/prepare_bigquery.py 000001-model-name
 
 
 The load commands look like:
@@ -21,56 +21,72 @@ bq load --project_id=$PROJECT_ID \
     oneoffs/bigquery_moves_schema.json
 
 '''
+import sys
+sys.path.insert(0, '.')
+
 import collections
-import itertools
 import json
 import os
 import re
-import sys; sys.path.insert(0, '.')
-import sgf
+
+from absl import app, flags
 from tensorflow import gfile
+from tqdm import tqdm
+import sgf
 
 import coords
-import shipname
 import sgf_wrapper
+import shipname
 import utils
 
 DebugRow = collections.namedtuple('DebugRow', [
     'move', 'action', 'Q', 'U', 'prior', 'orig_prior', 'N', 'soft_N', 'p_delta', 'p_rel'])
 
 BUCKET_NAME = os.environ['BUCKET_NAME']
-GCS_HOLDOUT_PATH = 'gs://%s/data/holdout/' % BUCKET_NAME
-GCS_PATH_TEMPLATE = 'gs://%s/sgf/{}/full/{}' % BUCKET_NAME
-OUTPUT_PATH_TEMPLATE = 'gs://%s/bigquery/holdout/{}/{}' % BUCKET_NAME
+BASE_GS_DIR = 'gs://{}'.format(BUCKET_NAME)
+HOLDOUT_PATH = os.path.join('{}', 'data', 'holdout', '{}')
+PATH_TEMPLATE = os.path.join('{}', 'sgf', '{}', 'full', '{}')
+OUTPUT_PATH = os.path.join('{}', 'bigquery', 'holdout', '{}', '{}')
 
-def extract_holdout_generation(generation_name):
-    tfrecord_paths = gfile.ListDirectory(GCS_HOLDOUT_PATH + generation_name)
-    filenames = [os.path.basename(path) for path in tfrecord_paths]
-    sgf_names = [GCS_PATH_TEMPLATE.format(generation_name, filename.replace('.tfrecord.zz', '.sgf'))
-        for filename in filenames]
-    game_output_path = OUTPUT_PATH_TEMPLATE.format('games', generation_name)
-    move_output_path = OUTPUT_PATH_TEMPLATE.format('moves', generation_name)
-    with gfile.GFile(game_output_path, 'w') as game_f:
-        with gfile.GFile(move_output_path, 'w') as move_f:
-            for sgf_name in sgf_names:
-                game_data, move_data = extract_data(sgf_name)
-                game_f.write(json.dumps(game_data))
-                game_f.write('\n')
-                for move_datum in move_data:
-                    move_f.write(json.dumps(move_datum))
-                    move_f.write('\n')
-                print('processed {}'.format(sgf_name))
+flags.DEFINE_string("base_dir", BASE_GS_DIR, "base directory for minigo data")
+
+FLAGS = flags.FLAGS
+
+
+def get_sgf_names(model):
+    game_dir = HOLDOUT_PATH.format(FLAGS.base_dir, model)
+    tf_records = map(os.path.basename, gfile.ListDirectory(game_dir))
+    sgfs = [record.replace('.tfrecord.zz', '.sgf') for record in tf_records]
+    return [PATH_TEMPLATE.format(FLAGS.base_dir, model, sgf) for sgf in sgfs]
+
+
+def extract_holdout_model(model):
+    game_output_path = OUTPUT_PATH.format(FLAGS.base_dir, 'games', model)
+    move_output_path = OUTPUT_PATH.format(FLAGS.base_dir, 'moves', model)
+    gfile.MakeDirs(os.path.basename(game_output_path))
+    gfile.MakeDirs(os.path.basename(move_output_path))
+
+    with gfile.GFile(game_output_path, 'w') as game_f, \
+            gfile.GFile(move_output_path, 'w') as move_f:
+        for sgf_name in tqdm(get_sgf_names(model)):
+            game_data, move_data = extract_data(sgf_name)
+            game_f.write(json.dumps(game_data) + '\n')
+            for move_datum in move_data:
+                move_f.write(json.dumps(move_datum) + '\n')
 
 
 def extract_data(filename):
     with gfile.GFile(filename) as f:
         contents = f.read()
-        root_node = sgf_wrapper.get_sgf_root_node(contents)
+    root_node = sgf_wrapper.get_sgf_root_node(contents)
     game_data = extract_game_data(filename, root_node)
     move_data = extract_move_data(
-        root_node, game_data['worker_id'], game_data['completed_time'],
+        root_node,
+        game_data['worker_id'],
+        game_data['completed_time'],
         game_data['board_size'])
     return game_data, move_data
+
 
 def extract_game_data(gcs_path, root_node):
     props = root_node.properties
@@ -79,7 +95,7 @@ def extract_game_data(gcs_path, root_node):
     board_size = int(sgf_wrapper.sgf_prop(props.get('SZ')))
     value = utils.parse_game_result(result)
     was_resign = '+R' in result
-    
+
     filename = os.path.basename(gcs_path)
     filename_no_ext, _ = os.path.splitext(filename)
     completion_time = int(filename_no_ext.split('-')[0])
@@ -103,6 +119,7 @@ def extract_game_data(gcs_path, root_node):
         'sgf_url': sgf_url,
         'resign_threshold': resign_threshold,
     }
+
 
 def extract_move_data(root_node, worker_id, completed_time, board_size):
     current_node = root_node.next
@@ -139,7 +156,7 @@ def extract_move_data(root_node, worker_id, completed_time, board_size):
             'move': move_played,
             'move_kgs': coords.to_kgs(coords.from_flat(move_played)),
             'prior_Q': None,
-            'post_Q': post_Q, 
+            'post_Q': post_Q,
             'policy_prior': policy_prior,
             'policy_prior_orig': policy_prior_orig,
             'mcts_visit_counts': mcts_visit_counts,
@@ -177,9 +194,15 @@ def parse_comment_node(comment):
         debug_rows.append(DebugRow(coord, *map(float, other_columns)))
     return post_Q, debug_rows
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("Usage: python {} 000017-generation-name")
+
+def main(unusedargv):
+    if len(unusedargv) != 2:
+        print("Usage: python {} 000001-model-name")
         sys.exit(1)
-    generation_name = sys.argv[1]
-    extract_holdout_generation(generation_name)
+
+    model = unusedargv[1]
+    extract_holdout_model(model)
+
+
+if __name__ == '__main__':
+    app.run(main)
