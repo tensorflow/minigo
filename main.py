@@ -93,6 +93,7 @@ def bootstrap(
         _ensure_dir_exists(os.path.dirname(model_save_path))
         dual_net.bootstrap(working_dir)
         dual_net.export_model(working_dir, model_save_path)
+        freeze_graph(model_save_path)
 
 
 def train(
@@ -108,6 +109,7 @@ def train(
     with timer("Training"):
         dual_net.train(working_dir, tf_records, generation_num)
         dual_net.export_model(working_dir, model_save_path)
+        freeze_graph(model_save_path)
 
 
 def validate(
@@ -264,8 +266,17 @@ def convert(load_file, dest_file):
     tf.reset_default_graph()
 
 
+def freeze_graph(load_file):
+    """ Loads a network and serializes just the inference parts for use by e.g. the C++ binary """
+    n = dual_net.DualNetwork(load_file)
+    out_graph = tf.graph_util.convert_variables_to_constants(
+        n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
+    with open(os.path.join(load_file + '.pb'), 'wb') as f:
+         f.write(out_graph.SerializeToString())
+
+
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train,
+argh.add_commands(parser, [gtp, bootstrap, train, freeze_graph,
                            selfplay, gather, evaluate, validate, convert])
 
 if __name__ == '__main__':
