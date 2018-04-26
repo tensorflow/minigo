@@ -21,7 +21,7 @@ app = Flask(__name__, static_url_path="", static_folder="static")
 app.config["SECRET_KEY"] = "woo"
 socketio = SocketIO(app)
 
-#TODO(amj) extract to flag
+# TODO(amj) extract to flag
 MODEL_PATH = "saved_models/000483-indus-upgrade"
 # If you change this BOARD_SIZE variable, also change the line at the top of
 # minigui.ts that says const N = board.BoardSize.Nine
@@ -106,4 +106,4 @@ def index():
 
 
 if __name__ == "__main__":
-  socketio.run(app)
+    socketio.run(app)

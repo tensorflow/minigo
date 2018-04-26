@@ -45,13 +45,14 @@ def rl_loop():
     dual_net.TRAIN_BATCH_SIZE = 16
     dual_net.EXAMPLES_PER_GENERATION = 64
 
-    #monkeypatch the shuffle buffer size so we don't spin forever shuffling up positions.
+    # monkeypatch the shuffle buffer size so we don't spin forever shuffling up positions.
     preprocessing.SHUFFLE_BUFFER_SIZE = 1000
 
     with tempfile.TemporaryDirectory() as base_dir:
         working_dir = os.path.join(base_dir, 'models_in_training')
         model_save_path = os.path.join(base_dir, 'models', '000000-bootstrap')
-        next_model_save_file = os.path.join(base_dir, 'models', '000001-nextmodel')
+        next_model_save_file = os.path.join(
+            base_dir, 'models', '000001-nextmodel')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
         model_selfplay_dir = os.path.join(selfplay_dir, '000000-bootstrap')
         gather_dir = os.path.join(base_dir, 'data', 'training_chunks')
@@ -92,7 +93,8 @@ def rl_loop():
         print("Gathering game output...")
         main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
         print("Training on gathered game data...")
-        main.train(working_dir, gather_dir, next_model_save_file, generation_num=1)
+        main.train(working_dir, gather_dir,
+                   next_model_save_file, generation_num=1)
         print("Trying validate on 'holdout' game...")
         main.validate(working_dir, holdout_dir)
         print("Verifying that new checkpoint is playable...")
@@ -102,7 +104,6 @@ def rl_loop():
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir,
             readouts=10)
-
 
 
 if __name__ == '__main__':

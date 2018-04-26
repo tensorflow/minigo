@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import go
-import time
-import numpy as np
 import random
 import sys
+import time
 
 import coords
-import go
 from gtp_wrapper import MCTSPlayer
 
 SIMULTANEOUS_LEAVES = 8

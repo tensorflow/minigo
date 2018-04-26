@@ -31,17 +31,17 @@ import sys
 
 # 505 moves for 19x19, 113 for 9x9
 flags.DEFINE_integer('max_game_length', int(go.N ** 2 * 1.4),
-    'Move number at which game is forcibly terminated')
+                     'Move number at which game is forcibly terminated')
 
 flags.DEFINE_float('c_puct', 1.38,
-    'Exploration constant balancing priors vs. value net output.')
+                   'Exploration constant balancing priors vs. value net output.')
 
 flags.DEFINE_float('dirichlet_noise_alpha', 0.03 * 361 / (go.N ** 2),
-    'Concentrated-ness of the noise being injected into priors.')
+                   'Concentrated-ness of the noise being injected into priors.')
 flags.register_validator('dirichlet_noise_alpha', lambda x: 0 <= x < 1)
 
 flags.DEFINE_float('dirichlet_noise_weight', 0.25,
-    'How much to weight the priors vs. dirichlet noise when mixing')
+                   'How much to weight the priors vs. dirichlet noise when mixing')
 flags.register_validator('dirichlet_noise_weight', lambda x: 0 <= x < 1)
 
 FLAGS = flags.FLAGS
@@ -243,7 +243,7 @@ class MCTSNode(object):
         dirch = np.random.dirichlet(
             [FLAGS.dirichlet_noise_alpha] * ((go.N * go.N) + 1))
         self.child_prior = (self.child_prior * (1 - FLAGS.dirichlet_noise_weight) +
-            dirch * FLAGS.dirichlet_noise_weight)
+                            dirch * FLAGS.dirichlet_noise_weight)
 
     def children_as_pi(self, squash=False):
         """Returns the child visit counts as a probability distribution, pi

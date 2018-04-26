@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys; sys.path.insert(0, '.')
+import sys
+sys.path.insert(0, '.')
 import dual_net
 import strategies
 import sgf_wrapper
@@ -21,6 +22,7 @@ import pdb
 import random
 import features
 import symmetries
+
 
 def initialize_game(sgf_file, load_file, move=1):
     with open(sgf_file) as f:
@@ -32,6 +34,7 @@ def initialize_game(sgf_file, load_file, move=1):
     player.initialize_game(position_w_context.position)
     return player
 
+
 def analyze_symmetries(sgf_file, load_file):
     with open(sgf_file) as f:
         sgf_contents = f.read()
@@ -41,7 +44,8 @@ def analyze_symmetries(sgf_file, load_file):
         if i < 200:
             continue
         feats = features.extract_features(pwc.position)
-        variants = [symmetries.apply_symmetry_feat(s, feats) for s in symmetries.SYMMETRIES]
+        variants = [symmetries.apply_symmetry_feat(s, feats)
+            for s in symmetries.SYMMETRIES]
         values = net.sess.run(
             net.inference_output['value_output'],
             feed_dict={net.inference_input['pos_tensor']: variants})
@@ -51,5 +55,3 @@ def analyze_symmetries(sgf_file, load_file):
 
         print("{:3d} {:.3f} +/- {:.3f} min {:.3f} {} max {:.3f} {}".format(
             i, mean, stdev, *all_vals[0], *all_vals[-1]))
-
-

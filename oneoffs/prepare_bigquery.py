@@ -98,7 +98,8 @@ def extract_game_data(gcs_path, root_node):
 
     filename = os.path.basename(gcs_path)
     filename_no_ext, _ = os.path.splitext(filename)
-    completion_time = int(filename_no_ext.split('-')[0])
+    # BigQuery's TIMESTAMP() takes in unix millis.
+    completion_millis = 1000 * int(filename_no_ext.split('-')[0])
     worker_id = filename_no_ext.split('-')[-1]
     model_num = shipname.detect_model_num(props.get('PW')[0])
     sgf_url = gcs_path
@@ -108,9 +109,10 @@ def extract_game_data(gcs_path, root_node):
     root_node.next.properties['C'][0] = '\n'.join(first_comment_node_lines[1:])
     resign_threshold = float(first_comment_node_lines[0].split()[-1])
 
+
     return {
         'worker_id': worker_id,
-        'completed_time': completion_time * 1000, # BigQuery's TIMESTAMP() takes in unix millis.
+        'completed_time': completion_millis
         'board_size': board_size,
         'model_num': model_num,
         'result_str': result,
@@ -186,7 +188,8 @@ def parse_comment_node(comment):
     post_Q = float(lines[0])
     debug_rows = []
     for line in lines[3:]:
-        if not line: continue
+        if not line:
+            continue
         columns = re.split(r'[ :,]', line)
         columns = list(filter(bool, columns))
         coord, *other_columns = columns
