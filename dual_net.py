@@ -206,8 +206,8 @@ def model_fn(features, labels, mode, params, config=None):
     # train ops
     global_step = tf.train.get_or_create_global_step()
     policy_cost = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits_v2(
-            logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
+        tf.nn.softmax_cross_entropy_with_logits(
+            logits=logits, labels=labels['pi_tensor']))
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
     l2_cost = params['l2_strength'] * tf.add_n([tf.nn.l2_loss(v)

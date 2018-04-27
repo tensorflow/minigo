@@ -32,7 +32,7 @@ TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
 # where it started; this and the interleave parameters in preprocessing can give
 # us an approximation of a uniform sampling.  The default of 4M is used in
 # training, but smaller numbers can be used for aggregation or validation.
-SHUFFLE_BUFFER_SIZE = int(2*1e6)
+SHUFFLE_BUFFER_SIZE = 2000000
 
 
 def _one_hot(index):
