@@ -16,27 +16,30 @@ import random
 import sys
 import time
 
+from absl import flags
 import coords
 from gtp_wrapper import MCTSPlayer
 
 SIMULTANEOUS_LEAVES = 8
 
 
-def play(network, readouts, resign_threshold, verbosity=0):
+def play(network, verbosity=0):
     ''' Plays out a self-play match, returning
     - the final position
     - the n x 362 tensor of floats representing the mcts search probabilities
     - the n-ary tensor of floats representing the original value-net estimate
     where n is the number of moves in the game'''
-    player = MCTSPlayer(network,
-                        resign_threshold=resign_threshold,
-                        verbosity=verbosity,
-                        num_parallel=SIMULTANEOUS_LEAVES)
-    global_n = 0
-
+    readouts = flags.FLAGS.num_readouts  # defined in strategies.py
     # Disable resign in 5% of games
     if random.random() < 0.05:
-        player.resign_threshold = -1.0
+        resign_threshold = -1.0
+    else:
+        resign_threshold = None
+
+    player = MCTSPlayer(network,
+                        verbosity=verbosity,
+                        resign_threshold=resign_threshold,
+                        num_parallel=SIMULTANEOUS_LEAVES)
 
     player.initialize_game()
 

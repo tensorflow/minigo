@@ -30,7 +30,7 @@ BOARD_SIZE = "19"  # Models are hardcoded to a board size.
 GTP_COMMAND = ["python",  "-u",  # turn off buffering
                "main.py", "gtp",
                "--load-file", MODEL_PATH,
-               "--readouts", "1000",
+               "--num_readouts", "1000",
                "-v", "2"]
 
 # GTP_COMMAND = [
