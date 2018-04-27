@@ -26,7 +26,7 @@ import mcts
 import sgf_wrapper
 
 flags.DEFINE_integer('softpick_move_cutoff', (go.N * go.N // 12) // 2 * 2,
-    'The move number (<=) up to which moves are softpicked from MCTS visits.')
+                     'The move number (<=) up to which moves are softpicked from MCTS visits.')
 # Ensure that both white and black have an equal number of softpicked moves.
 flags.register_validator('softpick_move_cutoff', lambda x: x % 2 == 0)
 
@@ -40,6 +40,7 @@ flags.DEFINE_integer('num_readouts', 800,
 flags.register_validator('num_readouts', lambda x: x > 0)
 
 FLAGS = flags.FLAGS
+
 
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
                         decay_factor=0.98):

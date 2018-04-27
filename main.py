@@ -12,34 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import argh
+import argparse
 import os.path
-import collections
 import random
-import re
-import shutil
 import socket
 import sys
 import tempfile
 import time
-from absl import flags
-import cloud_logging
-from tqdm import tqdm
-import gzip
-import numpy as np
-import tensorflow as tf
-from tensorflow import gfile
 
-import go
 import dual_net
-from gtp_wrapper import make_gtp_instance, MCTSPlayer
+import evaluation
 import preprocessing
 import selfplay_mcts
+from gtp_wrapper import make_gtp_instance
 from utils import logged_timer as timer
-import evaluation
-import sgf_wrapper
-import utils
+
+import cloud_logging
+import tensorflow as tf
+from absl import flags
+from tqdm import tqdm
+from tensorflow import gfile
 
 # How many positions we should aggregate per 'chunk'.
 EXAMPLES_PER_RECORD = 10000
@@ -91,6 +84,7 @@ def bootstrap(
         _ensure_dir_exists(os.path.dirname(model_save_path))
         dual_net.bootstrap(working_dir)
         dual_net.export_model(working_dir, model_save_path)
+        freeze_graph(model_save_path)
 
 
 def train(
@@ -106,6 +100,7 @@ def train(
     with timer("Training"):
         dual_net.train(working_dir, tf_records, generation_num)
         dual_net.export_model(working_dir, model_save_path)
+        freeze_graph(model_save_path)
 
 
 def validate(
@@ -258,8 +253,17 @@ def convert(load_file, dest_file):
     tf.reset_default_graph()
 
 
+def freeze_graph(load_file):
+    """ Loads a network and serializes just the inference parts for use by e.g. the C++ binary """
+    n = dual_net.DualNetwork(load_file)
+    out_graph = tf.graph_util.convert_variables_to_constants(
+        n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
+    with open(os.path.join(load_file + '.pb'), 'wb') as f:
+        f.write(out_graph.SerializeToString())
+
+
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train,
+argh.add_commands(parser, [gtp, bootstrap, train, freeze_graph,
                            selfplay, gather, evaluate, validate, convert])
 
 if __name__ == '__main__':

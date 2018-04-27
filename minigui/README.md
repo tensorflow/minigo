@@ -6,6 +6,8 @@
 
 1. Download a model from our [public bucket](https://console.cloud.google.com/storage/browser/minigo-pub) and set the path appropriately in `serve.py` where it says `MODEL_PATH = ...`. 
 
+1. Set the board size variables appropriately in `serve.py` and in `minigui.ts`. [TODO: make this board size detection automatic](https://github.com/tensorflow/minigo/issues/175)
+
 1. Make sure the command at the top of `serve.py` actually runs and prints `GTP engine ready`; if not, something is wrong with the rest of the minigo setup, like virtualenv or similar.
 
 1. Compile the typescript. (Requires [typescript compiler](https://www.typescriptlang.org/#download-links)). Running `cd minigui; tsc` should find and compile the relevant files.

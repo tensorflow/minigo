@@ -13,7 +13,6 @@
 # limitations under the License.
 """Utilities for working with go games and coordinates"""
 
-from collections import defaultdict
 from contextlib import contextmanager
 import functools
 import itertools

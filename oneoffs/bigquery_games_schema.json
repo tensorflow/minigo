@@ -1,0 +1,47 @@
+[
+    {
+        "name": "worker_id",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "completed_time",
+        "type": "TIMESTAMP",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "model_num",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "resign_threshold",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "result_str",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "value",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "was_resign",
+        "type": "BOOLEAN",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "board_size",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "sgf_url",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    }
+]

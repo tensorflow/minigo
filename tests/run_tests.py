@@ -1,4 +1,5 @@
-import sys; sys.path.insert(0, '.')
+import sys
+sys.path.insert(0, '.')
 import unittest
 
 # Importing all of these modules causes all the relevant flags to get defined.

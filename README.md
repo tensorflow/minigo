@@ -309,7 +309,7 @@ model, starting from the latest model weights.
 
 Run the training job:
 ```
-python3 main.py train gs://$BUCKET_NAME/data/training_chunks \
+BOARD_SIZE=19 python3 main.py train gs://$BUCKET_NAME/data/training_chunks \
     gs://$BUCKET_NAME/models/000001-somename \
     --load-file=gs://$BUCKET_NAME/models/000000-bootstrap \
     --generation-num=1 \
