@@ -16,11 +16,20 @@
 from contextlib import contextmanager
 import functools
 import itertools
-import operator
 import logging
+import operator
+import os
 import random
 import re
+import sys
 import time
+
+
+def ensure_dir_exists(directory):
+    if directory.startswith('gs://'):
+        return
+    print("Making dir {}".format(directory), file=sys.stderr)
+    os.makedirs(directory, exist_ok=True)
 
 
 def parse_game_result(result):

@@ -12,39 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Run gather and train in a loop, as subprocesses.
+""" Run train and validate in a loop, as subprocesses.
 
 We run as subprocesses because it gives us some isolation.
-If the gather job dies more than three times, we quit entirely.
 """
 
+import argh
 import subprocess
-import sys
 from utils import timer
 
 
-def loop():
-    """Run gather and train as subprocesses."""
-    gather_errors = 0
+def loop(working_dir=None):
+    """Run train and validate as subprocesses."""
     while True:
         print("==================================")
-        with timer("Gather"):
-            gather = subprocess.call("python rl_loop.py gather", shell=True)
-            if gather != 0:
-                print("Error in gather, retrying")
-                gather_errors += 1
-                if gather_errors == 3:
-                    print("Gathering died too many times!")
-                    sys.exit(1)
-                continue
-        gather_errors = 0
-
         with timer("Train"):
-            subprocess.call("python rl_loop.py train", shell=True)
+            train = subprocess.call(
+                ("python rl_loop.py train --working-dir=%s" % working_dir).split())
+            if train != 0:
+                print("Skipping validation")
+                continue
 
         with timer("validate"):
             subprocess.call("python rl_loop.py validate", shell=True)
 
 
 if __name__ == '__main__':
-    loop()
+    argh.dispatch_command(loop)

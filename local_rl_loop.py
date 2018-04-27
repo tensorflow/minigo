@@ -28,6 +28,7 @@ import preprocessing
 import dual_net
 import go
 import main
+import example_buffer as eb
 from tensorflow import gfile
 import subprocess
 
@@ -91,10 +92,16 @@ def rl_loop():
         print(sgf_listing.decode("utf-8"))
 
         print("Gathering game output...")
-        main.gather(input_directory=selfplay_dir, output_directory=gather_dir)
+        eb.make_chunk_for(output_dir=gather_dir,
+                   game_dir=selfplay_dir,
+                   model_num=1,
+                   positions=dual_net.EXAMPLES_PER_GENERATION,
+                   threads=8,
+                   samples_per_game=200)
+
         print("Training on gathered game data...")
-        main.train(working_dir, gather_dir,
-                   next_model_save_file, generation_num=1)
+        main.train_dir(working_dir, gather_dir,
+                       next_model_save_file, generation_num=1)
         print("Trying validate on 'holdout' game...")
         main.validate(working_dir, holdout_dir)
         print("Verifying that new checkpoint is playable...")
@@ -103,7 +110,6 @@ def rl_loop():
             holdout_dir=holdout_dir,
             output_dir=model_selfplay_dir,
             output_sgf=sgf_dir)
-
 
 if __name__ == '__main__':
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)

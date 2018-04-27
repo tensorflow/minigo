@@ -1,0 +1,21 @@
+1. 3/4 of the way through v125, change squash from 0.95 => 0.98, change temp cutoff
+to move 30 (from 31, because odd number = bias against black)
+
+1. v192 -- learning rate erroneously cut to 0.001.  v207 returned to 0.01.
+(v206 trained with 0.001, v207 @0.01) (Later rolled back completely)
+
+1. v231 -- moved #readouts to 900 from 800 as game length was too short
+
+1. v 295-6 -- move shuffle buffer to 1M from 200k
+
+1. v347 -- changed filter amount to 0.02.  (first present for v347)
+
+1. v348 reverted #4
+
+1. v352 change filter to 0.03 and move shuffle buffer back to 200k
+
+1. during v354 (for 355) change steps per generation to 1M from 2M, shuffle
+buffer down to 100k
+
+1. v360ish -- entered experimental mode; freely adjusted learning rate up and
+down, adjusted batch size, etc, to see if valnet divergence could be fixed.

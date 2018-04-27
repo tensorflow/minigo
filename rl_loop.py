@@ -21,6 +21,7 @@ import main
 import shipname
 import sys
 import time
+import tempfile
 from utils import timer
 
 from absl import flags
@@ -37,11 +38,15 @@ SELFPLAY_DIR = os.path.join(BASE_DIR, 'data/selfplay')
 HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
 SGF_DIR = os.path.join(BASE_DIR, 'sgf')
 TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
+GOLDEN_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'golden_chunks')
 
 ESTIMATOR_WORKING_DIR = 'estimator_working_dir'
 
 # How many games before the selfplay workers will stop trying to play more.
 MAX_GAMES_PER_GENERATION = 10000
+
+# How many games minimum, until the trainer will train
+MIN_GAMES_PER_GENERATION = 500
 
 # What percent of games to holdout from training per generation
 HOLDOUT_PCT = 0.05
@@ -140,18 +145,35 @@ def gather():
                 output_directory=TRAINING_CHUNK_DIR)
 
 
-def train():
+def train(load_dir=MODELS_DIR, save_dir=MODELS_DIR):
     model_num, model_name = get_latest_model()
+
+    games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
+    if len(games) < MIN_GAMES_PER_GENERATION:
+        print("{} doesn't have enough games to train a new model yet ({})".format(
+            model_name, len(games)))
+        print("Sleeping...")
+        time.sleep(10*60)
+        print("Done...")
+        sys.exit(1)
+
     print("Training on gathered game data, initializing from {}".format(model_name))
-    new_model_name = shipname.generate(model_num + 1)
+    new_model_num = model_num + 1
+    new_model_name = shipname.generate(new_model_num)
     print("New model will be {}".format(new_model_name))
-    load_file = os.path.join(MODELS_DIR, model_name)
-    save_file = os.path.join(MODELS_DIR, new_model_name)
+    training_file = os.path.join(
+        GOLDEN_CHUNK_DIR, str(new_model_num) + '.tfrecord.zz')
+    while not gfile.Exists(training_file):
+        print("Waiting for", training_file)
+        time.sleep(1*60)
+    print("Using Golden File:", training_file)
+
+    load_file = os.path.join(load_dir, model_name)
+    save_file = os.path.join(save_dir, new_model_name)
     try:
-        main.train(ESTIMATOR_WORKING_DIR, TRAINING_CHUNK_DIR, save_file,
+        main.train(ESTIMATOR_WORKING_DIR, [training_file], save_file,
                    generation_num=model_num + 1)
     except:
-        print("Got an error training, muddling on...")
         logging.exception("Train error")
 
 

@@ -61,6 +61,7 @@ class GtpInterface(object):
                 print("Error saving sgf", file=sys.stderr, flush=True)
         self.position = go.Position(komi=self.komi)
         self.initialize_game(self.position)
+        return True
 
     def accomodate_out_of_turn(self, color):
         if not translate_gtp_colors(color) == self.position.to_play:
@@ -116,13 +117,42 @@ class CGOSPlayer(CGOSPlayerMixin, GtpInterface):
     pass
 
 
-def make_gtp_instance(read_file, verbosity=1, cgos_mode=False):
+class KGSPlayer(MCTSPlayer):
+    """ A wrapper for playing on KGS
+    Adds 'courtsey pass' -- if the opponent passes, we pass, regardless
+    of score or our opinion on the game. """
+    def __init__(self, **kwargs):
+        self.they_passed = False
+        super().__init__(**kwargs)
+
+    def get_move(self, color):
+        if self.they_passed:
+            return gtp.PASS
+        return super().get_move(color)
+
+    def make_move(self, color, vertex):
+        if vertex == gtp.PASS:
+            self.they_passed = True
+        else:
+            self.they_passed = False
+        return super().make_move(color, vertex)
+
+    def clear(self):
+        self.they_passed = False
+        return super().clear()
+
+
+def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1, cgos_mode=False, kgs_mode=False):
     n = DualNetwork(read_file)
     if cgos_mode:
         instance = CGOSPlayer(n, seconds_per_move=5, timed_match=True,
                               verbosity=verbosity, two_player_mode=True)
+    elif kgs_mode:
+        instance = KGSPlayer(network=n, simulations_per_move=readouts_per_move,
+                             verbosity=verbosity, two_player_mode=True)
     else:
-        instance = MCTSPlayer(n, verbosity=verbosity, two_player_mode=True)
-    name = "Somebot-" + os.path.basename(read_file)
+        instance = MCTSPlayer(network=n, simulations_per_move=readouts_per_move,
+                             verbosity=verbosity, two_player_mode=True)
+    name = "Minigo-" + os.path.basename(read_file)
     gtp_engine = gtp_extensions.GTPDeluxe(instance, name=name)
     return gtp_engine

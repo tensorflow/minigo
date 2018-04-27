@@ -16,8 +16,9 @@
 
 import os
 import time
-
+from tensorflow import gfile
 from absl import flags
+
 from gtp_wrapper import MCTSPlayer
 import sgf_wrapper
 
@@ -73,7 +74,7 @@ def play_match(black_net, white_net, games, sgf_dir, verbosity):
             if active.is_done():
                 fname = "{:d}-{:s}-vs-{:s}-{:d}.sgf".format(int(time.time()),
                                                             white_name, black_name, i)
-                with open(os.path.join(sgf_dir, fname), 'w') as _file:
+                with gfile.GFile(os.path.join(sgf_dir, fname), 'w') as _file:
                     sgfstr = sgf_wrapper.make_sgf(active.position.recent,
                                                   active.result_string, black_name=black_name,
                                                   white_name=white_name)

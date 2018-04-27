@@ -39,8 +39,8 @@ import go
 # Per AGZ, 2048 minibatch * 1k = 2M positions/generation
 EXAMPLES_PER_GENERATION = 2000000
 
-# How many positions can fit on a graphics card. 256 for 9s, 16 or 32 for 19s.
-TRAIN_BATCH_SIZE = 16
+# How many positions can fit on the trainer; 256 for 19s on a p100
+TRAIN_BATCH_SIZE = 256
 
 
 class DualNetwork():
@@ -215,7 +215,7 @@ def model_fn(features, labels, mode, params, config=None):
     combined_cost = policy_cost + value_cost + l2_cost
     policy_entropy = -tf.reduce_mean(tf.reduce_sum(
         policy_output * tf.log(policy_output), axis=1))
-    boundaries = [int(1e6), int(2e6)]
+    boundaries = [40 * int(1e6), 80 * int(1e6)]
     values = [1e-2, 1e-3, 1e-4]
     learning_rate = tf.train.piecewise_constant(
         global_step, boundaries, values)

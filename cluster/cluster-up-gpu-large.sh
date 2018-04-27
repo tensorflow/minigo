@@ -25,7 +25,7 @@ echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
 
-export NUM_K8S_NODES=700
+export NUM_K8S_NODES=350
 echo "Overriding num nodes to: $NUM_K8S_NODES"
 
 check_gcloud_exists
@@ -35,10 +35,11 @@ check_gcloud_exists
 # See more details https://stackoverflow.com/questions/42129327/gke-cluster-creation-fails-because-the-network-default-does-not-have-available
 gcloud beta container clusters create \
   --num-nodes $NUM_K8S_NODES \
-  --accelerator type=nvidia-tesla-k80,count=1 \
-  --machine-type n1-standard-2 \
-  --disk-size 20 \
+  --accelerator type=nvidia-tesla-k80,count=2 \
+  --machine-type n1-standard-8 \
+  --disk-size 25 \
   --preemptible \
+  --network auto-network2 \
   --cluster-ipv4-cidr=10.0.0.0/10 \
   --zone=$ZONE \
   --cluster-version=$K8S_VERSION \

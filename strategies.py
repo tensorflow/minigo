@@ -143,7 +143,7 @@ class MCTSPlayerMixin:
         '''
         if not self.two_player_mode:
             self.searches_pi.append(
-                self.root.children_as_pi(self.root.position.n < self.temp_threshold))
+                self.root.children_as_pi(self.root.position.n <= self.temp_threshold))
         self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
         try:
@@ -168,7 +168,7 @@ class MCTSPlayerMixin:
             fcoord = np.argmax(self.root.child_N)
         else:
             cdf = self.root.child_N.cumsum()
-            cdf /= cdf[-1]
+            cdf /= cdf[-2] # Prevents passing via softpick.
             selection = random.random()
             fcoord = cdf.searchsorted(selection)
             assert self.root.child_N[fcoord] != 0
@@ -214,6 +214,9 @@ class MCTSPlayerMixin:
             path += " (game over) %0.1f" % node.position.score()
         return path
 
+    def is_done(self):
+        return self.result != 0 or self.root.is_done()
+
     def should_resign(self):
         '''Returns true if the player resigned.  No further moves should be played'''
         return self.root.Q_perspective < self.resign_threshold
@@ -241,9 +244,6 @@ class MCTSPlayerMixin:
                                     black_name=os.path.basename(
                                         self.network.save_file) or "Unknown",
                                     comments=comments)
-
-    def is_done(self):
-        return self.result != 0 or self.root.is_done()
 
     def extract_data(self):
         assert len(self.searches_pi) == self.root.position.n
