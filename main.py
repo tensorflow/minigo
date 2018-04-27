@@ -45,6 +45,7 @@ WINDOW_SIZE = 125000000
 def _ensure_dir_exists(directory):
     if directory.startswith('gs://'):
         return
+    print("Making dir {}".format(directory))
     os.makedirs(directory, exist_ok=True)
 
 

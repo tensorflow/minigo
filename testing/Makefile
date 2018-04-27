@@ -14,27 +14,11 @@
 
 # This file builds the images that are used by prow to run the Minigo tests.
 
-IMG = gcr.io/minigo-testing/minigo-prow-harness
 IMG_V2 = gcr.io/minigo-testing/minigo-prow-harness-v2
 TAG := $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)-$(shell git diff | openssl sha -sha256 | cut -c -6)
 DIR := ${CURDIR}
 
 all: build
-
-build:
-	mkdir -p staging
-	cp ../requirements.txt staging/requirements.txt
-	@echo {\"image\": \"$(IMG):$(TAG)\"} > version.json
-	docker build ${DOCKER_BUILD_OPTS} -t $(IMG):$(TAG) .
-	docker tag $(IMG):$(TAG) $(IMG):latest
-	rm -R staging/*
-	rmdir staging
-	@echo Built $(IMG):$(TAG) and tagged with latest
-
-push: build
-	gcloud docker -- push $(IMG):$(TAG)
-	gcloud docker -- push $(IMG):latest
-	@echo Pushed $(IMG) with :latest and :$(TAG) tags
 
 buildv2:
 	mkdir -p staging

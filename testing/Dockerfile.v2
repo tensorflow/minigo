@@ -43,6 +43,6 @@ COPY bootstrap_v2.sh /workspace/bootstrap_v2.sh
 COPY staging/requirements.txt /workspace/requirements.txt
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /workspace/requirements.txt
-RUN pip3 install "tensorflow>=1.5,<1.6"
+RUN pip3 install "tensorflow>=1.7,<1.8"
 
 ENTRYPOINT ["/bin/sh", "/workspace/bootstrap_v2.sh"]
