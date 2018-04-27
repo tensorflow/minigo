@@ -111,7 +111,7 @@ def bootstrap():
     main.bootstrap(ESTIMATOR_WORKING_DIR, bootstrap_model_path)
 
 
-def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
+def selfplay(readouts=1600, verbose=2):
     _, model_name = get_latest_model()
     games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
     if len(games) > MAX_GAMES_PER_GENERATION:
@@ -130,7 +130,6 @@ def selfplay(readouts=1600, verbose=2, resign_threshold=0.99):
         output_sgf=sgf_dir,
         readouts=readouts,
         holdout_pct=HOLDOUT_PCT,
-        resign_threshold=resign_threshold,
         verbose=verbose,
     )
 

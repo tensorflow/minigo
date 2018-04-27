@@ -12,34 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import argh
+import argparse
 import os.path
-import collections
 import random
-import re
-import shutil
 import socket
 import sys
 import tempfile
 import time
-from absl import flags
-import cloud_logging
-from tqdm import tqdm
-import gzip
-import numpy as np
-import tensorflow as tf
-from tensorflow import gfile
 
-import go
 import dual_net
-from gtp_wrapper import make_gtp_instance, MCTSPlayer
+import evaluation
 import preprocessing
 import selfplay_mcts
+from gtp_wrapper import make_gtp_instance
 from utils import logged_timer as timer
-import evaluation
-import sgf_wrapper
-import utils
+
+import cloud_logging
+import tensorflow as tf
+from absl import flags
+from tqdm import tqdm
+from tensorflow import gfile
 
 # How many positions we should aggregate per 'chunk'.
 EXAMPLES_PER_RECORD = 10000
@@ -57,11 +50,9 @@ def _ensure_dir_exists(directory):
 
 
 def gtp(load_file: "The path to the network model files"=None,
-        readouts: 'How many simulations to run per move'=100,
         cgos_mode: 'Whether to use CGOS time constraints'=False,
         verbose=1):
     engine = make_gtp_instance(load_file,
-                               readouts_per_move=readouts,
                                verbosity=verbose,
                                cgos_mode=cgos_mode)
     sys.stderr.write("GTP engine ready\n")
@@ -94,6 +85,7 @@ def bootstrap(
         _ensure_dir_exists(os.path.dirname(model_save_path))
         dual_net.bootstrap(working_dir)
         dual_net.export_model(working_dir, model_save_path)
+        freeze_graph(model_save_path)
 
 
 def train(
@@ -109,6 +101,7 @@ def train(
     with timer("Training"):
         dual_net.train(working_dir, tf_records, generation_num)
         dual_net.export_model(working_dir, model_save_path)
+        freeze_graph(model_save_path)
 
 
 def validate(
@@ -133,7 +126,6 @@ def evaluate(
         black_model: 'The path to the model to play black',
         white_model: 'The path to the model to play white',
         output_dir: 'Where to write the evaluation results'='sgf/evaluate',
-        readouts: 'How many readouts to make per move.'=400,
         games: 'the number of games to play'=16,
         verbose: 'How verbose the players should be (see selfplay)' = 1):
     _ensure_dir_exists(output_dir)
@@ -144,7 +136,7 @@ def evaluate(
 
     with timer("%d games" % games):
         evaluation.play_match(
-            black_net, white_net, games, readouts, output_dir, verbose)
+            black_net, white_net, games, output_dir, verbose)
 
 
 def selfplay(
@@ -152,9 +144,7 @@ def selfplay(
         output_dir: "Where to write the games"="data/selfplay",
         holdout_dir: "Where to write the games"="data/holdout",
         output_sgf: "Where to write the sgfs"="sgf/",
-        readouts: 'How many simulations to run per move'=100,
         verbose: '>=2 will print debug info, >=3 will print boards' = 1,
-        resign_threshold: 'absolute value of threshold to resign at' = 0.95,
         holdout_pct: 'how many games to hold out for validation' = 0.05):
     clean_sgf = os.path.join(output_sgf, 'clean')
     full_sgf = os.path.join(output_sgf, 'full')
@@ -167,8 +157,7 @@ def selfplay(
         network = dual_net.DualNetwork(load_file)
 
     with timer("Playing game"):
-        player = selfplay_mcts.play(
-            network, readouts, resign_threshold, verbose)
+        player = selfplay_mcts.play(network, verbose)
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
     game_data = player.extract_data()
@@ -265,8 +254,17 @@ def convert(load_file, dest_file):
     tf.reset_default_graph()
 
 
+def freeze_graph(load_file):
+    """ Loads a network and serializes just the inference parts for use by e.g. the C++ binary """
+    n = dual_net.DualNetwork(load_file)
+    out_graph = tf.graph_util.convert_variables_to_constants(
+        n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
+    with open(os.path.join(load_file + '.pb'), 'wb') as f:
+        f.write(out_graph.SerializeToString())
+
+
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train,
+argh.add_commands(parser, [gtp, bootstrap, train, freeze_graph,
                            selfplay, gather, evaluate, validate, convert])
 
 if __name__ == '__main__':

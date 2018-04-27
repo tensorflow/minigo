@@ -16,14 +16,15 @@
 
 import os
 import time
-import sgf_wrapper
 
+from absl import flags
 from gtp_wrapper import MCTSPlayer
+import sgf_wrapper
 
 SIMULTANEOUS_LEAVES = 8
 
 
-def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
+def play_match(black_net, white_net, games, sgf_dir, verbosity):
     """Plays matches between two neural nets.
 
     black_net: Instance of minigo.DualNetwork, a wrapper around a tensorflow
@@ -31,8 +32,8 @@ def play_match(black_net, white_net, games, readouts, sgf_dir, verbosity):
     white_net: Instance of the minigo.DualNetwork.
     games: number of games to play. We play all the games at the same time.
     sgf_dir: directory to write the sgf results.
-    readouts: number of readouts to perform for each step in each game.
     """
+    readouts = flags.FLAGS.num_readouts  # Flag defined in strategies.py
 
     # For n games, we create lists of n black and n white players
     black = MCTSPlayer(

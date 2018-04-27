@@ -31,6 +31,16 @@ cpu-image-clean:
 		rm staging/requirements.txt
 		rm staging/player_wrapper.sh
 
+cc-image:
+		mkdir -p staging/cc
+		cp ../../requirements.txt staging/
+		cp ../../WORKSPACE staging/
+		cp cc_wrapper.sh staging/
+		cp -r ../../cc/* staging/cc/
+	    docker build -f cc-Dockerfile -t "gcr.io/$(PROJECT)/$(CC_PLAYER_CONTAINER):$(VERSION_TAG)" .
+		rm -rfd staging/
+
+
 cpu-push: cpu-image
 	    gcloud docker -- push "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)"
 

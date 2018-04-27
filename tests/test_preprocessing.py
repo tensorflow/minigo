@@ -50,7 +50,8 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
         with tf.Session() as sess:
             while True:
                 try:
-                    pos_value, label_values = sess.run([pos_tensor, label_tensors])
+                    pos_value, label_values = sess.run(
+                        [pos_tensor, label_tensors])
                     recovered_data.append((
                         pos_value,
                         label_values['pi_tensor'],
@@ -71,7 +72,6 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             self.assertEqualNPArray(datum1[1], datum2[1])
             # value
             self.assertEqual(datum1[2], datum2[2])
-
 
     def test_serialize_round_trip(self):
         np.random.seed(1)
@@ -128,7 +128,6 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
 
         self.assertEqualData(original_data, recovered_data)
 
-
     def test_make_dataset_from_sgf(self):
         with tempfile.NamedTemporaryFile() as sgf_file, \
                 tempfile.NamedTemporaryFile() as record_file:
@@ -153,17 +152,15 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             )]
         self.assertEqualData(expected_data, recovered_data)
 
-
     def test_rotate_pyfunc(self):
         def reset_random():
-            np.random.seed(1)
             random.seed(1)
             tf.set_random_seed(1)
 
-        def find_symmetry(x1, pi1, x2, pi2):
+        def find_symmetry(x, pi, x2, pi2):
             for sym in symmetries.SYMMETRIES:
-                x_equal = (x1 == symmetries.apply_symmetry_feat(sym, x2)).all()
-                pi_equal = (pi1 == symmetries.apply_symmetry_pi(sym, pi2)).all()
+                x_equal = (x == symmetries.apply_symmetry_feat(sym, x2)).all()
+                pi_equal = (pi == symmetries.apply_symmetry_pi(sym, pi2)).all()
                 if x_equal and pi_equal:
                     return sym
 
@@ -199,10 +196,10 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
         assert not x_and_pi_same(run_one, run_two), "Should have been rotated"
 
         syms = []
-        for (x1, pi1, v1), (x2, pi2, v2) in zip(run_one, run_two):
-            assert v1 == v2, "Values not the same"
+        for (x, pi, v), (x2, pi2, v2) in zip(run_one, run_two):
+            assert v == v2, "Values not the same"
             # For each record find the symmetry that makes them equal
-            syms.extend(map(lambda r: find_symmetry(*r), zip(x1, pi1, x2, pi2)))
+            syms.extend(map(lambda r: find_symmetry(*r), zip(x, pi, x2, pi2)))
 
         difference = set(symmetries.SYMMETRIES) - set(syms)
         assert len(syms) == num_records, (len(syms), num_records)

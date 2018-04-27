@@ -69,7 +69,7 @@ class DualNetwork():
     def initialize_weights(self, save_file):
         """Initialize the weights from the given save_file.
         Assumes that the graph has been constructed, and the
-        save_file contains weights that match the graph. Used 
+        save_file contains weights that match the graph. Used
         to set the weights to a different version of the player
         without redifining the entire graph."""
         tf.train.Saver().restore(self.sess, save_file)

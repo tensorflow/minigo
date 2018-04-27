@@ -14,8 +14,6 @@
 
 '''Utilities to create, read, write tf.Examples.'''
 import functools
-import numpy as np
-import tensorflow as tf
 import random
 
 import coords
@@ -24,6 +22,9 @@ import go
 import sgf_wrapper
 import symmetries
 
+import numpy as np
+import tensorflow as tf
+
 TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
     tf.python_io.TFRecordCompressionType.ZLIB)
 
@@ -31,7 +32,7 @@ TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
 # where it started; this and the interleave parameters in preprocessing can give
 # us an approximation of a uniform sampling.  The default of 4M is used in
 # training, but smaller numbers can be used for aggregation or validation.
-SHUFFLE_BUFFER_SIZE = int(2*1e6)
+SHUFFLE_BUFFER_SIZE = 2000000
 
 
 def _one_hot(index):
@@ -153,10 +154,10 @@ def _random_rotation(x_tensor, outcome_tensor):
     pi_tensor = outcome_tensor['pi_tensor']
 
     x_rot_tensor, pi_rot_tensor = tuple(tf.py_func(
-            rotate_py_func,
-            [x_tensor, pi_tensor],
-            [tf.float32, tf.float32],
-            stateful=False))
+        rotate_py_func,
+        [x_tensor, pi_tensor],
+        [tf.float32, tf.float32],
+        stateful=False))
 
     x_rot_tensor.set_shape(x_tensor.get_shape())
     pi_rot_tensor.set_shape(pi_tensor.get_shape())
@@ -182,7 +183,8 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
                               shuffle_buffer_size=shuffle_buffer_size,
                               filter_amount=filter_amount)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
-    dataset = dataset.map(functools.partial(batch_parse_tf_example, batch_size))
+    dataset = dataset.map(functools.partial(
+        batch_parse_tf_example, batch_size))
     if random_rotation:
         dataset = dataset.map(_random_rotation)
 

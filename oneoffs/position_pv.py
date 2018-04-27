@@ -12,6 +12,7 @@ sys.path.insert(0, '.')
 import itertools
 import os
 
+from absl import app, flags
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
@@ -21,20 +22,18 @@ import strategies
 import oneoff_utils
 
 
-tf.app.flags.DEFINE_string(
+flags.DEFINE_string(
     "sgf_dir", "sgf/baduk_db/", "sgf database")
 
-tf.app.flags.DEFINE_string("model_dir", "saved_models",
+flags.DEFINE_string("model_dir", "saved_models",
                            "Where the model files are saved")
-tf.app.flags.DEFINE_string("data_dir", "data/eval", "Where to save data")
-tf.app.flags.DEFINE_integer("idx_start", 150,
+flags.DEFINE_string("data_dir", "data/eval", "Where to save data")
+flags.DEFINE_integer("idx_start", 150,
                             "Only take models after given idx")
-tf.app.flags.DEFINE_integer("eval_every", 5,
-                            "Eval every k models to generate the curve")
-tf.app.flags.DEFINE_integer("readouts", 1000,
+flags.DEFINE_integer("eval_every", 5,
                             "Eval every k models to generate the curve")
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = flags.FLAGS
 
 
 def eval_pv(eval_positions):
@@ -53,7 +52,6 @@ def eval_pv(eval_positions):
 
         mcts = strategies.MCTSPlayerMixin(
             player.network,
-            simulations_per_move=FLAGS.readouts,
             resign_threshold=-1)
 
         eval_trees = []
@@ -93,4 +91,4 @@ def main(unusedargv):
 
 
 if __name__ == "__main__":
-    tf.app.run(main)
+    app.run(main)

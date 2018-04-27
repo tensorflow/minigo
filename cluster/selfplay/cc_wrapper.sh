@@ -22,9 +22,18 @@ echo creds: $GOOGLE_APPLICATION_CREDENTIALS
 echo bucket: $BUCKET_NAME
 echo board_size: $BOARD_SIZE
 
-python3 rl_loop.py selfplay \
-  --resign_threshold=0.99
-  --num_readouts=600
+MODEL_NAME=gsutil ls "gs://$BUCKET_NAME/models/*.pb" | sort | tail -n 1
+GAMES=`gsutil ls "gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/*.zz" | wc -l`
 
+if [ $GAMES -lt 15000 ];
+then
+  bazel-bin/cc/main \
+    --model=$MODEL_NAME \
+    --num_readouts=800 \
+    --mode=selfplay \
+    --resign-threshold=0.90
+else
+  echo "$MODEL_NAME has enough games ($GAMES)"
+fi
 
 echo Finished a set of games!

@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import functools
-import numpy as np
 import random
+
 import go
+
+import numpy as np
 
 """
 Allowable symmetries:
@@ -72,7 +74,7 @@ def apply_symmetry_pi(s, pi):
 
 
 def randomize_symmetries_feat(features):
-    symmetries_used = [random.choice(SYMMETRIES) for f in features]
+    symmetries_used = [random.choice(SYMMETRIES) for _ in features]
     return symmetries_used, [apply_symmetry_feat(s, f)
                              for s, f in zip(symmetries_used, features)]
 

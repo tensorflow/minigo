@@ -176,7 +176,7 @@ To watch Minigo play a game, you need to specify a model. Here's an example
 to play using the latest model in your bucket
 
 ```shell
-python rl_loop.py selfplay --readouts=$READOUTS -v 2
+python rl_loop.py selfplay --num_readouts=$READOUTS -v 2
 ```
 where `READOUTS` is how many searches to make per move.  Timing information and
 statistics will be printed at each move.  Setting verbosity (-v) to 3 or higher
@@ -192,7 +192,7 @@ and you can use any gtp-compliant program with it.
 ```
 # Latest model should look like: /path/to/models/000123-something
 LATEST_MODEL=$(ls -d $MINIGO_MODELS/* | tail -1 | cut -f 1 -d '.')
-BOARD_SIZE=19 python3 main.py gtp -l $LATEST_MODEL -r $READOUTS -v 3
+BOARD_SIZE=19 python3 main.py gtp -l $LATEST_MODEL --num_readouts=$READOUTS -v 3
 ```
 
 (If no model is provided, it will initialize one with random values)
@@ -276,7 +276,7 @@ gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
 
 ```bash
 BOARD_SIZE=19 python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
-  --readouts 10 \
+  --num_readouts 10 \
   -v 3 \
   --output-dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
   --output-sgf=gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker
@@ -318,7 +318,7 @@ model, starting from the latest model weights.
 
 Run the training job:
 ```
-python3 main.py train\
+BOARD_SIZE=19 python3 main.py train\
   estimator_working_dir
   gs://$BUCKET_NAME/data/training_chunks \
   gs://$BUCKET_NAME/models/000001-somename \
