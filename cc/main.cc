@@ -210,6 +210,7 @@ void Gtp() {
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   auto player = absl::make_unique<GtpPlayer>(std::move(dual_net), options);
 
+  std::cout << "GTP engine ready" << std::endl;
   std::string line;
   do {
     std::getline(std::cin, line);

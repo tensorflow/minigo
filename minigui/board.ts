@@ -29,7 +29,6 @@ function otherColor(color: Color) {
 
 enum BoardSize {
   Nine = 9,
-  Thirteen = 13,
   Nineteen = 19,
 }
 
@@ -54,7 +53,6 @@ const COL_LABELS = 'ABCDEFGHJKLMNOPQRST';
 
 const STAR_POINTS = {
   [BoardSize.Nine]: [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]],
-  [BoardSize.Thirteen]: [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]],
   [BoardSize.Nineteen]: [[3, 3], [3, 9], [3, 15],
                          [9, 3], [9, 9], [9, 15],
                          [15, 3], [15, 9], [15, 15]],
@@ -91,6 +89,7 @@ class Board {
   protected caption: string | null;
   protected marks: Array<string | null>;
   protected variation = new Array<Move>();
+  protected heatMap: Float32Array;
   protected labelRowCol: boolean;
   protected margin: number;
   protected starPointRadius: number;
@@ -106,6 +105,7 @@ class Board {
     this.labelRowCol = options.labelRowCol || false;
     this.margin = options.margin || 0;
     this.starPointRadius = options.starPointRadius || 2.5;
+    this.heatMap = new Float32Array(this.size * this.size);
 
     this.stones = new Array<Color>(this.size * this.size);
     this.marks = new Array<string | null>(this.size * this.size);
@@ -160,6 +160,18 @@ class Board {
     }
   }
 
+  clearHeatMap() {
+    this.heatMap.fill(0);
+    this.draw();
+  }
+
+  setHeatMap(map: Array<number>) {
+    for (let i = 0; i < map.length; ++i) {
+      this.heatMap[i] = map[i];
+    }
+    this.draw();
+  }
+
   setVariation(variation: Array<Move>) {
     this.variation = variation;
     this.draw();
@@ -173,6 +185,7 @@ class Board {
   draw() {
     this.drawBackground();
     this.drawLabels();
+    this.drawHeatMap();
     this.drawBoardStones();
     this.drawMarks();
     this.drawVariation();
@@ -276,6 +289,29 @@ class Board {
 
     this.drawStones(blackStones, Color.Black, 1);
     this.drawStones(whiteStones, Color.White, 1);
+  }
+
+  protected drawHeatMap() {
+    let ctx = this.ctx;
+    let w = this.pointW;
+    let h = this.pointH;
+    let p = {row: 0, col: 0};
+    let i = 0;
+    for (p.row = 0; p.row < this.size; ++p.row) {
+      for (p.col = 0; p.col < this.size; ++p.col) {
+        let x = this.heatMap[i];
+        if (this.stones[i++] != Color.Empty) {
+          continue;
+        }
+        if (x < 0) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${-x}`;
+        } else {
+          ctx.fillStyle = `rgba(0, 0, 0, ${x}`;
+        }
+        let c = this.boardToCanvas(p.row, p.col);
+        ctx.fillRect(c.x - 0.5 * w, c.y - 0.5 * h, w, h);
+      }
+    }
   }
 
   protected drawVariation() {
@@ -499,57 +535,6 @@ class ClickableBoard extends Board {
   }
 }
 
-class HeatMapBoard extends Board {
-  protected heatMap: Float32Array;
-
-  constructor(parent: HTMLElement | string, public size: BoardSize, options: BoardOptions = {}) {
-    super(parent, size, options);
-    this.heatMap = new Float32Array(this.size * this.size);
-  }
-
-  clearHeatMap() {
-    this.heatMap.fill(0);
-    this.draw();
-  }
-
-  setHeatMap(map: Array<number>) {
-    for (let i = 0; i < map.length; ++i) {
-      this.heatMap[i] = map[i];
-    }
-    this.draw();
-  }
-
-  draw() {
-    this.drawBackground();
-    this.drawLabels();
-    this.drawHeatMap();
-    this.drawBoardStones();
-  }
-
-  protected drawHeatMap() {
-    let ctx = this.ctx;
-    let w = this.pointW;
-    let h = this.pointH;
-    let p = {row: 0, col: 0};
-    let i = 0;
-    for (p.row = 0; p.row < this.size; ++p.row) {
-      for (p.col = 0; p.col < this.size; ++p.col) {
-        let x = this.heatMap[i];
-        if (this.stones[i++] != Color.Empty) {
-          continue;
-        }
-        if (x < 0) {
-          ctx.fillStyle = `rgba(255, 255, 255, ${-x}`;
-        } else {
-          ctx.fillStyle = `rgba(0, 0, 0, ${x}`;
-        }
-        let c = this.boardToCanvas(p.row, p.col);
-        ctx.fillRect(c.x - 0.5 * w, c.y - 0.5 * h, w, h);
-      }
-    }
-  }
-}
-
 export {
   Board,
   BoardOptions,
@@ -557,7 +542,6 @@ export {
   ClickableBoard,
   COL_LABELS,
   Color,
-  HeatMapBoard,
   Move,
   Point,
   otherColor,

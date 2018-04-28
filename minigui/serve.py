@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, ".")  # to run from minigo/ dir
 
 
+import argparse
 from flask import Flask
 
 from flask_socketio import SocketIO
@@ -13,6 +14,38 @@ import logging
 import subprocess
 from threading import Lock
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "--model",
+    required=True,
+    type=str,
+    help="Model path.")
+
+parser.add_argument(
+    "--board_size",
+    default=19,
+    type=int,
+    help="Board size to use when running Python Minigo engine: either 9 or "
+         "19.")
+
+parser.add_argument(
+    "--port",
+    default=5001,
+    type=int,
+    help="Port to listen on.")
+
+parser.add_argument(
+    "--engine",
+    default="py",
+    type=str,
+    help="Which Minigo engine to use: \"py\" for the Python implementation, "
+         "\"cc\" for the C++ implementation.")
+
+
+args = parser.parse_args()
+
+
 # Suppress Flask's info logging.
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -21,26 +54,24 @@ app = Flask(__name__, static_url_path="", static_folder="static")
 app.config["SECRET_KEY"] = "woo"
 socketio = SocketIO(app)
 
-# TODO(amj) extract to flag
-MODEL_PATH = "saved_models/000483-indus-upgrade"
-# If you change this BOARD_SIZE variable, also change the line at the top of
-# minigui.ts that says const N = board.BoardSize.Nine
-BOARD_SIZE = "19"  # Models are hardcoded to a board size.
-
-GTP_COMMAND = ["python",  "-u",  # turn off buffering
-               "main.py", "gtp",
-               "--load-file", MODEL_PATH,
-               "--num_readouts", "1000",
-               "-v", "2"]
-
-# GTP_COMMAND = [
-#     "bazel-bin/cc/main",
-#     "--model=" + MODEL_PATH + ".pb",
-#     "--num_readouts=100",
-#     "--soft_pick=false",
-#     "--inject_noise=false",
-#     "--disable_resign_pct=0",
-#     "--mode=gtp"]
+if args.engine == "py":
+    GTP_COMMAND = ["python",  "-u",  # turn off buffering
+                   "main.py", "gtp",
+                   "--load-file", args.model,
+                   "--num_readouts", "1000",
+                   "-v", "2"]
+elif args.engine == "cc":
+    GTP_COMMAND = [
+        "bazel-bin/cc/main",
+        "--model=" + args.model,
+        "--num_readouts=1000",
+        "--soft_pick=false",
+        "--inject_noise=false",
+        "--disable_resign_pct=0",
+        "--mode=gtp"]
+else:
+    raise ValueError(
+        "Expected \"py\" or \"cc\" for engine, got \"%s\"" % args.engine)
 
 
 def _open_pipes():
@@ -48,23 +79,24 @@ def _open_pipes():
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            env=dict(os.environ, BOARD_SIZE=BOARD_SIZE))
+                            env=dict(os.environ, BOARD_SIZE=str(args.board_size)))
 
 
-p = _open_pipes()
-
-stderr_thread = None
-stdout_thread = None
 token = ''
-thread_lock = Lock()
+echo_streams = True
 
 
 def std_bg_thread(stream):
     global token
+    global echo_streams
 
     for line in p.__getattribute__(stream):
         line = line.decode()
-        # print("###", stream, line[:-1])
+        if echo_streams:
+            sys.stdout.write(line)
+            if "GTP engine ready" in line:
+                echo_streams = False
+
         if line[-1] == "\n":
             line = line[:-1]
 
@@ -74,19 +106,6 @@ def std_bg_thread(stream):
             socketio.send(json.dumps({stream: line, "token": token}),
                           namespace="/minigui", json=True)
     print(stream, "bg_thread died")
-
-
-@socketio.on("connect", namespace="/minigui")
-def stderr_connected():
-    global stderr_thread
-    global stdout_thread
-    with thread_lock:
-        if stderr_thread is None:
-            stderr_thread = socketio.start_background_task(
-                target=functools.partial(std_bg_thread, "stderr"))
-        if stdout_thread is None:
-            stdout_thread = socketio.start_background_task(
-                target=functools.partial(std_bg_thread, "stdout"))
 
 
 @socketio.on("gtpcmd", namespace="/minigui")
@@ -100,10 +119,17 @@ def stdin_cmd(message):
         p = _open_pipes()
 
 
+p = _open_pipes()
+stderr_thread = socketio.start_background_task(
+    target=functools.partial(std_bg_thread, "stderr"))
+stdout_thread = socketio.start_background_task(
+    target=functools.partial(std_bg_thread, "stdout"))
+
+
 @app.route("/")
 def index():
     return app.send_static_file("index.html")
 
 
 if __name__ == "__main__":
-    socketio.run(app)
+  socketio.run(app, port=args.port)

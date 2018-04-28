@@ -23,6 +23,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/time/clock.h"
+#include "cc/constants.h"
 
 namespace minigo {
 
@@ -94,7 +95,9 @@ GtpPlayer::Response GtpPlayer::CheckArgsRange(
 
 GtpPlayer::Response GtpPlayer::DispatchCmd(
     absl::string_view cmd, const std::vector<absl::string_view>& args) {
-  if (cmd == "clear_board") {
+  if (cmd == "boardsize") {
+    return HandleBoardsize(cmd, args);
+  } else if (cmd == "clear_board") {
     return HandleClearBoard(cmd, args);
   } else if (cmd == "echo") {
     return HandleEcho(cmd, args);
@@ -116,6 +119,21 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(
     return HandleReportSearchInterval(cmd, args);
   }
   return Response::Error("unknown command");
+}
+
+GtpPlayer::Response GtpPlayer::HandleBoardsize(
+    absl::string_view cmd, const std::vector<absl::string_view>& args) {
+  auto response = CheckArgsExact(cmd, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  int x;
+  if (!absl::SimpleAtoi(args[0], &x) || x != kN) {
+    return Response::Error("unacceptable size");
+  }
+
+  return Response::Ok();
 }
 
 GtpPlayer::Response GtpPlayer::HandleClearBoard(

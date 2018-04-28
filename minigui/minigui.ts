@@ -18,7 +18,7 @@ import {Log} from './log'
 import * as gtpsock from './gtp_socket'
 import {Graph} from './graph'
 
-const N = board.BoardSize.Nineteen;
+let N = 0;
 
 namespace BoardState {
   export type Move = board.Point | 'pass' | 'resign';
@@ -75,34 +75,77 @@ consoleElem.addEventListener('keypress', (e) => {
   }
 });
 
-// Initialize boards.
-let mainBoard = new board.ClickableBoard(
-    'main-board', N, {margin: 30, labelRowCol: true, starPointRadius: 4});
-let currentVariationBoard = new board.Board('search-board', N, {caption: 'search'});
-let qBoard = new board.HeatMapBoard('q-board', N, {caption: 'ΔQ'});
-let nBoard = new board.HeatMapBoard('n-board', N, {caption: 'N'});
-let boards = [
-  mainBoard,
-  currentVariationBoard,
-  qBoard,
-  nBoard,
-];
-for (let board of boards) {
-  board.draw();
-}
+let mainBoard: board.ClickableBoard;
+let currentVariationBoard: board.Board;
+let qBoard: board.Board;
+let nBoard: board.Board;
+let boards: Array<board.Board>;
 
 // Initialize socket connection to the backend.
 let gtp = new gtpsock.Socket(
   `http://${document.domain}:${location.port}/minigui`,
   (line: string) => { log.log(line, 'log-cmd'); });
 
-gtp.onConnect(() => {
+function init(boardSize: number) {
+  N = boardSize;
+  mainBoard = new board.ClickableBoard(
+      'main-board', N, {margin: 30, labelRowCol: true, starPointRadius: 4});
+  currentVariationBoard = new board.Board('search-board', N, {caption: 'search'});
+  qBoard = new board.Board('q-board', N, {caption: 'ΔQ'});
+  nBoard = new board.Board('n-board', N, {caption: 'N'});
+
+  boards = [
+    mainBoard,
+    currentVariationBoard,
+    qBoard,
+    nBoard,
+  ];
+  for (let board of boards) {
+    board.draw();
+  }
+
   gtp.send('clear_board');
   gtp.send('mg_gamestate');
-  gtp.send('report_search_interval 100');
+  gtp.send('report_search_interval 50');
   gtp.send('info');
   gameState.gameOver = false;
   util.getElement('ui-container').classList.remove('hidden');
+
+  mainBoard.onClick((p) => {
+    mainBoard.clearVariation();
+    currentVariationBoard.clearVariation();
+    qBoard.clearHeatMap();
+    nBoard.clearHeatMap();
+
+    let player = mainBoard.toPlay == board.Color.Black ? 'b' : 'w';
+    let row = N - p.row;
+    let col = board.COL_LABELS[p.col];
+    let move = `${col}${row}`;
+    gtp.send(`play ${player} ${move}`, (cmd: string, result: string, ok: boolean) => {
+      if (ok) {
+        onMovePlayed(move);
+      }
+    });
+  });
+}
+
+function tryBoardSize(sizes: board.BoardSize[]) {
+  if (sizes.length == 0) {
+    throw new Error('Couldn\'t find an acceptable board size');
+  }
+  gtp.send(`boardsize ${sizes[0]}`, (cmd, result, ok) => {
+    if (ok) {
+      init(sizes[0]);
+    } else {
+      tryBoardSize(sizes.slice(1));
+    }
+  });
+}
+
+gtp.onConnect(() => {
+  if (!mainBoard) {
+    tryBoardSize([board.BoardSize.Nine, board.BoardSize.Nineteen]);
+  }
 });
 
 let qGraph = new Graph('q-graph');
@@ -260,6 +303,7 @@ function resetGame(delay?: number) {
   gtp.newSession();
   gtp.send('clear_board', () => { gameState.gameOver = false; });
   gtp.send('mg_gamestate');
+  gtp.send('report_search_interval 50');
   gtp.send('info');
 }
 
@@ -424,20 +468,3 @@ const STDERR_HANDLERS: Array<[string, gtpsock.StderrHandler]> = [
 for (let [prefix, handler] of STDERR_HANDLERS) {
   gtp.addStderrHandler(prefix, handler);
 }
-
-mainBoard.onClick((p) => {
-  mainBoard.clearVariation();
-  currentVariationBoard.clearVariation();
-  qBoard.clearHeatMap();
-  nBoard.clearHeatMap();
-
-  let player = mainBoard.toPlay == board.Color.Black ? 'b' : 'w';
-  let row = N - p.row;
-  let col = board.COL_LABELS[p.col];
-  let move = `${col}${row}`;
-  gtp.send(`play ${player} ${move}`, (cmd: string, result: string, ok: boolean) => {
-    if (ok) {
-      onMovePlayed(move);
-    }
-  });
-});
