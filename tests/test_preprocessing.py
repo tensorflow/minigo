@@ -95,38 +95,6 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
         # TODO: this will flake out very infrequently.  Use set_random_seed
         self.assertLess(len(recovered_data), 50)
 
-    def test_serialize_round_trip_no_parse(self):
-        np.random.seed(1)
-        raw_data = self.create_random_data(10)
-        tfexamples = list(map(preprocessing.make_tf_example, *zip(*raw_data)))
-
-        with tempfile.NamedTemporaryFile() as start_file, \
-                tempfile.NamedTemporaryFile() as rewritten_file:
-            preprocessing.write_tf_examples(start_file.name, tfexamples)
-            # We want to test that the rewritten, shuffled file contains correctly
-            # serialized tf.Examples.
-            batch_size = 4
-            batches = list(preprocessing.shuffle_tf_examples(
-                batch_size, [start_file.name]))
-            # 2 batches of 4, 1 incomplete batch of 2.
-            self.assertEqual(len(batches), 3)
-
-            # concatenate list of lists into one list
-            all_batches = list(itertools.chain.from_iterable(batches))
-
-            for batch in batches:
-                preprocessing.write_tf_examples(
-                    rewritten_file.name, all_batches, serialize=False)
-
-            original_data = self.extract_data(start_file.name)
-            recovered_data = self.extract_data(rewritten_file.name)
-
-        # stuff is shuffled, so sort before checking equality
-        def sort_key(nparray_tuple): return nparray_tuple[2]
-        original_data = sorted(original_data, key=sort_key)
-        recovered_data = sorted(recovered_data, key=sort_key)
-
-        self.assertEqualData(original_data, recovered_data)
 
     def test_make_dataset_from_sgf(self):
         with tempfile.NamedTemporaryFile() as sgf_file, \

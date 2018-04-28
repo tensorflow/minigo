@@ -139,11 +139,6 @@ def selfplay(readouts=1600, verbose=2):
     )
 
 
-def gather():
-    print("Gathering game output...")
-    main.gather(input_directory=SELFPLAY_DIR,
-                output_directory=TRAINING_CHUNK_DIR)
-
 
 def train(load_dir=MODELS_DIR, save_dir=MODELS_DIR):
     model_num, model_name = get_latest_model()
@@ -231,7 +226,7 @@ def echo():
 
 parser = argparse.ArgumentParser()
 
-argh.add_commands(parser, [train, selfplay, gather, echo, backfill,
+argh.add_commands(parser, [train, selfplay, echo, backfill,
                            bootstrap, game_counts, validate])
 
 if __name__ == '__main__':

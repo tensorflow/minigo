@@ -86,7 +86,7 @@ def bootstrap(
 
 def train_dir(
         working_dir: 'tf.estimator working directory.',
-        chunk_dir: 'Directory where gathered training chunks are.',
+        chunk_dir: 'Directory where training chunks are.',
         model_save_path: 'Where to export the completed generation.',
         generation_num: 'Which generation you are training.'=0):
     tf_records = sorted(gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz')))
@@ -180,51 +180,6 @@ def selfplay(
     preprocessing.write_tf_examples(fname, tf_examples)
 
 
-def gather(
-        input_directory: 'where to look for games'='data/selfplay/',
-        output_directory: 'where to put collected games'='data/training_chunks/',
-        examples_per_record: 'how many tf.examples to gather in each chunk'=EXAMPLES_PER_RECORD):
-    utils.ensure_dir_exists(output_directory)
-    models = [model_dir.strip('/')
-              for model_dir in sorted(gfile.ListDirectory(input_directory))[-50:]]
-    with utils.logged_timer("Finding existing tfrecords..."):
-        model_gamedata = {
-            model: gfile.Glob(
-                os.path.join(input_directory, model, '*.tfrecord.zz'))
-            for model in models
-        }
-    print("Found %d models" % len(models))
-    for model_name, record_files in sorted(model_gamedata.items()):
-        print("    %s: %s files" % (model_name, len(record_files)))
-    print(" >> {} total games".format(
-        sum([len(f) for f in model_gamedata.values()])))
-
-    meta_file = os.path.join(output_directory, 'meta.txt')
-    try:
-        with gfile.GFile(meta_file, 'r') as f:
-            already_processed = set(f.read().split())
-    except tf.errors.NotFoundError:
-        already_processed = set()
-
-    num_already_processed = len(already_processed)
-
-    for model_name, record_files in sorted(model_gamedata.items()):
-        if set(record_files) <= already_processed:
-            continue
-        print("Gathering files for %s:" % model_name)
-        for i, example_batch in enumerate(
-                tqdm(preprocessing.shuffle_tf_examples(examples_per_record, record_files))):
-            output_record = os.path.join(output_directory,
-                                         '{}-{}.tfrecord.zz'.format(model_name, str(i)))
-            preprocessing.write_tf_examples(
-                output_record, example_batch, serialize=False)
-        already_processed.update(record_files)
-
-    print("Processed %s new files" %
-          (len(already_processed) - num_already_processed))
-    with gfile.GFile(meta_file, 'w') as f:
-        f.write('\n'.join(sorted(already_processed)))
-
 
 def convert(load_file, dest_file):
     from tensorflow.python.framework import meta_graph
@@ -270,7 +225,7 @@ def freeze_graph(load_file):
 
 parser = argparse.ArgumentParser()
 argh.add_commands(parser, [gtp, bootstrap, train, freeze_graph,
-                           selfplay, gather, evaluate, validate, convert])
+                           selfplay, evaluate, validate, convert])
 
 if __name__ == '__main__':
     cloud_logging.configure()

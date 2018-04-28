@@ -28,7 +28,8 @@ def ensure_dir_exists(directory):
     "Creates local directories if they don't exist."
     if directory.startswith('gs://'):
         return
-    print("Making dir {}".format(directory), file=sys.stderr)
+    if not os.path.exists(directory):
+        print("Making dir {}".format(directory), file=sys.stderr)
     os.makedirs(directory, exist_ok=True)
 
 

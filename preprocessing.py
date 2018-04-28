@@ -214,22 +214,3 @@ def _make_tf_example_from_pwc(position_w_context):
     value = position_w_context.result
     return make_tf_example(features, pi, value)
 
-
-def shuffle_tf_examples(gather_size, records_to_shuffle):
-    '''Read through tf.Record and yield shuffled, but unparsed tf.Examples
-
-    Args:
-        gather_size: The number of tf.Examples to be gathered together
-        records_to_shuffle: A list of filenames
-    Returns:
-        An iterator yielding lists of bytes, which are serialized tf.Examples.
-    '''
-    dataset = read_tf_records(gather_size, records_to_shuffle, num_repeats=1)
-    batch = dataset.make_one_shot_iterator().get_next()
-    sess = tf.Session()
-    while True:
-        try:
-            result = sess.run(batch)
-            yield list(result)
-        except tf.errors.OutOfRangeError:
-            break
