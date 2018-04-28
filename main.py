@@ -26,8 +26,7 @@ import evaluation
 import preprocessing
 import selfplay_mcts
 from gtp_wrapper import make_gtp_instance
-from utils import logged_timer as timer
-from utils import ensure_dir_exists
+import utils
 
 import cloud_logging
 import tensorflow as tf
@@ -73,13 +72,13 @@ def bootstrap(
         model_save_path: 'Where to export the first bootstrapped generation'=None):
     if working_dir is None:
         with tempfile.TemporaryDirectory() as working_dir:
-            ensure_dir_exists(working_dir)
-            ensure_dir_exists(os.path.dirname(model_save_path))
+            utils.ensure_dir_exists(working_dir)
+            utils.ensure_dir_exists(os.path.dirname(model_save_path))
             dual_net.bootstrap(working_dir)
             dual_net.export_model(working_dir, model_save_path)
     else:
-        ensure_dir_exists(working_dir)
-        ensure_dir_exists(os.path.dirname(model_save_path))
+        utils.ensure_dir_exists(working_dir)
+        utils.ensure_dir_exists(os.path.dirname(model_save_path))
         dual_net.bootstrap(working_dir)
         dual_net.export_model(working_dir, model_save_path)
         freeze_graph(model_save_path)
@@ -102,7 +101,7 @@ def train(
         model_save_path: 'Where to export the completed generation.',
         generation_num: 'Which generation you are training.'=0):
     print("Training on:", tf_records[0], "to", tf_records[-1])
-    with timer("Training"):
+    with utils.logged_timer("Training"):
         dual_net.train(working_dir, tf_records, generation_num)
         dual_net.export_model(working_dir, model_save_path)
         freeze_graph(model_save_path)
@@ -114,13 +113,13 @@ def validate(
         checkpoint_name: 'Which checkpoint to evaluate (None=latest)'=None,
         validate_name: 'Name for validation set (i.e., selfplay or human)'=None):
     tf_records = []
-    with timer("Building lists of holdout files"):
+    with utils.logged_timer("Building lists of holdout files"):
         for record_dir in tf_record_dirs:
             tf_records.extend(gfile.Glob(os.path.join(record_dir, '*.zz')))
 
     first_record = os.path.basename(tf_records[0])
     last_record = os.path.basename(tf_records[-1])
-    with timer("Validating from {} to {}".format(first_record, last_record)):
+    with utils.logged_timer("Validating from {} to {}".format(first_record, last_record)):
         dual_net.validate(
             working_dir, tf_records, checkpoint_name=checkpoint_name,
             name=validate_name)
@@ -132,13 +131,13 @@ def evaluate(
         output_dir: 'Where to write the evaluation results'='sgf/evaluate',
         games: 'the number of games to play'=16,
         verbose: 'How verbose the players should be (see selfplay)' = 1):
-    ensure_dir_exists(output_dir)
+    utils.ensure_dir_exists(output_dir)
 
-    with timer("Loading weights"):
+    with utils.logged_timer("Loading weights"):
         black_net = dual_net.DualNetwork(black_model)
         white_net = dual_net.DualNetwork(white_model)
 
-    with timer("%d games" % games):
+    with utils.logged_timer("%d games" % games):
         evaluation.play_match(
             black_net, white_net, games, output_dir, verbose)
 
@@ -152,15 +151,15 @@ def selfplay(
         holdout_pct: 'how many games to hold out for validation' = 0.05):
     clean_sgf = os.path.join(output_sgf, 'clean')
     full_sgf = os.path.join(output_sgf, 'full')
-    ensure_dir_exists(clean_sgf)
-    ensure_dir_exists(full_sgf)
-    ensure_dir_exists(output_dir)
-    ensure_dir_exists(holdout_dir)
+    utils.ensure_dir_exists(clean_sgf)
+    utils.ensure_dir_exists(full_sgf)
+    utils.ensure_dir_exists(output_dir)
+    utils.ensure_dir_exists(holdout_dir)
 
-    with timer("Loading weights from %s ... " % load_file):
+    with utils.logged_timer("Loading weights from %s ... " % load_file):
         network = dual_net.DualNetwork(load_file)
 
-    with timer("Playing game"):
+    with utils.logged_timer("Playing game"):
         player = selfplay_mcts.play(network, verbose)
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
@@ -185,10 +184,10 @@ def gather(
         input_directory: 'where to look for games'='data/selfplay/',
         output_directory: 'where to put collected games'='data/training_chunks/',
         examples_per_record: 'how many tf.examples to gather in each chunk'=EXAMPLES_PER_RECORD):
-    ensure_dir_exists(output_directory)
+    utils.ensure_dir_exists(output_directory)
     models = [model_dir.strip('/')
               for model_dir in sorted(gfile.ListDirectory(input_directory))[-50:]]
-    with timer("Finding existing tfrecords..."):
+    with utils.logged_timer("Finding existing tfrecords..."):
         model_gamedata = {
             model: gfile.Glob(
                 os.path.join(input_directory, model, '*.tfrecord.zz'))
