@@ -185,11 +185,11 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         # check -- white is losing.
         self.assertEqual(player.root.position.score(), -0.5)
         # initialize the tree so that the root node has populated children.
-        player.tree_search(num_parallel=1)
+        player.tree_search(parallel_readouts=1)
         # virtual losses should enable multiple searches to happen simultaneously
         # without throwing an error...
         for i in range(5):
-            player.tree_search(num_parallel=4)
+            player.tree_search(parallel_readouts=4)
         # uncomment to debug this test
         # print(player.root.describe())
 
@@ -210,7 +210,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         # Test that an almost complete game
         # will tree search with # parallelism > # legal moves.
         for i in range(10):
-            player.tree_search(num_parallel=50)
+            player.tree_search(parallel_readouts=50)
         self.assertNoPendingVirtualLosses(player.root)
 
     def test_long_game_tree_search(self):
@@ -228,7 +228,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
 
         # Test that an almost complete game
         for i in range(10):
-            player.tree_search(num_parallel=8)
+            player.tree_search(parallel_readouts=8)
         self.assertNoPendingVirtualLosses(player.root)
         self.assertGreater(player.root.Q, 0)
 
@@ -238,7 +238,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         player.initialize_game()
         self.assertEqual(player.root.N, 0)
         self.assertFalse(player.root.is_expanded)
-        player.tree_search(num_parallel=4)
+        player.tree_search(parallel_readouts=4)
         self.assertNoPendingVirtualLosses(player.root)
         # Even though the root gets selected 4 times by tree search, its
         # final visit count should just be 1.
@@ -254,7 +254,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         player = MCTSPlayerMixin(DummyNet(fake_priors=probs))
         pass_position = go.Position().pass_move()
         player.initialize_game(pass_position)
-        player.tree_search(num_parallel=1)
+        player.tree_search(parallel_readouts=1)
         self.assertNoPendingVirtualLosses(player.root)
 
     def test_only_check_game_end_once(self):
