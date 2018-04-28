@@ -20,8 +20,6 @@ from absl import flags
 import coords
 from gtp_wrapper import MCTSPlayer
 
-SIMULTANEOUS_LEAVES = 8
-
 
 def play(network, verbosity=0):
     ''' Plays out a self-play match, returning
@@ -38,8 +36,7 @@ def play(network, verbosity=0):
 
     player = MCTSPlayer(network,
                         verbosity=verbosity,
-                        resign_threshold=resign_threshold,
-                        num_parallel=SIMULTANEOUS_LEAVES)
+                        resign_threshold=resign_threshold)
 
     player.initialize_game()
 
