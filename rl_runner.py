@@ -17,8 +17,9 @@
 We run as subprocesses because it gives us some isolation.
 """
 
-import argh
 import subprocess
+
+import argh
 from utils import timer
 
 

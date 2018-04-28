@@ -26,7 +26,7 @@ and the features from AGZ as NEW_FEATURES.
 
 import numpy as np
 import go
-from utils import product
+import utils
 
 # Resolution/truncation limit for one-hot features
 P = 8
@@ -35,7 +35,7 @@ P = 8
 def make_onehot(feature, planes):
     onehot_features = np.zeros(feature.shape + (planes,), dtype=np.uint8)
     capped = np.minimum(feature, planes)
-    onehot_index_offsets = np.arange(0, product(
+    onehot_index_offsets = np.arange(0, utils.product(
         onehot_features.shape), planes) + capped.ravel()
     # A 0 is encoded as [0,0,0,0], not [1,0,0,0], so we'll
     # filter out any offsets that are a multiple of $planes

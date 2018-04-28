@@ -12,6 +12,7 @@ ignore=
       # coords.py,
       dual_net.py,
       # evaluation.py,
+      example_buffer.py,
       features.py,
       go.py,
       gtp_extensions.py,
@@ -23,10 +24,10 @@ ignore=
       rl_loop.py,
       selfplay_mcts.py,
       sgf_wrapper.py,
-      shipname.py,
+      # shipname.py,
       strategies.py,
       symmetries.py,
-      utils.py,
+      # utils.py,
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.

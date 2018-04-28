@@ -16,8 +16,8 @@
 
 import os
 import time
-from tensorflow import gfile
 from absl import flags
+from tensorflow import gfile
 
 from gtp_wrapper import MCTSPlayer
 import sgf_wrapper
