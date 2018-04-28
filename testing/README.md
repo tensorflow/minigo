@@ -28,7 +28,8 @@ docker run --rm gcr.io/minigo-testing/minigo-prow-harness-v2:latest --repo=githu
 
 ## Components
 
-- `../test.sh`: the actual tests that are run. TODO(somebody): Change this to output junit/XML and Prow will split out the tests.
+- `../test.sh`: the actual tests that are run. TODO(#188): Change this to
+  output junit/XML and Prow will split out the tests.
 - `Dockerfile`: Run the tests in this container (and pull in test-infra stuff as the runner).
 - `Makefile`: Build the Dockerfile
 - `bootstrap_v2.sh`: The Prow wrapper. You'll notice that `bootstrap_v2.sh`
