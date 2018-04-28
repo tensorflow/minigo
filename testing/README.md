@@ -43,11 +43,11 @@ Minigo has some configuration directly in Prow to make all this jazz work:
 - **Test configuration**. This configures the specific test-suites that are run on prow
   https://github.com/kubernetes/test-infra/blob/master/prow/config.yaml
 
-- **Test UI Configuration**: What shows up in testgruid?
+- **Test UI Configuration**: What shows up in testgrid, the Prow test-ui?
   https://github.com/kubernetes/test-infra/blob/master/testgrid/config.yaml
 
-- **Bootstrap-jobs-config**: This is what links `../test.sh` with.
-  bootstrap_v2.sh. See:
+- **Bootstrap-jobs-config**: This is what links `../test.sh` with
+  `bootstrap_v2.sh`. See:
   https://github.com/kubernetes/test-infra/blob/master/jobs/config.json
 
 - **Other Plugin Config**. We also use the Size and LGTM plugins provided by
