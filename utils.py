@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utilities for working with go games and coordinates"""
+"""Miscellaneous utilities"""
 
 from contextlib import contextmanager
 import functools
@@ -19,13 +19,13 @@ import itertools
 import logging
 import operator
 import os
-import random
 import re
 import sys
 import time
 
 
 def ensure_dir_exists(directory):
+    "Creates local directories if they don't exist."
     if directory.startswith('gs://'):
         return
     print("Making dir {}".format(directory), file=sys.stderr)
@@ -33,26 +33,28 @@ def ensure_dir_exists(directory):
 
 
 def parse_game_result(result):
+    "Parse an SGF result string into value target."
     if re.match(r'[bB]\+', result):
         return 1
     elif re.match(r'[wW]\+', result):
         return -1
-    else:
-        return 0
+    return 0
 
 
-def product(numbers):
-    return functools.reduce(operator.mul, numbers)
+def product(iterable):
+    "Like sum(), but with multiplication."
+    return functools.reduce(operator.mul, iterable)
 
 
-def take_n(n, iterable):
-    return list(itertools.islice(iterable, n))
+def _take_n(num_things, iterable):
+    return list(itertools.islice(iterable, num_things))
 
 
 def iter_chunks(chunk_size, iterator):
+    "Yield from an iterator in chunks of chunk_size."
     iterator = iter(iterator)
     while True:
-        next_chunk = take_n(chunk_size, iterator)
+        next_chunk = _take_n(chunk_size, iterator)
         # If len(iterable) % chunk_size == 0, don't return an empty chunk.
         if next_chunk:
             yield next_chunk
@@ -60,24 +62,9 @@ def iter_chunks(chunk_size, iterator):
             break
 
 
-def shuffler(iterator, pool_size=10**5, refill_threshold=0.9):
-    yields_between_refills = round(pool_size * (1 - refill_threshold))
-    # initialize pool; this step may or may not exhaust the iterator.
-    pool = take_n(pool_size, iterator)
-    while True:
-        random.shuffle(pool)
-        for i in range(yields_between_refills):
-            yield pool.pop()
-        next_batch = take_n(yields_between_refills, iterator)
-        if not next_batch:
-            break
-        pool.extend(next_batch)
-    # finish consuming whatever's left - no need for further randomization.
-    yield from pool
-
-
 @contextmanager
 def timer(message):
+    "Context manager for timing snippets of code."
     tick = time.time()
     yield
     tock = time.time()
@@ -86,8 +73,9 @@ def timer(message):
 
 @contextmanager
 def logged_timer(message):
+    "Context manager for timing snippets of code. Echos to logging module."
     tick = time.time()
     yield
     tock = time.time()
     print("%s: %.3f seconds" % (message, (tock - tick)))
-    logging.info("%s: %.3f seconds" % (message, (tock - tick)))
+    logging.info("%s: %.3f seconds", message, (tock - tick))

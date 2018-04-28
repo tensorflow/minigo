@@ -18,22 +18,18 @@ This helps the intermediate layers extract concepts that are relevant to both
 move prediction and score estimation.
 """
 
-import collections
 import functools
 import math
-import numpy as np
 import os.path
-import itertools
-import sys
+
+import numpy as np
 import tensorflow as tf
 from tensorflow.python.training.summary_io import SummaryWriterCache
-from tqdm import tqdm
-from typing import Dict
 
-import features
+import features as features_lib
+import go
 import preprocessing
 import symmetries
-import go
 
 # How many positions to look at per generation.
 # Per AGZ, 2048 minibatch * 1k = 2M positions/generation
@@ -80,7 +76,7 @@ class DualNetwork():
         return probs[0], values[0]
 
     def run_many(self, positions, use_random_symmetry=True):
-        processed = list(map(features.extract_features, positions))
+        processed = list(map(features_lib.extract_features, positions))
         if use_random_symmetry:
             syms_used, processed = symmetries.randomize_symmetries_feat(
                 processed)
@@ -98,7 +94,7 @@ def get_inference_input():
 
     Returns the feature, output tensors that get passed into model_fn."""
     return (tf.placeholder(tf.float32,
-                           [None, go.N, go.N, features.NEW_FEATURES_PLANES],
+                           [None, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
                            name='pos_tensor'),
             {'pi_tensor': tf.placeholder(tf.float32, [None, go.N * go.N + 1]),
              'value_tensor': tf.placeholder(tf.float32, [None])})
@@ -141,7 +137,7 @@ def model_fn(features, labels, mode, params, config=None):
     '''
     Args:
         features: tensor with shape
-            [BATCH_SIZE, go.N, go.N, features.NEW_FEATURES_PLANES]
+            [BATCH_SIZE, go.N, go.N, features_lib.NEW_FEATURES_PLANES]
         labels: dict from string to tensor with shape
             'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
             'value_tensor': [BATCH_SIZE]
@@ -159,6 +155,7 @@ def model_fn(features, labels, mode, params, config=None):
     return dict of tensors
         logits: [BATCH_SIZE, go.N * go.N + 1]
     '''
+    del config  # Unused
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
         momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,
@@ -179,7 +176,7 @@ def model_fn(features, labels, mode, params, config=None):
 
     # the shared stack
     shared_output = initial_output
-    for i in range(params['num_shared_layers']):
+    for _ in range(params['num_shared_layers']):
         shared_output = my_res_layer(shared_output)
 
     # policy head
@@ -311,8 +308,8 @@ def train(working_dir, tf_records, generation_num, **hparams):
     estimator = get_estimator(working_dir, **hparams)
     max_steps = generation_num * EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
 
-    def input_fn(): return preprocessing.get_input_tensors(
-        TRAIN_BATCH_SIZE, tf_records)
+    def input_fn():
+        return preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records)
     update_ratio_hook = UpdateRatioSessionHook(working_dir)
     step_counter_hook = EchoStepCounterHook(output_dir=working_dir)
     estimator.train(input_fn, hooks=[
@@ -324,9 +321,9 @@ def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
     if checkpoint_name is None:
         checkpoint_name = estimator.latest_checkpoint()
 
-    def input_fn(): return preprocessing.get_input_tensors(
-        TRAIN_BATCH_SIZE, tf_records, shuffle_buffer_size=1000,
-        filter_amount=0.05)
+    def input_fn():
+        return preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records,
+            shuffle_buffer_size=1000, filter_amount=0.05)
     estimator.evaluate(input_fn, steps=1000)
 
 

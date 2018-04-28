@@ -11,6 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Utilities for converting between representations of model numbers.
+
+i.e. the number 135 corresponds to the string 000135-some-name and so on.
+"""
+
 
 import random
 import re
@@ -18,11 +23,12 @@ import petname
 
 import go
 
-MODEL_NUM_REGEX = "^\d{6}"
-MODEL_NAME_REGEX = "^\d{6}(-\w+)+"
+MODEL_NUM_REGEX = r"^\d{6}"
+MODEL_NAME_REGEX = r"^\d{6}(-\w+)+"
 
 
 def generate(model_num):
+    """Generates a new model name, given the model number."""
     if model_num == 0:
         new_name = 'bootstrap'
     elif go.N == 19:
@@ -42,8 +48,7 @@ def detect_model_num(string):
     match = re.match(MODEL_NUM_REGEX, string)
     if match:
         return int(match.group())
-    else:
-        return None
+    return None
 
 
 def detect_model_name(string):
@@ -55,8 +60,7 @@ def detect_model_name(string):
     match = re.match(MODEL_NAME_REGEX, string)
     if match:
         return match.group()
-    else:
-        return None
+    return None
 
 
 NAMES = """
