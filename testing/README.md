@@ -26,13 +26,29 @@ And then run the tests.
 docker run --rm gcr.io/minigo-testing/minigo-prow-harness-v2:latest --repo=github.com/tensorflow/minigo --job=tf-minigo-presubmit
 ```
 
+## Components
+
+- `../test.sh`: the actual tests that are run. TODO(somebody): Change this to output junit/XML and Prow will split out the tests.
+- `Dockerfile`: Run the tests in this container (and pull in test-infra stuff as the runner).
+- `Makefile`: Build the Dockerfile
+- `bootstrap_v2.sh`: The Prow wrapper. You'll notice that `bootstrap_v2.sh`
+  does not actually reference `../test.sh`. That gets linked in via Prow's
+  **Job** config (see below).
+
 ## Prow configuration
+
 
 Minigo has some configuration directly in Prow to make all this jazz work:
 
-- Test configuration:
+- **Test configuration**. This configures the specific test-suites that are run on prow
   https://github.com/kubernetes/test-infra/blob/master/prow/config.yaml
-- Test UI Configuration:
+
+- **Test UI Configuration**: What shows up in testgruid?
   https://github.com/kubernetes/test-infra/blob/master/testgrid/config.yaml
-- Bootstrap-jobs-config:
+
+- **Bootstrap-jobs-config**: This is what links `../test.sh` with
   https://github.com/kubernetes/test-infra/blob/master/jobs/config.json
+
+- **Other Plugin Config**. We also use the Size and LGTM plugins provided by
+  Prow. See
+  https://github.com/kubernetes/test-infra/blob/master/prow/plugins.yaml
