@@ -7,7 +7,7 @@ dst_dir="${script_dir}/tensorflow"
 tmp_dir="/tmp/minigo_tf"
 rm -rfd ${tmp_dir}
 mkdir -p ${tmp_dir}
-version_tag="v1.6.0-rc0"
+version_tag="v1.7.0"
 
 echo "Cloning tensorflow to ${tmp_dir}"
 git clone https://github.com/tensorflow/tensorflow "${tmp_dir}"

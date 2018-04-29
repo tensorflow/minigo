@@ -37,7 +37,7 @@ RUN echo "startup --batch" >>/etc/bazel.bazelrc
 RUN echo "build --spawn_strategy=standalone --genrule_strategy=standalone" \
     >>/etc/bazel.bazelrc
 # Install the most recent bazel release.
-ENV BAZEL_VERSION 0.8.0
+ENV BAZEL_VERSION 0.11.0
 WORKDIR /
 RUN mkdir /bazel && \
     cd /bazel && \
@@ -52,7 +52,7 @@ RUN mkdir /bazel && \
 
 RUN git clone https://github.com/tensorflow/tensorflow.git && \
     cd tensorflow && \
-    git checkout r1.5
+    git checkout r1.7
 WORKDIR /tensorflow
 
 ENV CI_BUILD_PYTHON python3
