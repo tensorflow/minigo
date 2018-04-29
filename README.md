@@ -86,7 +86,7 @@ First set up and enter your virtualenv and then the shared requirements:
 pip3 install -r requirements.txt
 ```
 
-Then, you'll need to choose to install the GPU or CPU ensorflow requirements:
+Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
 - GPU: `pip3 install "tensorflow-gpu>=1.7,<1.8"`.
   - *Note*: You must install [CUDA
