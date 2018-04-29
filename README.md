@@ -66,6 +66,7 @@ This project assumes you have the following:
 - Python 3.5+
 - [Docker](https://docs.docker.com/install/)
 - [Cloud SDK](https://cloud.google.com/sdk/downloads)
+- Bazel v0.11 or greater
 
 The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
@@ -85,7 +86,7 @@ First set up and enter your virtualenv and then the shared requirements:
 pip3 install -r requirements.txt
 ```
 
-Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
+Then, you'll need to choose to install the GPU or CPU ensorflow requirements:
 
 - GPU: `pip3 install "tensorflow-gpu>=1.7,<1.8"`.
   - *Note*: You must install [CUDA
