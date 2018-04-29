@@ -55,6 +55,7 @@ def rl_loop():
     with tempfile.TemporaryDirectory() as base_dir:
         working_dir = os.path.join(base_dir, 'models_in_training')
         model_save_path = os.path.join(base_dir, 'models', '000000-bootstrap')
+        local_eb_dir = os.path.join(base_dir, 'scratch')
         next_model_save_file = os.path.join(
             base_dir, 'models', '000001-nextmodel')
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
@@ -93,11 +94,12 @@ def rl_loop():
 
         print("Gathering game output...")
         eb.make_chunk_for(output_dir=gather_dir,
-                   game_dir=selfplay_dir,
-                   model_num=1,
-                   positions=dual_net.EXAMPLES_PER_GENERATION,
-                   threads=8,
-                   samples_per_game=200)
+                          local_dir=local_eb_dir,
+                          game_dir=selfplay_dir,
+                          model_num=1,
+                          positions=dual_net.EXAMPLES_PER_GENERATION,
+                          threads=8,
+                          samples_per_game=200)
 
         print("Training on gathered game data...")
         main.train_dir(working_dir, gather_dir,
