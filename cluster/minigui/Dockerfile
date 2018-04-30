@@ -25,14 +25,6 @@ RUN apt update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# ENV PATH /google-cloud-sdk/bin:$PATH
-# RUN apt update && apt-get install -y \
-        # google-cloud-sdk \
-        # && \
-    # apt-get clean && \
-    # rm -rf /var/lib/apt/lists/*
-# VOLUME ["/root/.config"]
-
 # Install gcloud / gsutil
 ENV PATH /google-cloud-sdk/bin:$PATH
 RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
