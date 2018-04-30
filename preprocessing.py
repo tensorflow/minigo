@@ -100,7 +100,7 @@ def batch_parse_tf_example(batch_size, example_batch):
     return x, {'pi_tensor': pi, 'value_tensor': outcome}
 
 
-def read_tf_records(batch_size, tf_records, num_repeats=None,
+def read_tf_records(batch_size, tf_records, num_repeats=1,
                     shuffle_records=True, shuffle_examples=True,
                     shuffle_buffer_size=None,
                     filter_amount=1.0):
@@ -108,7 +108,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=None,
     Args:
         batch_size: batch size to return
         tf_records: a list of tf_record filenames
-        num_repeats: how many times the data should be read (default: infinite)
+        num_repeats: how many times the data should be read (default: One)
         shuffle_records: whether to shuffle the order of files read
         shuffle_examples: whether to shuffle the tf.Examples
         shuffle_buffer_size: how big of a buffer to fill before shuffling.
