@@ -14,6 +14,16 @@ library:
 ./cc/configure_tensorflow.sh
 ```
 
+If you want to compile for CPU and not GPU, then change `TF_NEED_CUDA` to 0.
+
+```shell
+echo "Configuring tensorflow"
+...
+TF_NEED_CUDA=0 \
+...
+./configure
+```
+
 This will automatically perform the first steps of
 [Installing Tensorflow from Sources](https://www.tensorflow.org/install/install_sources)
 but instead of installing the Tensorflow package, it extracts the generated C++

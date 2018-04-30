@@ -1,4 +1,3 @@
-#!/bin/sh
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,25 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Reset all the envinornment variables used by the cluster configuration.
-# To use, run: source unset-common.sh
+# To use this file, run: source minigui-defaults.sh
 
-unset PROJECT
-unset LOGGING_PROJECT
-unset CLUSTER_NAME
-unset BOARD_SIZE
-unset K8S_VERSION
-unset ZONE
-unset NUM_K8S_NODES
-
-unset SERVICE_ACCOUNT
-unset SERVICE_ACCOUNT_EMAIL
-unset SERVICE_ACCOUNT_KEY_LOCATION
-
-unset VERSION_TAG
-unset GPU_PLAYER_CONTAINER
-unset CPU_PLAYER_CONTAINER
-unset MINIGUI_PY_CPU_CONTAINER
-
-unset BUCKET_NAME
-unset BUCKET_LOCATION
+export MINIGUI_PYTHON=${MINIGUI_PYTHON:-"python3"}
+export MINIGUI_BUCKET_NAME=${MINIGUI_BUCKET_NAME:-"minigo-pub"}
+export MINIGUI_GCS_DIR=${MINIGUI_GCS_DIR:-"v5-19x19/models"}
+export MINIGUI_MODEL=${MINIGUI_MODEL:-"000363-auriga"}
+export MINIGUI_MODEL_TMPDIR=${MINIGUI_MODEL_TMPDIR:-"/tmp/minigo-models"}
+export MINIGUI_BOARD_SIZE=${MINIGUI_BOARD_SIZE:-"19"}
+export MINIGUI_PORT=${MINIGUI_PORT:-"5001"}
