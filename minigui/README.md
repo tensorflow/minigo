@@ -31,7 +31,7 @@
     gsutil cp gs://${BUCKET_NAME}/${GCS_DIR}/${MODEL}.meta $MODEL_DIR/
     ```
 
-1. Compile the typescript. (Requires
+1. Compile the Typescript to JavaSCript. (Requires
    [typescript compiler](https://www.typescriptlang.org/#download-links)).
    From the `minigui` directory run: `tsc`
 
@@ -41,7 +41,7 @@
     python minigui/serve.py --model=$MODEL_DIR/$MODEL --board_size=$BOARD_SIZE --port=5001
     ```
 
-1. If you get *Invalid size in bundle entry: key global_step; stored size 4; expected size 8*,
+1. If you get `Invalid size in bundle entry: key global_step; stored size 4; expected size 8`,
    you'll need to run the following:
 
     ```shell
@@ -52,8 +52,8 @@
     Make sure there isn't
     a directory in `$MODEL_DIR` named `$MODEL` or tensorflow will get
     confused. Not specifying `BOARD_SIZE` can also end up giving you errors like,
-    *Assign requires shapes of both tensors to match. lhs shape= [3,3,17,32]
-    rhs shape= [3,3,17,128]*
+    `Assign requires shapes of both tensors to match. lhs shape= [3,3,17,32]
+    rhs shape= [3,3,17,128]`
 
     Now you should be able to run:
 
