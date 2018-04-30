@@ -9,61 +9,27 @@
 
 1. Install the **minigui** python requirements: `pip install -r minigui/requirements.txt`
 
+1. Install the [Google Cloud SDK](https://cloud.google.com/sdk/downloads)
+
 1. Pick a model. See http://cloudygo.com/ for the available models.
 
-1. Set up some environment variables. Pick the right model name, path, and
-   boardsize. Note that each model can only play a specific size of Go board.
+1. Change the variables you want (these are the defaults):
 
     ```shell
-    BUCKET_NAME=minigo-pub
-    GCS_DIR=v5-19x19/models
-    MODEL=000363-auriga
-    MODEL_DIR=/tmp/minigo-models
-    BOARD_SIZE=19
+    export MINIGUI_BUCKET_NAME=minigo-pub
+    export MINIGUI_GCS_DIR=v5-19x19/models
+    export MINIGUI_MODEL=000363-auriga
+    export MINIGUI_MODEL_TMPDIR=/tmp/minigo-models
+    export MINIGUI_BOARD_SIZE=19
     ```
 
-1. Download a model from our [public bucket](https://console.cloud.google.com/storage/browser/minigo-pub). For example:
-
-    ```shell
-    mkdir -p $MODEL_DIR
-    gsutil cp gs://${BUCKET_NAME}/${GCS_DIR}/${MODEL}.data-00000-of-00001 $MODEL_DIR/
-    gsutil cp gs://${BUCKET_NAME}/${GCS_DIR}/${MODEL}.index $MODEL_DIR/
-    gsutil cp gs://${BUCKET_NAME}/${GCS_DIR}/${MODEL}.meta $MODEL_DIR/
-    ```
+1. Run `source minigui-common.sh`
 
 1. Compile the Typescript to JavaSCript. (Requires
    [typescript compiler](https://www.typescriptlang.org/#download-links)).
    From the `minigui` directory run: `tsc`
 
-1. Set your current working directory to minigo root and start the flask server.
-
-    ```shell
-    python minigui/serve.py --model=$MODEL_DIR/$MODEL --board_size=$BOARD_SIZE --port=5001
-    ```
-
-1. If you get `Invalid size in bundle entry: key global_step; stored size 4; expected size 8`,
-   you'll need to run the following:
-
-    ```shell
-    export BOARD_SIZE=$BOARD_SIZE
-    python main.py convert $MODEL_DIR/$MODEL $MODEL_DIR/$MODEL.converted
-    ```
-
-    Make sure there isn't
-    a directory in `$MODEL_DIR` named `$MODEL` or tensorflow will get
-    confused. Not specifying `BOARD_SIZE` can also end up giving you errors like,
-    `Assign requires shapes of both tensors to match. lhs shape= [3,3,17,32]
-    rhs shape= [3,3,17,128]`
-
-    Now you should be able to run:
-
-    ```shell
-    python minigui/serve.py --model=$MODEL_DIR/$MODEL.converted --board_size=$BOARD_SIZE --port=5001
-    ```
-
-1. Make sure the command at the top of `serve.py` actually runs and prints
-   `GTP engine ready`; if not, something is wrong with the rest of the minigo
-   setup, like virtualenv or similar.
+1. Run `./fetch-and-run.sh`
 
 1. open localhost:5001 (or whatever value you used for $PORT).
 
@@ -72,7 +38,6 @@
 
 **C++ Engine**
 
-
 1. By default, Minigui will use the Python Minigo engine. You can use the C++
    engine by first compiling it (see the
    [README](https://github.com/tensorflow/minigo/tree/master/cc/README.md)),
@@ -80,7 +45,12 @@
    to pass a frozen GraphDef proto as the `--model` command line argument
    instead of the saved parameter data that the Python backend requires.
 
+   **Note:** Compiling tensorflow from scratch can take 2+ hours if your
+   machine is not terribly beefy, So you might want to kick off the build and
+   get a coffee.
+
 1. Before running, you'll need to freeze a model so the C++ job can consume it.
+   This assumes a converted model from above.
 
     ```shell
     python main.py freeze-graph $MODEL_DIR/$MODEL.converted

@@ -43,7 +43,7 @@ WINDOW_SIZE = 125000000
 
 
 
-def gtp(load_file: "The path to the network model files"=None,
+def gtp(load_file: 'The path to the network model files'=None,
         cgos_mode: 'Whether to use CGOS time constraints'=False,
         kgs_mode: 'Whether to use KGS courtesy-pass'=False,
         verbose=1):

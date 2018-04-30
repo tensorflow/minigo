@@ -36,12 +36,25 @@ parser.add_argument(
     help="Port to listen on.")
 
 parser.add_argument(
+    "--host",
+    default="127.0.0.1",
+    type=str,
+    help="The hostname or IP to listen on.")
+
+parser.add_argument(
     "--engine",
     default="py",
     type=str,
     help="Which Minigo engine to use: \"py\" for the Python implementation, "
          "\"cc\" for the C++ implementation.")
 
+
+parser.add_argument(
+    "--python_for_engine",
+    default="python",
+    type=str,
+    help="Which python interpreter to use for the engine. "
+         "Defaults to `python` and only applies for the when --engine=py")
 
 args = parser.parse_args()
 
@@ -54,8 +67,11 @@ app = Flask(__name__, static_url_path="", static_folder="static")
 app.config["SECRET_KEY"] = "woo"
 socketio = SocketIO(app)
 
+
+python_binary = args.python_for_engine
+
 if args.engine == "py":
-    GTP_COMMAND = ["python",  "-u",  # turn off buffering
+    GTP_COMMAND = [python_binary,  "-u",  # turn off buffering
                    "main.py", "gtp",
                    "--load-file", args.model,
                    "--num_readouts", "1000",
@@ -132,4 +148,4 @@ def index():
 
 
 if __name__ == "__main__":
-  socketio.run(app, port=args.port)
+  socketio.run(app, port=args.port, host=args.host)
