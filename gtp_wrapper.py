@@ -120,6 +120,7 @@ class KGSPlayer(MCTSPlayer):
     """ A wrapper for playing on KGS
     Adds 'courtsey pass' -- if the opponent passes, we pass, regardless
     of score or our opinion on the game. """
+
     def __init__(self, **kwargs):
         self.they_passed = False
         super().__init__(**kwargs)
@@ -147,11 +148,11 @@ def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1, cgos_mode=F
         instance = CGOSPlayer(n, seconds_per_move=5, timed_match=True,
                               verbosity=verbosity, two_player_mode=True)
     elif kgs_mode:
-        instance = KGSPlayer(network=n, simulations_per_move=readouts_per_move,
+        instance = KGSPlayer(network=n, num_readouts=readouts_per_move,
                              verbosity=verbosity, two_player_mode=True)
     else:
-        instance = MCTSPlayer(network=n, simulations_per_move=readouts_per_move,
-                             verbosity=verbosity, two_player_mode=True)
+        instance = MCTSPlayer(network=n, num_readouts=readouts_per_move,
+                              verbosity=verbosity, two_player_mode=True)
     name = "Minigo-" + os.path.basename(read_file)
     gtp_engine = gtp_extensions.GTPDeluxe(instance, name=name)
     return gtp_engine
