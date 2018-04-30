@@ -19,6 +19,14 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/minigui-common.sh
 cd $SCRIPT_DIR
 
+# TODO(Kashomon): Use common utils library instead of copy-pasta.
+command -v gsutil >/dev/null 2>&1 || {
+  echo >&2 "gsutil command is not defined"
+  echo >&2 "Install Google Cloud SDK first:"
+  echo >&2 "   https://cloud.google.com/sdk/downloads"
+  exit 1
+}
+
 echo "Using: the following defaults:"
 echo "--------------------------------------------------"
 echo "MINIGUI_PYTHON:       ${MINIGUI_PYTHON}"
@@ -28,6 +36,7 @@ echo "MINIGUI_MODEL:        ${MINIGUI_MODEL}"
 echo "MINIGUI_MODEL_TMPDIR: ${MINIGUI_MODEL_TMPDIR}"
 echo "MINIGUI_BOARD_SIZE:   ${MINIGUI_BOARD_SIZE}"
 echo "MINIGUI_PORT:         ${MINIGUI_PORT}"
+echo "MINIGUI_HOST:         ${MINIGUI_HOST}"
 
 pyversion=$($MINIGUI_PYTHON --version)
 echo "Python Version:       ${pyversion}"
@@ -68,5 +77,5 @@ $MINIGUI_PYTHON minigui/serve.py \
 --model="$MINIGUI_MODEL_TMPDIR/$MINIGUI_MODEL.converted" \
 --board_size="$MINIGUI_BOARD_SIZE" \
 --port=$MINIGUI_PORT \
---host=0.0.0.0 \
+--host=$MINIGUI_HOST \
 --python_for_engine=${MINIGUI_PYTHON}

@@ -47,4 +47,5 @@ ADD staging/ /app
 
 WORKDIR /app
 
+ENV MINIGUI_HOST 0.0.0.0
 CMD ["/bin/bash", "minigui/fetch-and-run.sh"]
