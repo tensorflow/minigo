@@ -15,9 +15,9 @@
    boardsize. Note that each model can only play a specific size of Go board.
 
     ```shell
-    BUCKET_NAME=tensor-go-minigo-v5-19
-    GCS_DIR=models
-    MODEL=000570-kingfisher
+    BUCKET_NAME=minigo-pub
+    GCS_DIR=v5-19x19/models
+    MODEL=000363-auriga
     MODEL_DIR=/tmp/minigo-models
     BOARD_SIZE=19
     ```
