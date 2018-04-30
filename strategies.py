@@ -39,6 +39,10 @@ flags.DEFINE_integer('num_readouts', 800,
     'Number of searches to add to the MCTS search tree before playing a move.')
 flags.register_validator('num_readouts', lambda x: x > 0)
 
+flags.DEFINE_integer('parallel_readouts', 8,
+    'Number of searches to execute in parallel. This is also the batch size'
+    'for neural network evaluation.')
+
 FLAGS = flags.FLAGS
 
 
@@ -74,7 +78,7 @@ def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
 class MCTSPlayerMixin:
     def __init__(self, network, seconds_per_move=5, num_readouts=0,
                  resign_threshold=None, verbosity=0, two_player_mode=False,
-                 num_parallel=8, timed_match=False):
+                 timed_match=False):
         self.network = network
         self.seconds_per_move = seconds_per_move
         self.num_readouts = num_readouts or FLAGS.num_readouts
@@ -84,7 +88,6 @@ class MCTSPlayerMixin:
             self.temp_threshold = -1
         else:
             self.temp_threshold = FLAGS.softpick_move_cutoff
-        self.num_parallel = num_parallel
         self.qs = []
         self.comments = []
         self.searches_pi = []
@@ -174,12 +177,12 @@ class MCTSPlayerMixin:
             assert self.root.child_N[fcoord] != 0
         return coords.from_flat(fcoord)
 
-    def tree_search(self, num_parallel=None):
-        if num_parallel is None:
-            num_parallel = self.num_parallel
+    def tree_search(self, parallel_readouts=None):
+        if parallel_readouts is None:
+            parallel_readouts = FLAGS.parallel_readouts
         leaves = []
         failsafe = 0
-        while len(leaves) < num_parallel and failsafe < num_parallel * 2:
+        while len(leaves) < parallel_readouts and failsafe < parallel_readouts * 2:
             failsafe += 1
             leaf = self.root.select_leaf()
             if self.verbosity >= 4:
