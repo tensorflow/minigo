@@ -226,7 +226,8 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         )
         player.initialize_game(endgame)
 
-        # Test that an almost complete game
+        # Test that MCTS can deduce that B wins because of TT-scoring
+        # triggered by move limit.
         for i in range(10):
             player.tree_search(parallel_readouts=8)
         self.assertNoPendingVirtualLosses(player.root)
