@@ -45,8 +45,9 @@
    to pass a frozen GraphDef proto as the `--model` command line argument
    instead of the saved parameter data that the Python backend requires.
 
-   **Note:** Compiling tensorflow from scratch can take 2+ hours. So you might
-   want to kick off the build and get a coffee.
+   **Note:** Compiling tensorflow from scratch can take 2+ hours if your
+   machine is not terribly beefy, So you might want to kick off the build and
+   get a coffee.
 
 1. Before running, you'll need to freeze a model so the C++ job can consume it.
    This assumes a converted model from above.

@@ -49,6 +49,7 @@ do
 done
 
 # Assume models need to be converted if .converted.meta doesn't exist.
+# TODO(amj): Backfill all the models and remove this.
 cd ..
 if [[ ! -f "${MINIGUI_MODEL_TMPDIR}/${MINIGUI_MODEL}.converted.meta" ]]; then
   echo
