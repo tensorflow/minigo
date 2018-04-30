@@ -55,7 +55,6 @@
     *Assign requires shapes of both tensors to match. lhs shape= [3,3,17,32]
     rhs shape= [3,3,17,128]*
 
-
     Now you should be able to run:
 
     ```shell
