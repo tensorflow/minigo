@@ -27,7 +27,7 @@ def pick_examples_from_tfrecord(filename, samples_per_game=4):
     protos = list(tf.python_io.tf_record_iterator(filename, READ_OPTS))
     if len(protos) < 20:  # Filter games with less than 20 moves
         return []
-    choices = random.sample(protos, samples_per_game)
+    choices = random.sample(protos, min(len(protos), samples_per_game))
 
     def make_example(protostring):
         e = tf.train.Example()
@@ -164,6 +164,7 @@ def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
 
 
 def make_chunk_for(output_dir=LOCAL_DIR,
+                   local_dir=LOCAL_DIR,
                    game_dir=rl_loop.SELFPLAY_DIR,
                    model_num=1,
                    positions=dual_net.EXAMPLES_PER_GENERATION,
@@ -182,7 +183,7 @@ def make_chunk_for(output_dir=LOCAL_DIR,
     buf = ExampleBuffer(positions)
     files = []
     for _, model in sorted(models, reverse=True):
-        local_model_dir = os.path.join(LOCAL_DIR, model)
+        local_model_dir = os.path.join(local_dir, model)
         if not tf.gfile.Exists(local_model_dir):
             print("Rsyncing", model)
             _rsync_dir(os.path.join(

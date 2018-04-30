@@ -303,17 +303,20 @@ def export_model(working_dir, model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def train(working_dir, tf_records, generation_num, **hparams):
+def train(working_dir, tf_records, generation_num, steps=None, **hparams):
     assert generation_num > 0, "Model 0 is random weights"
-    estimator = get_estimator(working_dir, **hparams)
-    max_steps = generation_num * EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
+    estimator = get_estimator(working_dir, **hparams) 
 
     def input_fn():
         return preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records)
+
+
     update_ratio_hook = UpdateRatioSessionHook(working_dir)
     step_counter_hook = EchoStepCounterHook(output_dir=working_dir)
+    if steps is None:
+        steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
     estimator.train(input_fn, hooks=[
-                    update_ratio_hook, step_counter_hook], max_steps=max_steps)
+                        update_ratio_hook, step_counter_hook], steps=steps)
 
 
 def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
