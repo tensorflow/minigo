@@ -1,0 +1,11 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: minigo-service
+spec:
+  selector:
+    app: minigui
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5001

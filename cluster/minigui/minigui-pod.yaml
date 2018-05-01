@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: minigui
+spec:
+  containers:
+  - name: minigui
+    image: gcr.io/$(PROJECT)/$(MINIGUI_PY_CPU_CONTAINER):$(VERSION_TAG)
+    ports:
+    - containerPort: 5001

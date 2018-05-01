@@ -1,6 +1,30 @@
+## Minigui
 
+A UI for Minigo
 
-### Instructions
+### Simple Instructions
+
+1. Make sure you have Docker installed
+
+1. Pick a model from [Cloudy Go](http://cloudygo.com). Make note of the Model Name, the Board Size,
+   and the Model Path (should be either `v3-9x9/models/` or `v5-19x19/models/`.
+   Set these as environment variables:
+
+    ```shell
+    export MINIGUI_GCS_DIR=v5-19x19/models
+    export MINGUI_BOARD_SIZE=19
+    export MINIGUI_MODEL=000360-grown-teal
+    ```
+
+1. From the root directory, run:
+
+    ```shell
+    cluster/minigui/run-local.sh
+    ```
+
+1. Navigate to `localhost:5001`
+
+### Advanced Instructions
 
 1. Install the minigo python requirements: `pip install -r requirements.txt` (or
    `pip3 ...` depending how you've set things up).

@@ -19,15 +19,17 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/common.sh
 source ${SCRIPT_DIR}/utils.sh
 
+echo "CPU Cluster Creation"
+echo "--------------------------------------"
 echo "Using Project:      ${PROJECT}"
 echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
 echo "Using K8S Version:  ${K8S_VERSION}"
-echo "Number of Nodes:    ${NUM_K8S_NODES}"
+echo "Number of Nodes:    ${NUM_NODES}"
 echo "Bucket name:        ${BUCKET_NAME}"
 echo "Bucket location:    ${BUCKET_LOCATION}"
 
-export PARALLELISM="$((4 * ${NUM_K8S_NODES}))"
+export PARALLELISM="$((4 * ${NUM_NODES}))"
 
 check_gcloud_exists
 
@@ -35,12 +37,13 @@ check_gcloud_exists
 # Note, we require Intel Broadwells since they are a bit newer, and can provide
 # up to a 30% speedup, since we're so CPU bound.
 gcloud beta container clusters create \
-  --num-nodes $NUM_K8S_NODES \
+  --num-nodes $NUM_NODES \
   --machine-type n1-standard-4 \
   --min-cpu-platform "Intel Broadwell" \
   --disk-size 30 \
   --zone $ZONE \
   --project $PROJECT \
+  --cluster-version=$K8S_VERSION \
   $CLUSTER_NAME
 
 # Fetch its credentials so we can use kubectl locally

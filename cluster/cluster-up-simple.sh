@@ -19,7 +19,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/common.sh
 source ${SCRIPT_DIR}/utils.sh
 
-echo "GPU Cluster Creation"
+echo "Simple Cluster Creation"
 echo "--------------------------------------"
 echo "Using Project:      ${PROJECT}"
 echo "Using Zone:         ${ZONE}"
@@ -29,33 +29,20 @@ echo "Number of Nodes:    ${NUM_NODES}"
 
 check_gcloud_exists
 
-# Create a small Kubernetes gpu cluster.
-gcloud beta container clusters create \
-  --num-nodes ${NUM_NODES} \
-  --accelerator type=nvidia-tesla-k80,count=1 \
-  --machine-type n1-standard-2 \
-  --disk-size 20 \
-  --zone=$ZONE \
+# Create a Kubernetes cluster
+# Note, we require Intel Broadwells since they are a bit newer, and can provide
+# up to a 30% speedup, since we're so CPU bound.
+gcloud container clusters create \
+  --num-nodes $NUM_NODES \
+  --zone $ZONE \
+  --project $PROJECT \
   --cluster-version=$K8S_VERSION \
-  --project=$PROJECT \
   $CLUSTER_NAME
 
 # Fetch its credentials so we can use kubectl locally
-gcloud container clusters get-credentials $CLUSTER_NAME --project=$PROJECT --zone=$ZONE
+gcloud container clusters get-credentials $CLUSTER_NAME --project $PROJECT --zone $ZONE
 
-create_gcs_bucket
 create_service_account_key
 
 # Import the credentials into the cluster as a secret
 kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT_KEY_LOCATION}
-
-echo "Initializing GPUs"
-
-# Install the NVIDIA drivers on each of the nodes in the cluster that will have
-# GPU workers.
-kubectl apply -f gpu-provision-daemonset.yaml
-
-# TODO(kashomon): How can I automate this?
-echo "--------------------------------------------------------------"
-echo "To check that GPUS have been initialized, run:"
-echo "kubectl get no -w -o yaml | grep -E 'hostname:|nvidia.com/gpu'"
