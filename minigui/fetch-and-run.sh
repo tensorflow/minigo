@@ -27,7 +27,7 @@ command -v gsutil >/dev/null 2>&1 || {
   exit 1
 }
 
-echo "Using: the following defaults:"
+echo "Using: the following options for Minigui launch:"
 echo "--------------------------------------------------"
 echo "MINIGUI_PYTHON:       ${MINIGUI_PYTHON}"
 echo "MINIGUI_BUCKET_NAME:  ${MINIGUI_BUCKET_NAME}"

@@ -24,6 +24,8 @@ echo "--------------------------------------------------"
 echo "MINIGUI_MODEL:        ${MINIGUI_MODEL}"
 echo "MINIGUI_MODEL_TMPDIR: ${MINIGUI_MODEL_TMPDIR}"
 echo "MINIGUI_PORT:         ${MINIGUI_PORT}"
+echo "MINIGUI_GCS_DIR:      ${MINIGUI_GCS_DIR}"
+echo "MINIGUI_BOARD_SIZE:   ${MINIGUI_BOARD_SIZE}"
 
 echo "PROJECT:              ${PROJECT}"
 echo "VERSION_TAG:          ${VERSION_TAG}"
@@ -35,6 +37,8 @@ if [[ -d "${MINIGUI_MODEL_TMPDIR}" ]]; then
   docker run \
   -p 127.0.0.1:$MINIGUI_PORT:$MINIGUI_PORT \
   -e MINIGUI_MODEL="${MINIGUI_MODEL}" \
+  -e MINIGUI_BOARD_SIZE="${MINIGUI_BOARD_SIZE}" \
+  -e MINIGUI_GCS_DIR="${MINIGUI_GCS_DIR}" \
   -ti \
   --mount type=bind,source="${MINIGUI_MODEL_TMPDIR}",target="${MINIGUI_MODEL_TMPDIR}" \
   --rm gcr.io/${PROJECT}/${MINIGUI_PY_CPU_CONTAINER}:${VERSION_TAG}
@@ -42,6 +46,8 @@ else
   docker run \
   -p 127.0.0.1:$MINIGUI_PORT:$MINIGUI_PORT \
   -e MINIGUI_MODEL="${MINIGUI_MODEL}" \
+  -e MINIGUI_BOARD_SIZE="${MINIGUI_BOARD_SIZE}" \
+  -e MINIGUI_GCS_DIR="${MINIGUI_GCS_DIR}" \
   -ti \
   --rm gcr.io/${PROJECT}/${MINIGUI_PY_CPU_CONTAINER}:${VERSION_TAG}
 fi
