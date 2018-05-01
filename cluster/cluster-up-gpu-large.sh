@@ -17,57 +17,54 @@ set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Run in a sub-shell so we don't unexpectedly set new variables.
-{
-  source ${SCRIPT_DIR}/common.sh
-  source ${SCRIPT_DIR}/utils.sh
+source ${SCRIPT_DIR}/common.sh
+source ${SCRIPT_DIR}/utils.sh
 
 
-  echo "Large GPU Cluster Creation"
-  echo "--------------------------------------"
-  echo "Using Project:      ${PROJECT}"
-  echo "Using Zone:         ${ZONE}"
-  echo "Using Cluster Name: ${CLUSTER_NAME}"
-  echo "Using K8S Version:  ${K8S_VERSION}"
+echo "Large GPU Cluster Creation"
+echo "--------------------------------------"
+echo "Using Project:      ${PROJECT}"
+echo "Using Zone:         ${ZONE}"
+echo "Using Cluster Name: ${CLUSTER_NAME}"
+echo "Using K8S Version:  ${K8S_VERSION}"
 
-  export NUM_NODES=350
-  echo "Overriding num nodes to: $NUM_NODES"
+export NUM_NODES=350
+echo "Overriding num nodes to: $NUM_NODES"
 
-  check_gcloud_exists
+check_gcloud_exists
 
-  # Create a Kubernetes cluster. This setup is designed for creating large clusters.
-  # Allocating a big CIDR is necessary for large clusters (>1008 Nodes)
-  # See more details https://stackoverflow.com/questions/42129327/gke-cluster-creation-fails-because-the-network-default-does-not-have-available
-  gcloud beta container clusters create \
-    --num-nodes $NUM_NODES \
-    --accelerator type=nvidia-tesla-k80,count=2 \
-    --machine-type n1-standard-8 \
-    --disk-size 25 \
-    --preemptible \
-    --network auto-network2 \
-    --cluster-ipv4-cidr=10.0.0.0/10 \
-    --zone=$ZONE \
-    --cluster-version=$K8S_VERSION \
-    --project=$PROJECT \
-    $CLUSTER_NAME
+# Create a Kubernetes cluster. This setup is designed for creating large clusters.
+# Allocating a big CIDR is necessary for large clusters (>1008 Nodes)
+# See more details https://stackoverflow.com/questions/42129327/gke-cluster-creation-fails-because-the-network-default-does-not-have-available
+gcloud beta container clusters create \
+  --num-nodes $NUM_NODES \
+  --accelerator type=nvidia-tesla-k80,count=2 \
+  --machine-type n1-standard-8 \
+  --disk-size 25 \
+  --preemptible \
+  --network auto-network2 \
+  --cluster-ipv4-cidr=10.0.0.0/10 \
+  --zone=$ZONE \
+  --cluster-version=$K8S_VERSION \
+  --project=$PROJECT \
+  $CLUSTER_NAME
 
-  # Fetch its credentials so we can use kubectl locally
-  gcloud container clusters get-credentials $CLUSTER_NAME --project $PROJECT --zone $ZONE
+# Fetch its credentials so we can use kubectl locally
+gcloud container clusters get-credentials $CLUSTER_NAME --project $PROJECT --zone $ZONE
 
-  create_gcs_bucket
-  create_service_account_key
+create_gcs_bucket
+create_service_account_key
 
-  # Import the credentials into the cluster as a secret
-  kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT_KEY_LOCATION}
+# Import the credentials into the cluster as a secret
+kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT_KEY_LOCATION}
 
-  echo "Initializing GPUs"
+echo "Initializing GPUs"
 
-  # Install the NVIDIA drivers on each of the nodes in the cluster that will have
-  # GPU workers.
-  kubectl apply -f gpu-provision-daemonset.yaml
+# Install the NVIDIA drivers on each of the nodes in the cluster that will have
+# GPU workers.
+kubectl apply -f gpu-provision-daemonset.yaml
 
-  # TODO(kashomon): How can I automate this?
-  echo "--------------------------------------------------------------"
-  echo "To check that GPUS have been initialized, run:"
-  echo "kubectl get no -w -o yaml | grep -E 'hostname:|nvidia.com/gpu'"
-}
+# TODO(kashomon): How can I automate this?
+echo "--------------------------------------------------------------"
+echo "To check that GPUS have been initialized, run:"
+echo "kubectl get no -w -o yaml | grep -E 'hostname:|nvidia.com/gpu'"
