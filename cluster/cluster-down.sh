@@ -15,12 +15,9 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Run in a sub-shell so we don't unexpectedly set new variables.
-{
-  source ${SCRIPT_DIR}/common.sh
-  source ${SCRIPT_DIR}/utils.sh
+source ${SCRIPT_DIR}/common.sh
+source ${SCRIPT_DIR}/utils.sh
 
-  check_gcloud_exists
+check_gcloud_exists
 
-  gcloud container clusters delete $CLUSTER_NAME --project=$PROJECT --zone=$ZONE --async
-}
+gcloud container clusters delete $CLUSTER_NAME --project=$PROJECT --zone=$ZONE --async

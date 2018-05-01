@@ -19,18 +19,15 @@ set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Run in a sub-shell so we don't unexpectedly set new variables.
-{
-  source ${SCRIPT_DIR}/common.sh
-  source ${SCRIPT_DIR}/utils.sh
+source ${SCRIPT_DIR}/common.sh
+source ${SCRIPT_DIR}/utils.sh
 
-  echo "Bootstrapping a Minigo model!"
-  echo "Bucket name:      ${BUCKET_NAME}"
-  echo "Bucket location:  ${MODEL_NAME}"
-  echo "Board Size:       ${BOARD_SIZE}"
+echo "Bootstrapping a Minigo model!"
+echo "Bucket name:      ${BUCKET_NAME}"
+echo "Bucket location:  ${MODEL_NAME}"
+echo "Board Size:       ${BOARD_SIZE}"
 
-  MODEL_NAME=000000-bootstrap
-  PYTHONPATH=$SCRIPT_DIR/..
+MODEL_NAME=000000-bootstrap
+PYTHONPATH=$SCRIPT_DIR/..
 
-  python3 ../main.py bootstrap gs://$BUCKET_NAME/models/$MODEL_NAME
-}
+python3 ../main.py bootstrap gs://$BUCKET_NAME/models/$MODEL_NAME
