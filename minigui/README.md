@@ -6,13 +6,11 @@ A UI for Minigo
 
 1. Make sure you have Docker installed
 
-1. Pick a model from [Cloudy Go](http://cloudygo.com). Make note of the Model Name, the Board Size,
-   and the Model Path (should be either `v3-9x9/models/` or `v5-19x19/models/`.
-   Set these as environment variables:
+1. Pick a model from [Cloudy Go](http://cloudygo.com). Make note of the Model
+   Name and the Board Size.
 
     ```shell
-    export MINIGUI_GCS_DIR=v5-19x19/models
-    export MINGUI_BOARD_SIZE=19
+    export MINIGUI_BOARD_SIZE=9
     export MINIGUI_MODEL=000360-grown-teal
     ```
 
