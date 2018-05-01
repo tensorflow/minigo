@@ -22,7 +22,7 @@ export CLUSTER_NAME=${CLUSTER_NAME:-"minigo-v5"}
 export BOARD_SIZE=${BOARD_SIZE:-"19"}
 export K8S_VERSION=${K8S_VERSION:-"1.9"}
 export ZONE=${ZONE:-"asia-east1-a"}
-export NUM_K8S_NODES=${NUM_K8S_NODES:-"5"}
+export NUM_K8S_NODES=${NUM_NODES:-"5"}
 
 # Configuration for service accounts so that the cluster can do cloud-things.
 export SERVICE_ACCOUNT=${SERVICE_ACCOUNT:-"${PROJECT}-${CLUSTER_NAME}-services"}
