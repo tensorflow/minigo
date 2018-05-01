@@ -16,15 +16,19 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source ${SCRIPT_DIR}/common.sh
-source ${SCRIPT_DIR}/utils.sh
 
-echo "Using Project:            ${PROJECT}"
-echo "Service Account:          ${SERVICE_ACCOUNT}"
-echo "Service Account Email:    ${SERVICE_ACCOUNT_EMAIL}"
-echo "Service Account Key Loc:  ${SERVICE_ACCOUNT_KEY_LOCATION}"
-echo "Bucket name:              ${BUCKET_NAME}"
+# Run in a sub-shell so we don't unexpectedly set new variables.
+{
+  source ${SCRIPT_DIR}/common.sh
+  source ${SCRIPT_DIR}/utils.sh
 
-check_gcloud_exists
-check_gsutil_exists
-create_service_account_key
+  echo "Using Project:            ${PROJECT}"
+  echo "Service Account:          ${SERVICE_ACCOUNT}"
+  echo "Service Account Email:    ${SERVICE_ACCOUNT_EMAIL}"
+  echo "Service Account Key Loc:  ${SERVICE_ACCOUNT_KEY_LOCATION}"
+  echo "Bucket name:              ${BUCKET_NAME}"
+
+  check_gcloud_exists
+  check_gsutil_exists
+  create_service_account_key
+}
