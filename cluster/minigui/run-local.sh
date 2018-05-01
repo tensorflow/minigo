@@ -16,6 +16,19 @@
 
 set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# The model directory stuff is confusing. Try to help the user. Here they've
+# set the board size but not the GCS DIR. So do some guessing before we set
+# defaults
+if [[ ! -z "${MINIGUI_BOARD_SIZE}" && -z "${MINIGUI_GCS_DIR}" ]]; then
+  if [[ "${MINIGUI_BOARD_SIZE}" = "19" ]];  then
+    export MINIGUI_GCS_DIR="v5-19x19/models"
+  fi
+  if [[ "${MINIGUI_BOARD_SIZE}" = "9" ]];  then
+    export MINIGUI_GCS_DIR="v3-9x9/models"
+  fi
+fi
+
 source ${SCRIPT_DIR}/../../minigui/minigui-common.sh
 source ${SCRIPT_DIR}/../common.sh
 
