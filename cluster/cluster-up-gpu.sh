@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,46 +16,50 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source ${SCRIPT_DIR}/common.sh
-source ${SCRIPT_DIR}/utils.sh
 
-echo "GPU Cluster Creation"
-echo "--------------------------------------"
-echo "Using Project:      ${PROJECT}"
-echo "Using Zone:         ${ZONE}"
-echo "Using Cluster Name: ${CLUSTER_NAME}"
-echo "Using K8S Version:  ${K8S_VERSION}"
-echo "Number of Nodes:    ${NUM_NODES}"
+# Run in a sub-shell so we don't unexpectedly set new variables.
+{
+  source ${SCRIPT_DIR}/common.sh
+  source ${SCRIPT_DIR}/utils.sh
 
-check_gcloud_exists
+  echo "GPU Cluster Creation"
+  echo "--------------------------------------"
+  echo "Using Project:      ${PROJECT}"
+  echo "Using Zone:         ${ZONE}"
+  echo "Using Cluster Name: ${CLUSTER_NAME}"
+  echo "Using K8S Version:  ${K8S_VERSION}"
+  echo "Number of Nodes:    ${NUM_NODES}"
 
-# Create a small Kubernetes gpu cluster.
-gcloud beta container clusters create \
-  --num-nodes ${NUM_NODES} \
-  --accelerator type=nvidia-tesla-k80,count=1 \
-  --machine-type n1-standard-2 \
-  --disk-size 20 \
-  --zone=$ZONE \
-  --cluster-version=$K8S_VERSION \
-  --project=$PROJECT \
-  $CLUSTER_NAME
+  check_gcloud_exists
 
-# Fetch its credentials so we can use kubectl locally
-gcloud container clusters get-credentials $CLUSTER_NAME --project=$PROJECT --zone=$ZONE
+  # Create a small Kubernetes gpu cluster.
+  gcloud beta container clusters create \
+    --num-nodes ${NUM_NODES} \
+    --accelerator type=nvidia-tesla-k80,count=1 \
+    --machine-type n1-standard-2 \
+    --disk-size 20 \
+    --zone=$ZONE \
+    --cluster-version=$K8S_VERSION \
+    --project=$PROJECT \
+    $CLUSTER_NAME
 
-create_gcs_bucket
-create_service_account_key
+  # Fetch its credentials so we can use kubectl locally
+  gcloud container clusters get-credentials $CLUSTER_NAME --project=$PROJECT --zone=$ZONE
 
-# Import the credentials into the cluster as a secret
-kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT_KEY_LOCATION}
+  create_gcs_bucket
+  create_service_account_key
 
-echo "Initializing GPUs"
+  # Import the credentials into the cluster as a secret
+  kubectl create secret generic ${SERVICE_ACCOUNT}-creds --from-file=service-account.json=${SERVICE_ACCOUNT_KEY_LOCATION}
 
-# Install the NVIDIA drivers on each of the nodes in the cluster that will have
-# GPU workers.
-kubectl apply -f gpu-provision-daemonset.yaml
+  echo "Initializing GPUs"
 
-# TODO(kashomon): How can I automate this?
-echo "--------------------------------------------------------------"
-echo "To check that GPUS have been initialized, run:"
-echo "kubectl get no -w -o yaml | grep -E 'hostname:|nvidia.com/gpu'"
+  # Install the NVIDIA drivers on each of the nodes in the cluster that will have
+  # GPU workers.
+  kubectl apply -f gpu-provision-daemonset.yaml
+
+  # TODO(kashomon): How can I automate this?
+  echo "--------------------------------------------------------------"
+  echo "To check that GPUS have been initialized, run:"
+  echo "kubectl get no -w -o yaml | grep -E 'hostname:|nvidia.com/gpu'"
+}
