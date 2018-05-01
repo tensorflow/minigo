@@ -28,6 +28,7 @@ echo "MINIGUI_PORT:         ${MINIGUI_PORT}"
 echo "PROJECT:              ${PROJECT}"
 echo "VERSION_TAG:          ${VERSION_TAG}"
 echo "MINIGUI CONTAINER:    ${MINIGUI_PY_CPU_CONTAINER}"
+echo "IMAGE                 gcr.io/${PROJECT}/${MINIGUI_PY_CPU_CONTAINER}:${VERSION_TAG}"
 echo
 
 if [[ -d "${MINIGUI_MODEL_TMPDIR}" ]]; then
