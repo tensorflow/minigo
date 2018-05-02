@@ -33,7 +33,7 @@ export SERVICE_ACCOUNT_KEY_LOCATION=${SERVICE_ACCOUNT_KEY_LOCATION:-"/tmp/${SERV
 export VERSION_TAG=${VERSION_TAG:-"0.16"}
 export GPU_PLAYER_CONTAINER=${GPU_PLAYER_CONTAINER:-"minigo-gpu-player"}
 export CPU_PLAYER_CONTAINER=${CPU_PLAYER_CONTAINER:-"minigo-player"}
-export MINIGUI_PY_CPU_CONTAINER=${MINIGUI_PY_CPU_CONTAINER:-"minigui-py-cpu"}
+export MINIGUI_PY_CPU_CONTAINER=${MINIGUI_PY_CPU_CONTAINER:-"minigui-py-cpu-v2"}
 
 # Bucket names live in a single global namespace
 # So, we prefix the project name to avoid collisions
