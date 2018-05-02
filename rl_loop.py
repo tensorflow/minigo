@@ -13,34 +13,20 @@
 # limitations under the License.
 
 """Wrapper scripts to ensure that main.py commands are called correctly."""
-import argh
 import argparse
 import logging
 import os
-import main
-import shipname
 import sys
 import time
-import tempfile
-from utils import timer
 
 from absl import flags
-import cloud_logging
+import argh
 from tensorflow import gfile
 
-# Pull in environment variables. Run `source ./cluster/common` to set these.
-BUCKET_NAME = os.environ['BUCKET_NAME']
-BOARD_SIZE = os.environ['BOARD_SIZE']
-
-BASE_DIR = "gs://{}".format(BUCKET_NAME)
-MODELS_DIR = os.path.join(BASE_DIR, 'models')
-SELFPLAY_DIR = os.path.join(BASE_DIR, 'data/selfplay')
-HOLDOUT_DIR = os.path.join(BASE_DIR, 'data/holdout')
-SGF_DIR = os.path.join(BASE_DIR, 'sgf')
-TRAINING_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'training_chunks')
-GOLDEN_CHUNK_DIR = os.path.join(BASE_DIR, 'data', 'golden_chunks')
-
-ESTIMATOR_WORKING_DIR = 'estimator_working_dir'
+import cloud_logging
+import fsdb
+import main
+import shipname
 
 # How many games before the selfplay workers will stop trying to play more.
 MAX_GAMES_PER_GENERATION = 10000
@@ -52,98 +38,40 @@ MIN_GAMES_PER_GENERATION = 500
 HOLDOUT_PCT = 0.05
 
 
-def print_flags():
-    flags = {
-        'BUCKET_NAME': BUCKET_NAME,
-        'BASE_DIR': BASE_DIR,
-        'MODELS_DIR': MODELS_DIR,
-        'SELFPLAY_DIR': SELFPLAY_DIR,
-        'HOLDOUT_DIR': HOLDOUT_DIR,
-        'SGF_DIR': SGF_DIR,
-        'TRAINING_CHUNK_DIR': TRAINING_CHUNK_DIR,
-        'ESTIMATOR_WORKING_DIR': ESTIMATOR_WORKING_DIR,
-        'BOARD_SIZE': BOARD_SIZE,
-    }
-    print("Computed variables are:")
-    print('\n'.join('--{}={}'.format(flag, value)
-                    for flag, value in flags.items()))
-
-
-def get_models():
-    """Finds all models, returning a list of model number and names
-    sorted increasing.
-
-    Returns: [(13, 000013-modelname), (17, 000017-modelname), ...etc]
-    """
-    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
-    model_filenames = [os.path.basename(m) for m in all_models]
-    model_numbers_names = sorted([
-        (shipname.detect_model_num(m), shipname.detect_model_name(m))
-        for m in model_filenames])
-    return model_numbers_names
-
-
-def get_latest_model():
-    """Finds the latest model, returning its model number and name
-
-    Returns: (17, 000017-modelname)
-    """
-    return get_models()[-1]
-
-
-def get_model(model_num):
-    models = {k: v for k, v in get_models()}
-    if not model_num in models:
-        raise ValueError("Model {} not found!".format(model_num))
-    return models[model_num]
-
-
-def game_counts(n_back=20):
-    """Prints statistics for the most recent n_back models"""
-    all_models = gfile.Glob(os.path.join(MODELS_DIR, '*.meta'))
-    model_filenames = sorted([os.path.basename(m).split('.')[0]
-                              for m in all_models], reverse=True)
-    for m in model_filenames[:n_back]:
-        games = gfile.Glob(os.path.join(SELFPLAY_DIR, m, '*.zz'))
-        print(m, len(games))
-
-
-def bootstrap():
+def bootstrap(working_dir):
     bootstrap_name = shipname.generate(0)
-    bootstrap_model_path = os.path.join(MODELS_DIR, bootstrap_name)
+    bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
     print("Bootstrapping with working dir {}\n Model 0 exported to {}".format(
-        ESTIMATOR_WORKING_DIR, bootstrap_model_path))
-    main.bootstrap(ESTIMATOR_WORKING_DIR, bootstrap_model_path)
+        working_dir, bootstrap_model_path))
+    main.bootstrap(working_dir, bootstrap_model_path)
 
 
-def selfplay(readouts=1600, verbose=2):
-    _, model_name = get_latest_model()
-    games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
+def selfplay(verbose=2):
+    _, model_name = fsdb.get_latest_model()
+    games = gfile.Glob(os.path.join(fsdb.selfplay_dir(), model_name, '*.zz'))
     if len(games) > MAX_GAMES_PER_GENERATION:
         print("{} has enough games ({})".format(model_name, len(games)))
         time.sleep(10*60)
         sys.exit(1)
     print("Playing a game with model {}".format(model_name))
-    model_save_path = os.path.join(MODELS_DIR, model_name)
-    game_output_dir = os.path.join(SELFPLAY_DIR, model_name)
-    game_holdout_dir = os.path.join(HOLDOUT_DIR, model_name)
-    sgf_dir = os.path.join(SGF_DIR, model_name)
+    model_save_path = os.path.join(fsdb.models_dir(), model_name)
+    game_output_dir = os.path.join(fsdb.selfplay_dir(), model_name)
+    game_holdout_dir = os.path.join(fsdb.holdout_dir(), model_name)
+    sgf_dir = os.path.join(fsdb.sgf_dir(), model_name)
     main.selfplay(
         load_file=model_save_path,
         output_dir=game_output_dir,
         holdout_dir=game_holdout_dir,
         output_sgf=sgf_dir,
-        readouts=readouts,
         holdout_pct=HOLDOUT_PCT,
         verbose=verbose,
     )
 
 
+def train(working_dir):
+    model_num, model_name = fsdb.get_latest_model()
 
-def train(load_dir=MODELS_DIR, save_dir=MODELS_DIR):
-    model_num, model_name = get_latest_model()
-
-    games = gfile.Glob(os.path.join(SELFPLAY_DIR, model_name, '*.zz'))
+    games = gfile.Glob(os.path.join(fsdb.selfplay_dir(), model_name, '*.zz'))
     if len(games) < MIN_GAMES_PER_GENERATION:
         print("{} doesn't have enough games to train a new model yet ({})".format(
             model_name, len(games)))
@@ -157,53 +85,51 @@ def train(load_dir=MODELS_DIR, save_dir=MODELS_DIR):
     new_model_name = shipname.generate(new_model_num)
     print("New model will be {}".format(new_model_name))
     training_file = os.path.join(
-        GOLDEN_CHUNK_DIR, str(new_model_num) + '.tfrecord.zz')
+        fsdb.golden_chunk_dir(), str(new_model_num) + '.tfrecord.zz')
     while not gfile.Exists(training_file):
         print("Waiting for", training_file)
         time.sleep(1*60)
     print("Using Golden File:", training_file)
 
-    load_file = os.path.join(load_dir, model_name)
-    save_file = os.path.join(save_dir, new_model_name)
+    save_file = os.path.join(fsdb.models_dir(), new_model_name)
     try:
-        main.train(ESTIMATOR_WORKING_DIR, [training_file], save_file,
+        main.train(working_dir, [training_file], save_file,
                    generation_num=model_num + 1)
     except:
         logging.exception("Train error")
 
 
-def validate(model_num=None, validate_name=None):
+def validate(working_dir, model_num=None, validate_name=None):
     """ Runs validate on the directories up to the most recent model, or up to
     (but not including) the model specified by `model_num`
     """
     if model_num is None:
-        model_num, model_name = get_latest_model()
+        model_num, model_name = fsdb.get_latest_model()
     else:
         model_num = int(model_num)
-        model_name = get_model(model_num)
+        model_name = fsdb.get_model(model_num)
 
     # Model N was trained on games up through model N-2, so the validation set
     # should only be for models through N-2 as well, thus the (model_num - 1)
     # term.
     models = list(
-        filter(lambda num_name: num_name[0] < (model_num - 1), get_models()))
+        filter(lambda num_name: num_name[0] < (model_num - 1), fsdb.get_models()))
     # Run on the most recent 50 generations,
     # TODO(brianklee): make this hyperparameter dependency explicit/not hardcoded
-    holdout_dirs = [os.path.join(HOLDOUT_DIR, pair[1])
+    holdout_dirs = [os.path.join(fsdb.holdout_dir(), pair[1])
                     for pair in models[-50:]]
 
-    main.validate(ESTIMATOR_WORKING_DIR, *holdout_dirs,
-                  checkpoint_name=os.path.join(MODELS_DIR, model_name),
+    main.validate(working_dir, *holdout_dirs,
+                  checkpoint_name=os.path.join(fsdb.models_dir(), model_name),
                   validate_name=validate_name)
 
 
 def backfill():
-    models = [m[1] for m in get_models()]
+    models = [m[1] for m in fsdb.get_models()]
 
     import dual_net
     import tensorflow as tf
     from tqdm import tqdm
-    from tensorflow.python.framework import meta_graph
     features, labels = dual_net.get_inference_input()
     dual_net.model_fn(features, labels, tf.estimator.ModeKeys.PREDICT,
                       dual_net.get_default_hyperparams())
@@ -212,25 +138,20 @@ def backfill():
         if model_name.endswith('-upgrade'):
             continue
         try:
-            load_file = os.path.join(MODELS_DIR, model_name)
-            dest_file = os.path.join(MODELS_DIR, model_name)
+            load_file = os.path.join(fsdb.models_dir(), model_name)
+            dest_file = os.path.join(fsdb.models_dir(), model_name)
             main.convert(load_file, dest_file)
         except:
             print('failed on', model_name)
             continue
 
 
-def echo():
-    pass  # Flags are echo'd in the ifmain block below.
-
-
 parser = argparse.ArgumentParser()
 
-argh.add_commands(parser, [train, selfplay, echo, backfill,
-                           bootstrap, game_counts, validate])
+argh.add_commands(parser, [train, selfplay, backfill,
+                           bootstrap, fsdb.game_counts, validate])
 
 if __name__ == '__main__':
-    print_flags()
     cloud_logging.configure()
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
     argh.dispatch(parser, argv=remaining_argv[1:])

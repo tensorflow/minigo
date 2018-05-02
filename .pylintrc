@@ -14,6 +14,7 @@ ignore=
       # evaluation.py,
       example_buffer.py,
       features.py,
+      fsdb.py,
       go.py,
       gtp_extensions.py,
       gtp_wrapper.py,
