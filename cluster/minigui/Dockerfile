@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM python:2.7-slim
 
 RUN apt update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -15,7 +15,6 @@ RUN apt update && apt-get install -y --no-install-recommends \
         zip \
         zlib1g-dev \
         python3 \
-        python3-numpy \
         python3-dev \
         python3-pip \
         python3-wheel \
