@@ -17,25 +17,33 @@
 We run as subprocesses because it gives us some isolation.
 """
 
+import os
 import subprocess
 
 import argh
 from utils import timer
 
+BUCKET_NAME = os.environ['BUCKET_NAME']
 
-def loop(working_dir=None):
+
+def loop(working_dir='estimator_working_dir'):
     """Run train and validate as subprocesses."""
+    flags = [
+        '--working_dir',
+        working_dir,
+        '--bucket_name',
+        BUCKET_NAME,
+    ]
     while True:
         print("==================================")
         with timer("Train"):
-            train = subprocess.call(
-                ("python rl_loop.py train --working-dir=%s" % working_dir).split())
+            train = subprocess.call(['python' 'rl_loop.py', 'train'] + flags)
             if train != 0:
                 print("Skipping validation")
                 continue
 
         with timer("validate"):
-            subprocess.call("python rl_loop.py validate", shell=True)
+            subprocess.call(['python', 'rl_loop', 'validate'] + flags)
 
 
 if __name__ == '__main__':

@@ -15,7 +15,7 @@ from collections import deque
 import preprocessing
 import dual_net
 from utils import timer, ensure_dir_exists
-import rl_loop
+import fsdb
 
 
 READ_OPTS = preprocessing.TF_RECORD_CONFIG
@@ -107,10 +107,11 @@ def files_for_model(model):
 
 def smart_rsync(
         from_model_num=0,
-        source_dir=rl_loop.SELFPLAY_DIR,
+        source_dir=None,
         dest_dir=LOCAL_DIR):
+    source_dir = source_dir or fsdb.selfplay_dir()
     from_model_num = 0 if from_model_num < 0 else from_model_num
-    models = [m for m in rl_loop.get_models() if m[0] >= from_model_num]
+    models = [m for m in fsdb.get_models() if m[0] >= from_model_num]
     for _, model in models:
         _rsync_dir(os.path.join(
             source_dir, model), os.path.join(dest_dir, model))
@@ -124,7 +125,7 @@ def _rsync_dir(source_dir, dest_dir):
 
 
 def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
-                  write_dir=rl_loop.GOLDEN_CHUNK_DIR,
+                  write_dir=None,
                   model_window=100,
                   threads=8,
                   skip_first_rsync=False):
@@ -133,15 +134,16 @@ def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     Once it detects a new model, iit then dumps its contents for training to
     immediately begin on the next model.
     """
+    write_dir = write_dir or fsdb.golden_chunk_dir()
     buf = ExampleBuffer(bufsize)
-    models = rl_loop.get_models()[-model_window:]
+    models = fsdb.get_models()[-model_window:]
     # Last model is N.  N+1 is training.  We should gather games for N+2.
-    chunk_to_make = os.path.join(rl_loop.GOLDEN_CHUNK_DIR, str(
+    chunk_to_make = os.path.join(write_dir, str(
         models[-1][0] + 2) + '.tfrecord.zz')
     while tf.gfile.Exists(chunk_to_make):
         print("Next chunk ({}) already exists.  Sleeping.".format(chunk_to_make))
         time.sleep(5 * 60)
-        models = rl_loop.get_models()[-model_window:]
+        models = fsdb.get_models()[-model_window:]
     print("Making chunk:", chunk_to_make)
     if not skip_first_rsync:
         with timer("Rsync"):
@@ -150,13 +152,13 @@ def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     buf.parallel_fill(list(itertools.chain(*files)), threads=threads)
 
     print("Filled buffer, watching for new games")
-    while rl_loop.get_latest_model()[0] == models[-1][0]:
+    while fsdb.get_latest_model()[0] == models[-1][0]:
         with timer("Rsync"):
             smart_rsync(models[-1][0] - 2)
         new_files = tqdm(map(files_for_model, models[-2:]), total=len(models))
         buf.update(list(itertools.chain(*new_files)))
         time.sleep(60)
-    latest = rl_loop.get_latest_model()
+    latest = fsdb.get_latest_model()
 
     print("New model!", latest[1], "!=", models[-1][1])
     print(buf)
@@ -165,7 +167,7 @@ def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
 
 def make_chunk_for(output_dir=LOCAL_DIR,
                    local_dir=LOCAL_DIR,
-                   game_dir=rl_loop.SELFPLAY_DIR,
+                   game_dir=None,
                    model_num=1,
                    positions=dual_net.EXAMPLES_PER_GENERATION,
                    threads=8,
@@ -177,9 +179,10 @@ def make_chunk_for(output_dir=LOCAL_DIR,
       While we haven't yet got enough samples (EXAMPLES_PER_GENERATION)
       Add samples from the games of previous model.
     """
+    game_dir = game_dir or fsdb.selfplay_dir()
     ensure_dir_exists(output_dir)
     models = [(num, name)
-              for num, name in rl_loop.get_models() if num < model_num]
+              for num, name in fsdb.get_models() if num < model_num]
     buf = ExampleBuffer(positions)
     files = []
     for _, model in sorted(models, reverse=True):
