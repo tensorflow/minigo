@@ -38,6 +38,8 @@ EXAMPLES_PER_GENERATION = 2000000
 # How many positions can fit on the trainer; 256 for 19s on a p100
 TRAIN_BATCH_SIZE = 256
 
+VALIDATE_BATCH_SIZE = 32
+
 
 class DualNetwork():
     def __init__(self, save_file, **hparams):
@@ -213,7 +215,7 @@ def model_fn(features, labels, mode, params, config=None):
     policy_entropy = -tf.reduce_mean(tf.reduce_sum(
         policy_output * tf.log(policy_output), axis=1))
     boundaries = [40 * int(1e6), 80 * int(1e6)]
-    values = [1e-2, 1e-3, 1e-4]
+    values = [1e-3, 1e-4, 1e-5]
     learning_rate = tf.train.piecewise_constant(
         global_step, boundaries, values)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -325,9 +327,9 @@ def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
         checkpoint_name = estimator.latest_checkpoint()
 
     def input_fn():
-        return preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records,
-            shuffle_buffer_size=1000, filter_amount=0.05)
-    estimator.evaluate(input_fn, steps=1000)
+        return preprocessing.get_input_tensors(VALIDATE_BATCH_SIZE, tf_records,
+            shuffle_buffer_size=20000, filter_amount=0.05)
+    estimator.evaluate(input_fn, steps=500)
 
 
 def compute_update_ratio(weight_tensors, before_weights, after_weights):
