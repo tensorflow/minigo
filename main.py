@@ -225,7 +225,7 @@ def freeze_graph(load_file):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train, freeze_graph,
+argh.add_commands(parser, [gtp, bootstrap, train, train_dir, freeze_graph,
                            selfplay, evaluate, validate, convert])
 
 if __name__ == '__main__':
