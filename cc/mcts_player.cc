@@ -85,8 +85,9 @@ Coord MctsPlayer::SuggestMove(int num_readouts) {
     TreeSearch(options_.batch_size);
   }
   auto elapsed = absl::Now() - start;
-  std::cerr << "Seconds per 100 reads: " << elapsed * 100 / num_readouts
-            << std::endl;
+  elapsed = elapsed * 100 / num_readouts;
+  std::cerr << "Milliseconds per 100 reads: " << absl::ToInt64Milliseconds(elapsed)
+            << "ms" << std::endl;
 
   if (ShouldResign()) {
     return Coord::kResign;
