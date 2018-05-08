@@ -14,7 +14,7 @@
 
 """Filesystem DB: poor man's worker coordination strategy.
 
-This module to works equivalently both with local filesystems and GCS.
+This module works equivalently with local filesystems and GCS.
 """
 import os
 
@@ -79,18 +79,14 @@ def get_latest_model():
 
 def get_model(model_num):
     """Given a model number 17, returns its full name 000017-modelname."""
-    models = {k: v for k, v in get_models()}
-    if not model_num in models:
-        raise ValueError("Model {} not found!".format(model_num))
-    return models[model_num]
+    model_names_by_num = dict(get_models())
+    return model_names_by_num[model_num]
 
 
 def game_counts(n_back=20):
     """Prints statistics for the most recent n_back models"""
     all_models = gfile.Glob(os.path.join(models_dir(), '*.meta'))
-    model_filenames = sorted([os.path.basename(m).split('.')[0]
-                              for m in all_models], reverse=True)
-    for m in model_filenames[:n_back]:
-        games = gfile.Glob(os.path.join(selfplay_dir(), m, '*.zz'))
-        print(m, len(games))
+    for _, model_name in get_models[-n_back:]:
+        games = gfile.Glob(os.path.join(selfplay_dir(), model_name, '*.zz'))
+        print(model_name, len(games))
 
