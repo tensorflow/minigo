@@ -97,7 +97,7 @@ Coord MctsPlayer::SuggestMove(int num_readouts) {
 }
 
 Coord MctsPlayer::PickMove() {
-  if (!options_.soft_pick || root_->position.n() > temperature_cutoff_) {
+  if (!options_.soft_pick || root_->position.n() >= temperature_cutoff_) {
     // Choose the most visited node.
     Coord c = ArgMax(root_->edges, MctsNode::CmpN);
     std::cerr << "Picked arg_max " << c << "\n";
