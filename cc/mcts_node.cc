@@ -139,20 +139,8 @@ MctsNode* MctsNode::SelectLeaf() {
     ++node->stats->N;
 
     // If a node has never been evaluated, we have no basis to select a child.
-    if (node->state == State::kCollapsed) {
-      node->state = State::kSelected;
+    if (!node->is_expanded) {
       return node;
-    }
-    // If the node has already been selected for the next inference batch, we
-    // shouldn't select it again.
-    if (node->state == State::kSelected) {
-      // Revert the visits we just made.
-      --node->stats->N;
-      while (node != this) {
-        node = node->parent;
-        --node->stats->N;
-      }
-      return nullptr;
     }
     // HACK: if last move was a pass, always investigate double-pass first
     // to avoid situations where we auto-lose by passing too early.
@@ -174,8 +162,15 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
   // A finished game should not be going through this code path, it should
   // directly call BackupValue on the result of the game.
   assert(!position.is_game_over());
-  assert(state == State::kSelected);
-  state = State::kExpanded;
+
+  // If the node has already been selected for the next inference batch, we
+  // shouldn't select it again.
+  if (is_expanded) {
+    RevertVisits(up_to);
+    return;
+  }
+
+  is_expanded = true;
   for (int i = 0; i < kNumMoves; ++i) {
     edges[i].original_P = edges[i].P = move_probabilities[i];
     // Initialize child Q as current node's value, to prevent dynamics where
@@ -195,10 +190,19 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
 
 void MctsNode::IncorporateEndGameResult(float value, MctsNode* up_to) {
   assert(position.is_game_over() || position.n() == kMaxSearchDepth);
-  assert(state == State::kSelected);
-  // We can't expand an end game result, so collapse the node again.
-  state = State::kCollapsed;
+  assert(!is_expanded);
   BackupValue(value, up_to);
+}
+
+void MctsNode::RevertVisits(MctsNode* up_to) {
+  auto* node = this;
+  for (;;) {
+    node->stats->N -= 1;
+    if (node == up_to) {
+      return;
+    }
+    node = node->parent;
+  }
 }
 
 void MctsNode::BackupValue(float value, MctsNode* up_to) {

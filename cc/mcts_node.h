@@ -40,18 +40,6 @@ class MctsNode {
     float original_P = 0;
   };
 
-  enum class State {
-    // Leaf is not yet expanded.
-    kCollapsed,
-
-    // Leaf has been selected but not yet expanded: SelectLeaf has been called
-    // but not yet IncorporateResults.
-    kSelected,
-
-    // Node has been expanded and is no longer a leaf.
-    kExpanded,
-  };
-
   static bool CmpN(const EdgeStats& a, const EdgeStats& b) { return a.N < b.N; }
   static bool CmpW(const EdgeStats& a, const EdgeStats& b) { return a.W < b.W; }
   static bool CmpP(const EdgeStats& a, const EdgeStats& b) { return a.P < b.P; }
@@ -89,13 +77,21 @@ class MctsNode {
   // Selects the next leaf node for inference.
   // If inference is being batched and SelectLeaf chooses a node that has
   // already been added to the batch (IncorporateResults has not yet been
-  // called), then SelectLeaf will return null.
+  // called), then SelectLeaf will return that same node.
   MctsNode* SelectLeaf();
 
   void IncorporateResults(absl::Span<const float> move_probabilities,
                           float value, MctsNode* up_to);
 
   void IncorporateEndGameResult(float value, MctsNode* up_to);
+
+  // Sometimes, repeated calls to select_leaf return the same node.  This is
+  // rare and we're okay with the wasted computation to evaluate the position
+  // multiple times by the dual_net. But select_leaf has the side effect of
+  // incrementing visit counts. Since we want the value to only count once for
+  // the repeatedly selected node, we also have to revert the incremented visit
+  // counts.
+  void RevertVisits(MctsNode* up_to);
 
   void BackupValue(float value, MctsNode* up_to);
 
@@ -130,7 +126,7 @@ class MctsNode {
   // TODO(tommadams): use a better containiner.
   std::unordered_map<int, std::unique_ptr<MctsNode>> children;
 
-  State state = State::kCollapsed;
+  bool is_expanded = false;
 
   // Current board position.
   Position position;

@@ -277,7 +277,7 @@ TEST(MctsPlayerTest, ColdStartParallelTreeSearch) {
 
   // Test that parallel tree search doesn't trip on an empty tree.
   EXPECT_EQ(0, root->N());
-  EXPECT_EQ(MctsNode::State::kCollapsed, root->state);
+  EXPECT_EQ(false, root->is_expanded);
   player->TreeSearch(4);
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
 

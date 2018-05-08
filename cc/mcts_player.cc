@@ -68,7 +68,7 @@ Coord MctsPlayer::SuggestMove(int num_readouts) {
     // In order to be able to inject noise into the root node, we need to first
     // expand it. This should be the only time when SuggestMove is called when
     // the root isn't expanded.
-    if (root_->state != MctsNode::State::kExpanded) {
+    if (!root_->is_expanded) {
       MG_CHECK(root_ == &game_root_);
       auto* first_node = root_->SelectLeaf();
       auto output = Run(&first_node->features);

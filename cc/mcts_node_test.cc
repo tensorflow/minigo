@@ -142,11 +142,8 @@ TEST(MctsNodeTest, DoNotExplorePastFinish) {
   root.SelectLeaf()->IncorporateResults(probs, 0, &root);
 
   auto* first_pass = root.MaybeAddChild(Coord::kPass);
-  first_pass->state = MctsNode::State::kSelected;
   first_pass->IncorporateResults(probs, 0, &root);
   auto* second_pass = first_pass->MaybeAddChild(Coord::kPass);
-  second_pass->state = MctsNode::State::kSelected;
-
   EXPECT_DEATH(second_pass->IncorporateResults(probs, 0, &root),
                "is_game_over");
   float value = second_pass->position.CalculateScore() > 0 ? 1 : -1;
@@ -212,9 +209,6 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   // and even after injecting noise, we should still not select an illegal move
   Random rnd(1);
   for (int i = 0; i < 10; ++i) {
-    // Reset the leaf's state from kSelected back to kCollapsed so that we can
-    // select it again.
-    leaf->state = MctsNode::State::kCollapsed;
     std::array<float, kNumMoves> noise;
     rnd.Uniform(0, 1, &noise);
     root.InjectNoise(noise);
@@ -242,7 +236,39 @@ TEST(MctsNodeTest, DontPickUnexpandedChild) {
   leaf1->AddVirtualLoss(&root);
 
   auto* leaf2 = root.SelectLeaf();
-  EXPECT_EQ(nullptr, leaf2);
+  EXPECT_EQ(leaf2, leaf2);
+}
+
+// Verifies that even when one move is hugely more likely than all the others,
+// SelectLeaf will eventually start exploring other moves given enough
+// iterations.
+TEST(MctsNodeTest, TestSelectLeaf) {
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.001;
+  }
+  probs[17] = 0.99;
+
+  MctsNode::EdgeStats root_stats;
+  auto board = TestablePosition(kAlmostDoneBoard, 0, Color::kWhite);
+  MctsNode root(&root_stats, board);
+  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+
+  std::set<MctsNode*> leaves;
+
+  auto* leaf = root.SelectLeaf();
+  EXPECT_EQ(17, leaf->move);
+  leaf->AddVirtualLoss(&root);
+  leaves.insert(leaf);
+
+  for (int i = 0; i < 1000; ++i) {
+    leaf = root.SelectLeaf();
+    leaf->AddVirtualLoss(&root);
+    leaves.insert(leaf);
+  }
+
+  // We should have selected at least 2 leaves.
+  EXPECT_LE(2, leaves.size());
 }
 
 }  // namespace
