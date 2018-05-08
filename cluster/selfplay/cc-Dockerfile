@@ -22,6 +22,7 @@ RUN apt-get install -y --no-install-recommends \
         unzip \
         zip \
         zlib1g-dev \
+        gdb \
         python3 \
         python3-numpy \
         python3-dev \
@@ -31,6 +32,11 @@ RUN apt-get install -y --no-install-recommends \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
+    echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
+    apt-get update -y && apt-get install google-cloud-sdk -y
 
 ENV BAZEL_VERSION 0.11.0
 
@@ -46,12 +52,12 @@ RUN mkdir /bazel && \
 
 ENV CI_BUILD_PYTHON python3
 
+run mv /usr/bin/python /usr/bin/python.bak
 run ln -s /usr/bin/python3 /usr/bin/python
 ENV CUDA_HOME /usr/local/cuda
 RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
 ENV LD_LIBRARY_PATH ${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs/:$LD_LIBRARY_PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
-RUN env
 
 WORKDIR /app
 
@@ -62,6 +68,7 @@ RUN cc/configure_tensorflow.sh
 # Now bring in the rest of our code; changing our code will only trigger rebuilds below here
 COPY staging/ /app
 
-RUN bazel build --define=board_size=19 cc/main
+RUN bazel build --copt=-march=ivybridge --define=board_size=19 cc/main 
+
 
 CMD ["/bin/sh", "cc_wrapper.sh"]

@@ -22,16 +22,29 @@ echo creds: $GOOGLE_APPLICATION_CREDENTIALS
 echo bucket: $BUCKET_NAME
 echo board_size: $BOARD_SIZE
 
-MODEL_NAME=gsutil ls "gs://$BUCKET_NAME/models/*.pb" | sort | tail -n 1
+#gcloud auth activate-service-account --key-file=/etc/credentials/service-account.json
+echo Retrieiving Model
+MODEL_NAME=`gsutil ls "gs://$BUCKET_NAME/models/*.pb" | sort | tail -n 1`
+echo Retrieiving games
 GAMES=`gsutil ls "gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/*.zz" | wc -l`
+
+gsutil cp $MODEL_NAME .
+NAME=`echo $MODEL_NAME  | rev | cut -d/ -f1 | rev`
+BASENAME=`echo $NAME | cut -d. -f1`
+
+mkdir -p data/selfplay
+mkdir -p sgf
 
 if [ $GAMES -lt 15000 ];
 then
+  echo Playing $NAME
   bazel-bin/cc/main \
-    --model=$MODEL_NAME \
+    --model=$NAME \
     --num_readouts=800 \
     --mode=selfplay \
-    --resign-threshold=0.90
+    --resign_threshold=0.90 \
+    --output_dir="gs://$BUCKET_NAME/data/selfplay/$BASENAME" \
+    --sgf_dir="gs://$BUCKET_NAME/sgf/$BASENAME"
 else
   echo "$MODEL_NAME has enough games ($GAMES)"
 fi

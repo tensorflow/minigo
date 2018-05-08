@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minigo-cc-player
+spec:
+  parallelism: 1300
+  completions: 200000
+  template:
+    metadata:
+      name: cc-player
+    spec:
+      containers:
+      - name: player
+        image: gcr.io/$PROJECT/$CC_PLAYER_CONTAINER:$VERSION_TAG
+        imagePullPolicy: Always
+        resources:
+          limits:
+            beta.kubernetes.io/nvidia-gpu: 1
+          requests:
+            beta.kubernetes.io/nvidia-gpu: 1
+        volumeMounts:
+        - name: service-credentials
+          mountPath: /etc/credentials
+        - mountPath: /usr/local/bin/nvidia
+          name: nvidia-debug-tools
+        - mountPath: /usr/local/nvidia/lib64
+          name: nvidia-libraries
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/credentials/service-account.json
+        - name: BUCKET_NAME
+          value: $BUCKET_NAME
+        - name: BOARD_SIZE
+          value: "$BOARD_SIZE"
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+        securityContext:
+          privileged: true
+      volumes:
+      - name: service-credentials
+        secret:
+          secretName: $SERVICE_ACCOUNT-creds
+      - hostPath:
+          path: /home/kubernetes/bin/nvidia/bin
+        name: nvidia-debug-tools
+      - hostPath:
+          path: /home/kubernetes/bin/nvidia/lib64
+        name: nvidia-libraries
+      restartPolicy: OnFailure
