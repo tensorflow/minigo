@@ -87,22 +87,20 @@ def bootstrap(
 def train_dir(
         working_dir: 'tf.estimator working directory.',
         chunk_dir: 'Directory where training chunks are.',
-        model_save_path: 'Where to export the completed generation.',
-        generation_num: 'Which generation you are training.'=0):
+        model_save_path: 'Where to export the completed generation.'):
     tf_records = sorted(gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz')))
     tf_records = tf_records[-1 * (WINDOW_SIZE // EXAMPLES_PER_RECORD):]
 
-    train(working_dir, tf_records, model_save_path, generation_num)
+    train(working_dir, tf_records, model_save_path)
 
 
 def train(
         working_dir: 'tf.estimator working directory.',
         tf_records: 'list of files of tf_records to train on',
-        model_save_path: 'Where to export the completed generation.',
-        generation_num: 'Which generation you are training.'=0):
+        model_save_path: 'Where to export the completed generation.'):
     print("Training on:", tf_records[0], "to", tf_records[-1])
     with utils.logged_timer("Training"):
-        dual_net.train(working_dir, tf_records, generation_num)
+        dual_net.train(working_dir, tf_records) 
     print("== Training done.  Exporting model to ", model_save_path)
     dual_net.export_model(working_dir, model_save_path)
     freeze_graph(model_save_path)
@@ -220,7 +218,7 @@ def freeze_graph(load_file):
     n = dual_net.DualNetwork(load_file)
     out_graph = tf.graph_util.convert_variables_to_constants(
         n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
-    with open(os.path.join(load_file + '.pb'), 'wb') as f:
+    with gfile.GFile(os.path.join(load_file + '.pb'), 'wb') as f:
         f.write(out_graph.SerializeToString())
 
 

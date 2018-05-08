@@ -305,8 +305,7 @@ def export_model(working_dir, model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def train(working_dir, tf_records, generation_num, steps=None, **hparams):
-    assert generation_num > 0, "Model 0 is random weights"
+def train(working_dir, tf_records, steps=None, **hparams):
     estimator = get_estimator(working_dir, **hparams) 
 
     def input_fn():

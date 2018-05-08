@@ -29,10 +29,8 @@ BUCKET_NAME = os.environ['BUCKET_NAME']
 def loop(working_dir='estimator_working_dir'):
     """Run train and validate as subprocesses."""
     flags = [
-        '--working_dir',
         working_dir,
-        '--bucket_name',
-        BUCKET_NAME,
+        '--bucket_name', BUCKET_NAME,
     ]
     while True:
         print("==================================")
@@ -43,7 +41,7 @@ def loop(working_dir='estimator_working_dir'):
                 continue
 
         with timer("validate"):
-            subprocess.call(['python', 'rl_loop', 'validate'] + flags)
+            subprocess.call(['python', 'rl_loop.py', 'validate'] + flags)
 
 
 if __name__ == '__main__':

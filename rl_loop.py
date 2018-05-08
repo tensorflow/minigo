@@ -91,12 +91,17 @@ def train(working_dir):
         time.sleep(1*60)
     print("Using Golden File:", training_file)
 
-    save_file = os.path.join(fsdb.models_dir(), new_model_name)
+    local_copy = os.path.join(working_dir, str(new_model_num) + '.tfrecord.zz')
+    print("Copying locally to ", local_copy)
+    gfile.Copy(training_file, local_copy, overwrite=True)
+
     try:
-        main.train(working_dir, [training_file], save_file,
-                   generation_num=model_num + 1)
+        save_file = os.path.join(fsdb.models_dir(), new_model_name)
+        main.train(working_dir, [local_copy], save_file)
     except:
         logging.exception("Train error")
+    finally:
+        os.remove(local_copy)
 
 
 def validate(working_dir, model_num=None, validate_name=None):
