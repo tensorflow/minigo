@@ -53,6 +53,7 @@ def rl_loop():
     flags.FLAGS.num_readouts = 10
 
     with tempfile.TemporaryDirectory() as base_dir:
+        flags.FLAGS.base_dir = base_dir
         working_dir = os.path.join(base_dir, 'models_in_training')
         model_save_path = os.path.join(base_dir, 'models', '000000-bootstrap')
         local_eb_dir = os.path.join(base_dir, 'scratch')
