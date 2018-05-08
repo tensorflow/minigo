@@ -50,6 +50,9 @@ OUTPUT_PATH = os.path.join('{}', 'bigquery', 'holdout', '{}', '{}')
 
 flags.DEFINE_string("base_dir", BASE_GS_DIR, "base directory for minigo data")
 
+flags.DEFINE_boolean("only_top_move", False,
+                     "only include policy and playout data about played move")
+
 FLAGS = flags.FLAGS
 
 
@@ -112,7 +115,7 @@ def extract_game_data(gcs_path, root_node):
 
     return {
         'worker_id': worker_id,
-        'completed_time': completion_millis
+        'completed_time': completion_millis,
         'board_size': board_size,
         'model_num': model_num,
         'result_str': result,
@@ -139,16 +142,22 @@ def extract_move_data(root_node, worker_id, completed_time, board_size):
             import pdb; pdb.set_trace()
         move_played = coords.to_flat(coords.from_sgf(move_played))
         post_Q, debug_rows = parse_comment_node(props['C'][0])
-        policy_prior = [0] * (board_size * board_size + 1)
-        policy_prior_orig = policy_prior[:]
-        mcts_visit_counts = policy_prior[:]
-        mcts_visit_counts_norm = policy_prior[:]
-        for debug_row in debug_rows:
-            move = debug_row.move
-            policy_prior[move] = debug_row.prior
-            policy_prior_orig[move] = debug_row.orig_prior
-            mcts_visit_counts[move] = debug_row.N
-            mcts_visit_counts_norm[move] = debug_row.soft_N
+
+        def get_row_data(debug_row):
+            column_names = ["prior", "orig_prior", "N", "soft_N"]
+            return [getattr(debug_row, field) for field in column_names]
+
+        if FLAGS.only_top_move:
+            assert len(debug_rows) <= 1
+            row_data = list(map(get_row_data, debug_rows))
+        else:
+            row_data = [[0,0,0,0] for _ in range(board_size * board_size + 1)]
+            for debug_row in debug_rows:
+                move = debug_row.move
+                row_data[move] = get_row_data(debug_row)
+
+        policy_prior, policy_prior_orig, mcts_visits, mcts_visits_norm = \
+            zip(*row_data)
 
         move_data.append({
             'worker_id': worker_id,
@@ -161,8 +170,8 @@ def extract_move_data(root_node, worker_id, completed_time, board_size):
             'post_Q': post_Q,
             'policy_prior': policy_prior,
             'policy_prior_orig': policy_prior_orig,
-            'mcts_visit_counts': mcts_visit_counts,
-            'mcts_visit_counts_norm': mcts_visit_counts_norm,
+            'mcts_visit_counts': mcts_visits,
+            'mcts_visit_counts_norm': mcts_visits_norm,
         })
         move_num += 1
         current_node = current_node.next
@@ -187,14 +196,17 @@ def parse_comment_node(comment):
 
     post_Q = float(lines[0])
     debug_rows = []
+    comment_splitter = re.compile(r'[ :,]')
     for line in lines[3:]:
         if not line:
             continue
-        columns = re.split(r'[ :,]', line)
+        columns = comment_splitter.split(line)
         columns = list(filter(bool, columns))
         coord, *other_columns = columns
         coord = coords.to_flat(coords.from_kgs(coord))
         debug_rows.append(DebugRow(coord, *map(float, other_columns)))
+        if FLAGS.only_top_move:
+            break
     return post_Q, debug_rows
 
 
