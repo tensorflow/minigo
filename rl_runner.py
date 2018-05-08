@@ -37,7 +37,7 @@ def loop(working_dir='estimator_working_dir'):
     while True:
         print("==================================")
         with timer("Train"):
-            train = subprocess.call(['python' 'rl_loop.py', 'train'] + flags)
+            train = subprocess.call(['python', 'rl_loop.py', 'train'] + flags)
             if train != 0:
                 print("Skipping validation")
                 continue
