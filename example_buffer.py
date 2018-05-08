@@ -87,6 +87,7 @@ class ExampleBuffer():
 
     def flush(self, path):
         with timer("Writing examples to " + path):
+            random.shuffle(self.examples)
             preprocessing.write_tf_examples(
                 path, [ex[1] for ex in self.examples])
 
