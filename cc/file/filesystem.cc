@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <cerrno>
 
+#include "absl/strings/match.h"
 #include "cc/file/path.h"
 
 namespace minigo {
@@ -50,6 +51,13 @@ bool MaybeCreateDir(const std::string& path) {
 }  // namespace
 
 bool RecursivelyCreateDir(absl::string_view path) {
+  // GCS doesn't support empty directories (it pretends to by creating an
+  // empty file in them) and files can be written without having to first
+  // create a directory: just return success immediately.
+  if (absl::StartsWith(path, "gs://")) {
+    return true;
+  }
+
   std::string path_str(path);
   if (MaybeCreateDir(path_str)) {
     return true;

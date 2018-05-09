@@ -6,12 +6,10 @@ cc_library(
     name = "file",
     srcs = [
         "filesystem.cc",
-        "helpers.cc",
         "path.cc",
     ],
     hdrs = [
         "filesystem.h",
-        "helpers.h",
         "path.h",
     ],
     deps = [

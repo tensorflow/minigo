@@ -33,7 +33,6 @@
 #include "cc/constants.h"
 #include "cc/dual_net.h"
 #include "cc/file/filesystem.h"
-#include "cc/file/helpers.h"
 #include "cc/file/path.h"
 #include "cc/gtp_player.h"
 #include "cc/init.h"
@@ -108,12 +107,12 @@ void WriteExample(const std::string& output_dir, const std::string& output_name,
   std::vector<tensorflow::Example> examples;
   examples.reserve(player.history().size());
   for (const auto& h : player.history()) {
-    examples.push_back(
-        MakeTfExample(h.node->features, h.search_pi, player.result()));
+    examples.push_back(tf_utils::MakeTfExample(h.node->features, h.search_pi,
+                                               player.result()));
   }
 
   auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");
-  WriteTfExamples(output_path, examples);
+  tf_utils::WriteTfExamples(output_path, examples);
 }
 
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
@@ -150,7 +149,7 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
   auto sgf_str = sgf::CreateSgfString(moves, options);
 
   auto output_path = file::JoinPath(output_dir, output_name + ".sgf");
-  MG_CHECK(file::SetContents(output_path, sgf_str));
+  TF_CHECK_OK(tf_utils::WriteFile(output_path, sgf_str));
 }
 
 void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {

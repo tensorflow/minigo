@@ -16,7 +16,6 @@
 
 #include <memory>
 #include "absl/types/span.h"
-#include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/io/record_writer.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
@@ -25,6 +24,7 @@ using tensorflow::io::RecordWriter;
 using tensorflow::io::RecordWriterOptions;
 
 namespace minigo {
+namespace tf_utils {
 
 namespace {
 
@@ -85,4 +85,26 @@ void WriteTfExamples(const std::string& path,
   TF_CHECK_OK(file->Close());
 }
 
+__attribute__((warn_unused_result)) tensorflow::Status WriteFile(
+    const std::string& path, absl::string_view contents) {
+  tensorflow::Status status;
+
+  std::unique_ptr<tensorflow::WritableFile> file;
+  status = tensorflow::Env::Default()->NewWritableFile(path, &file);
+  if (!status.ok()) {
+    return status;
+  }
+
+  // *sigh* absl::string_view doesn't automatically convert to
+  // tensorflow::StringPiece even though I'm pretty sure they're exactly the
+  // same.
+  status = file->Append({contents.data(), contents.size()});
+  if (!status.ok()) {
+    return status;
+  }
+
+  return file->Close();
+}
+
+}  // namespace tf_utils
 }  // namespace minigo

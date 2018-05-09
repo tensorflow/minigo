@@ -22,8 +22,10 @@
 #include "cc/dual_net.h"
 
 #include "tensorflow/core/example/example.pb.h"
+#include "tensorflow/core/lib/core/status.h"
 
 namespace minigo {
+namespace tf_utils {
 
 // Converts board features, and the pi & value outputs of MTCS to a tensorflow
 // example proto.
@@ -36,6 +38,12 @@ tensorflow::Example MakeTfExample(const DualNet::BoardFeatures& features,
 void WriteTfExamples(const std::string& path,
                      absl::Span<const tensorflow::Example> examples);
 
+// Uses Tensorflow to write a file in one shot. This allows writing to GCS, etc
+// when Tensorflow is compiled with that support.
+__attribute__((warn_unused_result)) tensorflow::Status WriteFile(
+    const std::string& path, absl::string_view contents);
+
+}  // namespace tf_utils
 }  // namespace minigo
 
 #endif  // CC_TF_UTILS_H_
