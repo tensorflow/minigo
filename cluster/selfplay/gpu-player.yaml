@@ -15,9 +15,9 @@ spec:
         imagePullPolicy: Always
         resources:
           limits:
-            beta.kubernetes.io/nvidia-gpu: 1
+            nvidia.com/gpu: 1
           requests:
-            beta.kubernetes.io/nvidia-gpu: 1
+            nvidia.com/gpu: 1
         volumeMounts:
         - name: service-credentials
           mountPath: /etc/credentials
