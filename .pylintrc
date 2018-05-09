@@ -16,7 +16,8 @@ ignore=
       features.py,
       fsdb.py,
       go.py,
-      gtp_extensions.py,
+      gtp_cmd_handlers.py,
+      gtp_engine.py,
       gtp_wrapper.py,
       local_rl_loop.py,
       main.py,
@@ -77,8 +78,10 @@ confidence=
 # --disable=W"
 
 disable=bare-except,
-        too-many-locals,
-        too-many-arguments
+        invalid-name,
+        too-few-methods,
+        too-many-arguments,
+        too-many-locals
         # print-statement,
         # parameter-unpacking,
         # unpacking-in-except,

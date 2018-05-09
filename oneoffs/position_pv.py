@@ -26,12 +26,12 @@ flags.DEFINE_string(
     "sgf_dir", "sgf/baduk_db/", "sgf database")
 
 flags.DEFINE_string("model_dir", "saved_models",
-                           "Where the model files are saved")
+                    "Where the model files are saved")
 flags.DEFINE_string("data_dir", "data/eval", "Where to save data")
 flags.DEFINE_integer("idx_start", 150,
-                            "Only take models after given idx")
+                     "Only take models after given idx")
 flags.DEFINE_integer("eval_every", 5,
-                            "Eval every k models to generate the curve")
+                     "Eval every k models to generate the curve")
 
 FLAGS = flags.FLAGS
 
@@ -50,7 +50,7 @@ def eval_pv(eval_positions):
         else:
             oneoff_utils.restore_params(model_paths[idx], player)
 
-        mcts = strategies.MCTSPlayerMixin(
+        mcts = strategies.MCTSPlayer(
             player.network,
             resign_threshold=-1)
 

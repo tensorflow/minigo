@@ -22,7 +22,7 @@ import coords
 import go
 from go import Position
 from tests import test_utils
-from strategies import MCTSPlayerMixin, time_recommendation
+from strategies import MCTSPlayer, time_recommendation
 
 ALMOST_DONE_BOARD = test_utils.load_board('''
 .XO.XO.OO
@@ -79,7 +79,7 @@ class DummyNet():
 
 
 def initialize_basic_player():
-    player = MCTSPlayerMixin(DummyNet())
+    player = MCTSPlayer(DummyNet())
     player.initialize_game()
     first_node = player.root.select_leaf()
     first_node.incorporate_results(
@@ -92,13 +92,13 @@ def initialize_almost_done_player():
     probs[2:5] = 0.2  # some legal moves along the top.
     probs[-1] = 0.2  # passing is also ok
     net = DummyNet(fake_priors=probs)
-    player = MCTSPlayerMixin(net)
+    player = MCTSPlayer(net)
     # root position is white to play with no history == white passed.
     player.initialize_game(SEND_TWO_RETURN_ONE)
     return player
 
 
-class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
+class TestMCTSPlayer(test_utils.MiniGoUnitTest):
     def test_time_controls(self):
         secs_per_move = 5
         for time_limit in (10, 100, 1000):
@@ -214,7 +214,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         self.assertNoPendingVirtualLosses(player.root)
 
     def test_long_game_tree_search(self):
-        player = MCTSPlayerMixin(DummyNet())
+        player = MCTSPlayer(DummyNet())
         endgame = go.Position(
             board=TT_FTW_BOARD,
             n=flags.FLAGS.max_game_length - 2,
@@ -235,7 +235,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
 
     def test_cold_start_parallel_tree_search(self):
         # Test that parallel tree search doesn't trip on an empty tree
-        player = MCTSPlayerMixin(DummyNet(fake_value=0.17))
+        player = MCTSPlayer(DummyNet(fake_value=0.17))
         player.initialize_game()
         self.assertEqual(player.root.N, 0)
         self.assertFalse(player.root.is_expanded)
@@ -252,7 +252,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         # repeatedly visits a finished game state.
         probs = np.array([.001] * (go.N * go.N + 1))
         probs[-1] = 1  # Make the dummy net always want to pass
-        player = MCTSPlayerMixin(DummyNet(fake_priors=probs))
+        player = MCTSPlayer(DummyNet(fake_priors=probs))
         pass_position = go.Position().pass_move()
         player.initialize_game(pass_position)
         player.tree_search(parallel_readouts=1)
@@ -269,7 +269,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
                                 ).play_move((4, 3)  # b plays
                                             ).pass_move()  # w passes - if B passes too, B would lose by komi.
 
-        player = MCTSPlayerMixin(DummyNet())
+        player = MCTSPlayer(DummyNet())
         player.initialize_game(white_passed_pos)
         # initialize the root
         player.tree_search()
@@ -283,7 +283,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
         self.assertEqual(player.root.child_N[pass_move], 1)
 
     def test_extract_data_normal_end(self):
-        player = MCTSPlayerMixin(DummyNet())
+        player = MCTSPlayer(DummyNet())
         player.initialize_game()
         player.tree_search()
         player.play_move(None)
@@ -301,7 +301,7 @@ class TestMCTSPlayerMixin(test_utils.MiniGoUnitTest):
                          "W+{}".format(player.root.position.komi))
 
     def test_extract_data_resign_end(self):
-        player = MCTSPlayerMixin(DummyNet())
+        player = MCTSPlayer(DummyNet())
         player.initialize_game()
         player.tree_search()
         player.play_move((0, 0))

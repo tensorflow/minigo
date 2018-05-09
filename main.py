@@ -42,7 +42,6 @@ EXAMPLES_PER_RECORD = 10000
 WINDOW_SIZE = 125000000
 
 
-
 def gtp(load_file: 'The path to the network model files'=None,
         cgos_mode: 'Whether to use CGOS time constraints'=False,
         kgs_mode: 'Whether to use KGS courtesy-pass'=False,
@@ -51,20 +50,10 @@ def gtp(load_file: 'The path to the network model files'=None,
                                verbosity=verbose,
                                cgos_mode=cgos_mode,
                                kgs_mode=kgs_mode)
-    sys.stderr.write("GTP engine ready\n")
-    sys.stderr.flush()
-    while not engine.disconnect:
-        inpt = input()
-        # handle either single lines at a time
-        # or multiple commands separated by '\n'
-        try:
-            cmd_list = inpt.split("\n")
-        except:
-            cmd_list = [inpt]
-        for cmd in cmd_list:
-            engine_reply = engine.send(cmd)
-            sys.stdout.write(engine_reply)
-            sys.stdout.flush()
+    print("GTP engine ready\n", file=sys.stderr, flush=True)
+    for msg in sys.stdin:
+        if not engine.handle_msg(msg.strip()):
+            break
 
 
 def bootstrap(
@@ -177,7 +166,6 @@ def selfplay(
         fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
 
     preprocessing.write_tf_examples(fname, tf_examples)
-
 
 
 def convert(load_file, dest_file):

@@ -38,10 +38,7 @@ minigo coord    (0, 0)          (0, 18)         None
 flat            0               18              361
 SGF             'aa'            'sa'            ''
 KGS             'A19'           'T19'           'pass'
-pygtp           (1, 19)         (19, 19)        (0, 0)
 """
-
-import gtp
 
 import go
 
@@ -94,19 +91,3 @@ def to_kgs(coord):
         return 'pass'
     y, x = coord
     return '{}{}'.format(_KGS_COLUMNS[x], go.N - y)
-
-
-def from_pygtp(pygtpc):
-    """Converts from a pygtp coordinate to a MiniGo coordinate."""
-    # GTP has a notion of both a Pass and a Resign, both of which are mapped to
-    # None, so the conversion is not precisely bijective.
-    if pygtpc in (gtp.PASS, gtp.RESIGN):
-        return None
-    return go.N - pygtpc[1], pygtpc[0] - 1
-
-
-def to_pygtp(coord):
-    """Converts from a MiniGo coordinate to a pygtp coordinate."""
-    if coord is None:
-        return gtp.PASS
-    return coord[1] + 1, go.N - coord[0]

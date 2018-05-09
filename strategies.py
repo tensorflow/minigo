@@ -25,23 +25,25 @@ import go
 import mcts
 import sgf_wrapper
 
+from player_interface import MCTSPlayerInterface
+
 flags.DEFINE_integer('softpick_move_cutoff', (go.N * go.N // 12) // 2 * 2,
                      'The move number (<=) up to which moves are softpicked from MCTS visits.')
 # Ensure that both white and black have an equal number of softpicked moves.
 flags.register_validator('softpick_move_cutoff', lambda x: x % 2 == 0)
 
 flags.DEFINE_float('resign_threshold', -0.9,
-    'The post-search Q evaluation at which resign should happen.'
-    'A threshold of -1 implies resign is disabled.')
+                   'The post-search Q evaluation at which resign should happen.'
+                   'A threshold of -1 implies resign is disabled.')
 flags.register_validator('resign_threshold', lambda x: -1 <= x < 0)
 
 flags.DEFINE_integer('num_readouts', 800,
-    'Number of searches to add to the MCTS search tree before playing a move.')
+                     'Number of searches to add to the MCTS search tree before playing a move.')
 flags.register_validator('num_readouts', lambda x: x > 0)
 
 flags.DEFINE_integer('parallel_readouts', 8,
-    'Number of searches to execute in parallel. This is also the batch size'
-    'for neural network evaluation.')
+                     'Number of searches to execute in parallel. This is also the batch size'
+                     'for neural network evaluation.')
 
 FLAGS = flags.FLAGS
 
@@ -75,7 +77,7 @@ def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
     return base_time * decay_factor ** max(player_move_num - core_moves, 0)
 
 
-class MCTSPlayerMixin:
+class MCTSPlayer(MCTSPlayerInterface):
     def __init__(self, network, seconds_per_move=5, num_readouts=0,
                  resign_threshold=None, verbosity=0, two_player_mode=False,
                  timed_match=False):
@@ -96,8 +98,18 @@ class MCTSPlayerMixin:
         self.result_string = None
         self.resign_threshold = resign_threshold or FLAGS.resign_threshold
         self.timed_match = timed_match
-        assert (self.timed_match and self.seconds_per_move > 0) or self.num_readouts > 0
+        assert (self.timed_match and self.seconds_per_move >
+                0) or self.num_readouts > 0
         super().__init__()
+
+    def get_position(self):
+        return self.root.position if self.root else None
+
+    def get_root(self):
+        return self.root
+
+    def get_result_string(self):
+        return self.result_string
 
     def initialize_game(self, position=None):
         if position is None:
@@ -171,7 +183,7 @@ class MCTSPlayerMixin:
             fcoord = np.argmax(self.root.child_N)
         else:
             cdf = self.root.child_N.cumsum()
-            cdf /= cdf[-2] # Prevents passing via softpick.
+            cdf /= cdf[-2]  # Prevents passing via softpick.
             selection = random.random()
             fcoord = cdf.searchsorted(selection)
             assert self.root.child_N[fcoord] != 0
@@ -255,26 +267,14 @@ class MCTSPlayerMixin:
                            self.searches_pi):
             yield pwc.position, pi, pwc.result
 
-    def chat(self, msg_type, sender, text):
-        default_response = "Supported commands are 'winrate', 'nextplay', 'fortune', and 'help'."
-        if self.root is None or self.root.position.n == 0:
-            return "I'm not playing right now.  " + default_response
+    def get_num_readouts(self):
+        return self.num_readouts
 
-        if 'winrate' in text.lower():
-            wr = (abs(self.root.Q) + 1.0) / 2.0
-            color = "Black" if self.root.Q > 0 else "White"
-            return "{:s} {:.2f}%".format(color, wr * 100.0)
-        elif 'nextplay' in text.lower():
-            return "I'm thinking... " + self.root.most_visited_path()
-        elif 'fortune' in text.lower():
-            return "You're feeling lucky!"
-        elif 'help' in text.lower():
-            return "I can't help much with go -- try ladders!  Otherwise: " + default_response
-        else:
-            return default_response
+    def set_num_readouts(self, readouts):
+        self.num_readouts = readouts
 
 
-class CGOSPlayerMixin(MCTSPlayerMixin):
+class CGOSPlayer(MCTSPlayer):
     def suggest_move(self, position):
         self.seconds_per_move = time_recommendation(position.n)
         return super().suggest_move(position)

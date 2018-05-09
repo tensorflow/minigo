@@ -103,9 +103,9 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(
     return HandleEcho(cmd, args);
   } else if (cmd == "final_score") {
     return HandleFinalScore(cmd, args);
-  } else if (cmd == "gamestate" || cmd == "mg_gamestate") {
+  } else if (cmd == "gamestate") {
     return HandleGamestate(cmd, args);
-  } else if (cmd == "genmove" || cmd == "mg_genmove") {
+  } else if (cmd == "genmove") {
     return HandleGenmove(cmd, args);
   } else if (cmd == "info") {
     return HandleInfo(cmd, args);

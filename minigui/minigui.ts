@@ -105,7 +105,7 @@ function init(boardSize: number) {
   }
 
   gtp.send('clear_board');
-  gtp.send('mg_gamestate');
+  gtp.send('gamestate');
   gtp.send('report_search_interval 50');
   gtp.send('info');
   gameState.gameOver = false;
@@ -187,7 +187,7 @@ class Player {
         this.controller = Controller.Human;
       }
       button.innerHTML = `${Controller[this.controller]}`;
-      gtp.send('mg_gamestate');
+      gtp.send('gamestate');
     });
   }
 
@@ -196,7 +196,7 @@ class Player {
       throw new Error(`Unexpected controller: ${Controller[this.controller]}`);
     }
     this.thinking = true;
-    gtp.send('mg_genmove 20', (cmd: string, result: string) => {
+    gtp.send('genmove', (cmd: string, result: string) => {
       this.thinking = false;
       onMovePlayed(result);
     });
@@ -218,7 +218,7 @@ function onMovePlayed(move: string) {
   }
 
   log.scroll();
-  gtp.send('mg_gamestate');
+  gtp.send('gamestate');
 
   if (gameOver && !gameState.gameOver) {
     gameState.gameOver = true;
@@ -302,7 +302,7 @@ function resetGame(delay?: number) {
   nBoard.clearHeatMap();
   gtp.newSession();
   gtp.send('clear_board', () => { gameState.gameOver = false; });
-  gtp.send('mg_gamestate');
+  gtp.send('gamestate');
   gtp.send('report_search_interval 50');
   gtp.send('info');
 }
