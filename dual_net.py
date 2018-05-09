@@ -306,11 +306,11 @@ def export_model(working_dir, model_path):
 
 
 def train(working_dir, tf_records, steps=None, **hparams):
-    estimator = get_estimator(working_dir, **hparams) 
+    estimator = get_estimator(working_dir, **hparams)
 
     def input_fn():
-        return preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records)
-
+        return preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records,
+                                               filter_amount=1.0)
 
     update_ratio_hook = UpdateRatioSessionHook(working_dir)
     step_counter_hook = EchoStepCounterHook(output_dir=working_dir)
