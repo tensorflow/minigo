@@ -36,10 +36,4 @@ spec:
       - name: service-credentials
         secret:
           secretName: $SERVICE_ACCOUNT-creds
-      - hostPath:
-          path: /home/kubernetes/bin/nvidia/bin
-        name: nvidia-debug-tools
-      - hostPath:
-          path: /home/kubernetes/bin/nvidia/lib64
-        name: nvidia-libraries
       restartPolicy: OnFailure
