@@ -142,7 +142,7 @@ def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     chunk_to_make = os.path.join(write_dir, str(
         models[-1][0] + 2) + '.tfrecord.zz')
     while tf.gfile.Exists(chunk_to_make):
-        print("Next chunk ({}) already exists.  Sleeping.".format(chunk_to_make))
+        print("Chunk for next model ({}) already exists.  Sleeping.".format(chunk_to_make))
         time.sleep(5 * 60)
         models = fsdb.get_models()[-model_window:]
     print("Making chunk:", chunk_to_make)
@@ -193,7 +193,7 @@ def make_chunk_for(output_dir=LOCAL_DIR,
             _rsync_dir(os.path.join(
                 game_dir, model), local_model_dir)
         files.extend(tf.gfile.Glob(os.path.join(local_model_dir, '*.zz')))
-        if buf.count > positions:
+        if len(files) * samples_per_game > positions:
             break
 
     print("Filling from {} files".format(len(files)))
@@ -210,4 +210,6 @@ parser = argparse.ArgumentParser()
 argh.add_commands(parser, [fill_and_wait, smart_rsync, make_chunk_for])
 
 if __name__ == "__main__":
-    argh.dispatch(parser)
+    import sys
+    remaining_argv = flags.FLAGS(sys.argv, known_only=True)
+    argh.dispatch(parser, argv=remaining_argv[1:])
