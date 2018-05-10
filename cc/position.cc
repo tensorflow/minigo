@@ -57,13 +57,8 @@ inline const inline_vector<Coord, 4>& GetNeighborCoords(Coord c) {
 
 }  // namespace
 
-Position::Position(BoardVisitor* bv, GroupVisitor* gv, float komi,
-                   Color to_play, int n)
-    : board_visitor_(bv),
-      group_visitor_(gv),
-      to_play_(to_play),
-      n_(n),
-      komi_(komi) {}
+Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play, int n)
+    : board_visitor_(bv), group_visitor_(gv), to_play_(to_play), n_(n) {}
 
 Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
     : Position(position) {
@@ -391,7 +386,7 @@ bool Position::HasNeighboringGroup(Coord c, GroupId group_id) const {
   return false;
 }
 
-float Position::CalculateScore() {
+float Position::CalculateScore(float komi) {
   int score = 0;
 
   static_assert(static_cast<int>(Color::kEmpty) == 0, "Color::kEmpty != 0");
@@ -446,7 +441,7 @@ float Position::CalculateScore() {
     }
   }
 
-  return static_cast<float>(score) - komi_;
+  return static_cast<float>(score) - komi;
 }
 
 }  // namespace minigo

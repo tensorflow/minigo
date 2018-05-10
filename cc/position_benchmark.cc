@@ -68,7 +68,7 @@ void BM_PlayGame(benchmark::State& state) {  // NOLINT(runtime/references)
       // For a fair comparison with the Python performance, create a new board
       // for each move.
       boards.clear();
-      boards.emplace_back(&bv, &gv, kDefaultKomi, Color::kBlack);
+      boards.emplace_back(&bv, &gv, Color::kBlack);
       for (const auto& move : moves) {
         boards.push_back(boards.back());
         boards.back().PlayMove(move);

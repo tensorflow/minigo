@@ -129,8 +129,7 @@ class GroupVisitor {
 // instances of the Position class.
 class Position {
  public:
-  Position(BoardVisitor* bv, GroupVisitor* gv, float komi, Color to_play,
-           int n = 0);
+  Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play, int n = 0);
 
   // Copies the position's state from another instance, while preserving the
   // BoardVisitor and GroupVisitor it was constructed with.
@@ -153,7 +152,7 @@ class Position {
 
   // Calculates the score from B perspective. If W is winning, score is
   // negative.
-  float CalculateScore();
+  float CalculateScore(float komi);
 
   // Returns true if playing this move is legal.
   bool IsMoveLegal(Coord c) const;
@@ -214,7 +213,6 @@ class Position {
 
   int n_;
   int num_consecutive_passes_ = 0;
-  float komi_;
 };
 
 }  // namespace minigo

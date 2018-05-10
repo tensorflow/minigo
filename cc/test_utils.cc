@@ -51,9 +51,9 @@ std::string CleanBoardString(absl::string_view str) {
   return absl::StrJoin(SplitBoardString(str), "\n") + "\n";
 }
 
-TestablePosition::TestablePosition(absl::string_view board_str, float komi,
-                                   Color to_play, int n)
-    : Position(&board_visitor, &group_visitor, komi, to_play, n) {
+TestablePosition::TestablePosition(absl::string_view board_str, Color to_play,
+                                   int n)
+    : Position(&board_visitor, &group_visitor, to_play, n) {
   auto stones = ParseBoard(board_str);
   for (int i = 0; i < kN * kN; ++i) {
     if (stones[i] != Color::kEmpty) {

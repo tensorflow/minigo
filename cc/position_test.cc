@@ -343,20 +343,20 @@ TEST(PositionTest, TestSeki) {
 
   // All empty squares are neutral points and black has 5 more stones than
   // white.
-  EXPECT_EQ(5, board.CalculateScore());
+  EXPECT_EQ(5, board.CalculateScore(0));
 }
 
 TEST(PositionTest, TestScoring) {
-  EXPECT_EQ(0, TestablePosition("").CalculateScore());
-  EXPECT_EQ(-42, TestablePosition("", 42).CalculateScore());
-  EXPECT_EQ(kN * kN, TestablePosition("X").CalculateScore());
-  EXPECT_EQ(-kN * kN, TestablePosition("O").CalculateScore());
+  EXPECT_EQ(0, TestablePosition("").CalculateScore(0));
+  EXPECT_EQ(-42, TestablePosition("").CalculateScore(42));
+  EXPECT_EQ(kN * kN, TestablePosition("X").CalculateScore(0));
+  EXPECT_EQ(-kN * kN, TestablePosition("O").CalculateScore(0));
 
   {
     auto board = TestablePosition(R"(
     .X.
     X.O)");
-    EXPECT_EQ(2, board.CalculateScore());
+    EXPECT_EQ(2, board.CalculateScore(0));
   }
 
   {
@@ -369,9 +369,8 @@ TEST(PositionTest, TestScoring) {
    OOOXOXOXX
    .O.OOXOOX
    .O.O.OOXX
-   ......OOO)",
-                                  6.5);
-    EXPECT_EQ(1.5, board.CalculateScore());
+   ......OOO)");
+    EXPECT_EQ(1.5, board.CalculateScore(6.5));
   }
 
   {
@@ -384,9 +383,8 @@ TEST(PositionTest, TestScoring) {
    OOOXOXOXX
    .O.OOXOOX
    .O.O.OOXX
-   ......OOO)",
-                                  6.5);
-    EXPECT_EQ(2.5, board.CalculateScore());
+   ......OOO)");
+    EXPECT_EQ(2.5, board.CalculateScore(6.5));
   }
 }
 
@@ -402,7 +400,7 @@ TEST(PositionTest, PlayGame) {
       "hh", "ba", "ai", "ac", "bi", "da", "di", "ab", "eh", "bc", "gh",
   };
 
-  TestablePosition board("", kDefaultKomi);
+  TestablePosition board("");
   for (const auto& move : moves) {
     board.PlayMove(move);
     // std::cout << board.ToPrettyString() << std::endl;
@@ -422,7 +420,7 @@ TEST(PositionTest, PlayGame) {
 
   std::array<int, 2> expected_captures = {10, 2};
   EXPECT_EQ(expected_captures, board.num_captures());
-  EXPECT_EQ(-0.5, board.CalculateScore());
+  EXPECT_EQ(-0.5, board.CalculateScore(kDefaultKomi));
 }
 
 }  // namespace

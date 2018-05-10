@@ -99,10 +99,11 @@ std::unique_ptr<TestablePlayer> CreateBasicPlayer(MctsPlayer::Options options) {
   return player;
 }
 
-std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(
-    MctsPlayer::Options options, int n) {
+std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(int n) {
   // Always use a deterministic random seed.
+  MctsPlayer::Options options;
   options.random_seed = 17;
+  options.komi = 2.5;
 
   std::array<float, kNumMoves> probs;
   for (auto& p : probs) {
@@ -114,7 +115,7 @@ std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(
   probs[Coord::kPass] = 0.2;
 
   auto player = absl::make_unique<TestablePlayer>(probs, 0, options);
-  auto board = TestablePosition(kAlmostDoneBoard, 2.5, Color::kBlack, n);
+  auto board = TestablePosition(kAlmostDoneBoard, Color::kBlack, n);
   player->InitializeGame(board);
   return player;
 }
@@ -198,9 +199,9 @@ TEST(MctsPlayerTest, PickMoveSoft) {
 }
 
 TEST(MctsPlayerTest, DontPassIfLosing) {
-  auto player = CreateAlmostDonePlayer({}, 0);
+  auto player = CreateAlmostDonePlayer(0);
   auto* root = player->root();
-  EXPECT_EQ(-0.5, root->position.CalculateScore());
+  EXPECT_EQ(-0.5, root->position.CalculateScore(player->options().komi));
 
   for (int i = 0; i < 20; ++i) {
     player->TreeSearch(1);
@@ -220,7 +221,7 @@ TEST(MctsPlayerTest, DontPassIfLosing) {
 }
 
 TEST(MctsPlayerTest, ParallelTreeSearch) {
-  auto player = CreateAlmostDonePlayer({}, 0);
+  auto player = CreateAlmostDonePlayer(0);
   auto* root = player->root();
 
   // Initialize the tree so that the root node has populated children.
@@ -245,7 +246,7 @@ TEST(MctsPlayerTest, ParallelTreeSearch) {
 }
 
 TEST(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
-  auto player = CreateAlmostDonePlayer({}, 0);
+  auto player = CreateAlmostDonePlayer(0);
   auto* root = player->root();
 
   for (int i = 0; i < 10; ++i) {
@@ -259,7 +260,7 @@ TEST(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
 }
 
 TEST(MctsPlayerTest, LongGameTreeSearch) {
-  auto player = CreateAlmostDonePlayer({}, kMaxSearchDepth - 2);
+  auto player = CreateAlmostDonePlayer(kMaxSearchDepth - 2);
   // Test that an almost complete game.
   for (int i = 0; i < 10; ++i) {
     player->TreeSearch(8);
@@ -315,7 +316,7 @@ TEST(MctsPlayerTest, TreeSearchFailsafe) {
 TEST(MctsPlayerTest, OnlyCheckGameEndOnce) {
   BoardVisitor bv;
   GroupVisitor gv;
-  Position position(&bv, &gv, kDefaultKomi, Color::kBlack);
+  Position position(&bv, &gv, Color::kBlack);
   position.PlayMove({3, 3});  // B plays.
   position.PlayMove({3, 4});  // W plays.
   position.PlayMove({4, 3});  // B plays.
@@ -367,7 +368,7 @@ TEST(MctsPlayerTest, ExtractDataResignEnd) {
   auto* root = player->root();
 
   // Black is winning on the board.
-  EXPECT_LT(0, root->position.CalculateScore());
+  EXPECT_LT(0, root->position.CalculateScore(player->options().komi));
 
   EXPECT_EQ(-1, player->result());
   EXPECT_EQ("W+R", player->result_string());

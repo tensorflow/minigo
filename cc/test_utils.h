@@ -30,8 +30,8 @@ namespace minigo {
 // for testing purposes.
 class TestablePosition : public Position {
  public:
-  TestablePosition(absl::string_view board_str, float komi = 0,
-                   Color to_play = Color::kBlack, int n = 0);
+  TestablePosition(absl::string_view board_str, Color to_play = Color::kBlack,
+                   int n = 0);
 
   // Convenience functions that automatically parse coords.
   void PlayMove(absl::string_view str, Color color = Color::kEmpty) {

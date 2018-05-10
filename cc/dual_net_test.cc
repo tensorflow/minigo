@@ -36,7 +36,7 @@ StoneFeatures GetStoneFeatures(const BoardFeatures& features, Coord c) {
 
 // Verifies InitializeFeatures for an empty board with black to play.
 TEST(DualNetTest, TestInitializeFeaturesBlackToPlay) {
-  TestablePosition board("", 0, Color::kBlack);
+  TestablePosition board("", Color::kBlack);
 
   BoardFeatures features;
   DualNet::InitializeFeatures(board, &features);
@@ -51,7 +51,7 @@ TEST(DualNetTest, TestInitializeFeaturesBlackToPlay) {
 
 // Verifies InitializeFeatures for an empty board with white to play.
 TEST(DualNetTest, TestInitializeFeaturesWhiteToPlay) {
-  TestablePosition board("", 0, Color::kWhite);
+  TestablePosition board("", Color::kWhite);
 
   BoardFeatures features;
   DualNet::InitializeFeatures(board, &features);
