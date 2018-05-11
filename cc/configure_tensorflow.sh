@@ -53,6 +53,10 @@ bazel build --copt=-march=ivybridge -c opt --config=opt //tensorflow:libtensorfl
 echo "Copying tensorflow libraries to ${dst_dir}"
 cp bazel-bin/tensorflow/libtensorflow_*.so "${dst_dir}"
 
+echo "Building toco"
+bazel build -c opt --config=opt --copt=-march=ivybridge //tensorflow/contrib/lite/toco:toco
+cp bazel-bin/tensorflow/contrib/lite/toco/toco "${dst_dir}"
+
 popd
 echo "Deleting tmp dir ${tmp_dir}"
 rm -rf "${tmp_dir}"
