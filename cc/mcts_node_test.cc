@@ -15,6 +15,7 @@
 #include "cc/mcts_node.h"
 
 #include <array>
+#include <set>
 
 #include "cc/position.h"
 #include "cc/random.h"

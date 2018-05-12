@@ -20,13 +20,11 @@
 #include <utility>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/position.h"
 #include "cc/random.h"
 #include "cc/symmetries.h"
-#include "tensorflow/core/lib/core/errors.h"
-#include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/public/session.h"
 
 namespace minigo {
 
@@ -76,24 +74,14 @@ class DualNet {
     float value;
   };
 
-  DualNet();
   virtual ~DualNet();
-
-  void Initialize(const std::string& graph_path);
 
   // Runs the model on a batch of input features.
   // If rnd != nullptr, the features will be randomly rotated and mirrored
   // before running the model, then the inverse transform applied to the
   // returned policy array.
   virtual void RunMany(absl::Span<const BoardFeatures* const> features,
-                       absl::Span<Output> outputs, Random* rnd = nullptr);
-
- private:
-  std::unique_ptr<tensorflow::Session> session_;
-  std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
-  std::vector<std::string> output_names_;
-  std::vector<tensorflow::Tensor> outputs_;
-  std::vector<symmetry::Symmetry> symmetries_used_;
+                       absl::Span<Output> outputs, Random* rnd = nullptr) = 0;
 };
 
 }  // namespace minigo

@@ -17,6 +17,7 @@
 #include <cctype>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <utility>
 
 #include "absl/strings/str_cat.h"

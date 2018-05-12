@@ -71,7 +71,7 @@ minigo_cc_library(
         ":position",
         ":random",
         ":symmetries",
-        ":tensorflow",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -169,6 +169,21 @@ minigo_cc_library(
     hdrs = ["symmetries.h"],
     deps = [
         ":check",
+    ],
+)
+
+minigo_cc_library(
+    name = "tf_dual_net",
+    srcs = ["tf_dual_net.cc"],
+    hdrs = ["tf_dual_net.h"],
+    deps = [
+        ":base",
+        ":dual_net",
+        ":position",
+        ":random",
+        ":symmetries",
+        ":tensorflow",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -300,12 +315,12 @@ minigo_cc_binary(
     srcs = ["main.cc"],
     deps = [
         ":base",
-        ":dual_net",
         ":gtp_player",
         ":init",
         ":mcts",
         ":random",
         ":sgf",
+        ":tf_dual_net",
         ":tf_utils",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
