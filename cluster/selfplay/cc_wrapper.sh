@@ -42,6 +42,7 @@ then
     --mode=selfplay \
     --holdout_pct=0.1 \
     --resign_threshold=0.89 \
+    --holdout_dir="gs://$BUCKET_NAME/data/holdout/$BASENAME" \
     --output_dir="gs://$BUCKET_NAME/data/selfplay/$BASENAME" \
     --sgf_dir="gs://$BUCKET_NAME/sgf/$BASENAME"
   echo Finished a set of games!
