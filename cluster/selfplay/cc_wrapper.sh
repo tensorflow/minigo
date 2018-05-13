@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Added to the player image.
-# Wraps our call to main.py
+# Wraps our call to cc/main
 
 set -e
 
@@ -40,7 +40,8 @@ then
     --model=$NAME \
     --num_readouts=800 \
     --mode=selfplay \
-    --resign_threshold=0.88 \
+    --holdout_pct=0.1 \
+    --resign_threshold=0.89 \
     --output_dir="gs://$BUCKET_NAME/data/selfplay/$BASENAME" \
     --sgf_dir="gs://$BUCKET_NAME/sgf/$BASENAME"
   echo Finished a set of games!
