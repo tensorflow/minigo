@@ -2,7 +2,6 @@ FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
-        bc \
         cuda-command-line-tools-9-0 \
         cuda-cublas-dev-9-0 \
         cuda-cudart-dev-9-0 \
