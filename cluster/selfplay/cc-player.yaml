@@ -30,8 +30,6 @@ spec:
           value: "$BOARD_SIZE"
         - name: LD_LIBRARY_PATH
           value: /usr/local/nvidia/lib64
-        securityContext:
-          privileged: true
       volumes:
       - name: service-credentials
         secret:

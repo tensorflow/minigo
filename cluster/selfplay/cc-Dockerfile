@@ -1,8 +1,8 @@
 FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
 
-RUN apt-get update
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
+        bc \
         cuda-command-line-tools-9-0 \
         cuda-cublas-dev-9-0 \
         cuda-cudart-dev-9-0 \
@@ -68,7 +68,6 @@ RUN cc/configure_tensorflow.sh
 # Now bring in the rest of our code; changing our code will only trigger rebuilds below here
 COPY staging/ /app
 
-RUN bazel build --copt=-march=ivybridge --define=board_size=19 cc/main 
-
+RUN bazel build --copt=-march=ivybridge --define=board_size=19 cc/main
 
 CMD ["/bin/sh", "cc_wrapper.sh"]
