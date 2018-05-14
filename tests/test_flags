@@ -1,2 +1,5 @@
 # One line per flag
 # For example --someflag=value
+--conv_width=1
+--fc_width=2
+--trunk_layers=1

@@ -18,6 +18,7 @@ This helps the intermediate layers extract concepts that are relevant to both
 move prediction and score estimation.
 """
 
+from absl import flags
 import functools
 import math
 import os.path
@@ -31,20 +32,41 @@ import go
 import preprocessing
 import symmetries
 
+flags.DEFINE_integer('train_batch_size', 256,
+                     'Batch size to use for train/eval evaluation')
+
+flags.DEFINE_integer('conv_width', 128 if go.N == 19 else 32,
+                     'The width of each conv layer in the shared trunk')
+
+flags.DEFINE_integer('fc_width', 256 if go.N == 19 else 64,
+                     'The width of the fully connected layer in value head.')
+
+flags.DEFINE_integer('trunk_layers', go.N,
+                     'The number of resnet layers in the shared trunk')
+
+flags.DEFINE_float('l2_strength', 1e-4,
+                   'The L2 regularization parameter applied to weights.')
+
+flags.DEFINE_float('sgd_momentum', 0.9,
+                   'Momentum parameter for learning rate.')
+
+# See www.moderndescartes.com/essays/shuffle_viz for discussion on sizing
+flags.DEFINE_integer('shuffle_buffer_size', 2000000,
+                     'Size of buffer used to shuffle train examples')
+
+FLAGS = flags.FLAGS
+
+
+# TODO: Clean up dual_net.EXAMPLES_PER_GENERATION, main.EXAMPLES_PER_RECORD/main.WINDOW_SIZE
 # How many positions to look at per generation.
 # Per AGZ, 2048 minibatch * 1k = 2M positions/generation
 EXAMPLES_PER_GENERATION = 2000000
 
-# How many positions can fit on the trainer; 256 for 19s on a p100
-TRAIN_BATCH_SIZE = 256
-
-VALIDATE_BATCH_SIZE = 32
 
 
 class DualNetwork():
-    def __init__(self, save_file, **hparams):
+    def __init__(self, save_file):
         self.save_file = save_file
-        self.hparams = get_default_hyperparams(**hparams)
         self.inference_input = None
         self.inference_output = None
         config = tf.ConfigProto()
@@ -56,7 +78,7 @@ class DualNetwork():
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
             estimator_spec = model_fn(features, labels,
-                                      tf.estimator.ModeKeys.PREDICT, self.hparams)
+                                      tf.estimator.ModeKeys.PREDICT)
             self.inference_input = features
             self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
@@ -102,40 +124,7 @@ def get_inference_input():
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
 
-def _round_power_of_two(n):
-    """Finds the nearest power of 2 to a number.
-
-    Thus 84 -> 64, 120 -> 128, etc.
-    """
-    return 2 ** int(round(math.log(n, 2)))
-
-
-def get_default_hyperparams(**overrides):
-    """Returns the hyperparams for the neural net.
-
-    In other words, returns a dict whose parameters come from the AGZ
-    paper:
-      k: number of filters (AlphaGoZero used 256). We use 128 by
-        default for a 19x19 go board.
-      fc_width: Dimensionality of the fully connected linear layer
-      num_shared_layers: number of shared residual blocks.  AGZ used both 19
-        and 39. Here we use 19 because it's faster to train.
-      l2_strength: The L2 regularization parameter.
-      momentum: The momentum parameter for training
-    """
-    k = _round_power_of_two(go.N ** 2 / 3)  # width of each layer
-    hparams = {
-        'k': k,  # Width of each conv layer
-        'fc_width': 2 * k,  # Width of each fully connected layer
-        'num_shared_layers': go.N,  # Number of shared trunk layers
-        'l2_strength': 1e-4,  # Regularization strength
-        'momentum': 0.9,  # Momentum used in SGD
-    }
-    hparams.update(**overrides)
-    return hparams
-
-
-def model_fn(features, labels, mode, params, config=None):
+def model_fn(features, labels, mode):
     '''
     Args:
         features: tensor with shape
@@ -144,8 +133,6 @@ def model_fn(features, labels, mode, params, config=None):
             'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
             'value_tensor': [BATCH_SIZE]
         mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
-        params: a dict of hyperparams
-        config: ignored; is required by Estimator API.
     Returns: tf.estimator.EstimatorSpec with props
         mode: same as mode arg
         predictions: dict of tensors
@@ -157,7 +144,6 @@ def model_fn(features, labels, mode, params, config=None):
     return dict of tensors
         logits: [BATCH_SIZE, go.N * go.N + 1]
     '''
-    del config  # Unused
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
         momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,
@@ -165,7 +151,7 @@ def model_fn(features, labels, mode, params, config=None):
 
     my_conv2d = functools.partial(
         tf.layers.conv2d,
-        filters=params['k'], kernel_size=[3, 3], padding="same")
+        filters=FLAGS.conv_width, kernel_size=[3, 3], padding="same")
 
     def my_res_layer(inputs):
         int_layer1 = my_batchn(my_conv2d(inputs))
@@ -178,7 +164,7 @@ def model_fn(features, labels, mode, params, config=None):
 
     # the shared stack
     shared_output = initial_output
-    for _ in range(params['num_shared_layers']):
+    for _ in range(FLAGS.trunk_layers):
         shared_output = my_res_layer(shared_output)
 
     # policy head
@@ -197,7 +183,7 @@ def model_fn(features, labels, mode, params, config=None):
         center=False, scale=False))
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
         tf.reshape(value_conv, [-1, go.N * go.N]),
-        params['fc_width']))
+        FLAGS.fc_width))
     value_output = tf.nn.tanh(
         tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
         name='value_output')
@@ -209,8 +195,9 @@ def model_fn(features, labels, mode, params, config=None):
         logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
-    l2_cost = params['l2_strength'] * tf.add_n([tf.nn.l2_loss(v)
-                                                for v in tf.trainable_variables() if not 'bias' in v.name])
+    l2_cost = FLAGS.l2_strength * tf.add_n([
+        tf.nn.l2_loss(v)
+        for v in tf.trainable_variables() if not 'bias' in v.name])
     combined_cost = policy_cost + value_cost + l2_cost
     policy_entropy = -tf.reduce_mean(tf.reduce_sum(
         policy_output * tf.log(policy_output), axis=1))
@@ -221,7 +208,7 @@ def model_fn(features, labels, mode, params, config=None):
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
         train_op = tf.train.MomentumOptimizer(
-            learning_rate, params['momentum']).minimize(
+            learning_rate, FLAGS.sgd_momentum).minimize(
                 combined_cost, global_step=global_step)
 
     metric_ops = {
@@ -251,23 +238,17 @@ def model_fn(features, labels, mode, params, config=None):
     )
 
 
-def get_estimator(working_dir, **hparams):
-    hparams = get_default_hyperparams(**hparams)
-    return tf.estimator.Estimator(
-        model_fn,
-        model_dir=working_dir,
-        params=hparams)
+def get_estimator(working_dir):
+    return tf.estimator.Estimator(model_fn, model_dir=working_dir)
 
 
-def bootstrap(working_dir, **hparams):
+def bootstrap(working_dir):
     """Initialize a tf.Estimator run with random initial weights.
 
     Args:
         working_dir: The directory where tf.estimator will drop logs,
             checkpoints, and so on
-        hparams: hyperparams of the model.
     """
-    hparams = get_default_hyperparams(**hparams)
     # a bit hacky - forge an initial checkpoint with the name that subsequent
     # Estimator runs will expect to find.
     #
@@ -279,7 +260,7 @@ def bootstrap(working_dir, **hparams):
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()
-        model_fn(features, labels, tf.estimator.ModeKeys.PREDICT, hparams)
+        model_fn(features, labels, tf.estimator.ModeKeys.PREDICT)
         sess.run(tf.global_variables_initializer())
         tf.train.Saver().save(sess, save_file)
 
@@ -294,8 +275,7 @@ def export_model(working_dir, model_path):
         working_dir: The directory where tf.estimator keeps its checkpoints
         model_path: The path (can be a gs:// path) to export model to
     """
-    estimator = tf.estimator.Estimator(model_fn, model_dir=working_dir,
-                                       params='ignored')
+    estimator = tf.estimator.Estimator(model_fn, model_dir=working_dir)
     latest_checkpoint = estimator.latest_checkpoint()
     all_checkpoint_files = tf.gfile.Glob(latest_checkpoint + '*')
     for filename in all_checkpoint_files:
@@ -305,30 +285,31 @@ def export_model(working_dir, model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def train(working_dir, tf_records, steps=None, **hparams):
-    estimator = get_estimator(working_dir, **hparams)
+def train(working_dir, tf_records, steps=None):
+    estimator = get_estimator(working_dir)
 
     def input_fn():
-        return preprocessing.get_input_tensors(TRAIN_BATCH_SIZE, tf_records,
-                                               filter_amount=1.0)
+        return preprocessing.get_input_tensors(
+            FLAGS.train_batch_size, tf_records, filter_amount=1.0,
+            shuffle_buffer_size=FLAGS.shuffle_buffer_size)
 
     update_ratio_hook = UpdateRatioSessionHook(working_dir)
     step_counter_hook = EchoStepCounterHook(output_dir=working_dir)
     if steps is None:
-        steps = EXAMPLES_PER_GENERATION // TRAIN_BATCH_SIZE
+        steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
     estimator.train(input_fn, hooks=[
                         update_ratio_hook, step_counter_hook], steps=steps)
 
 
-def validate(working_dir, tf_records, checkpoint_name=None, **hparams):
-    estimator = get_estimator(working_dir, **hparams)
+def validate(working_dir, tf_records, checkpoint_name=None, validate_name=None):
+    estimator = get_estimator(working_dir)
     if checkpoint_name is None:
         checkpoint_name = estimator.latest_checkpoint()
 
     def input_fn():
-        return preprocessing.get_input_tensors(VALIDATE_BATCH_SIZE, tf_records,
+        return preprocessing.get_input_tensors(FLAGS.train_batch_size, tf_records,
             shuffle_buffer_size=20000, filter_amount=0.05)
-    estimator.evaluate(input_fn, steps=500)
+    estimator.evaluate(input_fn, steps=500, name=validate_name)
 
 
 def compute_update_ratio(weight_tensors, before_weights, after_weights):

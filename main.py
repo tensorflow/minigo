@@ -110,7 +110,7 @@ def validate(
     with utils.logged_timer("Validating from {} to {}".format(first_record, last_record)):
         dual_net.validate(
             working_dir, tf_records, checkpoint_name=checkpoint_name,
-            name=validate_name)
+            validate_name=validate_name)
 
 
 def evaluate(

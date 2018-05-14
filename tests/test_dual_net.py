@@ -21,9 +21,6 @@ import go
 import preprocessing
 from tests import test_utils
 
-fast_hparams = {'k': 1, 'fc_width': 2, 'num_shared_layers': 1}
-dual_net.EXAMPLES_PER_GENERATION = dual_net.TRAIN_BATCH_SIZE
-
 
 class TestDualNet(test_utils.MiniGoUnitTest):
     def test_train(self):
@@ -31,20 +28,20 @@ class TestDualNet(test_utils.MiniGoUnitTest):
                 tempfile.NamedTemporaryFile() as tf_record:
             preprocessing.make_dataset_from_sgf(
                 'tests/example_game.sgf', tf_record.name)
-            dual_net.train(working_dir, [tf_record.name], 1, **fast_hparams)
+            dual_net.train(working_dir, [tf_record.name], steps=1)
 
     def test_inference(self):
         with tempfile.TemporaryDirectory() as working_dir, \
                 tempfile.TemporaryDirectory() as export_dir:
-            dual_net.bootstrap(working_dir, **fast_hparams)
+            dual_net.bootstrap(working_dir)
             exported_model = os.path.join(export_dir, 'bootstrap-model')
             dual_net.export_model(working_dir, exported_model)
 
-            n1 = dual_net.DualNetwork(exported_model, **fast_hparams)
+            n1 = dual_net.DualNetwork(exported_model)
             n1.run(go.Position())
 
             # In the past we've had issues initializing two separate NNs
             # in the same process... just double check that two DualNetwork
             # instances can live side by side.
-            n2 = dual_net.DualNetwork(exported_model, **fast_hparams)
+            n2 = dual_net.DualNetwork(exported_model)
             n2.run(go.Position())

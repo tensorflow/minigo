@@ -41,14 +41,12 @@ def rl_loop():
     """
     # TODO(brilee): move these all into appropriate local_flags file.
     # monkeypatch the hyperparams so that we get a quickly executing network.
-    dual_net.get_default_hyperparams = lambda **kwargs: {
-        'k': 8, 'fc_width': 16, 'num_shared_layers': 1, 'l2_strength': 1e-4, 'momentum': 0.9}
-
-    dual_net.TRAIN_BATCH_SIZE = 16
+    flags.FLAGS.conv_width = 8
+    flags.FLAGS.fc_width = 16
+    flags.FLAGS.trunk_layers = 1
+    flags.FLAGS.train_batch_size = 16
+    flags.FLAGS.shuffle_buffer_size = 1000
     dual_net.EXAMPLES_PER_GENERATION = 64
-
-    # monkeypatch the shuffle buffer size so we don't spin forever shuffling up positions.
-    preprocessing.SHUFFLE_BUFFER_SIZE = 1000
 
     flags.FLAGS.num_readouts = 10
 
@@ -104,7 +102,7 @@ def rl_loop():
 
         print("Training on gathered game data...")
         main.train_dir(working_dir, gather_dir,
-                       next_model_save_file, generation_num=1)
+                       next_model_save_file)
         print("Trying validate on 'holdout' game...")
         main.validate(working_dir, holdout_dir)
         print("Verifying that new checkpoint is playable...")
