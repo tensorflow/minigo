@@ -67,7 +67,7 @@ DEFINE_string(holdout_dir, "",
 DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
 DEFINE_double(holdout_pct, 0.05,
               "Fraction of games to hold out for validation.");
-DEFINE_double(disable_resign_pct, 0.05,
+DEFINE_double(disable_resign_pct, 0.1,
               "Fraction of games to disable resignation for.");
 DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
