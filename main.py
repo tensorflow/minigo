@@ -125,7 +125,7 @@ def evaluate(
         black_net = dual_net.DualNetwork(black_model)
         white_net = dual_net.DualNetwork(white_model)
 
-    with utils.logged_timer("%d games" % games):
+    with utils.logged_timer("Playing game"):
         evaluation.play_match(
             black_net, white_net, games, output_dir, verbose)
 

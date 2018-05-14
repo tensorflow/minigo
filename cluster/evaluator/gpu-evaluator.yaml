@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minigo-gpu-evaluator-{{bnum}}-{{wnum}}
+spec:
+  parallelism: 4
+  completions: 10
+  template:
+    metadata:
+      name: gpu-evaluator
+    spec:
+      containers:
+      - name: evaluator
+        image: gcr.io/$PROJECT/$GPU_EVALUATOR_CONTAINER:$VERSION_TAG
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: service-credentials
+          mountPath: /etc/credentials
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/credentials/service-account.json
+        - name: BUCKET_NAME
+          value: $BUCKET_NAME
+        - name: BOARD_SIZE
+          value: "$BOARD_SIZE"
+        - name: MODEL_WHITE
+          value: {{ white }}
+        - name: MODEL_BLACK
+          value: {{ black }}
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+      volumes:
+      - name: service-credentials
+        secret:
+          secretName: $SERVICE_ACCOUNT-creds
+      restartPolicy: OnFailure

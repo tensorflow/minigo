@@ -34,7 +34,6 @@ def play_match(black_net, white_net, games, sgf_dir, verbosity):
     """
     readouts = flags.FLAGS.num_readouts  # Flag defined in strategies.py
 
-    # For n games, we create lists of n black and n white players
     black = MCTSPlayer(
         black_net, verbosity=verbosity, two_player_mode=True)
     white = MCTSPlayer(
