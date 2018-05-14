@@ -24,3 +24,21 @@ buffer down to 100k
 
 1. v360ish -- entered experimental mode; freely adjusted learning rate up and
 down, adjusted batch size, etc, to see if valnet divergence could be fixed.
+
+
+== v7
+
+Rolled back to v5 model 173 and continued from there; first v7 model was
+174.  Moved minimum games before starting training
+from 5k up to 10k.
+
+1. for 215, adjusted validation set to be last 30 models instead of last 50.
+It's hard coded and non-adaptive but it's an easy fix to make on a sunday :)
+
+1. Easy change on a sunday = famous last words.  Also at 215, also discovered
+haven't been writing holdout games for models 174-onwards.  Oops.  Should make
+for an interesting spike on tensorboard's validation error now as the
+validation set will be entirely games from 215.  This new cc image ends up
+causing disk pressure on the nodes leading to all the jobs stopping.  Sigh.
+
+1. 217 onwards -- resign disabled amount is 10%, not 5%.

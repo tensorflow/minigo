@@ -29,10 +29,10 @@ import main
 import shipname
 
 # How many games before the selfplay workers will stop trying to play more.
-MAX_GAMES_PER_GENERATION = 10000
+MAX_GAMES_PER_GENERATION = 20000
 
 # How many games minimum, until the trainer will train
-MIN_GAMES_PER_GENERATION = 500
+MIN_GAMES_PER_GENERATION = 10000
 
 # What percent of games to holdout from training per generation
 HOLDOUT_PCT = 0.05
@@ -119,10 +119,10 @@ def validate(working_dir, model_num=None, validate_name=None):
     # term.
     models = list(
         filter(lambda num_name: num_name[0] < (model_num - 1), fsdb.get_models()))
-    # Run on the most recent 50 generations,
+    # Run on the most recent 30 generations,
     # TODO(brianklee): make this hyperparameter dependency explicit/not hardcoded
     holdout_dirs = [os.path.join(fsdb.holdout_dir(), pair[1])
-                    for pair in models[-50:]]
+                    for pair in models[-30:]]
 
     main.validate(working_dir, *holdout_dirs,
                   checkpoint_name=os.path.join(fsdb.models_dir(), model_name),

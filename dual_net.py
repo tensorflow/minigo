@@ -51,7 +51,7 @@ flags.DEFINE_float('sgd_momentum', 0.9,
                    'Momentum parameter for learning rate.')
 
 # See www.moderndescartes.com/essays/shuffle_viz for discussion on sizing
-flags.DEFINE_integer('shuffle_buffer_size', 2000000,
+flags.DEFINE_integer('shuffle_buffer_size', 20000,
                      'Size of buffer used to shuffle train examples')
 
 FLAGS = flags.FLAGS
@@ -61,7 +61,6 @@ FLAGS = flags.FLAGS
 # How many positions to look at per generation.
 # Per AGZ, 2048 minibatch * 1k = 2M positions/generation
 EXAMPLES_PER_GENERATION = 2000000
-
 
 
 class DualNetwork():
@@ -192,7 +191,7 @@ def model_fn(features, labels, mode):
     global_step = tf.train.get_or_create_global_step()
     policy_cost = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
-        logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
+            logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
     l2_cost = FLAGS.l2_strength * tf.add_n([
@@ -298,17 +297,17 @@ def train(working_dir, tf_records, steps=None):
     if steps is None:
         steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
     estimator.train(input_fn, hooks=[
-                        update_ratio_hook, step_counter_hook], steps=steps)
+        update_ratio_hook, step_counter_hook], steps=steps)
 
 
 def validate(working_dir, tf_records, checkpoint_name=None, validate_name=None):
     estimator = get_estimator(working_dir)
-    if checkpoint_name is None:
-        checkpoint_name = estimator.latest_checkpoint()
+    validate_name = validate_name or "selfplay"
+    checkpoint_name = checkpoint_name or estimator.latest_checkpoint()
 
     def input_fn():
         return preprocessing.get_input_tensors(FLAGS.train_batch_size, tf_records,
-            shuffle_buffer_size=20000, filter_amount=0.05)
+                                               shuffle_buffer_size=20000, filter_amount=0.05)
     estimator.evaluate(input_fn, steps=500, name=validate_name)
 
 
@@ -334,7 +333,7 @@ class EchoStepCounterHook(tf.train.StepCounterHook):
 
 
 class UpdateRatioSessionHook(tf.train.SessionRunHook):
-    def __init__(self, working_dir, every_n_steps=100):
+    def __init__(self, working_dir, every_n_steps=1000):
         self.working_dir = working_dir
         self.every_n_steps = every_n_steps
         self.before_weights = None
