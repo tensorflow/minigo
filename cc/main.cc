@@ -205,7 +205,7 @@ void Gtp() {
   auto player = absl::make_unique<GtpPlayer>(
       absl::make_unique<TfDualNet>(FLAGS_model), options);
 
-  std::cout << "GTP engine ready" << std::endl;
+  std::cerr << "GTP engine ready" << std::endl;
   std::string line;
   do {
     std::getline(std::cin, line);

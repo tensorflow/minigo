@@ -96,6 +96,8 @@ GtpPlayer::Response GtpPlayer::CheckArgsRange(
 
 GtpPlayer::Response GtpPlayer::DispatchCmd(
     absl::string_view cmd, const std::vector<absl::string_view>& args) {
+  // TODO: Put these into a map<string, std::function>  to make the list of
+  // supported commands DRY with HandleListCommands
   if (cmd == "boardsize") {
     return HandleBoardsize(cmd, args);
   } else if (cmd == "clear_board") {
@@ -110,6 +112,8 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(
     return HandleGenmove(cmd, args);
   } else if (cmd == "info") {
     return HandleInfo(cmd, args);
+  } else if (cmd == "list_commands") {
+    return HandleListCommands(cmd, args);
   } else if (cmd == "name") {
     return HandleName(cmd, args);
   } else if (cmd == "play") {
@@ -148,7 +152,6 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(
 
   return Response::Ok();
 }
-
 GtpPlayer::Response GtpPlayer::HandleEcho(
     absl::string_view cmd, const std::vector<absl::string_view>& args) {
   return Response::Ok(absl::StrJoin(args, " "));
@@ -251,6 +254,21 @@ GtpPlayer::Response GtpPlayer::HandleInfo(
       << " report_search_interval:" << report_search_interval_
       << " name:" << name_;
   return Response::Ok(oss.str());
+}
+
+GtpPlayer::Response GtpPlayer::HandleListCommands(
+    absl::string_view cmd, const std::vector<absl::string_view>& args) {
+  auto response = CheckArgsExact(cmd, 0, args);
+  if (!response.ok) {
+    return response;
+  }
+  absl::string_view commands[] = {
+      "list_commands", "boardsize", "clear_board", "echo",
+      "final_score",   "gamestate", "genmove",     "info",
+      "name",          "play",      "readouts",    "report_search_interval"};
+
+  response.str = absl::StrJoin(commands, "\n");
+  return response;
 }
 
 GtpPlayer::Response GtpPlayer::HandleName(

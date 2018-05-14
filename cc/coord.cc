@@ -16,6 +16,7 @@
 
 #include <utility>
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 
@@ -28,10 +29,11 @@ constexpr char Coord::kKgsColumns[];
 namespace {
 
 Coord TryParseKgs(absl::string_view str) {
-  if (str == "pass") {
+  str = absl::AsciiStrToUpper(str);
+  if (str == "PASS") {
     return Coord::kPass;
   }
-  if (str == "resign") {
+  if (str == "RESIGN") {
     return Coord::kResign;
   }
 
