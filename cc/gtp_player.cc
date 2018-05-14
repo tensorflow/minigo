@@ -30,8 +30,64 @@ namespace minigo {
 
 GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
+      ponder_limit_(options.ponder_limit),
+      courtesy_pass_(options.courtesy_pass),
       name_(options.name),
       num_readouts_(options.num_readouts) {}
+
+void GtpPlayer::Run() {
+  std::cerr << "GTP engine ready" << std::endl;
+  std::string line;
+  std::ios::sync_with_stdio(false);
+  while (!std::cin.eof()) {
+    if (MaybePonder()) {
+      continue;
+    }
+    std::getline(std::cin, line);
+    if (!HandleCmd(line)) {
+      break;
+    }
+    ponder_count_ = 0;
+  }
+}
+
+Coord GtpPlayer::SuggestMove(int num_readouts) {
+  if (courtesy_pass_ && root()->move == Coord::kPass) {
+    return Coord::kPass;
+  }
+  return MctsPlayer::SuggestMove(num_readouts);
+}
+
+bool GtpPlayer::MaybePonder() {
+  // We ponder if all the following conditions are true:
+  //  1) Pondering is enabled.
+  //  2) We haven't pondered too much.
+  //  3) There's no GTP command pending on stdin.
+  //  4) It's the opponent's turn.
+  bool should_ponder =
+      (ponder_limit_ > 0 && ponder_count_ < ponder_limit_ &&
+       std::cin.rdbuf()->in_avail() == 0 && last_genmove_ != Color::kEmpty &&
+       last_genmove_ != root()->position.to_play());
+
+  if (!should_ponder) {
+    ponder_count_ = 0;
+    return false;
+  }
+
+  if (ponder_count_ == 0) {
+    std::cerr << "pondering...\n";
+  }
+
+  TreeSearch(options().batch_size);
+
+  ponder_count_ += options().batch_size;
+  if (ponder_count_ >= ponder_limit_) {
+    std::cerr << root()->Describe() << "\n";
+    std::cerr << "finished pondering\n";
+  }
+
+  return true;
+}
 
 bool GtpPlayer::HandleCmd(const std::string& line) {
   std::vector<absl::string_view> args =
@@ -118,6 +174,8 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(
     return HandleName(cmd, args);
   } else if (cmd == "play") {
     return HandlePlay(cmd, args);
+  } else if (cmd == "ponder_limit") {
+    return HandlePonderLimit(cmd, args);
   } else if (cmd == "readouts") {
     return HandleReadouts(cmd, args);
   } else if (cmd == "report_search_interval") {
@@ -148,6 +206,7 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(
     return response;
   }
 
+  last_genmove_ = Color::kEmpty;
   NewGame();
 
   return Response::Ok();
@@ -236,6 +295,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(
 
   auto c = SuggestMove(num_readouts_);
   std::cerr << root()->Describe() << std::endl;
+  last_genmove_ = root()->position.to_play();
   PlayMove(c);
 
   return Response::Ok(c.ToKgs());
@@ -314,6 +374,23 @@ GtpPlayer::Response GtpPlayer::HandlePlay(
   }
 
   PlayMove(c);
+  return Response::Ok();
+}
+
+GtpPlayer::Response GtpPlayer::HandlePonderLimit(
+    absl::string_view cmd, const std::vector<absl::string_view>& args) {
+  auto response = CheckArgsExact(cmd, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  int x;
+  if (!absl::SimpleAtoi(args[0], &x) || x < 0) {
+    return Response::Error("couldn't parse ", args[0], " as an integer >= 0");
+  } else {
+    ponder_limit_ = x;
+  }
+
   return Response::Ok();
 }
 

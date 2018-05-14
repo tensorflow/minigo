@@ -73,6 +73,13 @@ DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
 DEFINE_int32(batch_size, 8,
              "Number of readouts to run inference on in parallel.");
+DEFINE_int32(
+    ponder_limit, 0,
+    "If non-zero and in GTP mode, the number times of times to perform tree "
+    "search while waiting for the opponent to play.");
+DEFINE_bool(
+    courtesy_pass, false,
+    "If true and in GTP mode, we will always pass if the opponent passes.");
 
 DEFINE_string(mode, "", "Mode to run in: \"selfplay\" or \"gtp\"");
 
@@ -202,14 +209,11 @@ void Gtp() {
   ParseMctsPlayerOptionsFromFlags(&options);
   options.num_readouts = FLAGS_num_readouts;
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
+  options.ponder_limit = FLAGS_ponder_limit;
+  options.courtesy_pass = FLAGS_courtesy_pass;
   auto player = absl::make_unique<GtpPlayer>(
       absl::make_unique<TfDualNet>(FLAGS_model), options);
-
-  std::cerr << "GTP engine ready" << std::endl;
-  std::string line;
-  do {
-    std::getline(std::cin, line);
-  } while (!std::cin.eof() && player->HandleCmd(line));
+  player->Run();
 }
 
 }  // namespace

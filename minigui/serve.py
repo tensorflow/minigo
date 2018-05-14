@@ -84,6 +84,8 @@ elif args.engine == "cc":
         "--soft_pick=false",
         "--inject_noise=false",
         "--disable_resign_pct=0",
+        "--ponder_limit=100000",
+        "--courtesy_pass=true",
         "--mode=gtp"]
 else:
     raise ValueError(

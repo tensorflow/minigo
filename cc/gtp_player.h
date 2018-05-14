@@ -24,6 +24,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
+#include "cc/color.h"
 #include "cc/dual_net.h"
 #include "cc/mcts_player.h"
 
@@ -40,13 +41,20 @@ class GtpPlayer : public MctsPlayer {
     absl::Duration report_search_interval;
 
     std::string name = "minigo";
+
+    // If non-zero, TreeSearch up to ponder_limit times while waiting for the
+    // other player to play.
+    int ponder_limit = 0;
+
+    // If true, we will always pass if the opponent passes.
+    bool courtesy_pass = false;
   };
 
   GtpPlayer(std::unique_ptr<DualNet> network, const Options& options);
 
-  // Handles a GTP command specified by `line`, printing the result to stdout.
-  // Returns false if the GtpPlayer should quit.
-  bool HandleCmd(const std::string& line);
+  void Run();
+
+  Coord SuggestMove(int num_readouts) override;
 
  protected:
   absl::Span<MctsNode* const> TreeSearch(int batch_size) override;
@@ -63,6 +71,14 @@ class GtpPlayer : public MctsPlayer {
     std::string str;
     bool ok;
   };
+
+  // If waiting for the opponent to play, consider thinking for a bit.
+  // Returns true if we pondered.
+  bool MaybePonder();
+
+  // Handles a GTP command specified by `line`, printing the result to stdout.
+  // Returns false if the GtpPlayer should quit.
+  bool HandleCmd(const std::string& line);
 
   Response CheckArgsExact(absl::string_view cmd, size_t expected_num_args,
                           const std::vector<absl::string_view>& args);
@@ -103,6 +119,9 @@ class GtpPlayer : public MctsPlayer {
   Response HandlePlay(absl::string_view cmd,
                       const std::vector<absl::string_view>& args);
 
+  Response HandlePonderLimit(absl::string_view cmd,
+                             const std::vector<absl::string_view>& args);
+
   Response HandleReadouts(absl::string_view cmd,
                           const std::vector<absl::string_view>& args);
 
@@ -111,6 +130,14 @@ class GtpPlayer : public MctsPlayer {
 
   void ReportSearchStatus(const MctsNode* last_read);
 
+  // The color of the last genmove command, which under normal circumstances
+  // is the color we are playing as.
+  // Set to Color::kEmpty when the board is cleared.
+  Color last_genmove_ = Color::kEmpty;
+
+  int ponder_count_ = 0;
+  int ponder_limit_;
+  bool courtesy_pass_;
   std::string name_;
   int num_readouts_;
   absl::Duration report_search_interval_;

@@ -126,7 +126,6 @@ Coord MctsPlayer::PickMove() {
 absl::Span<MctsNode* const> MctsPlayer::TreeSearch(int batch_size) {
   int max_iterations = batch_size * 2;
 
-  // TODO(tommadams): Avoid creating this vector each time.
   leaves_.clear();
   for (int i = 0; i < max_iterations; ++i) {
     auto* leaf = root_->SelectLeaf();

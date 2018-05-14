@@ -68,7 +68,7 @@ class MctsPlayer {
 
   void NewGame();
 
-  Coord SuggestMove(int num_readouts);
+  virtual Coord SuggestMove(int num_readouts);
 
   void PlayMove(Coord c);
 
