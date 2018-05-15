@@ -16,12 +16,12 @@
 #define CC_POSITION_H_
 
 #include <array>
-#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <memory>
 #include <string>
 
+#include "cc/check.h"
 #include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/coord.h"
@@ -52,7 +52,7 @@ class BoardVisitor {
 
   // Starts a new visit around the board.
   void Begin() {
-    assert(Done());
+    MG_DCHECK(Done());
     if (epoch_++ == 0) {
       memset(visited_.data(), 0, sizeof(visited_));
     }

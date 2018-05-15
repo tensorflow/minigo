@@ -77,7 +77,7 @@ void Position::PlayMove(Coord c, Color color) {
   } else {
     to_play_ = color;
   }
-  assert(IsMoveLegal(c));
+  MG_CHECK(IsMoveLegal(c));
 
   AddStoneToBoard(c, color);
 
@@ -267,7 +267,7 @@ void Position::RemoveGroup(Coord c) {
   while (!board_visitor_->Done()) {
     c = board_visitor_->Next();
 
-    assert(stones_[c].group_id() == removed_group_id);
+    MG_CHECK(stones_[c].group_id() == removed_group_id);
     stones_[c] = {};
     tiny_set<GroupId, 4> other_groups;
     for (auto nc : GetNeighborCoords(c)) {
@@ -300,7 +300,7 @@ void Position::MergeGroup(Coord c) {
     if (stones_[c].color() == Color::kEmpty) {
       ++group.num_liberties;
     } else {
-      assert(stones_[c].color() == color);
+      MG_CHECK(stones_[c].color() == color);
       ++group.size;
       stones_[c] = s;
       for (auto nc : GetNeighborCoords(c)) {
