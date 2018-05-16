@@ -9,6 +9,7 @@ sgf
 pyvenv.cfg
 .DS_store
 logs/
+saved_models/
 
 # Vim temp files
 *.swp
