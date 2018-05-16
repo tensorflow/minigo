@@ -53,8 +53,9 @@ class BoardVisitor {
   // Starts a new visit around the board.
   void Begin() {
     MG_DCHECK(Done());
-    if (epoch_++ == 0) {
+    if (++epoch_ == 0) {
       memset(visited_.data(), 0, sizeof(visited_));
+      epoch_ = 1;
     }
   }
 
@@ -83,7 +84,10 @@ class BoardVisitor {
  private:
   inline_vector<Coord, kN * kN> stack_;
   std::array<uint8_t, kN * kN> visited_;
-  uint8_t epoch_ = 0;
+
+  // Initializing to 0xff means the visited_ array will get initialized on the
+  // first call to Begin().
+  uint8_t epoch_ = 0xff;
 };
 
 // GroupVisitor simply keeps track of which groups have been visited since the
@@ -94,8 +98,9 @@ class GroupVisitor {
   GroupVisitor() = default;
 
   void Begin() {
-    if (epoch_++ == 0) {
+    if (++epoch_ == 0) {
       memset(visited_.data(), 0, sizeof(visited_));
+      epoch_ = 1;
     }
   }
 
@@ -108,8 +113,11 @@ class GroupVisitor {
   }
 
  private:
-  uint8_t epoch_ = 0;
   std::array<uint8_t, Group::kMaxNumGroups> visited_;
+
+  // Initializing to 0xff means the visited_ array will get initialized on the
+  // first call to Begin().
+  uint8_t epoch_ = 0xff;
 };
 
 // Position represents a single board position.

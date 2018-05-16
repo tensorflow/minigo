@@ -27,6 +27,35 @@
 namespace minigo {
 namespace {
 
+TEST(BoardVisitorTest, TestEpochRollover) {
+  for (int j = 0; j <= 256; ++j) {
+    BoardVisitor bv;
+    for (int i = 0; i < j; ++i) {
+      bv.Begin();
+    }
+    for (int i = 0; i < kN * kN; ++i) {
+      auto c = Coord(i);
+      ASSERT_TRUE(bv.Visit(c));
+      ASSERT_EQ(c, bv.Next());
+      ASSERT_FALSE(bv.Visit(c));
+    }
+  }
+}
+
+TEST(GroupVisitorTest, TestEpochRollover) {
+  for (int j = 0; j <= 256; ++j) {
+    GroupVisitor gv;
+    for (int i = 0; i < j; ++i) {
+      gv.Begin();
+    }
+    for (int i = 0; i < Group::kMaxNumGroups; ++i) {
+      auto g = GroupId(i);
+      ASSERT_TRUE(gv.Visit(g));
+      ASSERT_FALSE(gv.Visit(g));
+    }
+  }
+}
+
 TEST(PositionTest, TestIsKoish) {
   auto board = TestablePosition(R"(
       .X.O.O.O.
