@@ -69,10 +69,9 @@ Coord MctsPlayer::SuggestMove(int num_readouts) {
   std::array<float, kNumMoves> noise;
   if (options_.inject_noise) {
     // In order to be able to inject noise into the root node, we need to first
-    // expand it. This should be the only time when SuggestMove is called when
-    // the root isn't expanded.
+    // expand it. The root will always be expanded unless this is the first time
+    // SuggestMove has been called for a game.
     if (!root_->is_expanded) {
-      MG_CHECK(root_ == &game_root_);
       auto* first_node = root_->SelectLeaf();
       auto output = Run(&first_node->features);
       first_node->IncorporateResults(output.policy, output.value, first_node);

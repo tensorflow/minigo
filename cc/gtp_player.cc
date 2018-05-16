@@ -14,7 +14,9 @@
 
 #include "cc/gtp_player.h"
 
+#include <algorithm>
 #include <cctype>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -25,6 +27,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/time/clock.h"
 #include "cc/constants.h"
+#include "cc/sgf.h"
 
 namespace minigo {
 
@@ -33,7 +36,23 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
       ponder_limit_(options.ponder_limit),
       courtesy_pass_(options.courtesy_pass),
       name_(options.name),
-      num_readouts_(options.num_readouts) {}
+      num_readouts_(options.num_readouts) {
+  RegisterCmd("boardsize", &GtpPlayer::HandleBoardsize);
+  RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
+  RegisterCmd("echo", &GtpPlayer::HandleEcho);
+  RegisterCmd("final_score", &GtpPlayer::HandleFinalScore);
+  RegisterCmd("gamestate", &GtpPlayer::HandleGamestate);
+  RegisterCmd("genmove", &GtpPlayer::HandleGenmove);
+  RegisterCmd("info", &GtpPlayer::HandleInfo);
+  RegisterCmd("known_command", &GtpPlayer::HandleKnownCommand);
+  RegisterCmd("list_commands", &GtpPlayer::HandleListCommands);
+  RegisterCmd("loadsgf", &GtpPlayer::HandleLoadsgf);
+  RegisterCmd("name", &GtpPlayer::HandleName);
+  RegisterCmd("play", &GtpPlayer::HandlePlay);
+  RegisterCmd("ponder_limit", &GtpPlayer::HandlePonderLimit);
+  RegisterCmd("readouts", &GtpPlayer::HandleReadouts);
+  RegisterCmd("report_search_interval", &GtpPlayer::HandleReportSearchInterval);
+}
 
 void GtpPlayer::Run() {
   std::cerr << "GTP engine ready" << std::endl;
@@ -56,6 +75,10 @@ Coord GtpPlayer::SuggestMove(int num_readouts) {
     return Coord::kPass;
   }
   return MctsPlayer::SuggestMove(num_readouts);
+}
+
+void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
+  cmd_handlers_[cmd] = handler;
 }
 
 bool GtpPlayer::MaybePonder() {
@@ -98,7 +121,7 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   }
 
   // Split the GTP command and its arguments.
-  auto cmd = args[0];
+  auto cmd = std::string(args[0]);
   args.erase(args.begin());
 
   if (cmd == "quit") {
@@ -151,37 +174,13 @@ GtpPlayer::Response GtpPlayer::CheckArgsRange(
 }
 
 GtpPlayer::Response GtpPlayer::DispatchCmd(
-    absl::string_view cmd, const std::vector<absl::string_view>& args) {
-  // TODO: Put these into a map<string, std::function>  to make the list of
-  // supported commands DRY with HandleListCommands
-  if (cmd == "boardsize") {
-    return HandleBoardsize(cmd, args);
-  } else if (cmd == "clear_board") {
-    return HandleClearBoard(cmd, args);
-  } else if (cmd == "echo") {
-    return HandleEcho(cmd, args);
-  } else if (cmd == "final_score") {
-    return HandleFinalScore(cmd, args);
-  } else if (cmd == "gamestate") {
-    return HandleGamestate(cmd, args);
-  } else if (cmd == "genmove") {
-    return HandleGenmove(cmd, args);
-  } else if (cmd == "info") {
-    return HandleInfo(cmd, args);
-  } else if (cmd == "list_commands") {
-    return HandleListCommands(cmd, args);
-  } else if (cmd == "name") {
-    return HandleName(cmd, args);
-  } else if (cmd == "play") {
-    return HandlePlay(cmd, args);
-  } else if (cmd == "ponder_limit") {
-    return HandlePonderLimit(cmd, args);
-  } else if (cmd == "readouts") {
-    return HandleReadouts(cmd, args);
-  } else if (cmd == "report_search_interval") {
-    return HandleReportSearchInterval(cmd, args);
+    const std::string& cmd, const std::vector<absl::string_view>& args) {
+  auto it = cmd_handlers_.find(cmd);
+  if (it == cmd_handlers_.end()) {
+    return Response::Error("unknown command");
   }
-  return Response::Error("unknown command");
+  auto handler = it->second;
+  return (this->*handler)(cmd, args);
 }
 
 GtpPlayer::Response GtpPlayer::HandleBoardsize(
@@ -211,6 +210,7 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(
 
   return Response::Ok();
 }
+
 GtpPlayer::Response GtpPlayer::HandleEcho(
     absl::string_view cmd, const std::vector<absl::string_view>& args) {
   return Response::Ok(absl::StrJoin(args, " "));
@@ -316,19 +316,64 @@ GtpPlayer::Response GtpPlayer::HandleInfo(
   return Response::Ok(oss.str());
 }
 
+GtpPlayer::Response GtpPlayer::HandleKnownCommand(
+    absl::string_view cmd, const std::vector<absl::string_view>& args) {
+  auto response = CheckArgsExact(cmd, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+  std::string result;
+  if (cmd_handlers_.find(std::string(args[0])) != cmd_handlers_.end()) {
+    result = "true";
+  } else {
+    result = "false";
+  }
+  return Response::Ok(result);
+}
+
 GtpPlayer::Response GtpPlayer::HandleListCommands(
     absl::string_view cmd, const std::vector<absl::string_view>& args) {
   auto response = CheckArgsExact(cmd, 0, args);
   if (!response.ok) {
     return response;
   }
-  absl::string_view commands[] = {
-      "list_commands", "boardsize", "clear_board", "echo",
-      "final_score",   "gamestate", "genmove",     "info",
-      "name",          "play",      "readouts",    "report_search_interval"};
+  std::vector<absl::string_view> cmds;
+  for (const auto& kv : cmd_handlers_) {
+    cmds.push_back(kv.first);
+  }
+  std::sort(cmds.begin(), cmds.end());
 
-  response.str = absl::StrJoin(commands, "\n");
+  response.str = absl::StrJoin(cmds, "\n");
   return response;
+}
+
+GtpPlayer::Response GtpPlayer::HandleLoadsgf(
+    absl::string_view cmd, const std::vector<absl::string_view>& args) {
+  auto response = CheckArgsExact(cmd, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  std::ifstream f;
+  f.open(std::string(args[0]));
+  if (!f.is_open()) {
+    std::cerr << "Couldn't read \"" << args[0] << "\"\n";
+    return Response::Error("cannot load file");
+  }
+  std::stringstream buffer;
+  buffer << f.rdbuf();
+
+  sgf::Ast ast;
+  if (!ast.Parse(buffer.str())) {
+    std::cerr << "Couldn't parse \"" << args[0] << "\"\n";
+    return Response::Error("cannot load file");
+  }
+
+  for (const auto& move : sgf::GetMainLineMoves(ast)) {
+    PlayMove(move.c);
+  }
+
+  return Response::Ok();
 }
 
 GtpPlayer::Response GtpPlayer::HandleName(

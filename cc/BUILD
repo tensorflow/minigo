@@ -82,6 +82,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         ":mcts",
+        ":sgf",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],

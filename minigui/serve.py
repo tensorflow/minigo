@@ -120,9 +120,8 @@ def std_bg_thread(stream):
 
         if line.startswith("= __NEW_TOKEN__ "):
             token = line.split(" ", 3)[2]
-        else:
-            socketio.send(json.dumps({stream: line, "token": token}),
-                          namespace="/minigui", json=True)
+        socketio.send(json.dumps({stream: line, "token": token}),
+                      namespace="/minigui", json=True)
     print(stream, "bg_thread died")
 
 

@@ -30,6 +30,7 @@ class Socket {
   private gameToken: string;
   private handshakeComplete = false;
   private connectCallback: ConnectCallback | null = null;
+  private lines = new Array<string>();
 
   private stderrHandlers = new Array<{prefix: string, handler: StderrHandler}>();
 
@@ -52,8 +53,11 @@ class Socket {
       }
 
       if (obj.stdout !== undefined) {
-        if (obj.stdout.trim() != '') {
-          this.cmdHandler(obj.stdout);
+        if (obj.stdout != '') {
+          this.lines.push(obj.stdout.trim());
+        } else {
+          this.cmdHandler(this.lines.join('\n'));
+          this.lines = [];
         }
       } else if (obj.stderr !== undefined) {
         this.stderrHandler(obj.stderr);
@@ -87,8 +91,7 @@ class Socket {
     this.cmdQueue = [];
     let token = `session-id-${Date.now()}`;
     this.gameToken = token;
-    let cmd = `echo __NEW_TOKEN__ ${token}`;
-    this.sock.emit('gtpcmd', {data: cmd});
+    this.send(`echo __NEW_TOKEN__ ${token}`);
   }
 
   private cmdHandler(line: string) {

@@ -15,6 +15,7 @@
 #ifndef CC_GTP_PLAYER_H_
 #define CC_GTP_PLAYER_H_
 
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -72,6 +73,10 @@ class GtpPlayer : public MctsPlayer {
     bool ok;
   };
 
+  using CmdHandler = Response (GtpPlayer::*)(
+      absl::string_view, const std::vector<absl::string_view>&);
+  void RegisterCmd(const std::string& cmd, CmdHandler handler);
+
   // If waiting for the opponent to play, consider thinking for a bit.
   // Returns true if we pondered.
   bool MaybePonder();
@@ -86,11 +91,8 @@ class GtpPlayer : public MctsPlayer {
                           size_t expected_max_args,
                           const std::vector<absl::string_view>& args);
 
-  Response DispatchCmd(absl::string_view cmd,
+  Response DispatchCmd(const std::string& cmd,
                        const std::vector<absl::string_view>& args);
-
-  Response HandleListCommands(absl::string_view cmd,
-                              const std::vector<absl::string_view>& args);
 
   Response HandleBoardsize(absl::string_view cmd,
                            const std::vector<absl::string_view>& args);
@@ -112,6 +114,15 @@ class GtpPlayer : public MctsPlayer {
 
   Response HandleInfo(absl::string_view cmd,
                       const std::vector<absl::string_view>& args);
+
+  Response HandleKnownCommand(absl::string_view cmd,
+                              const std::vector<absl::string_view>& args);
+
+  Response HandleListCommands(absl::string_view cmd,
+                              const std::vector<absl::string_view>& args);
+
+  Response HandleLoadsgf(absl::string_view cmd,
+                         const std::vector<absl::string_view>& args);
 
   Response HandleName(absl::string_view cmd,
                       const std::vector<absl::string_view>& args);
@@ -142,6 +153,8 @@ class GtpPlayer : public MctsPlayer {
   int num_readouts_;
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;
+
+  std::map<std::string, CmdHandler> cmd_handlers_;
 };
 
 }  // namespace minigo
