@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_TF_DUAL_NET_H_
-#define CC_TF_DUAL_NET_H_
+#ifndef CC_DUAL_NET_TF_DUAL_NET_H_
+#define CC_DUAL_NET_TF_DUAL_NET_H_
 
 #include <memory>
 #include <string>
@@ -22,7 +22,7 @@
 
 #include "absl/types/span.h"
 #include "cc/constants.h"
-#include "cc/dual_net.h"
+#include "cc/dual_net/dual_net.h"
 #include "cc/position.h"
 #include "cc/random.h"
 #include "cc/symmetries.h"
@@ -49,4 +49,4 @@ class TfDualNet : public DualNet {
 
 }  // namespace minigo
 
-#endif  // CC_TF_DUAL_NET_H_
+#endif  // CC_DUAL_NET_TF_DUAL_NET_H_

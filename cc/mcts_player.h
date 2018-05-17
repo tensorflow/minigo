@@ -26,7 +26,7 @@
 #include "absl/types/span.h"
 #include "cc/algorithm.h"
 #include "cc/constants.h"
-#include "cc/dual_net.h"
+#include "cc/dual_net/dual_net.h"
 #include "cc/mcts_node.h"
 #include "cc/position.h"
 #include "cc/random.h"

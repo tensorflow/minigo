@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/tf_dual_net.h"
+#include "cc/dual_net/tf_dual_net.h"
 
 #include "cc/check.h"
 #include "cc/constants.h"

@@ -26,7 +26,7 @@
 #include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "cc/color.h"
-#include "cc/dual_net.h"
+#include "cc/dual_net/dual_net.h"
 #include "cc/mcts_player.h"
 
 namespace minigo {

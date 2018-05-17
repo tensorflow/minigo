@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_MINIGO_FILE_FILESYSTEM_H_
+#ifndef CC_FILE_FILESYSTEM_H_
+#define CC_FILE_FILESYSTEM_H_
 
 #include "absl/strings/string_view.h"
 
@@ -25,4 +26,4 @@ __attribute__((warn_unused_result)) bool RecursivelyCreateDir(
 }  // namespace file
 }  // namespace minigo
 
-#endif  //  CC_MINIGO_FILE_FILESYSTEM_H_
+#endif  //  CC_FILE_FILESYSTEM_H_

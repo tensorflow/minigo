@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_DUAL_NET_H_
-#define CC_DUAL_NET_H_
+#ifndef CC_DUAL_NET_DUAL_NET_H_
+#define CC_DUAL_NET_DUAL_NET_H_
 
 #include <memory>
 #include <string>
@@ -86,4 +86,4 @@ class DualNet {
 
 }  // namespace minigo
 
-#endif  // CC_DUAL_NET_H_
+#endif  // CC_DUAL_NET_DUAL_NET_H_

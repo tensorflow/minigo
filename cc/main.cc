@@ -31,6 +31,7 @@
 #include "absl/time/time.h"
 #include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/dual_net/tf_dual_net.h"
 #include "cc/file/filesystem.h"
 #include "cc/file/path.h"
 #include "cc/gtp_player.h"
@@ -38,7 +39,6 @@
 #include "cc/mcts_player.h"
 #include "cc/random.h"
 #include "cc/sgf.h"
-#include "cc/tf_dual_net.h"
 #include "cc/tf_utils.h"
 #include "gflags/gflags.h"
 

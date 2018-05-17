@@ -25,7 +25,7 @@
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
 #include "cc/constants.h"
-#include "cc/dual_net.h"
+#include "cc/dual_net/dual_net.h"
 #include "cc/position.h"
 
 namespace minigo {

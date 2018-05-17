@@ -18,7 +18,7 @@
 #include "absl/memory/memory.h"
 #include "cc/algorithm.h"
 #include "cc/constants.h"
-#include "cc/dual_net.h"
+#include "cc/dual_net/dual_net.h"
 #include "cc/test_utils.h"
 #include "gtest/gtest.h"
 

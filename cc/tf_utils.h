@@ -19,7 +19,7 @@
 #include <string>
 
 #include "cc/constants.h"
-#include "cc/dual_net.h"
+#include "cc/dual_net/dual_net.h"
 
 #include "tensorflow/core/example/example.pb.h"
 #include "tensorflow/core/lib/core/status.h"

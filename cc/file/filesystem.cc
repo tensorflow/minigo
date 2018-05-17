@@ -16,6 +16,7 @@
 
 #include <sys/stat.h>
 #include <cerrno>
+#include <string>
 
 #include "absl/strings/match.h"
 #include "cc/file/path.h"

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/dual_net.h"
+#include "cc/dual_net/dual_net.h"
 
 #include "cc/color.h"
 #include "cc/constants.h"

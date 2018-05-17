@@ -1,5 +1,5 @@
 package(default_visibility = [
-    ":__pkg__",
+    ":__subpackages__",
 ])
 
 load(
@@ -63,26 +63,13 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
-    name = "dual_net",
-    srcs = ["dual_net.cc"],
-    hdrs = ["dual_net.h"],
-    deps = [
-        ":base",
-        ":position",
-        ":random",
-        ":symmetries",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-minigo_cc_library(
     name = "gtp_player",
     srcs = ["gtp_player.cc"],
     hdrs = ["gtp_player.h"],
     deps = [
-        ":dual_net",
         ":mcts",
         ":sgf",
+        "//cc/dual_net",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],
@@ -118,9 +105,9 @@ minigo_cc_library(
     ],
     deps = [
         ":base",
-        ":dual_net",
         ":position",
         ":random",
+        "//cc/dual_net",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
@@ -174,28 +161,13 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
-    name = "tf_dual_net",
-    srcs = ["tf_dual_net.cc"],
-    hdrs = ["tf_dual_net.h"],
-    deps = [
-        ":base",
-        ":dual_net",
-        ":position",
-        ":random",
-        ":symmetries",
-        ":tensorflow",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-minigo_cc_library(
     name = "tf_utils",
     srcs = ["tf_utils.cc"],
     hdrs = ["tf_utils.h"],
     deps = [
         ":base",
-        ":dual_net",
         ":tensorflow",
+        "//cc/dual_net",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
@@ -230,18 +202,6 @@ minigo_cc_test(
 )
 
 minigo_cc_test_9_only(
-    name = "dual_net_test",
-    size = "small",
-    srcs = ["dual_net_test.cc"],
-    deps = [
-        ":dual_net",
-        ":position",
-        ":test_utils",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-minigo_cc_test_9_only(
     name = "mcts_node_test",
     size = "small",
     srcs = ["mcts_node_test.cc"],
@@ -260,9 +220,9 @@ minigo_cc_test_9_only(
     srcs = ["mcts_player_test.cc"],
     deps = [
         ":base",
-        ":dual_net",
         ":mcts",
         ":test_utils",
+        "//cc/dual_net",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -321,8 +281,8 @@ minigo_cc_binary(
         ":mcts",
         ":random",
         ":sgf",
-        ":tf_dual_net",
         ":tf_utils",
+        "//cc/dual_net:tf_dual_net",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",

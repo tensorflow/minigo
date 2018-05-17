@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_MINIGO_FILE_PATH_H_
+#ifndef CC_FILE_PATH_H_
+#define CC_FILE_PATH_H_
 
 #include <initializer_list>
 #include <string>
@@ -46,4 +47,4 @@ inline absl::string_view Basename(absl::string_view path) {
 }  // namespace file
 }  // namespace minigo
 
-#endif  //  CC_MINIGO_FILE_PATH_H_
+#endif  //  CC_FILE_PATH_H_
