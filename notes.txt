@@ -26,7 +26,7 @@ buffer down to 100k
 down, adjusted batch size, etc, to see if valnet divergence could be fixed.
 
 
-== v7
+== v7a
 
 Rolled back to v5 model 173 and continued from there; first v7 model was
 174.  Moved minimum games before starting training
@@ -42,3 +42,10 @@ validation set will be entirely games from 215.  This new cc image ends up
 causing disk pressure on the nodes leading to all the jobs stopping.  Sigh.
 
 1. 217 onwards -- resign disabled amount is 10%, not 5%.
+
+ROLLBACK
+
+== v7
+
+Resign-disabled percent moved from 5% => 20%
+model 190: move resign threshold 0.89 => .85
