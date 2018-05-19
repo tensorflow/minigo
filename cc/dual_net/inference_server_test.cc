@@ -36,12 +36,12 @@ class InferenceServerTest : public ::testing::Test {
     priors.resize(kNumMoves, 0.3);
     dual_net_ = absl::make_unique<FakeNet>(priors, 0.1);
     server_ = absl::make_unique<InferenceServer>();
-    client_ = absl::make_unique<InferenceClient>(server_.get());
+    client_ = server_->NewDualNet();
   }
 
   std::unique_ptr<DualNet> dual_net_;
   std::unique_ptr<InferenceServer> server_;
-  std::unique_ptr<InferenceClient> client_;
+  std::unique_ptr<DualNet> client_;
 };
 
 TEST_F(InferenceServerTest, Test) {

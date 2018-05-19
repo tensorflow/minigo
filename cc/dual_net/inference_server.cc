@@ -14,6 +14,7 @@
 
 #include "cc/dual_net/inference_server.h"
 
+#include <functional>
 #include <string>
 #include <utility>
 
@@ -74,6 +75,24 @@ class ServiceImpl final : public InferenceService::Service {
   ThreadSafeQueue<RemoteInference> output_queue_;
 };
 
+class InferenceClient : public DualNet {
+ public:
+  explicit InferenceClient(std::function<void(RemoteInference)> run_inference)
+      : run_inference_(run_inference) {}
+
+  void RunMany(absl::Span<const BoardFeatures* const> features,
+               absl::Span<Output> outputs, Random* rnd) override {
+    absl::BlockingCounter pending_count(features.size());
+    for (size_t i = 0; i < features.size(); ++i) {
+      run_inference_({features[i], &outputs[i], &pending_count});
+    }
+    pending_count.Wait();
+  }
+
+ private:
+  std::function<void(RemoteInference)> run_inference_;
+};
+
 }  // namespace
 
 InferenceServer::InferenceServer() {
@@ -97,21 +116,11 @@ InferenceServer::~InferenceServer() {
   thread_.join();
 }
 
-void InferenceServer::RunInference(const DualNet::BoardFeatures* features,
-                                   DualNet::Output* output,
-                                   absl::BlockingCounter* counter) {
-  request_queue_->Push({features, output, counter});
-}
-
-InferenceClient ::InferenceClient(InferenceServer* server) : server_(server) {}
-
-void InferenceClient::RunMany(absl::Span<const BoardFeatures* const> features,
-                              absl::Span<Output> outputs, Random* rnd) {
-  absl::BlockingCounter pending_count(features.size());
-  for (size_t i = 0; i < features.size(); ++i) {
-    server_->RunInference(features[i], &outputs[i], &pending_count);
-  }
-  pending_count.Wait();
+std::unique_ptr<DualNet> InferenceServer::NewDualNet() {
+  return absl::make_unique<InferenceClient>(
+      [this](const RemoteInference& inference) {
+        request_queue_->Push(inference);
+      });
 }
 
 }  // namespace minigo

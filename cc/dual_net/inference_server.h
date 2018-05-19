@@ -16,7 +16,6 @@
 #define CC_DUAL_NET_INFERENCE_SERVER_H_
 
 #include <memory>
-#include <queue>
 #include <thread>
 
 #include "absl/synchronization/blocking_counter.h"
@@ -37,8 +36,9 @@ class InferenceServer {
   InferenceServer();
   ~InferenceServer();
 
-  void RunInference(const DualNet::BoardFeatures* features,
-                    DualNet::Output* output, absl::BlockingCounter* counter);
+  // Return a new DualNet instance whose inference requests are performed
+  // by this InferenceServer.
+  std::unique_ptr<DualNet> NewDualNet();
 
  private:
   std::thread thread_;
@@ -46,17 +46,6 @@ class InferenceServer {
   ThreadSafeQueue<RemoteInference>* request_queue_;
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<grpc::Service> service_;
-};
-
-class InferenceClient : public DualNet {
- public:
-  explicit InferenceClient(InferenceServer* server);
-
-  void RunMany(absl::Span<const BoardFeatures* const> features,
-               absl::Span<Output> outputs, Random* rnd = nullptr) override;
-
- private:
-  InferenceServer* server_;
 };
 
 }  // namespace minigo
