@@ -15,6 +15,8 @@
 #ifndef CC_CHECK_H_
 #define CC_CHECK_H_
 
+#include <iostream>
+
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
 
@@ -29,23 +31,42 @@ namespace minigo {
 // glog altogether and define our own macros.
 
 namespace internal {
+
 void ABSL_ATTRIBUTE_NOINLINE CheckFail(const char* cond, const char* file,
                                        int line);
+class CheckFailStream {
+ public:
+  CheckFailStream(const char* cond, const char* file, int line)
+      : cond_(cond), file_(file), line_(line) {}
+
+  ~CheckFailStream() {
+    std::cerr << std::endl;
+    CheckFail(cond_, file_, line_);
+  }
+
+  template <typename T>
+  CheckFailStream& operator<<(const T& t) {
+    std::cerr << t;
+    return *this;
+  }
+
+  operator bool() { return true; }
+
+ private:
+  const char* cond_;
+  const char* file_;
+  int line_;
+};
+
 }  // namespace internal
 
-#define MG_CHECK(cond)                                \
-  do {                                                \
-    if (ABSL_PREDICT_FALSE(!(cond))) {                \
-      internal::CheckFail(#cond, __FILE__, __LINE__); \
-    }                                                 \
-  } while (false)
+#define MG_CHECK(cond) \
+  (cond) ? 0 : true & internal::CheckFailStream(#cond, __FILE__, __LINE__)
 
 #ifndef NDEBUG
 #define MG_DCHECK MG_CHECK
 #else
-#define MG_DCHECK(cond) \
-  do {                  \
-  } while (false)
+#define MG_DCHECK(cond) MG_CHECK(true)
 #endif
 
 }  // namespace minigo

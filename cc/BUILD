@@ -160,6 +160,15 @@ minigo_cc_library(
     ],
 )
 
+cc_library(
+    name = "thread_safe_queue",
+    hdrs = ["thread_safe_queue.h"],
+    deps = [
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
 minigo_cc_library(
     name = "tf_utils",
     srcs = ["tf_utils.cc"],
@@ -222,7 +231,7 @@ minigo_cc_test_9_only(
         ":base",
         ":mcts",
         ":test_utils",
-        "//cc/dual_net",
+        "//cc/dual_net:fake_net",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -282,6 +291,7 @@ minigo_cc_binary(
         ":random",
         ":sgf",
         ":tf_utils",
+        "//cc/dual_net:inference_server",
         "//cc/dual_net:tf_dual_net",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",

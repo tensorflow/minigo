@@ -28,3 +28,13 @@ http_archive(
     strip_prefix = "cctz-2.2",
     urls = ["https://github.com/google/cctz/archive/v2.2.zip"],
 )
+
+http_archive(
+    name = "org_pubref_rules_protobuf",
+    strip_prefix = "rules_protobuf-0.8.2",
+    urls = ["https://github.com/pubref/rules_protobuf/archive/v0.8.2.zip"],
+)
+
+load("@org_pubref_rules_protobuf//cpp:rules.bzl", "cpp_proto_repositories")
+
+cpp_proto_repositories()

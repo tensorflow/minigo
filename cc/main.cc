@@ -31,6 +31,7 @@
 #include "absl/time/time.h"
 #include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/dual_net/inference_server.h"
 #include "cc/dual_net/tf_dual_net.h"
 #include "cc/file/filesystem.h"
 #include "cc/file/path.h"
@@ -59,10 +60,15 @@ DEFINE_bool(random_symmetry, true,
             "If true, randomly flip & rotate the board features before running "
             "the model and apply the inverse transform to the results.");
 DEFINE_string(model, "",
-              "Path to a minigo model serialized as a GraphDef proto.");
+              "Path to a minigo model serialized as a GraphDef proto, or "
+              "\"remote\" to launch a InferenceService server that delegates "
+              "inference to a separate process.");
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
+DEFINE_int32(port, 50051,
+             "If model=remote, the port opened by the InferenceService "
+             "server.");
 DEFINE_string(output_dir, "",
               "Output directory. If empty, no examples are written.");
 DEFINE_string(holdout_dir, "",
@@ -83,10 +89,9 @@ DEFINE_int32(
 DEFINE_bool(
     courtesy_pass, false,
     "If true and in GTP mode, we will always pass if the opponent passes.");
-DEFINE_double(
-    seconds_per_move, 0,
-    " If non-zero, the number of seconds to spend thinking about each "
-    "move instead of using a fixed number of readouts.");
+DEFINE_double(seconds_per_move, 0,
+              "If non-zero, the number of seconds to spend thinking about each "
+              "move instead of using a fixed number of readouts.");
 DEFINE_double(
     time_limit, 0,
     "If non-zero, the maximum amount of time to spend thinking in a game: we "
@@ -211,8 +216,16 @@ void SelfPlay() {
   if (rnd() < FLAGS_disable_resign_pct) {
     options.resign_threshold = -1;
   }
-  auto player = absl::make_unique<MctsPlayer>(
-      absl::make_unique<TfDualNet>(FLAGS_model), options);
+
+  std::unique_ptr<InferenceServer> server;
+  std::unique_ptr<DualNet> dual_net;
+  if (FLAGS_model == "remote") {
+    server = absl::make_unique<InferenceServer>();
+    dual_net = absl::make_unique<InferenceClient>(server.get());
+  } else {
+    dual_net = absl::make_unique<TfDualNet>(FLAGS_model);
+  }
+  auto player = absl::make_unique<MctsPlayer>(std::move(dual_net), options);
 
   while (!player->game_over()) {
     auto move = player->SuggestMove();

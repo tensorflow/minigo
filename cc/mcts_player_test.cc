@@ -18,7 +18,7 @@
 #include "absl/memory/memory.h"
 #include "cc/algorithm.h"
 #include "cc/constants.h"
-#include "cc/dual_net/dual_net.h"
+#include "cc/dual_net/fake_net.h"
 #include "cc/test_utils.h"
 #include "gtest/gtest.h"
 
@@ -36,39 +36,10 @@ static constexpr char kAlmostDoneBoard[] = R"(
     XXXXXOOOO
     XXXXOOOOO)";
 
-class FakeNet : public DualNet {
- public:
-  FakeNet(absl::Span<const float> priors, float value) : value_(value) {
-    if (!priors.empty()) {
-      assert(priors.size() == kNumMoves);
-      for (int i = 0; i < kNumMoves; ++i) {
-        priors_[i] = priors[i];
-      }
-    } else {
-      for (auto& prior : priors_) {
-        prior = 1.0 / kNumMoves;
-      }
-    }
-  }
-
-  void RunMany(absl::Span<const BoardFeatures* const> features,
-               absl::Span<Output> outputs, Random* rnd) override {
-    for (auto& output : outputs) {
-      output.policy = priors_;
-      output.value = value_;
-    }
-  }
-
- private:
-  std::array<float, kNumMoves> priors_;
-  float value_;
-};
-
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(const Options& options)
-      : MctsPlayer(absl::make_unique<FakeNet>(absl::Span<const float>(), 0),
-                   options) {}
+      : MctsPlayer(absl::make_unique<FakeNet>(), options) {}
 
   TestablePlayer(absl::Span<const float> fake_priors, float fake_value,
                  const Options& options)

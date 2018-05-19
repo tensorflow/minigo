@@ -28,6 +28,8 @@
 
 namespace minigo {
 
+// TODO(tommadams): Figure out how best to handle random symmetries.
+
 // The input features to the DualNet neural network have 17 binary feature
 // planes. 8 feature planes X_t indicate the presence of the current player's
 // stones at time t. A further 8 feature planes Y_t indicate the presence of
