@@ -280,6 +280,18 @@ minigo_cc_test(
     ],
 )
 
+minigo_cc_test(
+    name = "thread_safe_queue_test",
+    size = "small",
+    srcs = ["thread_safe_queue_test.cc"],
+    deps = [
+        ":thread_safe_queue",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 minigo_cc_binary(
     name = "main",
     srcs = ["main.cc"],

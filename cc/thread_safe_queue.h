@@ -16,9 +16,9 @@
 #define CC_THREAD_SAFE_QUEUE_H_
 
 #include <queue>
+#include <utility>
 
 #include "absl/base/thread_annotations.h"
-#include "absl/synchronization/blocking_counter.h"
 #include "absl/synchronization/mutex.h"
 
 namespace minigo {

@@ -15,9 +15,11 @@
 #ifndef CC_DUAL_NET_INFERENCE_SERVER_H_
 #define CC_DUAL_NET_INFERENCE_SERVER_H_
 
+#include <memory>
 #include <queue>
 #include <thread>
 
+#include "absl/synchronization/blocking_counter.h"
 #include "cc/dual_net/dual_net.h"
 #include "cc/thread_safe_queue.h"
 #include "grpc++/server.h"

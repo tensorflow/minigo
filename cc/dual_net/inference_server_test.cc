@@ -14,6 +14,9 @@
 
 #include "cc/dual_net/inference_server.h"
 
+#include <memory>
+#include <vector>
+
 #include "absl/memory/memory.h"
 #include "cc/constants.h"
 #include "cc/dual_net/fake_net.h"

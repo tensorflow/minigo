@@ -14,6 +14,9 @@
 
 #include "cc/dual_net/inference_server.h"
 
+#include <string>
+#include <utility>
+
 #include "absl/memory/memory.h"
 #include "cc/dual_net/inference_service.grpc.pb.h"
 #include "grpc++/grpc++.h"
@@ -57,7 +60,7 @@ class ServiceImpl final : public InferenceService::Service {
     auto& dst_policy = inference.output->policy;
     for (int i = 0; i < src_policy.size(); ++i) {
       dst_policy[i] = src_policy[i];
-    };
+    }
     inference.output->value = request->value();
     inference.counter->DecrementCount();
 
