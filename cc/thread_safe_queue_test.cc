@@ -35,12 +35,11 @@ TEST(CoordTest, Ordering) {
   q.Push(1);
   q.Push(2);
   q.Push(3);
-  EXPECT_EQ(1, q.Pop());
 
   int x;
+  EXPECT_EQ(1, q.Pop());
   EXPECT_TRUE(q.TryPop(&x));
   EXPECT_EQ(2, x);
-
   EXPECT_EQ(3, q.Pop());
 
   EXPECT_FALSE(q.TryPop(&x));
@@ -96,10 +95,10 @@ TEST(CoordTest, Multithreading) {
         // Sleep a little to give other threads a chance.
         absl::SleepFor(absl::Microseconds(1));
       }
-
-      // Push all the ints we popped off onto a shared set.
-      absl::MutexLock lock(&m);
       std::cerr << "popped " << my_popped.size() << " ints " << std::endl;
+
+      // Record all the ints we popped.
+      absl::MutexLock lock(&m);
       for (int x : my_popped) {
         popped[x] += 1;
       }
