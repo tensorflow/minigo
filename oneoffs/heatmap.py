@@ -34,7 +34,7 @@ tf.app.flags.DEFINE_integer("eval_every", 5,
 FLAGS = tf.app.flags.FLAGS
 
 
-def eval_policy(eval_positions)
+def eval_policy(eval_positions):
     """Evaluate all positions with all models save the policy heatmaps as CSVs
 
     CSV name is "heatmap-<position_name>-<model-index>.csv"
@@ -52,8 +52,14 @@ def eval_policy(eval_positions)
     print("Evaluating models {}-{}, eval_every={}".format(
           idx_start, len(model_paths), eval_every))
 
-    for idx in tqdm(range(idx_start, len(model_paths), eval_every)):
-        if idx == idx_start:
+    player = None
+    for i, idx in enumerate(tqdm(range(idx_start, len(model_paths), eval_every))):
+        if player and i % 20 == 0:
+            player.network.sess.close()
+            tf.reset_default_graph()
+            player = None
+
+        if not player:
             player = oneoff_utils.load_player(model_paths[idx])
         else:
             oneoff_utils.restore_params(model_paths[idx], player)
@@ -71,7 +77,7 @@ def eval_policy(eval_positions)
                     idx, value, ",".join(map(str, probs))))
 
 
-def positions_from_sgfs(sgf_files):
+def positions_from_sgfs(sgf_files, include_empty=True):
     positions = []
     if include_empty:
         # sgf_replay doesn't like SGFs with no moves played.
