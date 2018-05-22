@@ -169,6 +169,7 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
 
     Returns a dict of tensors (see return value of batch_parse_tf_example)
     '''
+    print ("Reading tf_records from {} inputs".format(len(tf_records)))
     dataset = read_tf_records(batch_size, tf_records, num_repeats=num_repeats,
                               shuffle_records=shuffle_records,
                               shuffle_examples=shuffle_examples,

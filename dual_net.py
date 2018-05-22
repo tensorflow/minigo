@@ -210,16 +210,35 @@ def model_fn(features, labels, mode):
             learning_rate, FLAGS.sgd_momentum).minimize(
                 combined_cost, global_step=global_step)
 
+    # pi_tensor is one_hot when generated from sgfs (for supervised learning)
+    # and soft-max when using self-play records. argmax normalizes the two.
+    policy_target_top_1 = tf.argmax(labels['pi_tensor'], axis=1)
+    policy_output_top_1 = tf.argmax(policy_output, axis=1)
+
+    policy_output_in_top3 = tf.to_float(
+        tf.nn.in_top_k(policy_output, policy_target_top_1, k=3))
+
+    policy_top_1_confidence = tf.reduce_max(policy_output, axis=1)
+    policy_target_top_1_confidence = tf.boolean_mask(
+        policy_output,
+        tf.one_hot(policy_target_top_1, tf.shape(policy_output)[1]))
+
     metric_ops = {
-        'accuracy': tf.metrics.accuracy(labels=labels['pi_tensor'],
-                                        predictions=policy_output,
-                                        name='accuracy_op'),
         'policy_cost': tf.metrics.mean(policy_cost),
         'value_cost': tf.metrics.mean(value_cost),
         'l2_cost': tf.metrics.mean(l2_cost),
         'policy_entropy': tf.metrics.mean(policy_entropy),
         'combined_cost': tf.metrics.mean(combined_cost),
+
+        'policy_accuracy_top_1': tf.metrics.accuracy(
+            labels=policy_target_top_1, predictions=policy_output_top_1),
+        'policy_accuracy_top_3': tf.metrics.mean(policy_output_in_top3),
+        'policy_top_1_confidence': tf.metrics.mean(policy_top_1_confidence),
+        'policy_target_top_1_confidence': tf.metrics.mean(
+            policy_target_top_1_confidence),
+        'value_confidence': tf.metrics.mean(tf.abs(value_output)),
     }
+
     # Create summary ops so that they show up in SUMMARIES collection
     # That way, they get logged automatically during training
     for metric_name, metric_op in metric_ops.items():
@@ -238,7 +257,11 @@ def model_fn(features, labels, mode):
 
 
 def get_estimator(working_dir):
-    return tf.estimator.Estimator(model_fn, model_dir=working_dir)
+    run_config = tf.estimator.RunConfig(save_summary_steps=500)
+    return tf.estimator.Estimator(
+        model_fn,
+        model_dir=working_dir,
+        config=run_config)
 
 
 def bootstrap(working_dir):
@@ -294,8 +317,10 @@ def train(working_dir, tf_records, steps=None):
 
     update_ratio_hook = UpdateRatioSessionHook(working_dir)
     step_counter_hook = EchoStepCounterHook(output_dir=working_dir)
+
     if steps is None:
         steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
+    print ("Training, steps = {}".format(steps))
     estimator.train(input_fn, hooks=[
         update_ratio_hook, step_counter_hook], steps=steps)
 
@@ -306,8 +331,10 @@ def validate(working_dir, tf_records, checkpoint_name=None, validate_name=None):
     checkpoint_name = checkpoint_name or estimator.latest_checkpoint()
 
     def input_fn():
-        return preprocessing.get_input_tensors(FLAGS.train_batch_size, tf_records,
-                                               shuffle_buffer_size=20000, filter_amount=0.05)
+        return preprocessing.get_input_tensors(
+            FLAGS.train_batch_size, tf_records, filter_amount=0.05,
+            shuffle_buffer_size=20000)
+
     estimator.evaluate(input_fn, steps=500, name=validate_name)
 
 
@@ -328,7 +355,7 @@ def compute_update_ratio(weight_tensors, before_weights, after_weights):
 class EchoStepCounterHook(tf.train.StepCounterHook):
     def _log_and_record(self, elapsed_steps, elapsed_time, global_step):
         s_per_sec = elapsed_steps / elapsed_time
-        print("{:.3f} steps per second".format(s_per_sec))
+        print("{}: {:.3f} steps per second".format(global_step, s_per_sec))
         super()._log_and_record(elapsed_steps, elapsed_time, global_step)
 
 
