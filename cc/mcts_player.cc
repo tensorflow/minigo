@@ -38,10 +38,10 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
 }
 
 MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
-    : network_(std::move(network)),
+    : name_(options.name),
+      network_(std::move(network)),
       game_root_(&dummy_stats_, {&bv_, &gv_, Color::kBlack}),
       rnd_(options.random_seed),
-      name_(options.name),
       options_(options) {
   options_.resign_threshold = -std::abs(options_.resign_threshold);
   // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.
@@ -200,8 +200,8 @@ void MctsPlayer::PlayMove(Coord c) {
   // never revisit them.
   root_->parent->PruneChildren(c);
 
-  std::cerr << name() << " Q: " << std::setw(8) << std::setprecision(5) << root_->Q()
-            << "\n";
+  std::cerr << name() << " Q: " << std::setw(8) << std::setprecision(5)
+            << root_->Q() << "\n";
   std::cerr << "Played >>" << c << std::endl;
 
   // Handle consecutive passing.

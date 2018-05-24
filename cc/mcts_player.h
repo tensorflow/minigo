@@ -119,9 +119,9 @@ class MctsPlayer {
   const MctsNode* game_root() const { return &game_root_; }
 
   Random* rnd() { return &rnd_; }
+  std::string name_;
 
   std::string FormatScore(float score) const;
-  std::string name_;
 
  private:
   void PushHistory(Coord c);
