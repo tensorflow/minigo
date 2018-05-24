@@ -49,3 +49,6 @@ ROLLBACK
 
 Resign-disabled percent moved from 5% => 20%
 model 190: move resign threshold 0.89 => .85
+model 206: rotation in training on. (from 5/20 00:20 PST)
+model 230ish: move resign threshold 0.85 => .90
+model 242: cut learning rate from 1e-3 to 1e-4 (step 11.47M)

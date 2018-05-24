@@ -42,6 +42,7 @@ class MctsPlayer {
     float resign_threshold = -0.95;
     int batch_size = 8;
     float komi = kDefaultKomi;
+    std::string name = "minigo";
 
     // Seed used from random permutations.
     // If the default value of 0 is used, a time-based seed is used.
@@ -101,6 +102,7 @@ class MctsPlayer {
 
   const Options& options() const { return options_; }
   const std::vector<History>& history() const { return history_; }
+  const std::string name() const { return name_; }
 
   // These methods are protected to facilitate direct testing.
  protected:
@@ -119,6 +121,7 @@ class MctsPlayer {
   Random* rnd() { return &rnd_; }
 
   std::string FormatScore(float score) const;
+  std::string name_;
 
  private:
   void PushHistory(Coord c);

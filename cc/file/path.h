@@ -44,6 +44,15 @@ inline absl::string_view Basename(absl::string_view path) {
   return SplitPath(path).second;
 }
 
+inline absl::string_view Stem(absl::string_view path) {
+  auto base = Basename(path);
+  auto pos = base.find_last_of('.');
+  if (pos == absl::string_view::npos) {
+    return base;
+  }
+  return base.substr(0, pos);
+}
+
 }  // namespace file
 }  // namespace minigo
 

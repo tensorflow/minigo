@@ -60,6 +60,9 @@ DEFINE_bool(random_symmetry, true,
             "the model and apply the inverse transform to the results.");
 DEFINE_string(model, "",
               "Path to a minigo model serialized as a GraphDef proto.");
+DEFINE_string(model_two, "",
+              "When running 'eval' mode, provide a path to a second minigo "
+              "model, also serialized as a GraphDef proto.");
 DEFINE_string(output_dir, "",
               "Output directory. If empty, no examples are written.");
 DEFINE_string(holdout_dir, "",
@@ -81,7 +84,7 @@ DEFINE_bool(
     courtesy_pass, false,
     "If true and in GTP mode, we will always pass if the opponent passes.");
 
-DEFINE_string(mode, "", "Mode to run in: \"selfplay\" or \"gtp\"");
+DEFINE_string(mode, "", "Mode to run in: \"selfplay\", \"eval\" or \"gtp\"");
 
 // Self play flags:
 //   --inject_noise=true
@@ -123,23 +126,32 @@ void WriteExample(const std::string& output_dir, const std::string& output_name,
 }
 
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
-              const MctsPlayer& player, bool write_comments) {
+              const MctsPlayer& player_b, const MctsPlayer& player_w,
+              bool write_comments) {
   MG_CHECK(file::RecursivelyCreateDir(output_dir));
+  MG_CHECK(player_b.history().size() == player_w.history().size());
+
+  bool log_names = player_b.name() != player_w.name();
 
   std::vector<sgf::MoveWithComment> moves;
-  moves.reserve(player.history().size());
+  moves.reserve(player_b.history().size());
 
-  for (size_t i = 0; i < player.history().size(); ++i) {
-    const auto& h = player.history()[i];
+  for (size_t i = 0; i < player_b.history().size(); ++i) {
+    const auto& h = i % 2 == 0 ? player_b.history()[i] : player_w.history()[i];
     const auto& color = h.node->position.to_play();
     std::string comment;
     if (write_comments) {
       if (i == 0) {
         comment = absl::StrCat(
-            "Resign Threshold: ", player.options().resign_threshold, "\n",
+            "Resign Threshold: ", player_b.options().resign_threshold, "\n",
             h.comment);
       } else {
-        comment = h.comment;
+        if (log_names) {
+          comment = absl::StrCat(i % 2 == 0 ? player_b.name() : player_w.name(),
+                                 "\n", h.comment);
+        } else {
+          comment = h.comment;
+        }
       }
       moves.emplace_back(color, h.c, std::move(comment));
     } else {
@@ -149,14 +161,19 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
 
   std::string player_name(file::Basename(FLAGS_model));
   sgf::CreateSgfOptions options;
-  options.komi = player.options().komi;
-  options.result = player.result_string();
-  options.black_name = player_name;
-  options.white_name = player_name;
+  options.komi = player_b.options().komi;
+  options.result = player_b.result_string();
+  options.black_name = player_b.name();
+  options.white_name = player_w.name();
   auto sgf_str = sgf::CreateSgfString(moves, options);
 
   auto output_path = file::JoinPath(output_dir, output_name + ".sgf");
   TF_CHECK_OK(tf_utils::WriteFile(output_path, sgf_str));
+}
+
+void WriteSgf(const std::string& output_dir, const std::string& output_name,
+              const MctsPlayer& player, bool write_comments) {
+  WriteSgf(output_dir, output_name, player, player, write_comments);
 }
 
 void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
@@ -204,6 +221,46 @@ void SelfPlay() {
   }
 }
 
+void Eval() {
+  MctsPlayer::Options options;
+  ParseMctsPlayerOptionsFromFlags(&options);
+  options.inject_noise = false;
+  options.soft_pick = false;
+  options.random_symmetry = true;
+  auto black_name = std::string(file::Stem(FLAGS_model));
+  options.name = black_name;
+  auto player = absl::make_unique<MctsPlayer>(
+      absl::make_unique<TfDualNet>(FLAGS_model), options);
+  options.name = std::string(file::Stem(FLAGS_model_two));
+  auto other_player = absl::make_unique<MctsPlayer>(
+      absl::make_unique<TfDualNet>(FLAGS_model_two), options);
+
+  while (!player->game_over()) {
+    auto move = player->SuggestMove(FLAGS_num_readouts);
+    std::cerr << player->root()->Describe() << "\n";
+    player->PlayMove(move);
+    other_player->PlayMove(move);
+    std::cerr << player->root()->position.ToPrettyString();
+    player.swap(other_player);
+  }
+  std::cerr << player->result_string() << "\n";
+
+  // Swap 'player' back to its original value if needed.
+  if (player->name() != black_name) {
+    player.swap(other_player);
+  }
+  std::cerr << "Black was: " << player->name() << "\n";
+
+  std::string output_name =
+      absl::StrCat(GetOutputName(), "-", player->name(), other_player->name());
+  std::string output_dir = FLAGS_output_dir;
+
+  // Write SGF.
+  if (!FLAGS_sgf_dir.empty()) {
+    WriteSgf(FLAGS_sgf_dir, output_name, *player, *other_player, true);
+  }
+}
+
 void Gtp() {
   GtpPlayer::Options options;
   ParseMctsPlayerOptionsFromFlags(&options);
@@ -225,6 +282,8 @@ int main(int argc, char* argv[]) {
 
   if (FLAGS_mode == "selfplay") {
     minigo::SelfPlay();
+  } else if (FLAGS_mode == "eval") {
+    minigo::Eval();
   } else if (FLAGS_mode == "gtp") {
     minigo::Gtp();
   } else {

@@ -35,7 +35,6 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
       ponder_limit_(options.ponder_limit),
       courtesy_pass_(options.courtesy_pass),
-      name_(options.name),
       num_readouts_(options.num_readouts) {
   RegisterCmd("boardsize", &GtpPlayer::HandleBoardsize);
   RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);

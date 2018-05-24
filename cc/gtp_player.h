@@ -41,8 +41,6 @@ class GtpPlayer : public MctsPlayer {
     // every report_search_interval to stderr in a format recognized by Minigui.
     absl::Duration report_search_interval;
 
-    std::string name = "minigo";
-
     // If non-zero, TreeSearch up to ponder_limit times while waiting for the
     // other player to play.
     int ponder_limit = 0;
@@ -149,7 +147,6 @@ class GtpPlayer : public MctsPlayer {
   int ponder_count_ = 0;
   int ponder_limit_;
   bool courtesy_pass_;
-  std::string name_;
   int num_readouts_;
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;
