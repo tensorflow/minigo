@@ -179,7 +179,7 @@ Our [milestones](https://github.com/tensorflow/minigo/milestone/1?closed=1) to h
     in the paper.
 
 
-### Fourth run, 9x9s.  Feb 7-
+### Fourth run, 9x9s.  Feb 7-March
 
 Since our 19x19 run seemed irrepairable, we decided to work on instrumentation
 to better understand when things were going off the rails while it would still
@@ -199,3 +199,124 @@ The results were very promising, reaching pro strength after about a week.
 
 Our models and training data can be found in [the GCS bucket
 here](https://console.cloud.google.com/storage/browser/minigo-pub/v3-9x9).
+
+
+### V5, 19x19s, March-April
+
+
+With our newly improved cluster tools, better monitoring, etc, we were pretty
+optimistic about our next attempt at 19x19.  Our evaluation matches -- pitting
+different models against each other to get a good ratings curve -- were
+automated during the v5 run, and a lot of new data analysis was made available
+during the run on the 'unofficial data site'
+['cloudygo'](http://www.cloudygo.com)
+
+Unfortunately, progress stalled shortly after cutting the learning rate, and
+seemed to never recover.  Our three most useful indicators were our value net's
+train error and validation error, our value net error on a set of professional
+games (aka "[figure 3](http://cloudygo.com/v7-19x19/figure-three)"), and our selfplay rating as measured by our evaluation
+matches.
+
+For these measures, shortly after our learning rate cut, performance improved
+dramatically before reverting almost completely, with the value net eventually
+becoming overfit to be worse than random chance on the holdout data.
+
+Various explanations for how the training data could be qualitatively different
+than the holdout data to result in overfitting were advanced:  Inadequate
+[shuffling of examples](http://www.moderndescartes.com/essays/shuffle_viz/), a
+too aggressive learning rate, not enough 'new games' played by new models before
+training new models, etc.
+
+After it seemed clear that it was not going to recover, the last half of the run
+(after 315 or so) was largely treated as a free time to twiddle knobs and
+observe their effects to try and narrow down these effects.
+
+During v5, we wrote a number of new features, including:
+
+ - A port of the engine to C++ for better performance.
+ - A new UI (in the minigui/ directory)
+ - Automated evaluation on a separate cluster
+ - Separate tfexample pipeline guaranteeing complete shuffling and better
+   throughput.
+ - And general improvements to our monitoring and data analysis.
+
+
+#### v5 changelog:
+
+1. 3/4 of the way through 125, change squash from 0.95 => 0.98, change temp cutoff
+to move 30 (from 31, because odd number = bias against black)
+
+1. 192 -- learning rate erroneously cut to 0.001.  207 returned to 0.01.
+(206 trained with 0.001, 207 @0.01)  (this was eventually reverted and moved off
+as v6)
+
+1. 231 -- moved #readouts to 900 from 800.
+
+1. 295-6 -- move shuffle buffer to 1M from 200k
+
+1. 347 -- changed filter amount to 0.02.  (first present for 347)
+
+1. 348 reverted shuffle buffer change
+
+1. 352 change filter to 0.03 and move shuffle buffer back to 200k
+
+1. during 354 (for 355) change steps per generation to 1M from 2M, shuffle
+buffer down to 100k
+
+1. 23.2M steps -- change l2_strength to 0.0002 (from 0.0001)
+
+1. 360ish -- entered experimental mode; freely adjusted learning rate up and
+down, adjusted batch size, etc, to see if valnet divergence could be fixed.
+
+
+### v7a, first week of May
+
+We began our next run by rolling back to v5-173-golden-horse, chosen because of
+its relatively high performance and it seemed to be before the v5 run flattened
+out.
+
+The major changes were:
+
+ - using the c++ selfplay worker
+ - better training data marshalling/shuffling
+ - larger training batch size (16 => 256)
+ - lower learning rate (1e-2 => 1e-3) (note this tracks the original aborted LR
+   cut at model #192 in the short-lived 'v6')
+ - higher numbers of games per model ( >15k, usually ending up with ~20k)
+
+
+v7's first premature run had a couple problems:
+
+ - We weren't writing our holdout data for 174-179ish, resulting in some weird tensorboard
+   artifacts as our holdout set became composed of models farther and farther
+   from the training data
+ - We also weren't writing SGFs, making analysis hard.
+ - But we did have our 'figure three', so we were able to make sure we were
+   moving in the right direction :)
+
+But it did make very strong progress on selfplay!  And then stopped...why?
+
+After finding a [potentially bad engine
+bug](https://github.com/tensorflow/minigo/pull/234) we decided to pause training
+to get to the bottom of it.  It ended up affecting < 0.01% of games, but we had
+already seen progress stall and retrace similar to v5, so we decided to rollback
+and test a new hypothesis:  That our amount of games with resign disabled (5%)
+was too small.  Compared to other efforts (AGZ paper says 10%, LZ stepped from 100% => 20%,
+and LCZ was still at 100% games played without resignations), Minigo is
+definitely the odd one out.
+
+This, combined with our better selfplay performance, made it a relatively
+painless decision to decide to roll back the few days progress.
+
+### v7, May 16-
+
+Rolled back to model v5-173; continued with the flags & features added in v7a,
+but with holdout data being written from the start ;)  And also with the
+resign-disabled fraction increased to 20%
+
+We expect to see it go sideways as it adapts to the new proportion of
+resign-disabled games, then show a similar improvement to the v7a improvement.
+After that, if it flattens off again we'll lower the learning rate further.
+
+Our limiting factor continues to be our rate of selfplay.
+
