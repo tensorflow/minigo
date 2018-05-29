@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libfreetype6-dev \
         libpng12-dev \
         libzmq3-dev \
+        libstdc++6 \
         pkg-config \
         rsync \
         software-properties-common \
@@ -65,8 +66,6 @@ COPY staging/cc/configure_tensorflow.sh cc/configure_tensorflow.sh
 RUN cc/configure_tensorflow.sh
 
 # Now bring in the rest of our code; changing our code will only trigger rebuilds below here
-COPY staging/ /app
+COPY staging /app
 
 RUN bazel build --copt=-march=ivybridge --define=board_size=19 cc/main
-
-CMD ["/bin/sh", "cc_wrapper.sh"]

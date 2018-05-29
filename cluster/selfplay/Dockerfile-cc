@@ -1,0 +1,5 @@
+FROM gcr.io/tensor-go/cc-base:latest
+
+COPY cc_wrapper.sh /app
+
+CMD ["/bin/sh", "cc_wrapper.sh"]

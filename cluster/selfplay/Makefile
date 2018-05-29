@@ -37,7 +37,7 @@ cc-image:
 		cp ../../WORKSPACE staging/
 		cp cc_wrapper.sh staging/
 		cp -r ../../cc/* staging/cc/
-	    docker build -f cc-Dockerfile -t "gcr.io/$(PROJECT)/$(CC_PLAYER_CONTAINER):$(VERSION_TAG)" .
+	    docker build -f Dockerfile-cc -t "gcr.io/$(PROJECT)/$(CC_PLAYER_CONTAINER):$(VERSION_TAG)" .
 		rm -rfd staging/
 
 cc-push: cc-image

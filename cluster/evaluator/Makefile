@@ -14,4 +14,15 @@ gpu-image:
 gpu-push: gpu-image
 	    gcloud docker -- push "gcr.io/$(PROJECT)/$(GPU_EVALUATOR_CONTAINER):$(VERSION_TAG)"
 
+cc-image:
+		mkdir -p staging/cc
+		cp ../../WORKSPACE staging/
+		cp evaluator_cc_wrapper.sh staging/
+		cp -r ../../cc/* staging/cc/
+	    docker build -f Dockerfile-cc -t "gcr.io/$(PROJECT)/minigo-cc-evaluator:$(VERSION_TAG)" .
+		rm -rfd staging/
+
+cc-push: cc-image
+	    gcloud docker -- push "gcr.io/$(PROJECT)/minigo-cc-evaluator:$(VERSION_TAG)"
+
 .PHONY: gpu-image gpu-push

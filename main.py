@@ -89,7 +89,7 @@ def train(
         model_save_path: 'Where to export the completed generation.'):
     print("Training on:", tf_records[0], "to", tf_records[-1])
     with utils.logged_timer("Training"):
-        dual_net.train(working_dir, tf_records) 
+        dual_net.train(working_dir, tf_records)
     print("== Training done.  Exporting model to ", model_save_path)
     dual_net.export_model(working_dir, model_save_path)
     freeze_graph(model_save_path)
@@ -171,8 +171,7 @@ def selfplay(
 def convert(load_file, dest_file):
     from tensorflow.python.framework import meta_graph
     features, labels = dual_net.get_inference_input()
-    dual_net.model_fn(features, labels, tf.estimator.ModeKeys.PREDICT,
-                      dual_net.get_default_hyperparams())
+    dual_net.model_fn(features, labels, tf.estimator.ModeKeys.PREDICT)
     sess = tf.Session()
 
     # retrieve the global step as a python value

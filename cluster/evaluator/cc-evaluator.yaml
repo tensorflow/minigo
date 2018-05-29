@@ -1,17 +1,17 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: minigo-gpu-evaluator-{{bnum}}-{{wnum}}
+  name: minigo-cc-evaluator-$MODEL_WHITE_NUM-$MODEL_BLACK_NUM
 spec:
-  parallelism: 8
-  completions: 15
+  parallelism: 10
+  completions: 10
   template:
     metadata:
       name: gpu-evaluator
     spec:
       containers:
       - name: evaluator
-        image: gcr.io/$PROJECT/$GPU_EVALUATOR_CONTAINER:$VERSION_TAG
+        image: gcr.io/$PROJECT/minigo-cc-evaluator:$VERSION_TAG
         imagePullPolicy: Always
         resources:
           limits:
@@ -24,14 +24,12 @@ spec:
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /etc/credentials/service-account.json
-        - name: BUCKET_NAME
-          value: $BUCKET_NAME
-        - name: BOARD_SIZE
-          value: "$BOARD_SIZE"
+        - name: SGF_BUCKET_NAME
+          value: tensor-go-minigo-cross-evals
         - name: MODEL_WHITE
-          value: {{ white }}
+          value: $MODEL_WHITE
         - name: MODEL_BLACK
-          value: {{ black }}
+          value: $MODEL_BLACK
         - name: LD_LIBRARY_PATH
           value: /usr/local/nvidia/lib64
       volumes:

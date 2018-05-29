@@ -253,7 +253,6 @@ void Eval() {
 
   std::string output_name =
       absl::StrCat(GetOutputName(), "-", player->name(), other_player->name());
-  std::string output_dir = FLAGS_output_dir;
 
   // Write SGF.
   if (!FLAGS_sgf_dir.empty()) {
