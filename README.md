@@ -88,11 +88,11 @@ pip3 install -r requirements.txt
 
 Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
-- GPU: `pip3 install "tensorflow-gpu>=1.7,<1.8"`.
+- GPU: `pip3 install "tensorflow-gpu>=1.8,<1.9"`.
   - *Note*: You must install [CUDA
     9.0].(https://developer.nvidia.com/cuda-90-download-archive) for Tensorflow
     1.5+.
-- CPU: `pip3 install "tensorflow>=1.7,<1.8"`.
+- CPU: `pip3 install "tensorflow>=1.8,<1.9"`.
 
 Setting up the Environment
 --------------------------

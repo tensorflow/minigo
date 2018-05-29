@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "absl/base/thread_annotations.h"
+#include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -43,6 +44,20 @@ TEST(CoordTest, Ordering) {
   EXPECT_EQ(3, q.Pop());
 
   EXPECT_FALSE(q.TryPop(&x));
+}
+
+// Verify that PopWithTimeout works whether the queue is empty or not.
+TEST(CoordTest, PopWithTimeout) {
+  ThreadSafeQueue<int> q;
+  int x;
+  // Pop with a 2ms delay on an empty queue should take at least 1ms.
+  auto start = absl::Now();
+  EXPECT_FALSE(q.PopWithTimeout(&x, absl::Milliseconds(2)));
+  EXPECT_LT(absl::Milliseconds(1), absl::Now() - start);
+
+  q.Push(-123);
+  EXPECT_TRUE(q.PopWithTimeout(&x, absl::Milliseconds(2)));
+  EXPECT_EQ(-123, x);
 }
 
 // Verify that the queue works with move-only objects.
@@ -95,7 +110,7 @@ TEST(CoordTest, Multithreading) {
         // Sleep a little to give other threads a chance.
         absl::SleepFor(absl::Microseconds(1));
       }
-      std::cerr << "popped " << my_popped.size() << " ints " << std::endl;
+      std::cerr << absl::StrCat("popped ", my_popped.size(), " ints\n");
 
       // Record all the ints we popped.
       absl::MutexLock lock(&m);

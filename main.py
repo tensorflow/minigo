@@ -28,8 +28,12 @@ import selfplay_mcts
 from gtp_wrapper import make_gtp_instance
 import utils
 
+
 import cloud_logging
 import tensorflow as tf
+from tensorflow.contrib.rpc.python.ops import rpc_op
+from tensorflow.contrib.proto.python.ops import decode_proto_op
+from tensorflow.contrib.proto.python.ops import encode_proto_op
 from absl import flags
 from tqdm import tqdm
 from tensorflow import gfile
@@ -209,9 +213,50 @@ def freeze_graph(load_file):
         f.write(out_graph.SerializeToString())
 
 
+def inference_worker(load_file):
+    rpc_client_info = dual_net.RpcClientInfo("localhost:50051",
+                                             "InferenceService/GetFeatures",
+                                             "InferenceService/PutOutputs")
+    n = dual_net.DualNetwork(load_file, rpc_client_info)
+
+    n.sess.run(n.inference_output)
+
+
+def test_rpc(load_file):
+    sess = tf.Session(graph=tf.Graph(), config=tf.ConfigProto())
+
+    # response = tf.contrib.rpc.rpc(
+    #     address="localhost:50001",
+    #     method="InferenceService/PutOutputs",
+    #     request=rpc_client_info.request,
+    #     protocol="grpc",
+    #     fail_fast=True,
+    #     timeout_in_ms=0,
+    #     name="PutOutputs")
+
+    response_proto = rpc_op.rpc(
+        address="localhost:50001",
+        method="InferenceService/GetFeatures",
+        request="",
+        protocol="grpc",
+        fail_fast=True,
+        timeout_in_ms=0,
+        name="put_outputs_proto")
+
+    features = decode_proto_op.decode_proto(
+        bytes=response_proto,
+        message_type='tensorflow.contrib.rpc.TestCase',
+        field_names=['shape'],
+        output_types=[dtypes.int32])
+
+    out_graph = tf.graph_util.convert_variables_to_constants(
+        sess, sess.graph.as_graph_def(), ["put_outputs"])
+
+
 parser = argparse.ArgumentParser()
 argh.add_commands(parser, [gtp, bootstrap, train, train_dir, freeze_graph,
-                           selfplay, evaluate, validate, convert])
+                           selfplay, evaluate, validate, convert,
+                           inference_worker, test_rpc])
 
 if __name__ == '__main__':
     cloud_logging.configure()

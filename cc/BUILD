@@ -166,6 +166,7 @@ cc_library(
     deps = [
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -286,6 +287,7 @@ minigo_cc_test(
     srcs = ["thread_safe_queue_test.cc"],
     deps = [
         ":thread_safe_queue",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",

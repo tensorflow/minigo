@@ -28,6 +28,9 @@ import sys
 import argh
 import numpy as np
 import tensorflow as tf
+
+from tensorflow.python.framework import dtypes
+from tensorflow.contrib.proto.python.ops import decode_proto_op
 from tensorflow.python.training.summary_io import SummaryWriterCache
 from tensorflow.contrib.tpu.python.tpu import bfloat16
 from tensorflow.contrib.tpu.python.tpu import tpu_config
@@ -104,21 +107,29 @@ FLAGS = flags.FLAGS
 EXAMPLES_PER_GENERATION = 2000000
 
 
+class RpcClientInfo(object):
+    def __init__(self, address, get_features_method, put_outputs_method):
+        self.address = address
+        self.get_features_method = get_features_method
+        self.put_outputs_method = put_outputs_method
+
+
 class DualNetwork():
-    def __init__(self, save_file):
+    def __init__(self, save_file, rpc_client_info=None):
         self.save_file = save_file
         self.inference_input = None
         self.inference_output = None
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=tf.Graph(), config=config)
-        self.initialize_graph()
+        self.initialize_graph(rpc_client_info)
 
-    def initialize_graph(self):
+    def initialize_graph(self, rpc_client_info=None):
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
             estimator_spec = model_fn(features, labels,
-                                      tf.estimator.ModeKeys.PREDICT)
+                                      tf.estimator.ModeKeys.PREDICT,
+                                      rpc_client_info)
             self.inference_input = features
             self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
@@ -164,7 +175,7 @@ def get_inference_input():
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
 
-def model_fn(features, labels, mode, params=None):
+def model_fn(features, labels, mode, params=None, rpc_client_info=None):
     '''
     Args:
         features: tensor with shape
@@ -200,6 +211,28 @@ def model_fn(features, labels, mode, params=None):
         int_layer2 = my_batchn(my_conv2d(initial_output))
         output = tf.nn.relu(inputs + int_layer2)
         return output
+
+    if rpc_client_info is not None:
+       raw_response = tf.contrib.rpc.rpc(
+           address=rpc_client_info.address,
+           method=rpc_client_info.get_features_method,
+           request="",
+           protocol="grpc",
+           fail_fast=True,
+           timeout_in_ms=0,
+           name="get_features")
+
+       _, (flat_features,) = decode_proto_op.decode_proto(
+           bytes=raw_response,
+           message_type='minigo.GetFeaturesResponse',
+           field_names=['features'],
+           output_types=[dtypes.float32],
+           descriptor_source="/usr/local/google/home/tmadams/minigo/inference_service_proto.pb.descriptor_set",
+           name="decode_raw_features")
+
+       features = tf.reshape(
+           flat_features, [-1, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
+           name="reshape_flat_features")
 
     initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
 
@@ -306,7 +339,7 @@ def model_fn(features, labels, mode, params=None):
                 tf.reshape(combined_cost, [1])]))
     else:
         metric_ops = host_call_fn(policy_output, value_output, labels['pi_tensor'],
-            policy_cost, value_cost, l2_cost, combined_cost)
+                                  policy_cost, value_cost, l2_cost, combined_cost)
         return tf.estimator.EstimatorSpec(
             mode=mode,
             predictions={
@@ -317,7 +350,6 @@ def model_fn(features, labels, mode, params=None):
             train_op=train_op,
             eval_metric_ops=metric_ops,
         )
-
 
 
 def get_estimator(working_dir):
@@ -391,6 +423,7 @@ def train(working_dir, *tf_records, steps=None):
             config=config,
             train_batch_size=FLAGS.train_batch_size,
             eval_batch_size=FLAGS.train_batch_size)
+
         def input_fn(params):
             return preprocessing.get_tpu_input_tensors(params['batch_size'], tf_records)
         # TODO: get hooks working again with TPUestimator.
@@ -408,7 +441,7 @@ def train(working_dir, *tf_records, steps=None):
 
     if steps is None:
         steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
-    print ("Training, steps = {}".format(steps))
+    print("Training, steps = {}".format(steps))
     estimator.train(input_fn, steps=int(steps), hooks=hooks)
 
 
@@ -474,6 +507,7 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
             self.summary_writer.add_summary(
                 weight_update_summaries, global_step)
             self.before_weights = None
+
 
 parser = argparse.ArgumentParser()
 argh.add_commands(parser, [train])

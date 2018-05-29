@@ -12,11 +12,17 @@ load(
     "minigo_cc_test_9_only",
 )
 load("@org_pubref_rules_protobuf//cpp:rules.bzl", "cc_proto_library")
+load("@org_pubref_rules_protobuf//python:rules.bzl", "py_proto_library")
 
 cc_proto_library(
     name = "inference_service_proto",
     protos = ["inference_service.proto"],
     with_grpc = True,
+)
+
+py_proto_library(
+    name = "inference_service_py_pb2",
+    protos = ["inference_service.proto"],
 )
 
 minigo_cc_library(
@@ -98,12 +104,14 @@ minigo_cc_test(
 )
 
 minigo_cc_binary(
-    name = "inference_model_client",
-    srcs = ["inference_model_client.cc"],
+    name = "inference_worker",
+    srcs = ["inference_worker.cc"],
     deps = [
+        # TODO(tommadams): remove this dependency
+        ":dual_net",
         ":inference_service_proto",
-        ":tf_dual_net",
         "//cc:base",
+        "//cc:tensorflow",
         "//cc:init",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/strings",

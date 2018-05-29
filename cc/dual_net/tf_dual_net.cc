@@ -35,6 +35,7 @@ namespace minigo {
 TfDualNet::TfDualNet(const std::string& graph_path) {
   GraphDef graph_def;
   TF_CHECK_OK(ReadBinaryProto(Env::Default(), graph_path, &graph_def));
+
   session_.reset(NewSession(SessionOptions()));
   TF_CHECK_OK(session_->Create(graph_def));
 

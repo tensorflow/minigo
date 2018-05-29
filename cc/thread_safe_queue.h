@@ -20,6 +20,7 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/time/time.h"
 
 namespace minigo {
 
@@ -52,6 +53,18 @@ class ThreadSafeQueue {
     T x = std::move(queue_.front());
     queue_.pop();
     return x;
+  }
+
+  bool PopWithTimeout(T* x, absl::Duration timeout) {
+    absl::MutexLock lock(&m_);
+    m_.AwaitWithTimeout(absl::Condition(this, &ThreadSafeQueue::has_elements),
+                        timeout);
+    if (queue_.empty()) {
+      return false;
+    }
+    *x = std::move(queue_.front());
+    queue_.pop();
+    return true;
   }
 
   bool empty() const {
