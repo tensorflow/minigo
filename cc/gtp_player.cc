@@ -35,7 +35,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
       ponder_limit_(options.ponder_limit),
       courtesy_pass_(options.courtesy_pass),
-      num_readouts_(options.num_readouts) {
+      name_(options.name) {
   RegisterCmd("boardsize", &GtpPlayer::HandleBoardsize);
   RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
   RegisterCmd("echo", &GtpPlayer::HandleEcho);
@@ -69,11 +69,11 @@ void GtpPlayer::Run() {
   }
 }
 
-Coord GtpPlayer::SuggestMove(int num_readouts) {
+Coord GtpPlayer::SuggestMove() {
   if (courtesy_pass_ && root()->move == Coord::kPass) {
     return Coord::kPass;
   }
-  return MctsPlayer::SuggestMove(num_readouts);
+  return MctsPlayer::SuggestMove();
 }
 
 void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
@@ -292,7 +292,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(
     return response;
   }
 
-  auto c = SuggestMove(num_readouts_);
+  auto c = SuggestMove();
   std::cerr << root()->Describe() << std::endl;
   last_genmove_ = root()->position.to_play();
   PlayMove(c);
@@ -309,7 +309,7 @@ GtpPlayer::Response GtpPlayer::HandleInfo(
 
   std::ostringstream oss;
   oss << options();
-  oss << " num_readouts: " << num_readouts_
+  oss << " num_readouts: " << options().num_readouts
       << " report_search_interval:" << report_search_interval_
       << " name:" << name_;
   return Response::Ok(oss.str());
@@ -449,7 +449,7 @@ GtpPlayer::Response GtpPlayer::HandleReadouts(
   if (!absl::SimpleAtoi(args[0], &x) || x <= 0) {
     return Response::Error("couldn't parse ", args[0], " as an integer > 0");
   } else {
-    num_readouts_ = x;
+    options().num_readouts = x;
   }
 
   return Response::Ok();

@@ -34,9 +34,6 @@ namespace minigo {
 class GtpPlayer : public MctsPlayer {
  public:
   struct Options : public MctsPlayer::Options {
-    // Number of readouts to perform.
-    int num_readouts = 100;
-
     // If non-zero, GtpPlayer will print the current state of its tree search
     // every report_search_interval to stderr in a format recognized by Minigui.
     absl::Duration report_search_interval;
@@ -53,7 +50,7 @@ class GtpPlayer : public MctsPlayer {
 
   void Run();
 
-  Coord SuggestMove(int num_readouts) override;
+  Coord SuggestMove() override;
 
  protected:
   absl::Span<MctsNode* const> TreeSearch(int batch_size) override;
@@ -147,7 +144,7 @@ class GtpPlayer : public MctsPlayer {
   int ponder_count_ = 0;
   int ponder_limit_;
   bool courtesy_pass_;
-  int num_readouts_;
+  std::string name_;
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;
 

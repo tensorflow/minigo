@@ -83,6 +83,18 @@ DEFINE_int32(
 DEFINE_bool(
     courtesy_pass, false,
     "If true and in GTP mode, we will always pass if the opponent passes.");
+DEFINE_double(
+    seconds_per_move, 0,
+    " If non-zero, the number of seconds to spend thinking about each "
+    "move instead of using a fixed number of readouts.");
+DEFINE_double(
+    time_limit, 0,
+    "If non-zero, the maximum amount of time to spend thinking in a game: we "
+    "spend seconds_per_move thinking for each move for as many moves as "
+    "possible before exponentially decaying the amount of time.");
+DEFINE_double(decay_factor, 0.98,
+              "If time_limit is non-zero, the decay factor used to shorten the "
+              "amount of time spent thinking as the game progresses.");
 
 DEFINE_string(mode, "", "Mode to run in: \"selfplay\", \"eval\" or \"gtp\"");
 
@@ -184,9 +196,15 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->batch_size = FLAGS_batch_size;
   options->komi = FLAGS_komi;
   options->random_seed = FLAGS_seed;
+  options->num_readouts = FLAGS_num_readouts;
+  options->seconds_per_move = FLAGS_seconds_per_move;
+  options->time_limit = FLAGS_time_limit;
+  options->decay_factor = FLAGS_decay_factor;
 }
 
 void SelfPlay() {
+  auto start_time = absl::Now();
+
   MctsPlayer::Options options;
   ParseMctsPlayerOptionsFromFlags(&options);
   Random rnd;
@@ -197,12 +215,14 @@ void SelfPlay() {
       absl::make_unique<TfDualNet>(FLAGS_model), options);
 
   while (!player->game_over()) {
-    auto move = player->SuggestMove(FLAGS_num_readouts);
+    auto move = player->SuggestMove();
     std::cerr << player->root()->position.ToPrettyString();
-    std::cerr << player->root()->Describe() << "\n";
+    std::cerr << player->root()->Describe() << std::endl;
     player->PlayMove(move);
   }
-  std::cerr << player->result_string() << "\n";
+  std::cerr << player->result_string() << std::endl;
+  std::cout << "Playing game: "
+            << absl::ToDoubleSeconds(absl::Now() - start_time) << std::endl;
 
   std::string output_name = GetOutputName();
   std::string output_dir =

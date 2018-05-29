@@ -37,6 +37,31 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
   return os;
 }
 
+float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
+                         float decay_factor) {
+  // Divide by two since you only play half the moves in a game.
+  int player_move_num = move_num / 2;
+
+  // Sum of geometric series maxes out at endgame_time seconds.
+  float endgame_time = seconds_per_move / (1.0f - decay_factor);
+
+  float base_time;
+  int core_moves;
+  if (endgame_time > time_limit) {
+    // There is so little main time that we're already in 'endgame' mode.
+    base_time = time_limit * (1.0f - decay_factor);
+    core_moves = 0;
+  } else {
+    // Leave over endgame_time seconds for the end, and play at
+    // seconds_per_move for as long as possible.
+    base_time = seconds_per_move;
+    core_moves = (time_limit - endgame_time) / seconds_per_move;
+  }
+
+  return std::pow(base_time * decay_factor,
+                  std::max(player_move_num - core_moves, 0));
+}
+
 MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : name_(options.name),
       network_(std::move(network)),
@@ -66,7 +91,7 @@ void MctsPlayer::NewGame() {
   game_over_ = false;
 }
 
-Coord MctsPlayer::SuggestMove(int num_readouts) {
+Coord MctsPlayer::SuggestMove() {
   std::array<float, kNumMoves> noise;
   if (options_.inject_noise) {
     // In order to be able to inject noise into the root node, we need to first
@@ -84,9 +109,34 @@ Coord MctsPlayer::SuggestMove(int num_readouts) {
   int current_readouts = root_->N();
 
   auto start = absl::Now();
-  while (root_->N() < current_readouts + num_readouts) {
-    TreeSearch(options_.batch_size);
+  if (options_.seconds_per_move > 0) {
+    // Use time to limit the number of reads.
+    float seconds_per_move = options_.seconds_per_move;
+    if (options_.time_limit > 0) {
+      seconds_per_move =
+          TimeRecommendation(root_->position.n(), seconds_per_move,
+                             options_.time_limit, options_.decay_factor);
+    }
+    for (;;) {
+      auto now = absl::Now();
+      std::cerr << "### " << (now - start) << " " << seconds_per_move
+                << std::endl;
+      if (absl::ToDoubleSeconds(now - start) < seconds_per_move) {
+        TreeSearch(options_.batch_size);
+      } else {
+        break;
+      }
+    }
+    // while (absl::ToDoubleSeconds(absl::Now() - start) < seconds_per_move) {
+    //   TreeSearch(options_.batch_size);
+    // }
+  } else {
+    // Use a fixed number of reads.
+    while (root_->N() < current_readouts + options_.num_readouts) {
+      TreeSearch(options_.batch_size);
+    }
   }
+  int num_readouts = root_->N() - current_readouts;
   auto elapsed = absl::Now() - start;
   elapsed = elapsed * 100 / num_readouts;
   std::cerr << "Milliseconds per 100 reads: "

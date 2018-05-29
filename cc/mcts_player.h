@@ -33,6 +33,10 @@
 
 namespace minigo {
 
+// Exposed for testing.
+float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
+                         float decay_factor);
+
 class MctsPlayer {
  public:
   struct Options {
@@ -45,8 +49,24 @@ class MctsPlayer {
     std::string name = "minigo";
 
     // Seed used from random permutations.
-    // If the default value of 0 is used, a time-based seed is used.
+    // If the default value of 0 is used, a time-based seed is chosen.
     uint64_t random_seed = 0;
+
+    // Number of readouts to perform (ignored if seconds_per_move is non-zero).
+    int num_readouts = 0;
+
+    // If non-zero, the number of seconds to spend thinking about each move
+    // instead of using a fixed number of readouts.
+    float seconds_per_move = 0;
+
+    // If non-zero, the maximum amount of time to spend thinking in a game:
+    // we spend seconds_per_move thinking for each move for as many moves as
+    // possible before exponentially decaying the amount of time.
+    float time_limit = 0;
+
+    // If time_limit is non-zero, the decay factor used to shorten the amount
+    // of time spent thinking as the game progresses.
+    float decay_factor = 0.98;
 
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
@@ -69,7 +89,7 @@ class MctsPlayer {
 
   void NewGame();
 
-  virtual Coord SuggestMove(int num_readouts);
+  virtual Coord SuggestMove();
 
   void PlayMove(Coord c);
 
@@ -106,6 +126,8 @@ class MctsPlayer {
 
   // These methods are protected to facilitate direct testing.
  protected:
+  Options& options() { return options_; }
+
   Coord PickMove();
 
   // Returns the list of nodes that TreeSearch performed inference on.
