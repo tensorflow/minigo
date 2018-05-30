@@ -120,6 +120,27 @@ std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(int n) {
   return player;
 }
 
+TEST(MctsPlayerTest, TimeRecommendation) {
+  // Early in the game with plenty of time left, the time recommendation should
+  // be the requested number of seconds per move.
+  EXPECT_EQ(5, TimeRecommendation(0, 5, 1000, 0.98));
+  EXPECT_EQ(5, TimeRecommendation(1, 5, 1000, 0.98));
+  EXPECT_EQ(5, TimeRecommendation(10, 5, 1000, 0.98));
+  EXPECT_EQ(5, TimeRecommendation(50, 5, 1000, 0.98));
+
+  // With a small time limit, the time recommendation should immediately be less
+  // than requested.
+  EXPECT_GT(1.0f, TimeRecommendation(0, 5, 10, 0.98));
+
+  // Time recommendations for even and odd moves should be identical.
+  EXPECT_EQ(TimeRecommendation(20, 5, 10, 0.98),
+            TimeRecommendation(21, 5, 10, 0.98));
+
+  // If we're later into the game than should really be possible, time
+  // recommendation should be almost zero.
+  EXPECT_GT(0.0001, TimeRecommendation(1000, 5, 100, 0.98));
+}
+
 TEST(MctsPlayerTest, InjectNoise) {
   MctsPlayer::Options options;
   auto player = CreateBasicPlayer(options);
