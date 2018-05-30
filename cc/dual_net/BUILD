@@ -23,6 +23,7 @@ cc_proto_library(
 py_proto_library(
     name = "inference_service_py_pb2",
     protos = ["inference_service.proto"],
+    with_grpc = True,
 )
 
 minigo_cc_library(
