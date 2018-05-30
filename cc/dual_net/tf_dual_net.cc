@@ -46,6 +46,14 @@ TfDualNet::TfDualNet(const std::string& graph_path) {
   output_names_.clear();
   output_names_.push_back("policy_output");
   output_names_.push_back("value_output");
+
+  // Tensorflow lazily initializes the first time Session::Run is called, which
+  // can take hundreds of milliseconds. This intefers with time control, so
+  // explicitly run inference once during construction.
+  Output output;
+  BoardFeatures features;
+  const auto* features_ptr = &features;
+  RunMany({&features_ptr, 1}, {&output, 1});
 }
 
 TfDualNet::~TfDualNet() {

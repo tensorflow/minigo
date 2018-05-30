@@ -126,7 +126,7 @@ class MctsPlayer {
 
   // These methods are protected to facilitate direct testing.
  protected:
-  Options& options() { return options_; }
+  Options* mutable_options() { return &options_; }
 
   Coord PickMove();
 

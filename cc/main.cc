@@ -256,7 +256,7 @@ void Eval() {
       absl::make_unique<TfDualNet>(FLAGS_model_two), options);
 
   while (!player->game_over()) {
-    auto move = player->SuggestMove(FLAGS_num_readouts);
+    auto move = player->SuggestMove();
     std::cerr << player->root()->Describe() << "\n";
     player->PlayMove(move);
     other_player->PlayMove(move);
@@ -283,7 +283,6 @@ void Eval() {
 void Gtp() {
   GtpPlayer::Options options;
   ParseMctsPlayerOptionsFromFlags(&options);
-  options.num_readouts = FLAGS_num_readouts;
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   options.ponder_limit = FLAGS_ponder_limit;
   options.courtesy_pass = FLAGS_courtesy_pass;

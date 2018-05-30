@@ -58,8 +58,8 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
     core_moves = (time_limit - endgame_time) / seconds_per_move;
   }
 
-  return std::pow(base_time * decay_factor,
-                  std::max(player_move_num - core_moves, 0));
+  return base_time *
+         std::pow(decay_factor, std::max(player_move_num - core_moves, 0));
 }
 
 MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
@@ -117,19 +117,9 @@ Coord MctsPlayer::SuggestMove() {
           TimeRecommendation(root_->position.n(), seconds_per_move,
                              options_.time_limit, options_.decay_factor);
     }
-    for (;;) {
-      auto now = absl::Now();
-      std::cerr << "### " << (now - start) << " " << seconds_per_move
-                << std::endl;
-      if (absl::ToDoubleSeconds(now - start) < seconds_per_move) {
-        TreeSearch(options_.batch_size);
-      } else {
-        break;
-      }
+    while (absl::ToDoubleSeconds(absl::Now() - start) < seconds_per_move) {
+      TreeSearch(options_.batch_size);
     }
-    // while (absl::ToDoubleSeconds(absl::Now() - start) < seconds_per_move) {
-    //   TreeSearch(options_.batch_size);
-    // }
   } else {
     // Use a fixed number of reads.
     while (root_->N() < current_readouts + options_.num_readouts) {

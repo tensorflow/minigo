@@ -449,7 +449,7 @@ GtpPlayer::Response GtpPlayer::HandleReadouts(
   if (!absl::SimpleAtoi(args[0], &x) || x <= 0) {
     return Response::Error("couldn't parse ", args[0], " as an integer > 0");
   } else {
-    options().num_readouts = x;
+    mutable_options()->num_readouts = x;
   }
 
   return Response::Ok();
