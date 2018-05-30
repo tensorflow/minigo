@@ -28,11 +28,15 @@
 namespace minigo {
 
 std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
-  os << "inject_noise:" << options.inject_noise
+  os << "name:" << options.name << " inject_noise:" << options.inject_noise
      << " soft_pick:" << options.soft_pick
      << " random_symmetry:" << options.random_symmetry
      << " resign_threshold:" << options.resign_threshold
      << " batch_size:" << options.batch_size << " komi:" << options.komi
+     << " num_readouts:" << options.num_readouts
+     << " seconds_per_move:" << options.seconds_per_move
+     << " time_limit:" << options.time_limit
+     << " decay_factor:" << options.decay_factor
      << " random_seed:" << options.random_seed;
   return os;
 }
@@ -63,8 +67,7 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
 }
 
 MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
-    : name_(options.name),
-      network_(std::move(network)),
+    : network_(std::move(network)),
       game_root_(&dummy_stats_, {&bv_, &gv_, Color::kBlack}),
       rnd_(options.random_seed),
       options_(options) {

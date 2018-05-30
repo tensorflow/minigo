@@ -122,7 +122,7 @@ class MctsPlayer {
 
   const Options& options() const { return options_; }
   const std::vector<History>& history() const { return history_; }
-  const std::string name() const { return name_; }
+  const std::string& name() const { return options_.name; }
 
   // These methods are protected to facilitate direct testing.
  protected:
@@ -141,7 +141,6 @@ class MctsPlayer {
   const MctsNode* game_root() const { return &game_root_; }
 
   Random* rnd() { return &rnd_; }
-  std::string name_;
 
   std::string FormatScore(float score) const;
 

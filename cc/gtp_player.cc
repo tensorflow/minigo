@@ -308,9 +308,7 @@ GtpPlayer::Response GtpPlayer::HandleInfo(
 
   std::ostringstream oss;
   oss << options();
-  oss << " num_readouts: " << options().num_readouts
-      << " report_search_interval:" << report_search_interval_
-      << " name:" << name_;
+  oss << " report_search_interval:" << report_search_interval_;
   return Response::Ok(oss.str());
 }
 
@@ -380,7 +378,7 @@ GtpPlayer::Response GtpPlayer::HandleName(
   if (!response.ok) {
     return response;
   }
-  return Response::Ok(name_);
+  return Response::Ok(options().name);
 }
 
 GtpPlayer::Response GtpPlayer::HandlePlay(
