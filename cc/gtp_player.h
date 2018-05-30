@@ -144,7 +144,6 @@ class GtpPlayer : public MctsPlayer {
   int ponder_count_ = 0;
   int ponder_limit_;
   bool courtesy_pass_;
-  std::string name_;
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;
 
