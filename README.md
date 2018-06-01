@@ -292,8 +292,7 @@ Run the training job:
 BOARD_SIZE=19 python3 main.py train-dir \
   estimator_working_dir
   gs://$BUCKET_NAME/data/training_chunks \
-  gs://$BUCKET_NAME/models/000001-somename \
-  --generation-num=1 \
+  gs://$BUCKET_NAME/models/000001-somename
 ```
 
 At the end of training, the latest checkpoint will be exported to the directory with the given name.  
