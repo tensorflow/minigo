@@ -38,11 +38,6 @@ SZ[{boardsize}]KM[{komi}]PW[{white_name}]PB[{black_name}]RE[{result}]
 PROGRAM_IDENTIFIER = "Minigo"
 
 
-def translate_sgf_move_qs(player_move, q):
-    return "{move}C[{q:.4f}]".format(
-        move=translate_sgf_move(player_move), q=q)
-
-
 def translate_sgf_move(player_move, comment):
     if player_move.color not in (go.BLACK, go.WHITE):
         raise ValueError("Can't translate color %s to sgf" % player_move.color)

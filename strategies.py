@@ -90,7 +90,6 @@ class MCTSPlayer(MCTSPlayerInterface):
             self.temp_threshold = -1
         else:
             self.temp_threshold = FLAGS.softpick_move_cutoff
-        self.qs = []
         self.comments = []
         self.searches_pi = []
         self.root = None
@@ -119,7 +118,6 @@ class MCTSPlayer(MCTSPlayerInterface):
         self.result_string = None
         self.comments = []
         self.searches_pi = []
-        self.qs = []
 
     def suggest_move(self, position):
         ''' Used for playing a single game.
@@ -159,7 +157,6 @@ class MCTSPlayer(MCTSPlayerInterface):
         if not self.two_player_mode:
             self.searches_pi.append(
                 self.root.children_as_pi(self.root.position.n <= self.temp_threshold))
-        self.qs.append(self.root.Q)  # Save our resulting Q.
         self.comments.append(self.root.describe())
         try:
             self.root = self.root.maybe_add_child(coords.to_flat(c))
@@ -167,7 +164,6 @@ class MCTSPlayer(MCTSPlayerInterface):
             print("Illegal move")
             if not self.two_player_mode:
                 self.searches_pi.pop()
-            self.qs.pop()
             self.comments.pop()
             return False
         self.position = self.root.position  # for showboard
