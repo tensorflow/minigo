@@ -40,12 +40,14 @@ message GetFeaturesRequest {
 }
 
 message GetFeaturesResponse {
-  repeated float features = 1;
+  int32 batch_id = 1;
+  repeated float features = 2;
 }
 
 message PutOutputsRequest {
-  repeated float policy = 1;
-  repeated float value = 2;
+  int32 batch_id = 1;
+  repeated float policy = 2;
+  repeated float value = 3;
 }
 
 message PutOutputsResponse {

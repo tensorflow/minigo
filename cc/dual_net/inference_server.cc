@@ -36,11 +36,11 @@ namespace {
 
 class ServiceImpl final : public InferenceService::Service {
  public:
-  ServiceImpl() : batch_size_(8), batch_timeout_(absl::Microseconds(100)) {}
+  ServiceImpl()
+      : batch_size_(8), batch_id_(1), batch_timeout_(absl::Seconds(100000)) {}
 
   Status GetConfig(ServerContext* context, const GetConfigRequest* request,
                    GetConfigResponse* response) override {
-    std::cerr << "### GetConfig()" << std::endl;
     response->set_board_size(kN);
     response->set_batch_size(batch_size_);
     return Status::OK;
@@ -48,67 +48,89 @@ class ServiceImpl final : public InferenceService::Service {
 
   Status GetFeatures(ServerContext* context, const GetFeaturesRequest* request,
                      GetFeaturesResponse* response) override {
-    std::cerr << "### GetFeatures()" << std::endl;
-    absl::MutexLock lock(&m_);
+    // std::cerr << "### GetFeatures()" << std::endl;
 
-    MG_CHECK(batch_.empty());
+    absl::MutexLock next_batch_lock(&next_batch_mutex_);
 
     // Wait forever until an inference is pushed onto the request_queue_.
     RemoteInference inference;
     auto timeout = absl::Milliseconds(100);
     while (!request_queue_.PopWithTimeout(&inference, timeout)) {
       if (context->IsCancelled()) {
+        // std::cerr << "### GetFeatures() CANCELLED" << std::endl;
         return Status(StatusCode::CANCELLED, "connection terminated");
       }
     }
-    batch_.push_back(inference);
+
+    MG_CHECK(next_batch_.empty());
+    next_batch_.push_back(inference);
 
     // Once we have the first inference, wait up to batch_timeout_ for more
     // inferences to arrive until we reach the maximum batch_size_.
     auto deadline = absl::Now() + batch_timeout_;
-    while (batch_.size() < batch_size_) {
+    while (next_batch_.size() < batch_size_) {
       auto now = absl::Now();
       if (now >= deadline ||
           !request_queue_.PopWithTimeout(&inference, deadline - now)) {
         break;
       }
-      batch_.push_back(inference);
+      next_batch_.push_back(inference);
     }
 
     // The RPC ops in the worker graph seem to require that the batch size is
     // known at graph build time, so make sure we always send a batch of size
     // batch_size_.
-    std::cerr << "batch size before padding: " << batch_.size() << std::endl;
-    while (batch_.size() < batch_size_) {
-      batch_.push_back(batch_.back());
+    // std::cerr << "### batch size before padding: " << next_batch_.size()
+    //           << std::endl;
+    while (next_batch_.size() < batch_size_) {
+      next_batch_.push_back(next_batch_.back());
     }
 
     // Response with the batch.
-    for (const auto& inference : batch_) {
+    response->set_batch_id(batch_id_++);
+    for (const auto& inference : next_batch_) {
       const auto& src = *inference.features;
       for (size_t i = 0; i < src.size(); ++i) {
         response->add_features(src[i]);
       }
     }
 
+    // std::cerr << "### GetFeatures() " << response->batch_id() << " OK"
+    //           << std::endl;
+
+    {
+      absl::MutexLock pending_batches_lock(&pending_batches_mutex_);
+      pending_batches_[response->batch_id()] = std::move(next_batch_);
+    }
+    next_batch_.clear();
+
     return Status::OK;
   }
 
   Status PutOutputs(ServerContext* context, const PutOutputsRequest* request,
                     PutOutputsResponse* response) override {
-    std::cerr << "### PutOutputs()" << std::endl;
-    absl::MutexLock lock(&m_);
+    // std::cerr << "### PutOutputs(" << request->batch_id() << ")" <<
+    // std::endl;
+
+    std::vector<RemoteInference> batch;
+    {
+      absl::MutexLock pending_batches_lock(&pending_batches_mutex_);
+      auto it = pending_batches_.find(request->batch_id());
+      MG_CHECK(it != pending_batches_.end());
+      batch = std::move(it->second);
+      pending_batches_.erase(it);
+    }
 
     // There should be one value for each inference.
-    MG_CHECK(request->value().size() == static_cast<int>(batch_.size()))
-        << request->value().size() << " != " << batch_.size();
+    MG_CHECK(request->value().size() == static_cast<int>(batch.size()))
+        << request->value().size() << " != " << batch.size();
 
     // There should be (N * N + 1) policy values for each inference.
     MG_CHECK(request->policy().size() ==
-             static_cast<int>(batch_.size() * kNumMoves));
+             static_cast<int>(batch.size() * kNumMoves));
 
     for (int j = 0; j < request->value().size(); ++j) {
-      auto& inference = batch_[j];
+      auto& inference = batch[j];
       auto& dst_policy = inference.output->policy;
       for (int i = 0; i < kNumMoves; ++i) {
         dst_policy[i] = request->policy(i + j * kNumMoves);
@@ -117,8 +139,7 @@ class ServiceImpl final : public InferenceService::Service {
       inference.counter->DecrementCount();
     }
 
-    batch_.clear();
-
+    // std::cerr << "### PutOutputs() OK" << std::endl;
     return Status::OK;
   }
 
@@ -129,6 +150,8 @@ class ServiceImpl final : public InferenceService::Service {
   // request_queue_ before replying.
   const size_t batch_size_;
 
+  std::atomic<int32_t> batch_id_{1};
+
   // After successfully popping the first request off request_queue, GetFeatures
   // will wait for up to the batch_timeout_ for more inference requests before
   // replying.
@@ -136,8 +159,12 @@ class ServiceImpl final : public InferenceService::Service {
 
   ThreadSafeQueue<RemoteInference> request_queue_;
 
-  absl::Mutex m_;
-  std::vector<RemoteInference> batch_ GUARDED_BY(&m_);
+  absl::Mutex next_batch_mutex_;
+  std::vector<RemoteInference> next_batch_ GUARDED_BY(&next_batch_mutex_);
+
+  absl::Mutex pending_batches_mutex_;
+  std::map<int32_t, std::vector<RemoteInference>> pending_batches_
+      GUARDED_BY(&pending_batches_mutex_);
 };
 
 class InferenceClient : public DualNet {

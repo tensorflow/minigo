@@ -198,11 +198,11 @@ absl::Span<MctsNode* const> MctsPlayer::TreeSearch(int batch_size) {
       features_.push_back(&leaf->features);
     }
 
-    for (const auto* leaf : leaves_) {
-      std::cerr << "----------------" << std::endl;
-      std::cerr << leaf << std::endl;
-      std::cerr << leaf->position.ToSimpleString() << std::endl;
-    }
+    // for (const auto* leaf : leaves_) {
+    //   std::cerr << "----------------" << std::endl;
+    //   std::cerr << leaf << std::endl;
+    //   std::cerr << leaf->position.ToSimpleString() << std::endl;
+    // }
     outputs_.resize(leaves_.size());
     RunMany(features_, {outputs_.data(), outputs_.size()});
 

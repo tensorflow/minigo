@@ -180,35 +180,11 @@ def get_inference_input():
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
 
-def model_fn(features, labels, mode, params=None, inference_worker_config=None):
-    '''
-    Args:
-        features: tensor with shape
-            [BATCH_SIZE, go.N, go.N, features_lib.NEW_FEATURES_PLANES]
-        labels: dict from string to tensor with shape
-            'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
-            'value_tensor': [BATCH_SIZE]
-        mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
-        params: (Ignored; needed for compat with TPUEstimator)
-        inference_worker_config: if not None, build a model graph for running as
-                                 an inference server worker: the model will
-                                 loop forever, requesting features & writing
-                                 outputs via RPC ops.
-    Returns: tf.estimator.EstimatorSpec with props
-        mode: same as mode arg
-        predictions: dict of tensors
-            'policy': [BATCH_SIZE, go.N * go.N + 1]
-            'value': [BATCH_SIZE]
-        loss: a single value tensor
-        train_op: train op
-        eval_metric_ops
-    return dict of tensors
-        logits: [BATCH_SIZE, go.N * go.N + 1]
-    '''
+def model_inference_fn(features, training):
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
         momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,
-        training=(mode == tf.estimator.ModeKeys.TRAIN))
+        training=training)
 
     my_conv2d = functools.partial(
         tf.layers.conv2d,
@@ -220,28 +196,6 @@ def model_fn(features, labels, mode, params=None, inference_worker_config=None):
         int_layer2 = my_batchn(my_conv2d(initial_output))
         output = tf.nn.relu(inputs + int_layer2)
         return output
-
-    if inference_worker_config is not None:
-        raw_response = tf.contrib.rpc.rpc(
-            address=inference_worker_config.address,
-            method=inference_worker_config.get_features_method,
-            request="",
-            protocol="grpc",
-            fail_fast=True,
-            timeout_in_ms=0,
-            name="get_features")
-
-        _, (flat_features,) = decode_proto_op.decode_proto(
-            bytes=raw_response,
-            message_type='minigo.GetFeaturesResponse',
-            field_names=['features'],
-            output_types=[dtypes.float32],
-            descriptor_source=inference_worker_config.descriptor_path,
-            name="decode_raw_features")
-
-        features = tf.reshape(
-            flat_features, [-1, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
-            name="unflatten_features")
 
     initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
 
@@ -271,27 +225,110 @@ def model_fn(features, labels, mode, params=None, inference_worker_config=None):
         tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
         name='value_output')
 
-    if inference_worker_config is not None:
-        flat_value = value_output  # value_output is already flat.
-        flat_policy = tf.reshape(policy_output, [-1], name="flatten_policy")
+    return policy_output, value_output, logits
 
+
+def model_inference_worker_fn(config):
+    # The loop body must return policy_output and value_output to make sure
+    # they get executed. The loop condition and body must take the same number
+    # of inputs as the loop body returns.
+    value_output_size = config.batch_size
+    policy_output_size = config.batch_size * (go.N * go.N + 1)
+
+    def loop_condition(a, b):
+        return tf.less(a, 1)
+
+    def loop_body(a, b):
+        # a = tf.add(a, 1)
+
+        # Request features features.
+        raw_response = tf.contrib.rpc.rpc(
+            address=config.address,
+            method=config.get_features_method,
+            request="",
+            protocol="grpc",
+            fail_fast=True,
+            timeout_in_ms=0,
+            name="get_features")
+
+        # Decode features from a proto to a flat tensor.
+        _, (batch_id, flat_features) = decode_proto_op.decode_proto(
+            bytes=raw_response,
+            message_type='minigo.GetFeaturesResponse',
+            field_names=['batch_id', 'features'],
+            output_types=[dtypes.int32, dtypes.float32],
+            descriptor_source=config.descriptor_path,
+            name="decode_raw_features")
+
+        # Reshape flat features.
+        features = tf.reshape(
+            flat_features, [-1, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
+            name="unflatten_features")
+
+        # Run inference.
+        policy_output, value_output, _ = model_inference_fn(features, False)
+
+        # Flatten model outputs.
+        flat_policy = tf.reshape(policy_output, [-1], name="flatten_policy")
+        flat_value = value_output  # value_output is already flat.
+
+        # Encode outputs from flat tensors to a proto.
         request_tensors = encode_proto_op.encode_proto(
             message_type='minigo.PutOutputsRequest',
-            field_names=['value', 'policy'],
-            sizes=[[inference_worker_config.batch_size,
-                    inference_worker_config.batch_size * (go.N * go.N + 1)]],
-            values=[[flat_value], [flat_policy]],
-            descriptor_source=inference_worker_config.descriptor_path,
+            field_names=['batch_id', 'policy', 'value'],
+            sizes=[[1, policy_output_size, value_output_size]],
+            values=[[batch_id], [flat_policy], [flat_value]],
+            descriptor_source=config.descriptor_path,
             name="encode_outputs")
 
-        inference_worker_output = tf.contrib.rpc.rpc(
-            address=inference_worker_config.address,
-            method=inference_worker_config.put_outputs_method,
+        # Send outputs.
+        response = tf.contrib.rpc.rpc(
+            address=config.address,
+            method=config.put_outputs_method,
             request=request_tensors,
             protocol="grpc",
             fail_fast=True,
             timeout_in_ms=0,
             name="put_outputs")
+
+        return a, response[0]
+
+    return tf.while_loop(loop_condition, loop_body, [0, ""],
+                         name="inference_worker_loop")
+
+
+def model_fn(features, labels, mode, params=None, inference_worker_config=None):
+    '''
+    Args:
+        features: tensor with shape
+            [BATCH_SIZE, go.N, go.N, features_lib.NEW_FEATURES_PLANES]
+        labels: dict from string to tensor with shape
+            'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
+            'value_tensor': [BATCH_SIZE]
+        mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
+        params: (Ignored; needed for compat with TPUEstimator)
+        inference_worker_config: if not None, build a model graph for running as
+                                 an inference server worker: the model will
+                                 loop forever, requesting features & writing
+                                 outputs via RPC ops.
+    Returns: tf.estimator.EstimatorSpec with props
+        mode: same as mode arg
+        predictions: dict of tensors
+            'policy': [BATCH_SIZE, go.N * go.N + 1]
+            'value': [BATCH_SIZE]
+        loss: a single value tensor
+        train_op: train op
+        eval_metric_ops
+    return dict of tensors
+        logits: [BATCH_SIZE, go.N * go.N + 1]
+    '''
+
+    if inference_worker_config is not None:
+        policy_output, value_output, logits = model_inference_worker_fn(
+            mode, inference_worker_config)
+    else:
+        policy_output, value_output, logits = model_inference_fn(
+            features, mode == tf.estimator.ModeKeys.TRAIN)
 
     # train ops
     global_step = tf.train.get_or_create_global_step()
