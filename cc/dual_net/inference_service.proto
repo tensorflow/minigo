@@ -20,10 +20,20 @@ package minigo;
 //   option cc_enable_arenas = true;
 
 service InferenceService {
+  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse) {
+  }
   rpc GetFeatures(GetFeaturesRequest) returns (GetFeaturesResponse) {
   }
   rpc PutOutputs(PutOutputsRequest) returns (PutOutputsResponse) {
   }
+}
+
+message GetConfigRequest {
+}
+
+message GetConfigResponse {
+  int32 board_size = 1;
+  int32 batch_size = 2;
 }
 
 message GetFeaturesRequest {

@@ -213,10 +213,11 @@ def freeze_graph(load_file):
         f.write(out_graph.SerializeToString())
 
 
-def inference_worker(load_file):
-    rpc_client_info = dual_net.RpcClientInfo("localhost:50051",
-                                             "InferenceService/GetFeatures",
-                                             "InferenceService/PutOutputs")
+def inference_worker(load_file, address="localhost:50051"):
+    rpc_client_info = dual_net.RpcClientInfo(
+        address,
+        "/minigo.InferenceService/GetFeatures",
+        "/minigo.InferenceService/PutOutputs")
     n = dual_net.DualNetwork(load_file, rpc_client_info)
 
     n.sess.run(n.inference_output)

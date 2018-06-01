@@ -31,6 +31,7 @@ import tensorflow as tf
 
 from tensorflow.python.framework import dtypes
 from tensorflow.contrib.proto.python.ops import decode_proto_op
+from tensorflow.contrib.proto.python.ops import encode_proto_op
 from tensorflow.python.training.summary_io import SummaryWriterCache
 from tensorflow.contrib.tpu.python.tpu import bfloat16
 from tensorflow.contrib.tpu.python.tpu import tpu_config
@@ -107,29 +108,33 @@ FLAGS = flags.FLAGS
 EXAMPLES_PER_GENERATION = 2000000
 
 
-class RpcClientInfo(object):
-    def __init__(self, address, get_features_method, put_outputs_method):
+class InferenceWorkerConfig(object):
+    def __init__(self, address, get_features_method, put_outputs_method,
+                 batch_size, descriptor_path):
         self.address = address
         self.get_features_method = get_features_method
         self.put_outputs_method = put_outputs_method
+        self.batch_size = batch_size
+        self.descriptor_path = descriptor_path
 
 
 class DualNetwork():
-    def __init__(self, save_file, rpc_client_info=None):
+    def __init__(self, save_file, inference_worker_config=None):
         self.save_file = save_file
         self.inference_input = None
         self.inference_output = None
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=tf.Graph(), config=config)
-        self.initialize_graph(rpc_client_info)
+        self.initialize_graph(inference_worker_config)
+        self.inference_worker_output = None
 
-    def initialize_graph(self, rpc_client_info=None):
+    def initialize_graph(self, inference_worker_config=None):
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
             estimator_spec = model_fn(features, labels,
                                       tf.estimator.ModeKeys.PREDICT,
-                                      rpc_client_info)
+                                      inference_worker_config)
             self.inference_input = features
             self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
@@ -175,7 +180,7 @@ def get_inference_input():
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
 
-def model_fn(features, labels, mode, params=None, rpc_client_info=None):
+def model_fn(features, labels, mode, params=None, inference_worker_config=None):
     '''
     Args:
         features: tensor with shape
@@ -185,6 +190,10 @@ def model_fn(features, labels, mode, params=None, rpc_client_info=None):
             'value_tensor': [BATCH_SIZE]
         mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
         params: (Ignored; needed for compat with TPUEstimator)
+        inference_worker_config: if not None, build a model graph for running as
+                                 an inference server worker: the model will
+                                 loop forever, requesting features & writing
+                                 outputs via RPC ops.
     Returns: tf.estimator.EstimatorSpec with props
         mode: same as mode arg
         predictions: dict of tensors
@@ -212,27 +221,27 @@ def model_fn(features, labels, mode, params=None, rpc_client_info=None):
         output = tf.nn.relu(inputs + int_layer2)
         return output
 
-    if rpc_client_info is not None:
-       raw_response = tf.contrib.rpc.rpc(
-           address=rpc_client_info.address,
-           method=rpc_client_info.get_features_method,
-           request="",
-           protocol="grpc",
-           fail_fast=True,
-           timeout_in_ms=0,
-           name="get_features")
+    if inference_worker_config is not None:
+        raw_response = tf.contrib.rpc.rpc(
+            address=inference_worker_config.address,
+            method=inference_worker_config.get_features_method,
+            request="",
+            protocol="grpc",
+            fail_fast=True,
+            timeout_in_ms=0,
+            name="get_features")
 
-       _, (flat_features,) = decode_proto_op.decode_proto(
-           bytes=raw_response,
-           message_type='minigo.GetFeaturesResponse',
-           field_names=['features'],
-           output_types=[dtypes.float32],
-           descriptor_source="/usr/local/google/home/tmadams/minigo/inference_service_proto.pb.descriptor_set",
-           name="decode_raw_features")
+        _, (flat_features,) = decode_proto_op.decode_proto(
+            bytes=raw_response,
+            message_type='minigo.GetFeaturesResponse',
+            field_names=['features'],
+            output_types=[dtypes.float32],
+            descriptor_source=inference_worker_config.descriptor_path,
+            name="decode_raw_features")
 
-       features = tf.reshape(
-           flat_features, [-1, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
-           name="reshape_flat_features")
+        features = tf.reshape(
+            flat_features, [-1, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
+            name="unflatten_features")
 
     initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
 
@@ -261,6 +270,28 @@ def model_fn(features, labels, mode, params=None, rpc_client_info=None):
     value_output = tf.nn.tanh(
         tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
         name='value_output')
+
+    if inference_worker_config is not None:
+        flat_value = value_output  # value_output is already flat.
+        flat_policy = tf.reshape(policy_output, [-1], name="flatten_policy")
+
+        request_tensors = encode_proto_op.encode_proto(
+            message_type='minigo.PutOutputsRequest',
+            field_names=['value', 'policy'],
+            sizes=[[inference_worker_config.batch_size,
+                    inference_worker_config.batch_size * (go.N * go.N + 1)]],
+            values=[[flat_value], [flat_policy]],
+            descriptor_source=inference_worker_config.descriptor_path,
+            name="encode_outputs")
+
+        inference_worker_output = tf.contrib.rpc.rpc(
+            address=inference_worker_config.address,
+            method=inference_worker_config.put_outputs_method,
+            request=request_tensors,
+            protocol="grpc",
+            fail_fast=True,
+            timeout_in_ms=0,
+            name="put_outputs")
 
     # train ops
     global_step = tf.train.get_or_create_global_step()

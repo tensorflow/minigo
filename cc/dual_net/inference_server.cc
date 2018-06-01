@@ -38,13 +38,22 @@ class ServiceImpl final : public InferenceService::Service {
  public:
   ServiceImpl() : batch_size_(8), batch_timeout_(absl::Microseconds(100)) {}
 
+  Status GetConfig(ServerContext* context, const GetConfigRequest* request,
+                   GetConfigResponse* response) override {
+    std::cerr << "### GetConfig()" << std::endl;
+    response->set_board_size(kN);
+    response->set_batch_size(batch_size_);
+    return Status::OK;
+  }
+
   Status GetFeatures(ServerContext* context, const GetFeaturesRequest* request,
                      GetFeaturesResponse* response) override {
+    std::cerr << "### GetFeatures()" << std::endl;
     absl::MutexLock lock(&m_);
 
     MG_CHECK(batch_.empty());
 
-    // Wait "forever" until an inference is pushed onto the request_queue_.
+    // Wait forever until an inference is pushed onto the request_queue_.
     RemoteInference inference;
     auto timeout = absl::Milliseconds(100);
     while (!request_queue_.PopWithTimeout(&inference, timeout)) {
@@ -66,6 +75,14 @@ class ServiceImpl final : public InferenceService::Service {
       batch_.push_back(inference);
     }
 
+    // The RPC ops in the worker graph seem to require that the batch size is
+    // known at graph build time, so make sure we always send a batch of size
+    // batch_size_.
+    std::cerr << "batch size before padding: " << batch_.size() << std::endl;
+    while (batch_.size() < batch_size_) {
+      batch_.push_back(batch_.back());
+    }
+
     // Response with the batch.
     for (const auto& inference : batch_) {
       const auto& src = *inference.features;
@@ -79,6 +96,7 @@ class ServiceImpl final : public InferenceService::Service {
 
   Status PutOutputs(ServerContext* context, const PutOutputsRequest* request,
                     PutOutputsResponse* response) override {
+    std::cerr << "### PutOutputs()" << std::endl;
     absl::MutexLock lock(&m_);
 
     // There should be one value for each inference.
