@@ -78,13 +78,15 @@ minigo_cc_test_9_only(
     ],
 )
 
-minigo_cc_test(
+minigo_cc_test_9_only(
     name = "inference_server_test",
     srcs = ["inference_server_test.cc"],
     deps = [
         ":fake_net",
         ":inference_server",
+        "//cc:random",
         "//proto:inference_service_proto",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

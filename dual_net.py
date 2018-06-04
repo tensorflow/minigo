@@ -165,6 +165,16 @@ def get_inference_input():
 
 
 def model_inference_fn(features, training):
+    """Builds just the inference part of the model graph.
+
+    Args:
+        features: input features tensor.
+        training: True if the model is training.
+
+    Returns:
+        (policy_output, value_output, logits) tuple of tensors.
+    """
+
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
         momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,

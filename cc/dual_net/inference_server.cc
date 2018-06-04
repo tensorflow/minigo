@@ -141,7 +141,7 @@ class ServiceImpl final : public InferenceService::Service {
 
     // There should be (N * N + 1) policy values for each inference.
     MG_CHECK(request->policy().size() ==
-             static_cast<int>(batch.size() * kNumMoves));
+             static_cast<int>(batch_size_ * kNumMoves));
 
     // Because of padding, it's possible that we have more value & policy
     // results than were requested: match sure to only extract the first
@@ -175,9 +175,14 @@ class ServiceImpl final : public InferenceService::Service {
 
   ThreadSafeQueue<RemoteInference> request_queue_;
 
+  // Mutex that is locked while popping inference requests off request_queue_
+  // (see GetFeatures() for why this is needed).
   absl::Mutex batch_mutex_;
 
+  // Mutex that protects access to pending_batches_.
   absl::Mutex pending_batches_mutex_;
+
+  // Map from batch ID to list of remote inference requests in that batch.
   std::map<int32_t, std::vector<RemoteInference>> pending_batches_
       GUARDED_BY(&pending_batches_mutex_);
 };
@@ -190,10 +195,17 @@ class InferenceClient : public DualNet {
 
   void RunMany(absl::Span<const BoardFeatures* const> features,
                absl::Span<Output> outputs, Random* rnd) override {
+    // Counter that blocks until all inferences are complete.
     absl::BlockingCounter pending_count(features.size());
+
+    // Enqueue all inference requests.
+    // TODO(tommadams): Consider adding a PushMany method to ThreadSafeQueue to
+    // push all requests in a single call.
     for (size_t i = 0; i < features.size(); ++i) {
       enqueue_inference_({features[i], &outputs[i], &pending_count});
     }
+
+    // Wait for all the inferences to complete.
     pending_count.Wait();
   }
 
