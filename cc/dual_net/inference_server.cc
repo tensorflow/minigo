@@ -21,8 +21,8 @@
 
 #include "absl/memory/memory.h"
 #include "absl/time/time.h"
-#include "cc/dual_net/inference_service.grpc.pb.h"
 #include "grpc++/grpc++.h"
+#include "proto/inference_service.grpc.pb.h"
 
 using grpc::Server;
 using grpc::ServerBuilder;

@@ -20,11 +20,11 @@
 #include "absl/memory/memory.h"
 #include "cc/constants.h"
 #include "cc/dual_net/fake_net.h"
-#include "cc/dual_net/inference_service.grpc.pb.h"
 #include "gmock/gmock.h"
 #include "grpc++/create_channel.h"
 #include "grpc/status.h"
 #include "gtest/gtest.h"
+#include "proto/inference_service.grpc.pb.h"
 
 namespace minigo {
 namespace {
@@ -79,7 +79,7 @@ TEST_F(InferenceServerTest, Test) {
     for (int i = 0; i < kNumMoves; ++i) {
       put_outputs_request.add_policy(output.policy[i]);
     }
-    put_outputs_request.set_value(output.value);
+    put_outputs_request.add_value(output.value);
     {
       grpc::ClientContext context;
       status =

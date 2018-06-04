@@ -11,20 +11,6 @@ load(
     "minigo_cc_test_19_only",
     "minigo_cc_test_9_only",
 )
-load("@org_pubref_rules_protobuf//cpp:rules.bzl", "cc_proto_library")
-load("@org_pubref_rules_protobuf//python:rules.bzl", "py_proto_library")
-
-cc_proto_library(
-    name = "inference_service_proto",
-    protos = ["inference_service.proto"],
-    with_grpc = True,
-)
-
-py_proto_library(
-    name = "inference_service_py_pb2",
-    protos = ["inference_service.proto"],
-    with_grpc = True,
-)
 
 minigo_cc_library(
     name = "dual_net",
@@ -56,8 +42,8 @@ minigo_cc_library(
     hdrs = ["inference_server.h"],
     deps = [
         ":dual_net",
-        ":inference_service_proto",
         "//cc:thread_safe_queue",
+        "//proto:inference_service_proto",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
@@ -99,23 +85,7 @@ minigo_cc_test(
     deps = [
         ":fake_net",
         ":inference_server",
-        ":inference_service_proto",
+        "//proto:inference_service_proto",
         "@com_google_googletest//:gtest_main",
-    ],
-)
-
-minigo_cc_binary(
-    name = "inference_worker",
-    srcs = ["inference_worker.cc"],
-    deps = [
-        # TODO(tommadams): remove this dependency
-        ":dual_net",
-        ":inference_service_proto",
-        "//cc:base",
-        "//cc:tensorflow",
-        "//cc:init",
-        "@com_github_gflags_gflags//:gflags",
-        "@com_google_absl//absl/strings",
-        "@com_google_grpc//:grpc++",
     ],
 )
