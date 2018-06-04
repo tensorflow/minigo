@@ -6,7 +6,7 @@ base-image:
 		cp ../../WORKSPACE staging/
 		cp -r -p ../../cc/ staging/
 		rm -rfd staging/cc/tensorflow
-	  docker build -t "gcr.io/tensor-go/cc-base:latest" .
+	  docker build -t "gcr.io/tensor-go/cc-base:${VERSION_TAG}" .
 		rm -rfd staging/
 
 base-push: base-image

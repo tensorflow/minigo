@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: minigo-cgos-player-$MODEL_NUM
+spec:
+  containers:
+  - name: cgos-player-$MODEL_NUM
+    image: gcr.io/$PROJECT/cgos-player:$VERSION_TAG
+    imagePullPolicy: Always
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+      requests:
+        nvidia.com/gpu: 1
+    volumeMounts:
+    - name: service-credentials
+      mountPath: /etc/credentials
+  volumes:
+  - name: service-credentials
+    secret:
+      secretName: $SERVICE_ACCOUNT-creds
+  restartPolicy: OnFailure

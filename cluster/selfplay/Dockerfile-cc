@@ -1,4 +1,4 @@
-FROM gcr.io/tensor-go/cc-base:latest
+FROM gcr.io/tensor-go/cc-base:0.1
 
 COPY cc_wrapper.sh /app
 
