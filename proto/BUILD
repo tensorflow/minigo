@@ -18,3 +18,10 @@ py_proto_library(
     protos = ["inference_service.proto"],
     with_grpc = True,
 )
+
+genrule(
+    name = "gen_inference_servive_py_srcs",
+    srcs = [":inference_service_py_pb2"],
+    outs = [],
+    cmd = "echo $(locations :inference_service_py_pb2)",
+)

@@ -1,16 +1,17 @@
 import sys
 import time
 import grpc
-import inference_service_pb2
 import tensorflow as tf
-import inference_service_pb2_grpc
+from proto import inference_service_pb2
+from proto import inference_service_pb2_grpc
 from absl import flags
 import dual_net
 import go
 
 flags.DEFINE_string("model", "", "Path to the TensorFlow model.")
 flags.DEFINE_string("address", "localhost:50051", "Inference server address.")
-flags.DEFINE_string("descriptor", "",
+flags.DEFINE_string("descriptor",
+                    "proto/inference_service_py_pb2.pb.descriptor_set",
                     "Path to the InferenceService proto descriptor.")
 
 FLAGS = flags.FLAGS
