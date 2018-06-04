@@ -28,10 +28,6 @@ import sys
 import argh
 import numpy as np
 import tensorflow as tf
-
-from tensorflow.python.framework import dtypes
-from tensorflow.contrib.proto.python.ops import decode_proto_op
-from tensorflow.contrib.proto.python.ops import encode_proto_op
 from tensorflow.python.training.summary_io import SummaryWriterCache
 from tensorflow.contrib.tpu.python.tpu import bfloat16
 from tensorflow.contrib.tpu.python.tpu import tpu_config
@@ -108,33 +104,21 @@ FLAGS = flags.FLAGS
 EXAMPLES_PER_GENERATION = 2000000
 
 
-class InferenceWorkerConfig(object):
-    def __init__(self, address, get_features_method, put_outputs_method,
-                 batch_size, descriptor_path):
-        self.address = address
-        self.get_features_method = get_features_method
-        self.put_outputs_method = put_outputs_method
-        self.batch_size = batch_size
-        self.descriptor_path = descriptor_path
-
-
 class DualNetwork():
-    def __init__(self, save_file, inference_worker_config=None):
+    def __init__(self, save_file):
         self.save_file = save_file
         self.inference_input = None
         self.inference_output = None
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         self.sess = tf.Session(graph=tf.Graph(), config=config)
-        self.initialize_graph(inference_worker_config)
-        self.inference_worker_output = None
+        self.initialize_graph()
 
-    def initialize_graph(self, inference_worker_config=None):
+    def initialize_graph(self):
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
             estimator_spec = model_fn(features, labels,
-                                      tf.estimator.ModeKeys.PREDICT,
-                                      inference_worker_config)
+                                      tf.estimator.ModeKeys.PREDICT)
             self.inference_input = features
             self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
@@ -228,76 +212,7 @@ def model_inference_fn(features, training):
     return policy_output, value_output, logits
 
 
-def model_inference_worker_fn(config):
-    # The loop body must return policy_output and value_output to make sure
-    # they get executed. The loop condition and body must take the same number
-    # of inputs as the loop body returns.
-    value_output_size = config.batch_size
-    policy_output_size = config.batch_size * (go.N * go.N + 1)
-
-    def loop_condition(a, b):
-        return tf.less(a, 1)
-
-    def loop_body(a, b):
-        # a = tf.add(a, 1)
-
-        # Request features features.
-        raw_response = tf.contrib.rpc.rpc(
-            address=config.address,
-            method=config.get_features_method,
-            request="",
-            protocol="grpc",
-            fail_fast=True,
-            timeout_in_ms=0,
-            name="get_features")
-
-        # Decode features from a proto to a flat tensor.
-        _, (batch_id, flat_features) = decode_proto_op.decode_proto(
-            bytes=raw_response,
-            message_type='minigo.GetFeaturesResponse',
-            field_names=['batch_id', 'features'],
-            output_types=[dtypes.int32, dtypes.float32],
-            descriptor_source=config.descriptor_path,
-            name="decode_raw_features")
-
-        # Reshape flat features.
-        features = tf.reshape(
-            flat_features, [-1, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
-            name="unflatten_features")
-
-        # Run inference.
-        policy_output, value_output, _ = model_inference_fn(features, False)
-
-        # Flatten model outputs.
-        flat_policy = tf.reshape(policy_output, [-1], name="flatten_policy")
-        flat_value = value_output  # value_output is already flat.
-
-        # Encode outputs from flat tensors to a proto.
-        request_tensors = encode_proto_op.encode_proto(
-            message_type='minigo.PutOutputsRequest',
-            field_names=['batch_id', 'policy', 'value'],
-            sizes=[[1, policy_output_size, value_output_size]],
-            values=[[batch_id], [flat_policy], [flat_value]],
-            descriptor_source=config.descriptor_path,
-            name="encode_outputs")
-
-        # Send outputs.
-        response = tf.contrib.rpc.rpc(
-            address=config.address,
-            method=config.put_outputs_method,
-            request=request_tensors,
-            protocol="grpc",
-            fail_fast=True,
-            timeout_in_ms=0,
-            name="put_outputs")
-
-        return a, response[0]
-
-    return tf.while_loop(loop_condition, loop_body, [0, ""],
-                         name="inference_worker_loop")
-
-
-def model_fn(features, labels, mode, params=None, inference_worker_config=None):
+def model_fn(features, labels, mode, params=None):
     '''
     Args:
         features: tensor with shape
@@ -307,10 +222,6 @@ def model_fn(features, labels, mode, params=None, inference_worker_config=None):
             'value_tensor': [BATCH_SIZE]
         mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
         params: (Ignored; needed for compat with TPUEstimator)
-        inference_worker_config: if not None, build a model graph for running as
-                                 an inference server worker: the model will
-                                 loop forever, requesting features & writing
-                                 outputs via RPC ops.
     Returns: tf.estimator.EstimatorSpec with props
         mode: same as mode arg
         predictions: dict of tensors
@@ -323,12 +234,8 @@ def model_fn(features, labels, mode, params=None, inference_worker_config=None):
         logits: [BATCH_SIZE, go.N * go.N + 1]
     '''
 
-    if inference_worker_config is not None:
-        policy_output, value_output, logits = model_inference_worker_fn(
-            mode, inference_worker_config)
-    else:
-        policy_output, value_output, logits = model_inference_fn(
-            features, mode == tf.estimator.ModeKeys.TRAIN)
+    policy_output, value_output, logits = model_inference_fn(
+        features, mode == tf.estimator.ModeKeys.TRAIN)
 
     # train ops
     global_step = tf.train.get_or_create_global_step()

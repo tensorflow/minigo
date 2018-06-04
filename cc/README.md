@@ -4,8 +4,12 @@ This directory contains a in-developent C++ port of Minigo.
 
 ## Set up
 
-The C++ Minigo port uses the [Bazel](https://bazel.build/) build system.
-It depends on the Tensorflow C++ libraries, but we have not yet set up
+The C++ Minigo port uses __version 0.11.1__ of the [Bazel](https://bazel.build/)
+build system. We have experienced build issues with the latest version of Bazel,
+so for now we recommend installing
+[bazel-0.11.1-installer-linux-x86\_64.sh](https://github.com/bazelbuild/bazel/releases).
+
+Minigo++ depends on the Tensorflow C++ libraries, but we have not yet set up
 Bazel WORKSPACE and BUILD rules to automatically download and configure
 Tensorflow so (for now at least) you must perform a manual step to build the
 library:
@@ -53,6 +57,18 @@ multiple times:
 bazel test --define=board_size=9 cc/...  &&  bazel test --define=board_size=19 cc/...
 ```
 
+## Running with AddressSanitizer
+
+Bazel supports building with AddressSanitizer to check for C++ memory errors:
+
+```shell
+bazel build --define=board\_size=19 cc:main \
+  --copt=-fsanitize=address \
+  --linkopt=-fsanitize=address \
+  --copt=-fno-omit-frame-pointer \
+  --copt=-O1
+```
+
 ## Running self play:
 
 The C++ Minigo binary requires the model to be provided in GraphDef binary
@@ -96,3 +112,58 @@ counterpart.
 The C++ code follows
 [Google's C++ style guide](https://github.com/google/styleguide)
 and we use cpplint to delint.
+
+## Remote inference
+
+The C++ runtime supports running inference remotely on a separate process,
+potentially on a different machine: one process performs tree search and the
+other performs inference. Communication between the two processes is performed
+via [gRPC](https://grpc.io/).
+
+In this configuration, the tree search C++ code starts up a gRPC server with
+two important methods:
+
+ * `GetFeatures`: called by the inference worker process to get the next batch
+    of input features to run inference on.
+ * `PutOutputs`: called by the inference worker process at the end of inference
+    to send the `policy_output` and `value_output` outputs back to the tree
+    search process.
+
+The gRPC server (InferenceServer) and the tree search code run in the same
+process and communicate via an InferenceClient. Where the tree search code would
+normally perform inference directly, it instead uses the InferenceClient to pass
+an inference request to the InferenceServer via a queue. The InferenceClient
+then waits for the InferenceServer to pass the request on to the InferenceWorker
+and get the results back. The InferenceClient has a blocking API, so all of
+these details are hidden from the tree search code.
+
+```
+   +-----------------+
+   | InferenceWorker |
+   |    (TF model)   |
+   +-----------------+
+            |
+           RPC
+            |
+            v
+   +-----------------+
+   | InferenceServer |
+   |  (gRPC server)  |
+   +-----------------+
+            ^
+            |
+       request_queue
+            |
+   +-----------------+
+   | InferenceClient |
+   |  (tree search)  |
+   +-----------------+
+```
+
+The inference worker process is implemented by inference\_worker.py. It wraps
+the inference model in a TensorFlow loop that iterates indefinitely. RPC and
+DecodeProto operations are inserted at the top of the loop to fetch the input
+features from the tree search process. EncodeProto and RPC operations are
+inserted at the bottom of the loop to send the inference results back. This
+keeps all execution of the InferenceWorker inside TensorFlow for optimal
+performance.

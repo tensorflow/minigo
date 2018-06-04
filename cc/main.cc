@@ -220,7 +220,7 @@ void SelfPlay() {
   std::unique_ptr<InferenceServer> server;
   std::unique_ptr<DualNet> dual_net;
   if (FLAGS_model == "remote") {
-    server = absl::make_unique<InferenceServer>();
+    server = absl::make_unique<InferenceServer>(FLAGS_port);
     dual_net = server->NewDualNet();
   } else {
     dual_net = absl::make_unique<TfDualNet>(FLAGS_model);

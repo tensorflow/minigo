@@ -51,7 +51,6 @@ minigo_cc_library(
     ],
 )
 
-# TODO(tommadams): rename tf_dual_net to tf_net
 minigo_cc_library(
     name = "tf_dual_net",
     srcs = ["tf_dual_net.cc"],

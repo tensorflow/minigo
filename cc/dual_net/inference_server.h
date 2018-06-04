@@ -25,15 +25,21 @@
 
 namespace minigo {
 
+// A single inference request.
 struct RemoteInference {
+  // The features to run inference on.
   const DualNet::BoardFeatures* features;
+
+  // Inference output.
   DualNet::Output* output;
+
+  // Decremented when the inference output is available.
   absl::BlockingCounter* counter;
 };
 
 class InferenceServer {
  public:
-  InferenceServer();
+  explicit InferenceServer(int port);
   ~InferenceServer();
 
   // Return a new DualNet instance whose inference requests are performed

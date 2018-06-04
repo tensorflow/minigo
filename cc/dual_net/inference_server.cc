@@ -16,10 +16,13 @@
 
 #include <atomic>
 #include <functional>
+#include <map>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "absl/time/time.h"
 #include "grpc++/grpc++.h"
 #include "proto/inference_service.grpc.pb.h"
@@ -34,9 +37,11 @@ namespace minigo {
 
 namespace {
 
+// Implementation of the InferenceService.
+// The client InferenceServer pushes inference requests onto ServiceImpl's
+// request queue.
 class ServiceImpl final : public InferenceService::Service {
  public:
-  // TODO(tommadams): tune batch_timeout_.
   // TODO(tommadams): try having the InferenceServer keep track of how many
   // InferenceClients are actively wanting to make inference requests (and their
   // desired batch size). That way it should be possible to know exactly how
@@ -55,8 +60,6 @@ class ServiceImpl final : public InferenceService::Service {
 
   Status GetFeatures(ServerContext* context, const GetFeaturesRequest* request,
                      GetFeaturesResponse* response) override {
-    // std::cerr << "### GetFeatures()" << std::endl;
-
     std::vector<RemoteInference> batch;
 
     {
@@ -72,7 +75,6 @@ class ServiceImpl final : public InferenceService::Service {
       auto timeout = absl::Milliseconds(100);
       while (!request_queue_.PopWithTimeout(&inference, timeout)) {
         if (context->IsCancelled()) {
-          // std::cerr << "### GetFeatures() CANCELLED" << std::endl;
           return Status(StatusCode::CANCELLED, "connection terminated");
         }
       }
@@ -121,9 +123,6 @@ class ServiceImpl final : public InferenceService::Service {
 
   Status PutOutputs(ServerContext* context, const PutOutputsRequest* request,
                     PutOutputsResponse* response) override {
-    // std::cerr << "### PutOutputs(" << request->batch_id() << ")" <<
-    // std::endl;
-
     std::vector<RemoteInference> batch;
     {
       absl::MutexLock pending_batches_lock(&pending_batches_mutex_);
@@ -157,7 +156,6 @@ class ServiceImpl final : public InferenceService::Service {
       inference.counter->DecrementCount();
     }
 
-    // std::cerr << "### PutOutputs() OK" << std::endl;
     return Status::OK;
   }
 
@@ -186,26 +184,27 @@ class ServiceImpl final : public InferenceService::Service {
 
 class InferenceClient : public DualNet {
  public:
-  explicit InferenceClient(std::function<void(RemoteInference)> run_inference)
-      : run_inference_(run_inference) {}
+  explicit InferenceClient(
+      std::function<void(const RemoteInference&)> enqueue_inference)
+      : enqueue_inference_(enqueue_inference) {}
 
   void RunMany(absl::Span<const BoardFeatures* const> features,
                absl::Span<Output> outputs, Random* rnd) override {
     absl::BlockingCounter pending_count(features.size());
     for (size_t i = 0; i < features.size(); ++i) {
-      run_inference_({features[i], &outputs[i], &pending_count});
+      enqueue_inference_({features[i], &outputs[i], &pending_count});
     }
     pending_count.Wait();
   }
 
  private:
-  std::function<void(RemoteInference)> run_inference_;
+  std::function<void(const RemoteInference&)> enqueue_inference_;
 };
 
 }  // namespace
 
-InferenceServer::InferenceServer() {
-  std::string server_address("0.0.0.0:50051");
+InferenceServer::InferenceServer(int port) {
+  auto server_address = absl::StrCat("0.0.0.0:", port);
 
   auto impl = absl::make_unique<ServiceImpl>();
   request_queue_ = impl->request_queue();
@@ -215,13 +214,13 @@ InferenceServer::InferenceServer() {
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
   builder.RegisterService(service_.get());
   server_ = builder.BuildAndStart();
-  std::cerr << "Inference server listening on " << server_address << std::endl;
+  std::cerr << "Inference server listening on port " << port << std::endl;
 
   thread_ = std::thread([this]() { server_->Wait(); });
 }
 
 InferenceServer::~InferenceServer() {
-  // Passing inf past to Shutdown makes it shutdown immediately.
+  // Passing gpr_inf_past to Shutdown makes it shutdown immediately.
   server_->Shutdown(gpr_inf_past(GPR_CLOCK_REALTIME));
   thread_.join();
 }

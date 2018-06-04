@@ -67,4 +67,4 @@ cp bazel-bin/tensorflow/contrib/lite/toco/toco "${dst_dir}"
 
 popd
 echo "Deleting tmp dir ${tmp_dir}"
-#rm -rf "${tmp_dir}"
+rm -rf "${tmp_dir}"
