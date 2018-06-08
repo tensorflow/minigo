@@ -89,7 +89,7 @@ def train(
         model_save_path: 'Where to export the completed generation.'):
     print("Training on:", tf_records[0], "to", tf_records[-1])
     with utils.logged_timer("Training"):
-        dual_net.train(working_dir, tf_records)
+        dual_net.train(working_dir, *tf_records)
     print("== Training done.  Exporting model to ", model_save_path)
     dual_net.export_model(working_dir, model_save_path)
     freeze_graph(model_save_path)

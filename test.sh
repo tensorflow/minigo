@@ -34,6 +34,11 @@ PYTHONPATH= BOARD_SIZE=9 python3 tests/run_tests.py || {
   test_fail=1
 }
 
+integration_fail=0
+BOARD_SIZE=9 python3 local_rl_loop.py || {
+  integration_fail=1
+}
+
 if [ "${lint_fail}" -eq "1" ]; then
   echo >&2 "--------------------------------------"
   echo >&2 "Py linting did not pass successfully!"
@@ -44,6 +49,13 @@ if [ "${test_fail}" -eq "1" ]; then
   echo >&2 "The tests did not pass successfully!"
 fi
 
-if [ "${test_fail}" -eq "1" ] || [ "${lint_fail}" -eq "1" ]; then
+if [ "${integration_fail}" -eq "1" ]; then
+  echo >&2 "--------------------------------------"
+  echo >&2 "Integration test did not pass successfully!"
+fi
+
+if [ "${test_fail}" -eq "1" ] || [ "${lint_fail}" -eq "1" ] || [ "${integration_fail}" -eq "1" ]; then
   exit 1
 fi
+
+echo >&2 "All tests passed!"

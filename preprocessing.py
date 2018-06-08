@@ -96,7 +96,7 @@ def batch_parse_tf_example(batch_size, example_batch):
 
 def read_tf_records(batch_size, tf_records, num_repeats=1,
                     shuffle_records=True, shuffle_examples=True,
-                    shuffle_buffer_size=None,
+                    shuffle_buffer_size=None, sloppy_interleave=True,
                     filter_amount=1.0):
     '''
     Args:
@@ -114,6 +114,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
         raise ValueError("Must set shuffle buffer size if shuffling examples")
 
     if shuffle_records:
+        tf_records = list(tf_records)
         random.shuffle(tf_records)
     record_list = tf.data.Dataset.from_tensor_slices(tf_records)
 
@@ -123,12 +124,18 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
     #   moving to the next file
     # The idea is to shuffle both the order of the files being read,
     # and the examples being read from the files.
-    dataset = record_list.interleave(lambda x:
-                                     tf.data.TFRecordDataset(
-                                         x, compression_type='ZLIB'),
-                                     cycle_length=64, block_length=16)
-    dataset = dataset.filter(lambda x: tf.less(
-        tf.random_uniform([1]), filter_amount)[0])
+    if sloppy_interleave:
+        dataset = record_list.apply(tf.contrib.data.parallel_interleave(
+            functools.partial(tf.data.TFRecordDataset, buffer_size=8*1024*1024, compression_type='ZLIB'),
+            cycle_length=64, sloppy=True))
+    else:
+        dataset = record_list.interleave(lambda x:
+                                         tf.data.TFRecordDataset(
+                                             x, compression_type='ZLIB'),
+                                         cycle_length=64, block_length=16)
+    if filter_amount < 1.0:
+        dataset = dataset.filter(lambda x: tf.less(
+            tf.random_uniform([1]), filter_amount)[0])
     if num_repeats is not None:
         dataset = dataset.repeat(num_repeats)
     else:
@@ -182,6 +189,20 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
         dataset = dataset.map(_random_rotation)
 
     return dataset.make_one_shot_iterator().get_next()
+
+
+def get_tpu_input_tensors(batch_size, tf_records):
+    dataset = read_tf_records(batch_size, tf_records, shuffle_records=True,
+        shuffle_buffer_size=1024, num_repeats=None)
+    # TODO take a bfloat16 param and cast the dataset/labels to bfloat16
+    # TODO? use tf.contrib.data.map_and_batch?
+    dataset = dataset.map(functools.partial(
+        batch_parse_tf_example, batch_size))
+    # TODO: reimplement random rotation as TF ops?
+    # dataset = dataset.map(_random_rotation)
+    # TODO: assign shapes?
+    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+    return dataset
 
 
 def make_dataset_from_selfplay(data_extracts):
