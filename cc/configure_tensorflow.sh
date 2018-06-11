@@ -13,7 +13,7 @@ mkdir -p ${tmp_dir}
 # The TensorFlow 1.8.0 release doesn't compile with gcc6+, so checkout at the
 # commit that fixed the build issue.
 # See https://github.com/tensorflow/tensorflow/issues/18402 for more details.
-# TODO(tommadams): switch to v.18.1 when that's released.
+# TODO(tommadams): switch to v1.9 when that's released.
 # TODO(tommadams): we should probably switch to Clang at some point.
 commit_tag="e489b600f388ae345387881a85368af3cd373ba2"
 

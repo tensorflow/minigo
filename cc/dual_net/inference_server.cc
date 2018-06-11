@@ -189,9 +189,8 @@ class ServiceImpl final : public InferenceService::Service {
 
 class InferenceClient : public DualNet {
  public:
-  explicit InferenceClient(
-      std::function<void(const RemoteInference&)> enqueue_inference)
-      : enqueue_inference_(enqueue_inference) {}
+  explicit InferenceClient(ThreadSafeQueue<RemoteInference>* request_queue)
+      : request_queue_(request_queue) {}
 
   void RunMany(absl::Span<const BoardFeatures* const> features,
                absl::Span<Output> outputs, Random* rnd) override {
@@ -202,7 +201,7 @@ class InferenceClient : public DualNet {
     // TODO(tommadams): Consider adding a PushMany method to ThreadSafeQueue to
     // push all requests in a single call.
     for (size_t i = 0; i < features.size(); ++i) {
-      enqueue_inference_({features[i], &outputs[i], &pending_count});
+      request_queue_->Push({features[i], &outputs[i], &pending_count});
     }
 
     // Wait for all the inferences to complete.
@@ -210,7 +209,7 @@ class InferenceClient : public DualNet {
   }
 
  private:
-  std::function<void(const RemoteInference&)> enqueue_inference_;
+  ThreadSafeQueue<RemoteInference>* request_queue_;
 };
 
 }  // namespace
@@ -238,10 +237,7 @@ InferenceServer::~InferenceServer() {
 }
 
 std::unique_ptr<DualNet> InferenceServer::NewDualNet() {
-  return absl::make_unique<InferenceClient>(
-      [this](const RemoteInference& inference) {
-        request_queue_->Push(inference);
-      });
+  return absl::make_unique<InferenceClient>(request_queue_);
 }
 
 }  // namespace minigo

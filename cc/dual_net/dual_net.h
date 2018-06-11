@@ -28,7 +28,10 @@
 
 namespace minigo {
 
-// TODO(tommadams): Figure out how best to handle random symmetries.
+// TODO(tommadams): Figure out a better way to handle random symmetries: each
+// subclass of DualNet currently must copy-paste the same block of code to
+// apply symmetries. Perhaps moving the symmetry code up to the calling code
+// might yield cleaner code.
 
 // The input features to the DualNet neural network have 17 binary feature
 // planes. 8 feature planes X_t indicate the presence of the current player's

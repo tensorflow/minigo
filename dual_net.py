@@ -164,64 +164,6 @@ def get_inference_input():
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
 
-def model_inference_fn(features, training):
-    """Builds just the inference part of the model graph.
-
-    Args:
-        features: input features tensor.
-        training: True if the model is training.
-
-    Returns:
-        (policy_output, value_output, logits) tuple of tensors.
-    """
-
-    my_batchn = functools.partial(
-        tf.layers.batch_normalization,
-        momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,
-        training=training)
-
-    my_conv2d = functools.partial(
-        tf.layers.conv2d,
-        filters=FLAGS.conv_width, kernel_size=[3, 3], padding="same")
-
-    def my_res_layer(inputs):
-        int_layer1 = my_batchn(my_conv2d(inputs))
-        initial_output = tf.nn.relu(int_layer1)
-        int_layer2 = my_batchn(my_conv2d(initial_output))
-        output = tf.nn.relu(inputs + int_layer2)
-        return output
-
-    initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
-
-    # the shared stack
-    shared_output = initial_output
-    for _ in range(FLAGS.trunk_layers):
-        shared_output = my_res_layer(shared_output)
-
-    # policy head
-    policy_conv = tf.nn.relu(my_batchn(
-        my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
-        center=False, scale=False))
-    logits = tf.layers.dense(
-        tf.reshape(policy_conv, [-1, go.N * go.N * 2]),
-        go.N * go.N + 1)
-
-    policy_output = tf.nn.softmax(logits, name='policy_output')
-
-    # value head
-    value_conv = tf.nn.relu(my_batchn(
-        my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
-        center=False, scale=False))
-    value_fc_hidden = tf.nn.relu(tf.layers.dense(
-        tf.reshape(value_conv, [-1, go.N * go.N]),
-        FLAGS.fc_width))
-    value_output = tf.nn.tanh(
-        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
-        name='value_output')
-
-    return policy_output, value_output, logits
-
-
 def model_fn(features, labels, mode, params=None):
     '''
     Args:
@@ -335,6 +277,64 @@ def model_fn(features, labels, mode, params=None):
             train_op=train_op,
             eval_metric_ops=metric_ops,
         )
+
+
+def model_inference_fn(features, training):
+    """Builds just the inference part of the model graph.
+
+    Args:
+        features: input features tensor.
+        training: True if the model is training.
+
+    Returns:
+        (policy_output, value_output, logits) tuple of tensors.
+    """
+
+    my_batchn = functools.partial(
+        tf.layers.batch_normalization,
+        momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,
+        training=training)
+
+    my_conv2d = functools.partial(
+        tf.layers.conv2d,
+        filters=FLAGS.conv_width, kernel_size=[3, 3], padding="same")
+
+    def my_res_layer(inputs):
+        int_layer1 = my_batchn(my_conv2d(inputs))
+        initial_output = tf.nn.relu(int_layer1)
+        int_layer2 = my_batchn(my_conv2d(initial_output))
+        output = tf.nn.relu(inputs + int_layer2)
+        return output
+
+    initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
+
+    # the shared stack
+    shared_output = initial_output
+    for _ in range(FLAGS.trunk_layers):
+        shared_output = my_res_layer(shared_output)
+
+    # policy head
+    policy_conv = tf.nn.relu(my_batchn(
+        my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
+        center=False, scale=False))
+    logits = tf.layers.dense(
+        tf.reshape(policy_conv, [-1, go.N * go.N * 2]),
+        go.N * go.N + 1)
+
+    policy_output = tf.nn.softmax(logits, name='policy_output')
+
+    # value head
+    value_conv = tf.nn.relu(my_batchn(
+        my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
+        center=False, scale=False))
+    value_fc_hidden = tf.nn.relu(tf.layers.dense(
+        tf.reshape(value_conv, [-1, go.N * go.N]),
+        FLAGS.fc_width))
+    value_output = tf.nn.tanh(
+        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
+        name='value_output')
+
+    return policy_output, value_output, logits
 
 
 def get_estimator(working_dir):
