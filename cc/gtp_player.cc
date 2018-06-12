@@ -43,7 +43,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("genmove", &GtpPlayer::HandleGenmove);
   RegisterCmd("info", &GtpPlayer::HandleInfo);
   RegisterCmd("known_command", &GtpPlayer::HandleKnownCommand);
-  RegisterCmd("komi", &GtpPlayer::HandleKomiCommand);
+  RegisterCmd("komi", &GtpPlayer::HandleKomi);
   RegisterCmd("list_commands", &GtpPlayer::HandleListCommands);
   RegisterCmd("loadsgf", &GtpPlayer::HandleLoadsgf);
   RegisterCmd("name", &GtpPlayer::HandleName);
@@ -328,17 +328,18 @@ GtpPlayer::Response GtpPlayer::HandleKnownCommand(
   return Response::Ok(result);
 }
 
-GtpPlayer::Response GtpPlayer::HandleKomiCommand(
+GtpPlayer::Response GtpPlayer::HandleKomi(
     absl::string_view cmd, const std::vector<absl::string_view>& args) {
   auto response = CheckArgsExact(cmd, 1, args);
   if (!response.ok) {
     return response;
   }
 
-  float x;
-  if (!absl::SimpleAtof(args[0], &x) || x != kDefaultKomi) {
+  double x;
+  if (!absl::SimpleAtod(args[0], &x) || x != options().komi) {
     return Response::Error("unacceptable komi");
   }
+
   return Response::Ok();
 }
 

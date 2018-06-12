@@ -18,14 +18,16 @@ import os
 from dual_net import DualNetwork
 from strategies import MCTSPlayer, CGOSPlayer
 
+from absl import flags
 
-def make_gtp_instance(read_file, readouts_per_move=100, verbosity=1, cgos_mode=False, kgs_mode=False):
+def make_gtp_instance(read_file, verbosity=1, cgos_mode=False, kgs_mode=False):
     n = DualNetwork(read_file)
     if cgos_mode:
         player = CGOSPlayer(network=n, seconds_per_move=5, timed_match=True,
                             verbosity=verbosity, two_player_mode=True)
     else:
-        player = MCTSPlayer(network=n, num_readouts=readouts_per_move,
+        readouts = flags.FLAGS.num_readouts  # defined in strategies.py
+        player = MCTSPlayer(network=n, num_readouts=readouts,
                             verbosity=verbosity, two_player_mode=True)
 
     name = "Minigo-" + os.path.basename(read_file)
