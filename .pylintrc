@@ -19,6 +19,7 @@ ignore=
       gtp_cmd_handlers.py,
       gtp_engine.py,
       gtp_wrapper.py,
+      inference_worker.py,
       local_rl_loop.py,
       main.py,
       mcts.py,
@@ -80,6 +81,7 @@ confidence=
 disable=bare-except,
         invalid-name,
         too-few-methods,
+        too-few-public-methods,
         too-many-arguments,
         too-many-locals
         # print-statement,

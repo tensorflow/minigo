@@ -179,6 +179,8 @@ def wrapped_model_inference_fn(config):
 
 
 def main():
+    """Runs the inference worker."""
+
     server_config = get_server_config()
     print("server_config:\n%s" % server_config)
 
