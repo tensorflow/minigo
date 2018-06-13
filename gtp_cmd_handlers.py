@@ -100,6 +100,10 @@ class BasicCmdHandler(object):
     def cmd_undo(self):
         raise NotImplementedError()
 
+    def cmd_showboard(self):
+        print('\n\n' + str(self._player.get_position()) + '\n\n', file=sys.stderr)
+        return True
+
     def cmd_final_score(self):
         return self._player.get_result_string()
 
@@ -115,10 +119,6 @@ class KgsCmdHandler(object):
 
     def cmd_time_left(self, color: str, time: int, stones: int):
         pass
-
-    def cmd_showboard(self):
-        print('\n\n' + str(self._player.get_position()) + '\n\n', file=sys.stderr)
-        return True
 
     def cmd_kgs_chat(self, msg_type: str, sender: str, text: str):
         if not hasattr(self._player, 'get_root'):
