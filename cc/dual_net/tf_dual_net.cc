@@ -35,7 +35,10 @@ namespace minigo {
 TfDualNet::TfDualNet(const std::string& graph_path) {
   GraphDef graph_def;
   TF_CHECK_OK(ReadBinaryProto(Env::Default(), graph_path, &graph_def));
-  session_.reset(NewSession(SessionOptions()));
+
+  SessionOptions options;
+  options.config.mutable_gpu_options()->set_allow_growth(true);
+  session_.reset(NewSession(options));
   TF_CHECK_OK(session_->Create(graph_def));
 
   inputs_.clear();
