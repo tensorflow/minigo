@@ -25,6 +25,7 @@
 #include "absl/time/clock.h"
 #include "cc/check.h"
 #include "cc/random.h"
+#include "cc/symmetries.h"
 
 namespace minigo {
 
@@ -103,8 +104,7 @@ Coord MctsPlayer::SuggestMove() {
     // SuggestMove has been called for a game.
     if (!root_->is_expanded) {
       auto* first_node = root_->SelectLeaf();
-      auto output = Run(&first_node->features);
-      first_node->IncorporateResults(output.policy, output.value, first_node);
+      ProcessLeaves({&first_node, 1});
     }
 
     rnd_.Dirichlet(kDirichletAlpha, &noise);
@@ -193,20 +193,9 @@ absl::Span<MctsNode* const> MctsPlayer::TreeSearch(int batch_size) {
   }
 
   if (!leaves_.empty()) {
-    features_.clear();
-    features_.reserve(leaves_.size());
+    ProcessLeaves(absl::MakeSpan(leaves_));
     for (auto* leaf : leaves_) {
-      features_.push_back(&leaf->features);
-    }
-
-    outputs_.resize(leaves_.size());
-    RunMany(features_, {outputs_.data(), outputs_.size()});
-
-    for (size_t i = 0; i < leaves_.size(); ++i) {
-      MctsNode* leaf = leaves_[i];
-      const auto& output = outputs_[i];
       leaf->RevertVirtualLoss(root_);
-      leaf->IncorporateResults(output.policy, output.value, root_);
     }
   }
 
@@ -300,17 +289,47 @@ void MctsPlayer::PushHistory(Coord c) {
   }
 }
 
-DualNet::Output MctsPlayer::Run(const DualNet::BoardFeatures* features) {
-  DualNet::Output output;
-  RunMany({&features, 1}, {&output, 1});
-  return output;
-}
+void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves) {
+  // Select symmetry operations to apply.
+  symmetries_used_.clear();
+  if (options_.random_symmetry) {
+    symmetries_used_.reserve(leaves.size());
+    for (size_t i = 0; i < leaves.size(); ++i) {
+      symmetries_used_.push_back(static_cast<symmetry::Symmetry>(
+          rnd_.UniformInt(0, symmetry::kNumSymmetries - 1)));
+    }
+  } else {
+    symmetries_used_.resize(leaves.size(), symmetry::kIdentity);
+  }
 
-void MctsPlayer::RunMany(
-    absl::Span<const DualNet::BoardFeatures* const> features,
-    absl::Span<DualNet::Output> outputs) {
-  network_->RunMany(features, outputs,
-                    options_.random_symmetry ? &rnd_ : nullptr);
+  // Build input features for each leaf, applying random symmetries if
+  // requested.
+  DualNet::BoardFeatures raw_features;
+  features_.resize(leaves.size());
+  for (size_t i = 0; i < leaves.size(); ++i) {
+    leaves[i]->GetMoveHistory(DualNet::kMoveHistory, &recent_positions_);
+    DualNet::SetFeatures(recent_positions_, leaves[i]->position.to_play(),
+                         &raw_features);
+    symmetry::ApplySymmetry<float, kN, DualNet::kNumStoneFeatures>(
+        symmetries_used_[i], raw_features.data(), features_[i].data());
+  }
+
+  // Run inference.
+  outputs_.resize(leaves.size());
+  network_->RunMany(features_, absl::MakeSpan(outputs_));
+
+  // Incorporate the inference outputs back into tree search, undoing any
+  // previously applied random symmetries.
+  std::array<float, kNumMoves> raw_policy;
+  for (size_t i = 0; i < leaves.size(); ++i) {
+    MctsNode* leaf = leaves[i];
+    const auto& output = outputs_[i];
+    symmetry::ApplySymmetry<float, kN, 1>(
+        symmetry::Inverse(symmetries_used_[i]), output.policy.data(),
+        raw_policy.data());
+    raw_policy[Coord::kPass] = output.policy[Coord::kPass];
+    leaf->IncorporateResults(raw_policy, output.value, root_);
+  }
 }
 
 }  // namespace minigo

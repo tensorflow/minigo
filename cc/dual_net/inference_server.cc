@@ -192,8 +192,8 @@ class InferenceClient : public DualNet {
   explicit InferenceClient(ThreadSafeQueue<RemoteInference>* request_queue)
       : request_queue_(request_queue) {}
 
-  void RunMany(absl::Span<const BoardFeatures* const> features,
-               absl::Span<Output> outputs, Random* rnd) override {
+  void RunMany(absl::Span<const BoardFeatures> features,
+               absl::Span<Output> outputs) override {
     // Counter that blocks until all inferences are complete.
     absl::BlockingCounter pending_count(features.size());
 
@@ -201,7 +201,7 @@ class InferenceClient : public DualNet {
     // TODO(tommadams): Consider adding a PushMany method to ThreadSafeQueue to
     // push all requests in a single call.
     for (size_t i = 0; i < features.size(); ++i) {
-      request_queue_->Push({features[i], &outputs[i], &pending_count});
+      request_queue_->Push({&features[i], &outputs[i], &pending_count});
     }
 
     // Wait for all the inferences to complete.

@@ -24,8 +24,6 @@
 #include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
 #include "cc/position.h"
-#include "cc/random.h"
-#include "cc/symmetries.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/public/session.h"
 
@@ -36,15 +34,14 @@ class TfDualNet : public DualNet {
   explicit TfDualNet(const std::string& graph_path);
   ~TfDualNet() override;
 
-  void RunMany(absl::Span<const BoardFeatures* const> features,
-               absl::Span<Output> outputs, Random* rnd = nullptr) override;
+  void RunMany(absl::Span<const BoardFeatures> features,
+               absl::Span<Output> outputs) override;
 
  private:
   std::unique_ptr<tensorflow::Session> session_;
   std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
   std::vector<std::string> output_names_;
   std::vector<tensorflow::Tensor> outputs_;
-  std::vector<symmetry::Symmetry> symmetries_used_;
 };
 
 }  // namespace minigo

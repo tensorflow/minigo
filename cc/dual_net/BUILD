@@ -19,8 +19,6 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:position",
-        "//cc:random",
-        "//cc:symmetries",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -59,7 +57,6 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:position",
-        "//cc:random",
         "//cc:symmetries",
         "//cc:tensorflow",
         "@com_google_absl//absl/types:span",

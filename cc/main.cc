@@ -133,9 +133,14 @@ void WriteExample(const std::string& output_dir, const std::string& output_name,
   // Write the TensorFlow examples.
   std::vector<tensorflow::Example> examples;
   examples.reserve(player.history().size());
+  DualNet::BoardFeatures features;
+  std::vector<const Position::Stones*> recent_positions;
   for (const auto& h : player.history()) {
-    examples.push_back(tf_utils::MakeTfExample(h.node->features, h.search_pi,
-                                               player.result()));
+    h.node->GetMoveHistory(DualNet::kMoveHistory, &recent_positions);
+    DualNet::SetFeatures(recent_positions, h.node->position.to_play(),
+                         &features);
+    examples.push_back(
+        tf_utils::MakeTfExample(features, h.search_pi, player.result()));
   }
 
   auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");

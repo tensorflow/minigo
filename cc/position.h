@@ -146,6 +146,8 @@ class Position {
   Position(const Position&) = default;
   Position& operator=(const Position&) = default;
 
+  using Stones = std::array<Stone, kN * kN>;
+
   void PlayMove(Coord c, Color color = Color::kEmpty);
 
   // Adds the stone to the board.
@@ -171,7 +173,7 @@ class Position {
 
   Color to_play() const { return to_play_; }
   Coord previous_move() const { return previous_move_; }
-  const std::array<Stone, kN * kN>& stones() const { return stones_; }
+  const Stones& stones() const { return stones_; }
   int n() const { return n_; }
   bool is_game_over() const { return num_consecutive_passes_ >= 2; }
 
@@ -207,7 +209,7 @@ class Position {
   // Returns true if the point at coordinate c neighbors the given group.
   bool HasNeighboringGroup(Coord c, GroupId group_id) const;
 
-  std::array<Stone, kN * kN> stones_;
+  Stones stones_;
   BoardVisitor* board_visitor_;
   GroupVisitor* group_visitor_;
   GroupPool groups_;

@@ -23,15 +23,8 @@
 #include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/position.h"
-#include "cc/random.h"
-#include "cc/symmetries.h"
 
 namespace minigo {
-
-// TODO(tommadams): Figure out a better way to handle random symmetries: each
-// subclass of DualNet currently must copy-paste the same block of code to
-// apply symmetries. Perhaps moving the symmetry code up to the calling code
-// might yield cleaner code.
 
 // The input features to the DualNet neural network have 17 binary feature
 // planes. 8 feature planes X_t indicate the presence of the current player's
@@ -42,12 +35,15 @@ namespace minigo {
 //   [X_t, Y_t, X_t-1, Y_t-1, ..., X_t-7, Y_t-7, C].
 class DualNet {
  public:
+  // Size of move history in the stone features.
+  static constexpr int kMoveHistory = 8;
+
   // Number of features per stone.
-  static constexpr int kNumStoneFeatures = 17;
+  static constexpr int kNumStoneFeatures = kMoveHistory * 2 + 1;
 
   // Index of the per-stone feature that describes whether the black or white
   // player is to play next.
-  static constexpr int kPlayerFeature = 16;
+  static constexpr int kPlayerFeature = kMoveHistory * 2;
 
   // Total number of features for the board.
   static constexpr int kNumBoardFeatures = kN * kN * kNumStoneFeatures;
@@ -55,24 +51,14 @@ class DualNet {
   using StoneFeatures = std::array<float, kNumStoneFeatures>;
   using BoardFeatures = std::array<float, kNumBoardFeatures>;
 
-  // Initializes the input features so that the C feature plane is taken from
-  // position.to_play(), and position.stones() are copied into all X and Y
-  // feature planes (that is: X_t .. X_t-7 are identical and Y_t .. Y_t-7 are
-  // identical).
-  static void InitializeFeatures(const Position& position,
-                                 BoardFeatures* features);
-
-  // Updates the input features after the move position.previous_move() was
-  // played.
-  // old_features holds the input features for the network prior to
-  // position.previous_move() being played.
-  // position.stones() holds the board state after position.previous_move() was
-  // played.
-  // The updated input features for the network are written to new_features.
-  // old_features and new_features are allowed to be the same object.
-  static void UpdateFeatures(const BoardFeatures& old_features,
-                             const Position& position,
-                             BoardFeatures* new_features);
+  // Generates the board features from the history of recent moves, where
+  // history[0] is the current board position, and history[i] is the board
+  // position from i moves ago.
+  // history.size() must be <= kMoveHistory.
+  // TODO(tommadams): Move Position::Stones out of the Position class so we
+  // don't need to depend on position.h.
+  static void SetFeatures(absl::Span<const Position::Stones* const> history,
+                          Color to_play, BoardFeatures* features);
 
   struct Output {
     std::array<float, kNumMoves> policy;
@@ -81,12 +67,16 @@ class DualNet {
 
   virtual ~DualNet();
 
-  // Runs the model on a batch of input features.
-  // If rnd != nullptr, the features will be randomly rotated and mirrored
-  // before running the model, then the inverse transform applied to the
-  // returned policy array.
-  virtual void RunMany(absl::Span<const BoardFeatures* const> features,
-                       absl::Span<Output> outputs, Random* rnd = nullptr) = 0;
+  // Runs inference on a batch of input features.
+  virtual void RunMany(absl::Span<const BoardFeatures> features,
+                       absl::Span<Output> outputs) = 0;
+
+  // Runst inference on features from a single position.
+  Output Run(const BoardFeatures features) {
+    Output output;
+    RunMany({&features, 1}, {&output, 1});
+    return output;
+  }
 };
 
 }  // namespace minigo

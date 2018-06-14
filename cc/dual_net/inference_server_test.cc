@@ -105,11 +105,7 @@ TEST_F(InferenceServerTest, Test) {
       }
     }
     std::vector<DualNet::Output> outputs(batch_size);
-    std::vector<const DualNet::BoardFeatures*> feature_ptrs;
-    for (const auto& f : features) {
-      feature_ptrs.push_back(&f);
-    }
-    dual_net_->RunMany(feature_ptrs, {outputs.data(), outputs.size()});
+    dual_net_->RunMany(features, absl::MakeSpan(outputs));
 
     // Put the outputs.
     PutOutputsRequest put_outputs_request;
@@ -131,9 +127,8 @@ TEST_F(InferenceServerTest, Test) {
   });
 
   DualNet::BoardFeatures features;
-  auto* features_ptr = &features;
   DualNet::Output output;
-  client_->RunMany({&features_ptr, 1}, {&output, 1});
+  client_->RunMany({&features, 1}, {&output, 1});
 
   ASSERT_EQ(value_, output.value);
   for (int i = 0; i < kNumMoves; ++i) {

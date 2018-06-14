@@ -30,6 +30,7 @@
 #include "cc/mcts_node.h"
 #include "cc/position.h"
 #include "cc/random.h"
+#include "cc/symmetries.h"
 
 namespace minigo {
 
@@ -95,6 +96,8 @@ class MctsPlayer {
 
   bool ShouldResign() const;
 
+  void GetNodeFeatures(const MctsNode* node, DualNet::BoardFeatures* features);
+
   // Returns the root of the current search tree, i.e. the current board state.
   MctsNode* root() { return root_; }
   const MctsNode* root() const { return root_; }
@@ -134,8 +137,6 @@ class MctsPlayer {
   // The contents of the returned Span is valid until the next call TreeSearch.
   virtual absl::Span<MctsNode* const> TreeSearch(int batch_size);
 
-  DualNet::Output Run(const DualNet::BoardFeatures* features);
-
   // Returns the root of the game tree.
   MctsNode* game_root() { return &game_root_; }
   const MctsNode* game_root() const { return &game_root_; }
@@ -144,11 +145,13 @@ class MctsPlayer {
 
   std::string FormatScore(float score) const;
 
+  DualNet* network() { return network_.get(); }
+
+  // Run inference for the given leaf nodes & incorportate the inference output.
+  void ProcessLeaves(absl::Span<MctsNode*> leaves);
+
  private:
   void PushHistory(Coord c);
-
-  void RunMany(absl::Span<const DualNet::BoardFeatures* const> features,
-               absl::Span<DualNet::Output> outputs);
 
   std::unique_ptr<DualNet> network_;
   int temperature_cutoff_;
@@ -173,8 +176,10 @@ class MctsPlayer {
 
   // Vectors reused when running TreeSearch.
   std::vector<MctsNode*> leaves_;
-  std::vector<const DualNet::BoardFeatures*> features_;
+  std::vector<DualNet::BoardFeatures> features_;
   std::vector<DualNet::Output> outputs_;
+  std::vector<symmetry::Symmetry> symmetries_used_;
+  std::vector<const Position::Stones*> recent_positions_;
 };
 
 }  // namespace minigo

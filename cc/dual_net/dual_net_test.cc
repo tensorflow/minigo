@@ -15,6 +15,8 @@
 #include "cc/dual_net/dual_net.h"
 
 #include <array>
+#include <deque>
+#include <vector>
 
 #include "cc/position.h"
 #include "cc/test_utils.h"
@@ -34,12 +36,13 @@ StoneFeatures GetStoneFeatures(const BoardFeatures& features, Coord c) {
   return result;
 }
 
-// Verifies InitializeFeatures for an empty board with black to play.
-TEST(DualNetTest, TestInitializeFeaturesBlackToPlay) {
-  TestablePosition board("", Color::kBlack);
+// Verifies SetFeatures an empty board with black to play.
+TEST(DualNetTest, TestEmptyBoardBlackToPlay) {
+  Position::Stones stones;
+  std::vector<const Position::Stones*> history = {&stones};
+  DualNet::BoardFeatures features;
+  DualNet::SetFeatures(history, Color::kBlack, &features);
 
-  BoardFeatures features;
-  DualNet::InitializeFeatures(board, &features);
   for (int c = 0; c < kN * kN; ++c) {
     auto f = GetStoneFeatures(features, c);
     for (int i = 0; i < DualNet::kPlayerFeature; ++i) {
@@ -49,12 +52,13 @@ TEST(DualNetTest, TestInitializeFeaturesBlackToPlay) {
   }
 }
 
-// Verifies InitializeFeatures for an empty board with white to play.
-TEST(DualNetTest, TestInitializeFeaturesWhiteToPlay) {
-  TestablePosition board("", Color::kWhite);
+// Verifies SetFeatures for an empty board with white to play.
+TEST(DualNetTest, TestEmptyBoardWhiteToPlay) {
+  Position::Stones stones;
+  std::vector<const Position::Stones*> history = {&stones};
+  DualNet::BoardFeatures features;
+  DualNet::SetFeatures(history, Color::kWhite, &features);
 
-  BoardFeatures features;
-  DualNet::InitializeFeatures(board, &features);
   for (int c = 0; c < kN * kN; ++c) {
     auto f = GetStoneFeatures(features, c);
     for (int i = 0; i < DualNet::kPlayerFeature; ++i) {
@@ -64,18 +68,24 @@ TEST(DualNetTest, TestInitializeFeaturesWhiteToPlay) {
   }
 }
 
-// Verifies UpdateFeatures.
-TEST(DualNetTest, TestUpdateFeatures) {
+// Verifies SetFeatures.
+TEST(DualNetTest, TestSetFeatures) {
   TestablePosition board("");
 
-  BoardFeatures features;
-  DualNet::InitializeFeatures(board, &features);
-
   std::vector<std::string> moves = {"B9", "H9", "A8", "J9"};
+  std::deque<Position::Stones> positions;
   for (const auto& move : moves) {
     board.PlayMove(move);
-    DualNet::UpdateFeatures(features, board, &features);
+    positions.push_front(board.stones());
   }
+
+  std::vector<const Position::Stones*> history;
+  for (const auto& p : positions) {
+    history.push_back(&p);
+  }
+
+  DualNet::BoardFeatures features;
+  DualNet::SetFeatures(history, board.to_play(), &features);
 
   //                  B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7 C
   StoneFeatures b9 = {1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
@@ -93,35 +103,25 @@ TEST(DualNetTest, TestUpdateFeatures) {
 TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   TestablePosition board("");
 
-  BoardFeatures features;
-  DualNet::InitializeFeatures(board, &features);
-
   std::vector<std::string> moves = {"J3", "pass", "H2", "J2",
                                     "J1", "pass", "J2"};
+  std::deque<Position::Stones> positions;
   for (const auto& move : moves) {
     board.PlayMove(move);
-    DualNet::UpdateFeatures(features, board, &features);
+    positions.push_front(board.stones());
   }
+
+  std::vector<const Position::Stones*> history;
+  for (const auto& p : positions) {
+    history.push_back(&p);
+  }
+
+  BoardFeatures features;
+  DualNet::SetFeatures(history, board.to_play(), &features);
 
   //                  W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   StoneFeatures j2 = {0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   EXPECT_EQ(j2, GetStoneFeatures(features, Coord::FromString("J2")));
-}
-
-// Verifies that UpdateFeatures generates the correct features when the same
-// object is passed for both old_features and new_features.
-TEST(DualNetTest, TestUpdateFeaturesSameObject) {
-  TestablePosition board("");
-
-  BoardFeatures a, b;
-  DualNet::InitializeFeatures(board, &a);
-  std::vector<std::string> moves = {"A9", "B9", "A8", "D3"};
-  for (const auto& move : moves) {
-    board.PlayMove(move);
-    DualNet::UpdateFeatures(a, board, &b);
-    DualNet::UpdateFeatures(a, board, &a);
-    ASSERT_EQ(a, b);
-  }
 }
 
 }  // namespace

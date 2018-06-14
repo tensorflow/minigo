@@ -25,7 +25,6 @@
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
 #include "cc/constants.h"
-#include "cc/dual_net/dual_net.h"
 #include "cc/position.h"
 
 namespace minigo {
@@ -71,6 +70,13 @@ class MctsNode {
   std::string Describe() const;
   std::string MostVisitedPathString() const;
   std::vector<Coord> MostVisitedPath() const;
+
+  // Returns up to the last num_moves of moves that lead up to this node,
+  // including the node itself.
+  // After GetMoveHistory returns, history[0] is this MctsNode and history[i] is
+  // the MctsNode from i moves ago.
+  void GetMoveHistory(int num_moves,
+                      std::vector<const Position::Stones*>* history) const;
 
   void InjectNoise(const std::array<float, kNumMoves>& noise);
 
@@ -130,9 +136,6 @@ class MctsNode {
 
   // Current board position.
   Position position;
-
-  // Input features for this position.
-  DualNet::BoardFeatures features;
 
   // Number of virtual losses on this node.
   int num_virtual_losses_applied = 0;

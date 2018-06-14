@@ -55,8 +55,7 @@ TfDualNet::TfDualNet(const std::string& graph_path) {
   // explicitly run inference once during construction.
   Output output;
   BoardFeatures features;
-  const auto* features_ptr = &features;
-  RunMany({&features_ptr, 1}, {&output, 1});
+  RunMany({&features, 1}, {&output, 1});
 }
 
 TfDualNet::~TfDualNet() {
@@ -65,8 +64,8 @@ TfDualNet::~TfDualNet() {
   }
 }
 
-void TfDualNet::RunMany(absl::Span<const BoardFeatures* const> features,
-                        absl::Span<Output> outputs, Random* rnd) {
+void TfDualNet::RunMany(absl::Span<const BoardFeatures> features,
+                        absl::Span<Output> outputs) {
   MG_DCHECK(features.size() == outputs.size());
 
   int batch_size = static_cast<int>(features.size());
@@ -76,23 +75,10 @@ void TfDualNet::RunMany(absl::Span<const BoardFeatures* const> features,
         Tensor(DT_FLOAT, TensorShape({batch_size, kN, kN, kNumStoneFeatures}));
   }
 
-  // Select symmetry operations to apply.
-  symmetries_used_.clear();
-  if (rnd != nullptr) {
-    symmetries_used_.reserve(batch_size);
-    for (int i = 0; i < batch_size; ++i) {
-      symmetries_used_.push_back(static_cast<symmetry::Symmetry>(
-          rnd->UniformInt(0, symmetry::kNumSymmetries - 1)));
-    }
-  } else {
-    symmetries_used_.resize(batch_size, symmetry::kIdentity);
-  }
-
   // Copy the features into the input tensor.
   for (int i = 0; i < batch_size; ++i) {
-    symmetry::ApplySymmetry<float, kN, kNumStoneFeatures>(
-        symmetries_used_[i], features[i]->data(),
-        feature_tensor.flat<float>().data() + i * kNumBoardFeatures);
+    memcpy(feature_tensor.flat<float>().data(), features.data(),
+           features.size() * sizeof(BoardFeatures));
   }
 
   // Run the model.
@@ -102,13 +88,8 @@ void TfDualNet::RunMany(absl::Span<const BoardFeatures* const> features,
   const auto& policy_tensor = outputs_[0].flat<float>();
   const auto& value_tensor = outputs_[1].flat<float>();
   for (int i = 0; i < batch_size; ++i) {
-    const auto* policy_tensor_data = policy_tensor.data() + i * kNumMoves;
-
-    symmetry::ApplySymmetry<float, kN, 1>(
-        symmetry::Inverse(symmetries_used_[i]), policy_tensor_data,
-        outputs[i].policy.data());
-    outputs[i].policy[Coord::kPass] = policy_tensor_data[Coord::kPass];
-
+    memcpy(outputs[i].policy.data(), policy_tensor.data() + i * kNumMoves,
+           sizeof(outputs[i].policy));
     outputs[i].value = value_tensor.data()[i];
   }
 }

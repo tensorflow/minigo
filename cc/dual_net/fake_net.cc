@@ -31,8 +31,8 @@ FakeNet::FakeNet(absl::Span<const float> priors, float value) : value_(value) {
   }
 }
 
-void FakeNet::RunMany(absl::Span<const BoardFeatures* const> features,
-                      absl::Span<Output> outputs, Random* rnd) {
+void FakeNet::RunMany(absl::Span<const BoardFeatures> features,
+                      absl::Span<Output> outputs) {
   for (auto& output : outputs) {
     output.policy = priors_;
     output.value = value_;

@@ -28,10 +28,11 @@ namespace minigo {
 
 MctsNode::MctsNode(EdgeStats* stats, const Position& position)
     : parent(nullptr), stats(stats), move(Coord::kInvalid), position(position) {
+  // TODO(tommadams): Only call IsMoveLegal if we want to select a leaf for
+  // expansion.
   for (int i = 0; i < kNumMoves; ++i) {
     illegal_moves[i] = position.IsMoveLegal(i) ? 0 : 1000;
   }
-  DualNet::InitializeFeatures(position, &features);
 }
 
 MctsNode::MctsNode(MctsNode* parent, Coord move)
@@ -40,10 +41,11 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
       move(move),
       position(parent->position) {
   position.PlayMove(move);
+  // TODO(tommadams): Only call IsMoveLegal if we want to select a leaf for
+  // expansion.
   for (int i = 0; i < kNumMoves; ++i) {
     illegal_moves[i] = position.IsMoveLegal(i) ? 0 : 1000;
   }
-  DualNet::UpdateFeatures(parent->features, position, &features);
 }
 
 std::string MctsNode::Describe() const {
@@ -125,6 +127,20 @@ std::string MctsNode::MostVisitedPathString() const {
   }
   oss << std::fixed << std::setprecision(5) << "Q: " << node->Q();
   return oss.str();
+}
+
+void MctsNode::GetMoveHistory(
+    int num_moves, std::vector<const Position::Stones*>* history) const {
+  history->clear();
+  history->reserve(num_moves);
+  const auto* node = this;
+  for (int j = 0; j < num_moves; ++j) {
+    history->push_back(&node->position.stones());
+    node = node->parent;
+    if (node == nullptr) {
+      break;
+    }
+  }
 }
 
 void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise) {

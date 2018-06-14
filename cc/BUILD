@@ -107,6 +107,7 @@ minigo_cc_library(
         ":base",
         ":position",
         ":random",
+        ":symmetries",
         "//cc/dual_net",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/time",

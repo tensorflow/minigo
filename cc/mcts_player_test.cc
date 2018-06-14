@@ -15,8 +15,11 @@
 #include "cc/mcts_player.h"
 
 #include <memory>
+#include <string>
+#include <utility>
 #include "absl/memory/memory.h"
 #include "cc/algorithm.h"
+#include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/dual_net/fake_net.h"
 #include "cc/test_utils.h"
@@ -41,6 +44,10 @@ class TestablePlayer : public MctsPlayer {
   explicit TestablePlayer(const Options& options)
       : MctsPlayer(absl::make_unique<FakeNet>(), options) {}
 
+  explicit TestablePlayer(std::unique_ptr<DualNet> network,
+                          const Options& options)
+      : MctsPlayer(std::move(network), options) {}
+
   TestablePlayer(absl::Span<const float> fake_priors, float fake_value,
                  const Options& options)
       : MctsPlayer(absl::make_unique<FakeNet>(fake_priors, fake_value),
@@ -48,14 +55,18 @@ class TestablePlayer : public MctsPlayer {
 
   using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;
+  using MctsPlayer::ProcessLeaves;
   using MctsPlayer::rnd;
-  using MctsPlayer::Run;
   using MctsPlayer::TreeSearch;
 
   std::array<float, kNumMoves> Noise() {
     std::array<float, kNumMoves> noise;
     rnd()->Dirichlet(kDirichletAlpha, &noise);
     return noise;
+  }
+
+  DualNet::Output Run(const DualNet::BoardFeatures& features) {
+    return network()->Run(features);
   }
 };
 
@@ -65,7 +76,11 @@ std::unique_ptr<TestablePlayer> CreateBasicPlayer(MctsPlayer::Options options) {
 
   auto player = absl::make_unique<TestablePlayer>(options);
   auto* first_node = player->root()->SelectLeaf();
-  auto output = player->Run(&player->root()->features);
+  DualNet::BoardFeatures features;
+  std::vector<const Position::Stones*> positions = {
+      &player->root()->position.stones()};
+  DualNet::SetFeatures(positions, Color::kBlack, &features);
+  auto output = player->Run(features);
   first_node->IncorporateResults(output.policy, output.value, player->root());
   return player;
 }
@@ -75,6 +90,10 @@ std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(int n) {
   MctsPlayer::Options options;
   options.random_seed = 17;
   options.komi = 2.5;
+  // Don't apply random symmetries. If we did, the probabilities we set in
+  // the FakeNet won't be chosen correctly (since the board position will be
+  // randomly transformed).
+  options.random_symmetry = false;
 
   std::array<float, kNumMoves> probs;
   for (auto& p : probs) {
@@ -364,6 +383,73 @@ TEST(MctsPlayerTest, ExtractDataResignEnd) {
 
   EXPECT_EQ(-1, player->result());
   EXPECT_EQ("W+R", player->result_string());
+}
+
+// Fake DualNet implementation used to verify that MctsPlayer symmetries work
+// correctly. For each position on the board, MergeFeaturesNet returns a policy
+// value that is set to an integer with its i'th bit set to the corresponding
+// value of the i'th feature plane.
+class MergeFeaturesNet : public DualNet {
+ public:
+  void RunMany(absl::Span<const BoardFeatures> features,
+               absl::Span<Output> outputs) override {
+    for (size_t i = 0; i < features.size(); ++i) {
+      Run(features[i], &outputs[i]);
+    }
+  }
+
+ private:
+  void Run(const BoardFeatures& features, Output* output) {
+    for (int i = 0; i < kN * kN; ++i) {
+      int merged = 0;
+      const float* src = features.data() + i * DualNet::kNumStoneFeatures;
+      for (int f = 0; f < DualNet::kNumStoneFeatures; ++f) {
+        if (src[f] != 0) {
+          merged |= 1 << f;
+        }
+      }
+      output->policy[i] = static_cast<float>(merged);
+    }
+    output->policy[Coord::kPass] = 0;
+    output->value = 0;
+  }
+};
+
+TEST(MctsPlayerTest, SymmetriesTest) {
+  MctsPlayer::Options options;
+  options.random_seed = 17;
+  options.random_symmetry = true;
+  TestablePlayer player(absl::make_unique<MergeFeaturesNet>(), options);
+
+  // Without playing a move, all features planes should be zero except the last
+  // one (it's black's turn to play).
+  auto* root = player.root();
+  player.ProcessLeaves({&root, 1});
+  for (int i = 0; i < kN * kN; ++i) {
+    ASSERT_EQ(0x10000, root->child_P(i));
+  }
+
+  // Play an odd number of moves.
+  // Because it's white to play next, the output of the MergeFeaturesNet should
+  // only be non-zero in locations where we have played (since the "to play"
+  // feature will be 0).
+  std::vector<std::unique_ptr<MctsNode>> nodes;
+  std::vector<std::string> moves = {"B3", "F1", "C6"};
+  auto* parent = root;
+  for (const auto& move : moves) {
+    nodes.push_back(absl::make_unique<MctsNode>(parent, Coord::FromKgs(move)));
+    parent = nodes.back().get();
+  }
+
+  // Run the MergeFeaturesNet many times to have a good chance of exercising all
+  // the symmetries.
+  for (int i = 0; i < 100; ++i) {
+    auto* leaf = nodes.back().get();
+    player.ProcessLeaves({&leaf, 1});
+    ASSERT_EQ(0x02, leaf->child_P(Coord::FromKgs("C6")));
+    ASSERT_EQ(0x05, leaf->child_P(Coord::FromKgs("F1")));
+    ASSERT_EQ(0x2a, leaf->child_P(Coord::FromKgs("B3")));
+  }
 }
 
 }  // namespace
