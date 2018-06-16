@@ -136,12 +136,10 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
     if filter_amount < 1.0:
         dataset = dataset.filter(lambda x: tf.less(
             tf.random_uniform([1]), filter_amount)[0])
-    if num_repeats is not None:
-        dataset = dataset.repeat(num_repeats)
-    else:
-        dataset = dataset.repeat()
+    dataset = dataset.repeat(num_repeats)
     if shuffle_examples:
         dataset = dataset.shuffle(buffer_size=shuffle_buffer_size)
+
     dataset = dataset.batch(batch_size)
     return dataset
 
@@ -183,8 +181,8 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
                               shuffle_buffer_size=shuffle_buffer_size,
                               filter_amount=filter_amount)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
-    dataset = dataset.map(functools.partial(
-        batch_parse_tf_example, batch_size))
+    dataset = dataset.map(
+        functools.partial(batch_parse_tf_example, batch_size))
     if random_rotation:
         dataset = dataset.map(_random_rotation)
 

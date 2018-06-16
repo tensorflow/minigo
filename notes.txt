@@ -57,3 +57,4 @@ model 330: learning rate cut from 1e-4 to 3e-5
 model 375: learning rate cut from 3e-5 to 1e-5
 model 380: learning rate increased from 1e-5 to 1e-4
 model 389: learning rate increased from 1e-4 to 3e-4
+model 409: learning rate decreased from 3e-4 to 3e-5
