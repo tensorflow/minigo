@@ -28,6 +28,43 @@ import random
 import time
 
 
+def cross_eval(m1_path, m2_path, jobname, completions=20):
+    """
+    m1_path, m2_path: full gs:// paths to the .pb files to match up
+    jobname: string, appended to the container, used to differentiate the job names
+    (e.g. 'minigo-gpu-evaluator-v5-123-v7-456')
+    """
+    if m1_path is None or m2_path is None or jobname is None:
+        print("Provide all of m1_path, m2_path, and jobname params")
+        return
+    kubernetes.config.load_kube_config()
+    configuration = kubernetes.client.Configuration()
+    api_instance = kubernetes.client.BatchV1Api(
+        kubernetes.client.ApiClient(configuration))
+
+    raw_job_conf = open("cluster/evaluator/cc-evaluator.yaml").read()
+
+    os.environ['MODEL_BLACK'] = m1_path
+    os.environ['MODEL_WHITE'] = m2_path
+    os.environ['JOBNAME'] = jobname + '-bw'
+    env_job_conf = os.path.expandvars(raw_job_conf)
+
+    job_conf = yaml.load(env_job_conf)
+    job_conf['spec']['completions'] = completions
+
+    resp = api_instance.create_namespaced_job('default', body=job_conf)
+
+    os.environ['MODEL_WHITE'] = m1_path
+    os.environ['MODEL_BLACK'] = m2_path
+    os.environ['JOBNAME'] = jobname + '-wb'
+    env_job_conf = os.path.expandvars(raw_job_conf)
+    job_conf = yaml.load(env_job_conf)
+    job_conf['spec']['completions'] = completions
+
+    resp = api_instance.create_namespaced_job('default', body=job_conf)
+
+
+
 def launch_eval(black_num=0, white_num=0):
     if black_num <= 0 or white_num <= 0:
         print("Need real model numbers")
@@ -88,7 +125,7 @@ def zoo_loop():
 
             cleanup(api_instance)
             r = api_instance.list_job_for_all_namespaces()
-            if len(r.items) < 20:
+            if len(r.items) < 10:
                 if not desired_pairs:
                     time.sleep(60*5)
                     continue
@@ -167,7 +204,7 @@ def make_pairs_for_model(model_num=0):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [zoo_loop, launch_eval, backpair, cleanup])
+argh.add_commands(parser, [zoo_loop, launch_eval, backpair, cleanup, cross_eval])
 
 if __name__ == '__main__':
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)

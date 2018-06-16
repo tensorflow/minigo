@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: minigo-cc-evaluator-$MODEL_WHITE_NUM-$MODEL_BLACK_NUM
+  name: minigo-cc-evaluator-$JOBNAME
 spec:
   parallelism: 10
   completions: 10
