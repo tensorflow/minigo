@@ -33,19 +33,10 @@ against.
 ## Building
 
 The C++ Minigo implementation requires that the board size be defined at compile
-time, using the MINIGO\_BOARD\_SIZE preprocessor define. This allows us to
-significantly reduce the number of heap allocations performed. However, it does
-mean that you must specify the board size when compiling by invoking Bazel with
-either `--define=board_size=9` or `--define=board_size=19`.
-This defines MINIGO\_BOARD\_SIZE when compiling the Minigo sources, but none of
-their dependencies, which avoids unnecessarily recompiling Minigo's
-dependencies when switching board size.
-
-Pass `--define=board_size=9` when invoking Bazel to build Minigo for a 9x9
-board.
-
-Pass `--define=board_size=19` when invoking Bazel to build Minigo for a 19x19
-board.
+time, using the `MINIGO_BOARD_SIZE` preprocessor define. This allows us to
+significantly reduce the number of heap allocations performed. The build scripts
+are configured to compile with `MINIGO_BOARD_SIZE=19` by default. To compile a
+version that works with a 9x9 board, invoke Bazel with `--define=board_size=9`.
 
 ## Running the unit tests
 
@@ -54,7 +45,7 @@ enabled for a particular board size. Consequently, you must run the tests
 multiple times:
 
 ```shell
-bazel test --define=board_size=9 cc/...  &&  bazel test --define=board_size=19 cc/...
+bazel test --define=board_size=9 cc/...  &&  bazel test cc/...
 ```
 
 ## Running with AddressSanitizer
@@ -62,7 +53,7 @@ bazel test --define=board_size=9 cc/...  &&  bazel test --define=board_size=19 c
 Bazel supports building with AddressSanitizer to check for C++ memory errors:
 
 ```shell
-bazel build --define=board\_size=19 cc:main \
+bazel build cc:main \
   --copt=-fsanitize=address \
   --linkopt=-fsanitize=address \
   --copt=-fno-omit-frame-pointer \
@@ -77,14 +68,14 @@ proto format.
 To run Minigo with a 9x9 model:
 
 ```shell
-bazel build --config=minigo9 -c opt cc:main
+bazel build --define=board_size=9 -c opt cc:main
 bazel-bin/cc/main --model=$MODEL_PATH
 ```
 
 To run Minigo with a 19x19 model:
 
 ```shell
-bazel build --config=minigo9 -c opt cc:main
+bazel build -c opt cc:main
 bazel-bin/cc/main --model=$MODEL_PATH
 ```
 

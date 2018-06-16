@@ -3,6 +3,8 @@ package(default_visibility = [
     "//cc:__pkg__",
 ])
 
+licenses(["notice"])  # Apache License 2.0
+
 load(
     "//cc/config:minigo.bzl",
     "minigo_cc_binary",
@@ -31,6 +33,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:check",
     ],
 )
 
@@ -56,6 +59,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:check",
         "//cc:position",
         "//cc:symmetries",
         "//cc:tensorflow",

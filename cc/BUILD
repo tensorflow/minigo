@@ -2,6 +2,8 @@ package(default_visibility = [
     ":__subpackages__",
 ])
 
+licenses(["notice"])  # Apache License 2.0
+
 load(
     "//cc/config:minigo.bzl",
     "minigo_cc_binary",
@@ -32,17 +34,20 @@ minigo_cc_library(
     srcs = [
         "color.cc",
         "coord.cc",
+        "group.cc",
     ],
     hdrs = [
         "algorithm.h",
         "color.h",
         "constants.h",
         "coord.h",
+        "group.h",
         "move.h",
         "stone.h",
     ],
     deps = [
         ":check",
+        ":inline_vector",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -56,7 +61,7 @@ minigo_cc_library(
         "check.h",
     ],
     deps = [
-        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/debugging:stacktrace",
         "@com_google_absl//absl/debugging:symbolize",
     ],
@@ -67,11 +72,13 @@ minigo_cc_library(
     srcs = ["gtp_player.cc"],
     hdrs = ["gtp_player.h"],
     deps = [
+        ":base",
         ":mcts",
         ":sgf",
         "//cc/dual_net",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -105,6 +112,7 @@ minigo_cc_library(
     ],
     deps = [
         ":base",
+        ":check",
         ":position",
         ":random",
         ":symmetries",
@@ -118,15 +126,14 @@ minigo_cc_library(
 minigo_cc_library(
     name = "position",
     srcs = [
-        "group.cc",
         "position.cc",
     ],
     hdrs = [
-        "group.h",
         "position.h",
     ],
     deps = [
         ":base",
+        ":check",
         ":inline_vector",
         ":tiny_set",
     ],
@@ -148,6 +155,7 @@ minigo_cc_library(
     hdrs = ["sgf.h"],
     deps = [
         ":base",
+        ":check",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
@@ -165,7 +173,7 @@ cc_library(
     name = "thread_safe_queue",
     hdrs = ["thread_safe_queue.h"],
     deps = [
-        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
     ],
@@ -187,6 +195,9 @@ minigo_cc_library(
 minigo_cc_library(
     name = "tiny_set",
     hdrs = ["tiny_set.h"],
+    deps = [
+        ":inline_vector",
+    ],
 )
 
 minigo_cc_library(
@@ -234,6 +245,7 @@ minigo_cc_test_9_only(
         ":mcts",
         ":test_utils",
         "//cc/dual_net:fake_net",
+        "@com_google_absl//absl/memory",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -266,6 +278,7 @@ minigo_cc_test_19_only(
     size = "small",
     srcs = ["sgf_test.cc"],
     deps = [
+        ":base",
         ":sgf",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
@@ -288,6 +301,7 @@ minigo_cc_test(
     srcs = ["thread_safe_queue_test.cc"],
     deps = [
         ":thread_safe_queue",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
@@ -300,6 +314,7 @@ minigo_cc_binary(
     srcs = ["main.cc"],
     deps = [
         ":base",
+        ":check",
         ":gtp_player",
         ":init",
         ":mcts",

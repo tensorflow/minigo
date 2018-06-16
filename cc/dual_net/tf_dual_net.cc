@@ -60,7 +60,7 @@ TfDualNet::TfDualNet(const std::string& graph_path) {
 
 TfDualNet::~TfDualNet() {
   if (session_ != nullptr) {
-    session_->Close();
+    TF_CHECK_OK(session_->Close());
   }
 }
 

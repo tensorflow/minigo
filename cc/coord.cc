@@ -29,21 +29,21 @@ constexpr char Coord::kKgsColumns[];
 namespace {
 
 Coord TryParseKgs(absl::string_view str) {
-  str = absl::AsciiStrToUpper(str);
-  if (str == "PASS") {
+  auto upper = absl::AsciiStrToUpper(str);
+  if (upper == "PASS") {
     return Coord::kPass;
   }
-  if (str == "RESIGN") {
+  if (upper == "RESIGN") {
     return Coord::kResign;
   }
 
-  auto col_char = str[0];
+  auto col_char = upper[0];
   if (col_char < 'A' || col_char > 'T' || col_char == 'I') {
     return Coord::kInvalid;
   }
   int col = col_char < 'I' ? col_char - 'A' : 8 + col_char - 'J';
 
-  auto row_str = str.substr(1);
+  auto row_str = upper.substr(1);
   int row;
   if (!absl::SimpleAtoi(row_str, &row) || row <= 0 || row > kN) {
     return Coord::kInvalid;

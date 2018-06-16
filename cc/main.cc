@@ -31,7 +31,9 @@
 #include "absl/time/time.h"
 #include "cc/check.h"
 #include "cc/constants.h"
+#ifndef MINIGO_DISABLE_INFERENCE_SERVER
 #include "cc/dual_net/inference_server.h"
+#endif
 #include "cc/dual_net/tf_dual_net.h"
 #include "cc/file/filesystem.h"
 #include "cc/file/path.h"
@@ -222,6 +224,7 @@ void SelfPlay() {
     options.resign_threshold = -1;
   }
 
+#ifndef MINIGO_DISABLE_INFERENCE_SERVER
   std::unique_ptr<InferenceServer> server;
   std::unique_ptr<DualNet> dual_net;
   if (FLAGS_model == "remote") {
@@ -230,6 +233,10 @@ void SelfPlay() {
   } else {
     dual_net = absl::make_unique<TfDualNet>(FLAGS_model);
   }
+#else
+  auto dual_net = absl::make_unique<TfDualNet>(FLAGS_model);
+#endif
+
   auto player = absl::make_unique<MctsPlayer>(std::move(dual_net), options);
 
   while (!player->game_over()) {
