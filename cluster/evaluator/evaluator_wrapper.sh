@@ -24,9 +24,11 @@ echo board_size: $BOARD_SIZE
 echo black:  $MODEL_BLACK
 echo white:  $MODEL_WHITE
 
+DATE=`date +%Y-%m-%d` 
+
 python3 main.py evaluate \
   $MODEL_BLACK $MODEL_WHITE \
-  --output-dir "gs://$BUCKET_NAME/sgf/eval" \
+  --output-dir "gs://$BUCKET_NAME/sgf/eval/$DATE" \
   --num_readouts=1000 \
   --games=1 \
   --verbose=2

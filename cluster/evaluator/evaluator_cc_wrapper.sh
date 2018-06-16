@@ -30,13 +30,15 @@ echo Retrieiving Models
 gsutil cp ${MODEL_BLACK} .
 gsutil cp ${MODEL_WHITE} .
 
+#TODO use `basename` instead
 BASENAME_BLACK=`echo $MODEL_BLACK  | rev | cut -d/ -f1 | rev`
 BASENAME_WHITE=`echo $MODEL_WHITE  | rev | cut -d/ -f1 | rev`
+DATE=`date +%Y-%m-%d` 
 
 bazel-bin/cc/main --mode=eval \
   --model=$BASENAME_BLACK \
   --model_two=$BASENAME_WHITE \
-  --sgf_dir "gs://$SGF_BUCKET_NAME/sgf/eval" \
+  --sgf_dir "gs://$SGF_BUCKET_NAME/sgf/eval/$DATE" \
   --num_readouts=1000 \
   --resign_threshold=0.90
 
