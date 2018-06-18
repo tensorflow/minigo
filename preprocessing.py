@@ -191,7 +191,7 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
 
 def get_tpu_input_tensors(batch_size, tf_records):
     dataset = read_tf_records(batch_size, tf_records, shuffle_records=True,
-        shuffle_buffer_size=1024, num_repeats=None)
+        shuffle_buffer_size=1024, num_repeats=1)
     # TODO take a bfloat16 param and cast the dataset/labels to bfloat16
     # TODO? use tf.contrib.data.map_and_batch?
     dataset = dataset.map(functools.partial(

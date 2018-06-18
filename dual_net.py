@@ -28,8 +28,8 @@ import sys
 import argh
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib import summary
 from tensorflow.python.training.summary_io import SummaryWriterCache
-from tensorflow.contrib.tpu.python.tpu import bfloat16
 from tensorflow.contrib.tpu.python.tpu import tpu_config
 from tensorflow.contrib.tpu.python.tpu import tpu_estimator
 from tensorflow.contrib.tpu.python.tpu import tpu_optimizer
@@ -41,9 +41,8 @@ import symmetries
 
 flags.DEFINE_integer('train_batch_size', 256,
                      'Batch size to use for train/eval evaluation. For GPU '
-                     'this is batch size as expected. For TPU, this is the '
-                     'batch size used for each TPU core (so that effective '
-                     'batch size = train_batch_size * num_tpu_cores).')
+                     'this is batch size as expected. If \"use_tpu\" is set,'
+                     'final batch size will be = train_batch_size * num_tpu_cores')
 
 flags.DEFINE_integer('conv_width', 128 if go.N == 19 else 32,
                      'The width of each conv layer in the shared trunk.')
@@ -54,11 +53,20 @@ flags.DEFINE_integer('fc_width', 256 if go.N == 19 else 64,
 flags.DEFINE_integer('trunk_layers', go.N,
                      'The number of resnet layers in the shared trunk.')
 
+flags.DEFINE_multi_integer('lr_boundaries', [10000, 30000],
+                     'The number of steps at which the learning rate will decay')
+
+flags.DEFINE_multi_float('lr_rates', [2e-2, 1e-3, 1e-4],
+                     'The different learning rates')
+
 flags.DEFINE_float('l2_strength', 1e-4,
                    'The L2 regularization parameter applied to weights.')
 
 flags.DEFINE_float('sgd_momentum', 0.9,
                    'Momentum parameter for learning rate.')
+
+flags.DEFINE_string('model_dir', None,
+                    'The working directory of the model')
 
 # See www.moderndescartes.com/essays/shuffle_viz for discussion on sizing
 flags.DEFINE_integer('shuffle_buffer_size', 20000,
@@ -76,8 +84,13 @@ flags.register_multi_flags_validator(
     lambda flags: bool(flags['use_tpu']) == bool(flags['tpu_name']),
     'If use_tpu is set, tpu_name must also be set.')
 
+flags.register_multi_flags_validator(
+    ['lr_boundaries', 'lr_rates'],
+    lambda flags: len(flags['lr_boundaries']) == len(flags['lr_rates']) - 1,
+    'Number of learning rates must be exactly one greater than the number of boundaries')
+
 flags.DEFINE_integer(
-    'iterations_per_loop', 100,
+    'iterations_per_loop', 200,
     help=('Number of steps to run on TPU before outfeeding metrics to the CPU.'
           ' If the number of iterations in the loop would exceed the number of'
           ' train steps, the loop will exit before reaching'
@@ -200,10 +213,8 @@ def model_fn(features, labels, mode, params=None):
         tf.nn.l2_loss(v)
         for v in tf.trainable_variables() if not 'bias' in v.name])
     combined_cost = policy_cost + value_cost + l2_cost
-    boundaries = [40 * int(1e6), 80 * int(1e6)]
-    values = [1e-3, 1e-4, 1e-5]
     learning_rate = tf.train.piecewise_constant(
-        global_step, boundaries, values)
+        global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     optimizer = tf.train.MomentumOptimizer(
         learning_rate, FLAGS.sgd_momentum)
@@ -247,9 +258,15 @@ def model_fn(features, labels, mode, params=None):
         }
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
-        for metric_name, metric_op in metric_ops.items():
-            tf.summary.scalar(metric_name, metric_op[1])
-        return metric_ops
+        if FLAGS.use_tpu:
+            with summary.create_file_writer(FLAGS.model_dir).as_default(), summary.record_summaries_every_n_global_steps(FLAGS.iterations_per_loop * 2):
+                for metric_name, metric_op in metric_ops.items():
+                    summary.scalar(metric_name, metric_op[1])
+            return summary.all_summary_ops()
+        else:
+            for metric_name, metric_op in metric_ops.items():
+                tf.summary.scalar(metric_name, metric_op[1])
+            return metric_ops
 
     if FLAGS.use_tpu:
         return tpu_estimator.TPUEstimatorSpec(
@@ -359,7 +376,7 @@ def bootstrap(working_dir):
     # train() requires data, and I didn't feel like creating training data in
     # order to run the full train pipeline for 1 step.
     estimator_initial_checkpoint_name = 'model.ckpt-1'
-    save_file = os.path.join(working_dir, estimator_initial_checkpoint_name)
+    save_file = os.path.join(FLAGS.model_dir, estimator_initial_checkpoint_name)
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()
@@ -388,15 +405,19 @@ def export_model(working_dir, model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def train(working_dir, *tf_records, steps=None):
+def train(*tf_records, steps=None):
+    tf.logging.set_verbosity(tf.logging.INFO)
     if FLAGS.use_tpu:
         tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
             FLAGS.tpu_name, zone=None, project=None)
+        tpu_grpc_url = tpu_cluster_resolver.get_master()
 
         config = tpu_config.RunConfig(
-            cluster=tpu_cluster_resolver,
-            model_dir=working_dir,
-            save_checkpoints_steps=max(600, FLAGS.iterations_per_loop),
+            master=tpu_grpc_url,
+            evaluation_master=tpu_grpc_url,
+            model_dir=FLAGS.model_dir,
+            save_checkpoints_steps=max(800, FLAGS.iterations_per_loop),
+            session_config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True),
             tpu_config=tpu_config.TPUConfig(
                 iterations_per_loop=FLAGS.iterations_per_loop,
                 num_shards=FLAGS.num_tpu_cores,
@@ -406,23 +427,23 @@ def train(working_dir, *tf_records, steps=None):
             use_tpu=FLAGS.use_tpu,
             model_fn=model_fn,
             config=config,
-            train_batch_size=FLAGS.train_batch_size,
-            eval_batch_size=FLAGS.train_batch_size)
+            train_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores,
+            eval_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores)
 
         def input_fn(params):
             return preprocessing.get_tpu_input_tensors(params['batch_size'], tf_records)
         # TODO: get hooks working again with TPUestimator.
         hooks = []
     else:
-        estimator = get_estimator(working_dir)
+        estimator = get_estimator(FLAGS.model_dir)
 
         def input_fn():
             return preprocessing.get_input_tensors(
                 FLAGS.train_batch_size, tf_records, filter_amount=1.0,
                 shuffle_buffer_size=FLAGS.shuffle_buffer_size)
 
-        hooks = [UpdateRatioSessionHook(working_dir),
-                 EchoStepCounterHook(output_dir=working_dir)]
+        hooks = [UpdateRatioSessionHook(FLAGS.model_dir),
+                 EchoStepCounterHook(output_dir=FLAGS.model_dir)]
 
     if steps is None:
         steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
@@ -430,8 +451,8 @@ def train(working_dir, *tf_records, steps=None):
     estimator.train(input_fn, steps=int(steps), hooks=hooks)
 
 
-def validate(working_dir, tf_records, checkpoint_name=None, validate_name=None):
-    estimator = get_estimator(working_dir)
+def validate(tf_records, checkpoint_name=None, validate_name=None):
+    estimator = get_estimator(FLAGS.model_dir)
     validate_name = validate_name or "selfplay"
     checkpoint_name = checkpoint_name or estimator.latest_checkpoint()
 

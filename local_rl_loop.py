@@ -53,6 +53,7 @@ def rl_loop():
     with tempfile.TemporaryDirectory() as base_dir:
         flags.FLAGS.base_dir = base_dir
         working_dir = os.path.join(base_dir, 'models_in_training')
+        flags.FLAGS.model_dir = working_dir
         model_save_path = os.path.join(base_dir, 'models', '000000-bootstrap')
         local_eb_dir = os.path.join(base_dir, 'scratch')
         next_model_save_file = os.path.join(
@@ -101,7 +102,7 @@ def rl_loop():
                           samples_per_game=200)
 
         print("Training on gathered game data...")
-        main.train_dir(working_dir, gather_dir,
+        main.train_dir(gather_dir,
                        next_model_save_file)
         print("Trying validate on 'holdout' game...")
         main.validate(working_dir, holdout_dir)
