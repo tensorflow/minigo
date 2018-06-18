@@ -113,8 +113,8 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
     if shuffle_examples and not shuffle_buffer_size:
         raise ValueError("Must set shuffle buffer size if shuffling examples")
 
+    tf_records = list(tf_records)
     if shuffle_records:
-        tf_records = list(tf_records)
         random.shuffle(tf_records)
     record_list = tf.data.Dataset.from_tensor_slices(tf_records)
 
