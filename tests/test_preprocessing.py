@@ -34,8 +34,8 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
     def create_random_data(self, num_examples):
         raw_data = []
         for i in range(num_examples):
-            feature = np.random.random([
-                go.N, go.N, features.NEW_FEATURES_PLANES]).astype(np.uint8)
+            feature = (256 * np.random.random([
+                go.N, go.N, features.NEW_FEATURES_PLANES])).astype(np.uint8)
             pi = np.random.random([go.N * go.N + 1]).astype(np.float32)
             value = np.random.random()
             raw_data.append((feature, pi, value))
