@@ -376,7 +376,7 @@ def bootstrap(working_dir):
     # train() requires data, and I didn't feel like creating training data in
     # order to run the full train pipeline for 1 step.
     estimator_initial_checkpoint_name = 'model.ckpt-1'
-    save_file = os.path.join(FLAGS.model_dir, estimator_initial_checkpoint_name)
+    save_file = os.path.join(working_dir, estimator_initial_checkpoint_name)
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()
