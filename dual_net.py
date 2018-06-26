@@ -209,11 +209,11 @@ def model_fn(features, labels, mode, params=None):
             logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
-    # TODO(sethtroisi) Add 'beta' to reg_vars
     reg_vars = [v for v in tf.trainable_variables()
-        if not '/bias:' in v.name]
+                if not '/bias:' in v.name and not '/beta:' in v.name]
 
-    l2_cost = FLAGS.l2_strength * tf.add_n(tf.nn.l2_loss(v) for v in reg_vars)
+    l2_cost = FLAGS.l2_strength * \
+        tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
     combined_cost = policy_cost + value_cost + l2_cost
     learning_rate = tf.train.piecewise_constant(
         global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
@@ -342,7 +342,7 @@ def model_inference_fn(features, training):
 
     # policy head
     policy_conv = my_conv2d(shared_output, filters=2, kernel_size=1)
-    policy_conv = tf.nn.relu(my_batchn(policy_conv, center=True, scale=True))
+    policy_conv = tf.nn.relu(my_batchn(policy_conv, center=True, scale=False))
     logits = tf.layers.dense(
         tf.reshape(policy_conv, [-1, 2 * go.N * go.N]),
         go.N * go.N + 1)
@@ -351,13 +351,13 @@ def model_inference_fn(features, training):
 
     # value head
     value_conv = my_conv2d(shared_output, filters=1, kernel_size=1)
-    value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
+    value_conv = tf.nn.relu(my_batchn(value_conv, center=True, scale=False))
 
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
         tf.reshape(value_conv, [-1, go.N * go.N]),
         FLAGS.fc_width))
     value_output = tf.nn.tanh(
-        tf.squeeze(tf.layers.dense(value_fc_hidden, 1)),
+        tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
         name='value_output')
 
     return policy_output, value_output, logits
