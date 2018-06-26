@@ -16,7 +16,6 @@ import sys
 sys.path.insert(0, '.')
 
 from absl import flags
-import jinja2
 import kubernetes
 import argparse
 import yaml
@@ -24,29 +23,27 @@ import json
 import os
 import argh
 import fsdb
-import random
 import time
 
 
-def cross_eval(m1_path, m2_path, jobname, completions=20):
-    """
+def launch_eval_job(m1_path, m2_path, job_name, bucket_name="tensor-go-minigo-cross-evals",completions=20):
+    """Launches an evaluator job.
     m1_path, m2_path: full gs:// paths to the .pb files to match up
-    jobname: string, appended to the container, used to differentiate the job names
-    (e.g. 'minigo-gpu-evaluator-v5-123-v7-456')
+    job_name: string, appended to the container, used to differentiate the job names
+    (e.g. 'minigo-cc-evaluator-v5-123-v7-456')
+    bucket_name: Where to write the sgfs, passed into the job as $BUCKET_NAME
+    completions: the number of completions desired
     """
-    if m1_path is None or m2_path is None or jobname is None:
-        print("Provide all of m1_path, m2_path, and jobname params")
+    if not all([m1_path, m2_path, job_name, bucket_name]):
+        print("Provide all of m1_path, m2_path, job_name, and bucket_name params")
         return
-    kubernetes.config.load_kube_config()
-    configuration = kubernetes.client.Configuration()
-    api_instance = kubernetes.client.BatchV1Api(
-        kubernetes.client.ApiClient(configuration))
+    api_instance = get_api()
 
     raw_job_conf = open("cluster/evaluator/cc-evaluator.yaml").read()
 
     os.environ['MODEL_BLACK'] = m1_path
     os.environ['MODEL_WHITE'] = m2_path
-    os.environ['JOBNAME'] = jobname + '-bw'
+    os.environ['JOBNAME'] = job_name + '-bw'
     env_job_conf = os.path.expandvars(raw_job_conf)
 
     job_conf = yaml.load(env_job_conf)
@@ -56,58 +53,46 @@ def cross_eval(m1_path, m2_path, jobname, completions=20):
 
     os.environ['MODEL_WHITE'] = m1_path
     os.environ['MODEL_BLACK'] = m2_path
-    os.environ['JOBNAME'] = jobname + '-wb'
+    os.environ['JOBNAME'] = job_name + '-wb'
     env_job_conf = os.path.expandvars(raw_job_conf)
     job_conf = yaml.load(env_job_conf)
     job_conf['spec']['completions'] = completions
 
     resp = api_instance.create_namespaced_job('default', body=job_conf)
+    return resp
 
 
-
-def launch_eval(black_num=0, white_num=0):
+def same_run_eval(black_num=0, white_num=0):
+    """Shorthand to spawn a job matching up two models from the same run,
+    identified by their model number """
     if black_num <= 0 or white_num <= 0:
         print("Need real model numbers")
         return
 
     b = fsdb.get_model(black_num)
     w = fsdb.get_model(white_num)
+    bucket = fsdb.eval_dir
 
     b_model_path = os.path.join(fsdb.models_dir(), b)
     w_model_path = os.path.join(fsdb.models_dir(), w)
 
-    kubernetes.config.load_kube_config()
-    configuration = kubernetes.client.Configuration()
-    api_instance = kubernetes.client.BatchV1Api(
-        kubernetes.client.ApiClient(configuration))
-
-    raw_job_conf = open("cluster/evaluator/gpu-evaluator.yaml").read()
-    env_job_conf = os.path.expandvars(raw_job_conf)
-
-    t = jinja2.Template(env_job_conf)
-    job_conf = yaml.load(t.render({'white': w_model_path,
-                                   'black': b_model_path,
-                                   'wnum': white_num,
-                                   'bnum': black_num}))
-
-    resp = api_instance.create_namespaced_job('default', body=job_conf)
-
-    job_conf = yaml.load(t.render({'white': b_model_path,
-                                   'black': w_model_path,
-                                   'wnum': black_num,
-                                   'bnum': white_num}))
-
-    resp = api_instance.create_namespaced_job('default', body=job_conf)
-
-
-def get_api():
-    kubernetes.config.load_kube_config(persist_config=True)
-    configuration = kubernetes.client.Configuration()
-    return kubernetes.client.BatchV1Api(
-        kubernetes.client.ApiClient(configuration))
+    launch_eval_job(b_model_path + ".pb",
+               w_model_path + ".pb",
+               "{:d}-{:d}".format(black_num, white_num),
+               bucket)
 
 
 def zoo_loop():
+    """Manages creating and cleaning up match jobs.
+
+    - Load whatever pairs didn't get queued last time, and whatever our most
+      recently seen model was.
+    - Loop and...
+        - If a new model is detected, create and append new pairs to the list
+        - Automatically queue models from a list of pairs to keep a cluster busy
+        - As jobs finish, delete them from the cluster.
+        - If we crash, write out the list of pairs we didn't manage to queue
+    """
     desired_pairs = restore_pairs() or []
     last_model_queued = restore_last_model()
 
@@ -125,14 +110,14 @@ def zoo_loop():
 
             cleanup(api_instance)
             r = api_instance.list_job_for_all_namespaces()
-            if len(r.items) < 10:
+            if len(r.items) < 8:
                 if not desired_pairs:
                     time.sleep(60*5)
                     continue
                 next_pair = desired_pairs.pop()  # take our pair off
                 print("Enqueuing:", next_pair)
                 try:
-                    launch_eval(*next_pair)
+                    same_run_eval(*next_pair)
                 except:
                     desired_pairs.append(next_pair)
                     raise
@@ -173,7 +158,15 @@ def restore_last_model():
     return last_model
 
 
+def get_api():
+    kubernetes.config.load_kube_config(persist_config=True)
+    configuration = kubernetes.client.Configuration()
+    return kubernetes.client.BatchV1Api(
+        kubernetes.client.ApiClient(configuration))
+
+
 def cleanup(api_instance=None):
+    """ Remove completed jobs from the cluster """
     api = api_instance or get_api()
     r = api.list_job_for_all_namespaces()
     delete_opts = kubernetes.client.V1DeleteOptions()
@@ -184,13 +177,13 @@ def cleanup(api_instance=None):
                 job.metadata.name, 'default', body=delete_opts)
 
 
-def backpair(model_num=0):
-    pairs = make_pairs_for_model(model_num)
-    for p in pairs:
-        launch_eval(*p)
-
 
 def make_pairs_for_model(model_num=0):
+    """ Create a list of pairs of model nums; play every model nearby, then
+    every other model after that, then every fifth, etc.
+
+    Returns a list like [[N, N-1], [N, N-2], ... , [N, N-12], ... , [N, N-50]]
+    """
     if model_num == 0:
         return
     pairs = []
@@ -204,10 +197,8 @@ def make_pairs_for_model(model_num=0):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [zoo_loop, launch_eval, backpair, cleanup, cross_eval])
+argh.add_commands(parser, [zoo_loop, same_run_eval, cleanup, launch_eval_job])
 
 if __name__ == '__main__':
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
     argh.dispatch(parser, argv=remaining_argv[1:])
-    #for i in range(270, 280, 1):
-    #    make_pairs(i)

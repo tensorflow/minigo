@@ -58,3 +58,7 @@ model 375: learning rate cut from 3e-5 to 1e-5
 model 380: learning rate increased from 1e-5 to 1e-4
 model 389: learning rate increased from 1e-4 to 3e-4
 model 409: learning rate decreased from 3e-4 to 3e-5
+model 433: batch norm momentum decreased from 0.997 to 0.95
+model 450: learning rate increased from 3e-5 to 1e-4
+model 456: learning rate decreased from 1e-4 to 3e-5
+model 476: dropped-in 20x256 model trained via running start.

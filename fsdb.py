@@ -51,6 +51,7 @@ models_dir = _with_base('models')
 selfplay_dir = _with_base('data', 'selfplay')
 holdout_dir = _with_base('data', 'holdout')
 sgf_dir = _with_base('sgf')
+eval_dir = _with_base('sgf', 'eval')
 training_chunk_dir = _with_base('data', 'training_chunks')
 golden_chunk_dir = _with_base('data', 'golden_chunks')
 
