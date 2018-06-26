@@ -23,29 +23,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
+from absl import app, flags
 from tqdm import tqdm
 
 import coords
+import fsdb
 from gtp_wrapper import MCTSPlayer
 import oneoff_utils
 
-tf.app.flags.DEFINE_string("sgf_dir", "sgf/baduk_db/", "sgf database")
+flags.DEFINE_string("sgf_dir", None, "sgf database")
 
-tf.app.flags.DEFINE_string("model_dir", "saved_models",
-                           "Where the model files are saved")
-tf.app.flags.DEFINE_string("plot_dir", "data", "Where to save the plots.")
-tf.app.flags.DEFINE_integer("min_year", "2000",
-                            "Only take sgf games with date >= min_year")
-tf.app.flags.DEFINE_string("komi", "7.5",
-                           "Only take sgf games with given komi")
-tf.app.flags.DEFINE_integer("idx_start", 150,
-                            "Only take models after given idx")
-tf.app.flags.DEFINE_integer("num_positions", 1,
-                            "How many positions from each game to sample from.")
-tf.app.flags.DEFINE_integer("eval_every", 5,
-                            "Eval every k models to generate the curve")
+flags.DEFINE_string("plot_dir", "data", "Where to save the plots.")
+flags.DEFINE_integer("min_year", "2000",
+                     "Only take sgf games with date >= min_year")
+flags.DEFINE_string("komi", "7.5", "Only take sgf games with given komi")
+flags.DEFINE_integer("idx_start", 150, "Only take models after given idx")
+flags.DEFINE_integer("num_positions", 1,
+                     "How many positions from each game to sample from.")
+flags.DEFINE_integer("eval_every", 5,
+                     "Eval every k models to generate the curve")
 
-FLAGS = tf.app.flags.FLAGS
+flags.mark_flag_as_required('sgf_dir')
+
+FLAGS = flags.FLAGS
 
 
 def batch_run_many(player, positions, batch_size=100):
@@ -79,10 +79,11 @@ def sample_positions_from_games(sgf_files, num_positions=1):
     fail_count = 0
     for path in tqdm(sgf_files, desc="loading sgfs", unit="games"):
         try:
-            positions, moves, results = parse_sgf(path)
+            positions, moves, results = oneoff_utils.parse_sgf(path)
         except KeyboardInterrupt:
             raise
-        except:
+        except Exception as e:
+            print ("Parse exception:", e)
             fail_count += 1
             continue
 
@@ -153,12 +154,11 @@ def main(unusedargv):
         FLAGS.sgf_dir, FLAGS.min_year, FLAGS.komi)
     pos_data, move_data, result_data, move_idxs = sample_positions_from_games(
         sgf_files=sgf_files, num_positions=FLAGS.num_positions)
-    df = get_training_curve_data(FLAGS.model_dir, pos_data, move_data,
+    df = get_training_curve_data(fsdb.models_dir(), pos_data, move_data,
                                  result_data, FLAGS.idx_start, FLAGS.eval_every)
     save_plots(FLAGS.plot_dir, df)
 
 
-FLAGS = tf.app.flags.FLAGS
-
 if __name__ == "__main__":
-    tf.app.run(main)
+    remaining_argv = flags.FLAGS(sys.argv, known_only=True)
+    main(remaining_argv)

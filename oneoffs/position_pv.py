@@ -18,26 +18,21 @@ import tensorflow as tf
 from tqdm import tqdm
 
 import go
-import strategies
+import fsdb
 import oneoff_utils
+import strategies
 
 
-flags.DEFINE_string(
-    "sgf_dir", "sgf/baduk_db/", "sgf database")
-
-flags.DEFINE_string("model_dir", "saved_models",
-                    "Where the model files are saved")
-flags.DEFINE_string("data_dir", "data/eval", "Where to save data")
-flags.DEFINE_integer("idx_start", 150,
-                     "Only take models after given idx")
-flags.DEFINE_integer("eval_every", 5,
-                     "Eval every k models to generate the curve")
+flags.DEFINE_string("sgf_dir", "sgf/baduk_db/", "sgf database.")
+flags.DEFINE_string("data_dir", "data/eval", "Where to save data.")
+flags.DEFINE_integer("idx_start", 150, "Only take models after given idx.")
+flags.DEFINE_integer("eval_every", 5, "Eval every k models.")
 
 FLAGS = flags.FLAGS
 
 
 def eval_pv(eval_positions):
-    model_paths = oneoff_utils.get_model_paths(FLAGS.model_dir)
+    model_paths = oneoff_utils.get_model_paths(fsdb.models_dir())
 
     idx_start = FLAGS.idx_start
     eval_every = FLAGS.eval_every
