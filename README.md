@@ -160,15 +160,15 @@ gs://$BUCKET_NAME/models/000193-trusty.meta
 
 These three files comprise the model, and commands that take a model as an
 argument usually need the path to the model basename, e.g.
-`gs://$BUCKET_NAME/models/000193-trusty`
+`gs://$BUCKET_NAME/models/000123-foobar`
 
-You'll need to copy them to your local disk.  This fragment copies the latest
-model to the directory specified by `MINIGO_MODELS`
+You'll need to copy them to your local disk.  This fragment copies the files
+associated with $MODEL_NAME to the directory specified by `MINIGO_MODELS`
 
 ```shell
 MINIGO_MODELS=$HOME/minigo-models
 mkdir -p $MINIGO_MODELS
-gsutil ls gs://$BUCKET_NAME/models | tail -3 | xargs -I{} gsutil cp "{}" $MINIGO_MODELS
+gsutil ls gs://$BUCKET_NAME/models | grep $MODEL_NAME | xargs -I{} gsutil cp "{}" $MINIGO_MODELS
 ```
 
 Selfplay
@@ -290,9 +290,9 @@ model, starting from the latest model weights in the `estimator_working_dir` par
 Run the training job:
 ```
 BOARD_SIZE=19 python3 main.py train-dir \
-  estimator_working_dir
   gs://$BUCKET_NAME/data/training_chunks \
-  gs://$BUCKET_NAME/models/000001-somename
+  gs://$BUCKET_NAME/models/000001-somename \
+  --model_dir estimator_working_dir
 ```
 
 At the end of training, the latest checkpoint will be exported to the directory with the given name.  
