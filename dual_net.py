@@ -209,22 +209,9 @@ def model_fn(features, labels, mode, params=None):
             logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
-    print ()
-    print ()
-    print ("NOT BIAS:")
-    print ("\n".join(v.name for v in tf.trainable_variables() if not 'bias' in v.name))
-    print ()
-    print ("BIAS:")
-    print ("\n".join(v.name for v in tf.trainable_variables() if 'bias' in v.name))
-    print ()
-    print ("BETA:")
-    print ("\n".join(v.name for v in tf.trainable_variables() if 'beta' in v.name))
-    print ()
-    # what about moving mean, moving variance
-    print ()
-    print ()
+    # TODO(sethtroisi) Add 'beta' to reg_vars
     reg_vars = [v for v in tf.trainable_variables()
-        if not '/bias:' in v.name and not '/beta:' in v.name]
+        if not '/bias:' in v.name]
 
     l2_cost = FLAGS.l2_strength * tf.add_n(tf.nn.l2_loss(v) for v in reg_vars)
     combined_cost = policy_cost + value_cost + l2_cost
@@ -331,20 +318,6 @@ def model_inference_fn(features, training):
         fused=True,
         training=training)
 
-    # has both biases right now :(
-    '''
-import numpy as np
-import tensorflow as tf
-model = "gs://minigo-pub/v7-19x19/models/000303-olympus"
-ckpt = tf.train.load_checkpoint(model)
-print (str(ckpt.debug_string()).replace('\\n', '\n'))
-for tensor in ('batch_normalization_{}/beta', 'conv2d_{}/bias'):
-    print (tensor)
-    for l in range(1,39):
-        #print (ckpt.get_tensor(tensor.format(l)))
-        print (l, np.sum(np.abs(ckpt.get_tensor(tensor.format(l)))))
-    '''
-
     my_conv2d = functools.partial(
         tf.layers.conv2d,
         filters=FLAGS.conv_width,
@@ -352,10 +325,9 @@ for tensor in ('batch_normalization_{}/beta', 'conv2d_{}/bias'):
         padding="same",
         data_format="channels_last",
         use_bias=False)
-        # kernal_regularizer?
 
     def my_res_layer(inputs):
-        int_layer1 = my_batchn(my_conv2d(inputs), scale=False)
+        int_layer1 = my_batchn(my_conv2d(inputs))
         initial_output = tf.nn.relu(int_layer1)
         int_layer2 = my_batchn(my_conv2d(initial_output))
         output = tf.nn.relu(inputs + int_layer2)
@@ -371,19 +343,19 @@ for tensor in ('batch_normalization_{}/beta', 'conv2d_{}/bias'):
     # policy head
     policy_conv = my_conv2d(shared_output, filters=2, kernel_size=1)
     policy_conv = tf.nn.relu(my_batchn(policy_conv, center=True, scale=True))
-    policy_conv = tf.reshape(policy_conv, [-1, 2 * go.N * go.N])
-
-    # should dense be using a bias? (it currently is)
-    logits = tf.layers.dense(policy_conv, go.N * go.N + 1)
+    logits = tf.layers.dense(
+        tf.reshape(policy_conv, [-1, 2 * go.N * go.N]),
+        go.N * go.N + 1)
 
     policy_output = tf.nn.softmax(logits, name='policy_output')
 
     # value head
     value_conv = my_conv2d(shared_output, filters=1, kernel_size=1)
-    value_conv = tf.nn.relu(my_batchn(value_conv, center=True, scale=True))
-    value_conv = tf.reshape(value_conv, [-1, go.N * go.N])
+    value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
 
-    value_fc_hidden = tf.nn.relu(tf.layers.dense(value_conv, FLAGS.fc_width))
+    value_fc_hidden = tf.nn.relu(tf.layers.dense(
+        tf.reshape(value_conv, [-1, go.N * go.N]),
+        FLAGS.fc_width))
     value_output = tf.nn.tanh(
         tf.squeeze(tf.layers.dense(value_fc_hidden, 1)),
         name='value_output')
