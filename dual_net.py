@@ -210,7 +210,7 @@ def model_fn(features, labels, mode, params=None):
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
     reg_vars = [v for v in tf.trainable_variables()
-                if not '/bias:' in v.name and not '/beta:' in v.name]
+                if not 'bias' in v.name and not 'beta' in v.name]
 
     l2_cost = FLAGS.l2_strength * \
         tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
@@ -311,6 +311,7 @@ def model_inference_fn(features, training):
 
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
+        axis=-1,
         momentum=.997,
         epsilon=1e-5,
         center=True,
@@ -342,7 +343,7 @@ def model_inference_fn(features, training):
 
     # policy head
     policy_conv = my_conv2d(shared_output, filters=2, kernel_size=1)
-    policy_conv = tf.nn.relu(my_batchn(policy_conv, center=True, scale=False))
+    policy_conv = tf.nn.relu(my_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
         tf.reshape(policy_conv, [-1, 2 * go.N * go.N]),
         go.N * go.N + 1)
@@ -351,7 +352,7 @@ def model_inference_fn(features, training):
 
     # value head
     value_conv = my_conv2d(shared_output, filters=1, kernel_size=1)
-    value_conv = tf.nn.relu(my_batchn(value_conv, center=True, scale=False))
+    value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
 
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
         tf.reshape(value_conv, [-1, go.N * go.N]),
@@ -385,7 +386,7 @@ def bootstrap(working_dir):
     # train() requires data, and I didn't feel like creating training data in
     # order to run the full train pipeline for 1 step.
     estimator_initial_checkpoint_name = 'model.ckpt-1'
-    save_file = os.path.join(FLAGS.model_dir, estimator_initial_checkpoint_name)
+    save_file = os.path.join(working_dir, estimator_initial_checkpoint_name)
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()

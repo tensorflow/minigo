@@ -8,9 +8,11 @@ import os
 import random
 import subprocess
 import time
+from collections import deque
+
+from absl import flags
 import tensorflow as tf
 from tqdm import tqdm
-from collections import deque
 
 import preprocessing
 import dual_net
@@ -51,25 +53,27 @@ def _ts_to_str(timestamp):
 
 
 class ExampleBuffer():
-    def __init__(self, max_size=2000000):
+    def __init__(self, max_size=2000000, samples_per_game=4):
         self.examples = deque(maxlen=max_size)
         self.max_size = max_size
+        self.samples_per_game = samples_per_game
+        self.func = functools.partial(
+            choose, samples_per_game=self.samples_per_game)
 
-    def parallel_fill(self, games, threads=8, samples_per_game=4):
+    def parallel_fill(self, games, threads=8):
+        """ games is a list of .tfrecord.zz game records. """
         games.sort(key=os.path.basename)
-        if len(games) * samples_per_game > self.max_size:
-            games = games[-1 * self.max_size // samples_per_game:]
-
-        func = functools.partial(choose, samples_per_game=samples_per_game)
+        # A couple extra in case parsing fails
+        max_games = self.max_size // self.samples_per_game + 10
+        if len(games) > max_games:
+            games = games[-max_games:]
 
         with mp.Pool(threads) as pool:
-            res = tqdm(pool.imap(func, games), total=len(games))
+            res = tqdm(pool.imap(self.func, games), total=len(games))
             self.examples.extend(itertools.chain(*res))
 
-    def update(self, new_games, samples_per_game=4):
-        """
-        new_games is list of .tfrecord.zz files of new games
-        """
+    def update(self, new_games):
+        """ new_games is a list of .tfrecord.zz new game records. """
         new_games.sort(key=os.path.basename)
         first_new_game = None
         for idx, game in enumerate(tqdm(new_games)):
@@ -78,24 +82,27 @@ class ExampleBuffer():
                 continue
             elif first_new_game is None:
                 first_new_game = idx
-                print(
-                    "Found {}/{} new games".format(len(new_games) - idx, len(new_games)))
-
-            choices = [(timestamp, ex) for ex in pick_examples_from_tfrecord(
-                game, samples_per_game)]
-            self.examples.extend(choices)
+                print("Found {}/{} new games".format(
+                    len(new_games) - idx, len(new_games)))
+            self.examples.extend(self.func(game))
 
     def flush(self, path):
+        # random.shuffle on deque is O(n^2) convert to list for O(n)
+        self.examples = list(self.examples)
+        random.shuffle(self.examples)
         with timer("Writing examples to " + path):
-            random.shuffle(self.examples)
             preprocessing.write_tf_examples(
                 path, [ex[1] for ex in self.examples])
+        self.examples.clear()
+        self.examples = deque(maxlen=self.max_size)
 
     @property
     def count(self):
         return len(self.examples)
 
     def __str__(self):
+        if self.count == 0:
+            return "ExampleBuffer: 0 positions"
         return "ExampleBuffer: {} positions sampled from {} to {}".format(
             self.count,
             _ts_to_str(self.examples[0][0]),
@@ -182,24 +189,22 @@ def make_chunk_for(output_dir=LOCAL_DIR,
     """
     game_dir = game_dir or fsdb.selfplay_dir()
     ensure_dir_exists(output_dir)
-    models = [(num, name)
-              for num, name in fsdb.get_models() if num < model_num]
-    buf = ExampleBuffer(positions)
+    models = [model for model in fsdb.get_models() if model[0] < model_num]
+    buf = ExampleBuffer(positions, samples_per_game=samples_per_game)
     files = []
     for _, model in sorted(models, reverse=True):
         local_model_dir = os.path.join(local_dir, model)
         if not tf.gfile.Exists(local_model_dir):
             print("Rsyncing", model)
-            _rsync_dir(os.path.join(
-                game_dir, model), local_model_dir)
+            _rsync_dir(os.path.join(game_dir, model), local_model_dir)
         files.extend(tf.gfile.Glob(os.path.join(local_model_dir, '*.zz')))
+        print("{}: {} games".format(model, len(files)))
         if len(files) * samples_per_game > positions:
             break
 
     print("Filling from {} files".format(len(files)))
 
-    buf.parallel_fill(files, threads=threads,
-                      samples_per_game=samples_per_game)
+    buf.parallel_fill(files, threads=threads)
     print(buf)
     output = os.path.join(output_dir, str(model_num) + '.tfrecord.zz')
     print("Writing to", output)

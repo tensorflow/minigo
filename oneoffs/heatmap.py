@@ -14,24 +14,20 @@ import os
 
 import numpy as np
 import tensorflow as tf
+from absl import app, flags
 from tqdm import tqdm
 
 import go
+import fsdb
 import oneoff_utils
 
 
-tf.app.flags.DEFINE_string(
-    "sgf_dir", "sgf/baduk_db/", "Path to directory of sgf to analyze")
+flags.DEFINE_string("sgf_dir", "sgf/baduk_db/", "sgf database.")
+flags.DEFINE_string("data_dir", "data/eval", "Where to save data.")
+flags.DEFINE_integer("idx_start", 150, "Only take models after given idx.")
+flags.DEFINE_integer("eval_every", 5, "Eval every k models.")
 
-tf.app.flags.DEFINE_string("model_dir", "saved_models",
-                           "Where the model files are saved")
-tf.app.flags.DEFINE_string("data_dir", "data/eval", "Where to save data")
-tf.app.flags.DEFINE_integer("idx_start", 150,
-                            "Only take models after given idx")
-tf.app.flags.DEFINE_integer("eval_every", 5,
-                            "Eval every k models to generate the curve")
-
-FLAGS = tf.app.flags.FLAGS
+FLAGS = flags.FLAGS
 
 
 def eval_policy(eval_positions):
@@ -44,7 +40,7 @@ def eval_policy(eval_positions):
     Policy network outputs (19x19) are saved in flat order (see coord.from_flat)
     """
 
-    model_paths = oneoff_utils.get_model_paths(FLAGS.model_dir)
+    model_paths = oneoff_utils.get_model_paths(fsdb.models_dir())
 
     idx_start = FLAGS.idx_start
     eval_every = FLAGS.eval_every
@@ -100,4 +96,4 @@ def main(unusedargv):
 
 
 if __name__ == "__main__":
-    tf.app.run(main)
+    app.run(main)

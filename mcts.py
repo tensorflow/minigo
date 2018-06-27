@@ -31,7 +31,7 @@ import go
 flags.DEFINE_integer('max_game_length', int(go.N ** 2 * 1.4),
                      'Move number at which game is forcibly terminated')
 
-flags.DEFINE_float('c_puct', 1.38,
+flags.DEFINE_float('c_puct', 0.96,
                    'Exploration constant balancing priors vs. value net output.')
 
 flags.DEFINE_float('dirichlet_noise_alpha', 0.03 * 361 / (go.N ** 2),

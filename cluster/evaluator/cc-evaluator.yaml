@@ -25,7 +25,7 @@ spec:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /etc/credentials/service-account.json
         - name: SGF_BUCKET_NAME
-          value: tensor-go-minigo-cross-evals
+          value: $BUCKET_NAME
         - name: MODEL_WHITE
           value: $MODEL_WHITE
         - name: MODEL_BLACK
