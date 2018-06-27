@@ -209,9 +209,12 @@ def model_fn(features, labels, mode, params=None):
             logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
-    l2_cost = FLAGS.l2_strength * tf.add_n([
-        tf.nn.l2_loss(v)
-        for v in tf.trainable_variables() if not 'bias' in v.name])
+    # TODO(sethtroisi) Add 'beta' to reg_vars
+    reg_vars = [v for v in tf.trainable_variables()
+                if not 'bias' in v.name]
+
+    l2_cost = FLAGS.l2_strength * \
+        tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
     combined_cost = policy_cost + value_cost + l2_cost
     learning_rate = tf.train.piecewise_constant(
         global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
@@ -309,12 +312,21 @@ def model_inference_fn(features, training):
 
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
-        momentum=.997, epsilon=1e-5, fused=True, center=True, scale=True,
+        axis=-1,
+        momentum=.997,
+        epsilon=1e-5,
+        center=True,
+        scale=True,
+        fused=True,
         training=training)
 
     my_conv2d = functools.partial(
         tf.layers.conv2d,
-        filters=FLAGS.conv_width, kernel_size=[3, 3], padding="same")
+        filters=FLAGS.conv_width,
+        kernel_size=3,
+        padding="same",
+        data_format="channels_last",
+        use_bias=True)
 
     def my_res_layer(inputs):
         int_layer1 = my_batchn(my_conv2d(inputs))
@@ -331,19 +343,18 @@ def model_inference_fn(features, training):
         shared_output = my_res_layer(shared_output)
 
     # policy head
-    policy_conv = tf.nn.relu(my_batchn(
-        my_conv2d(shared_output, filters=2, kernel_size=[1, 1]),
-        center=False, scale=False))
+    policy_conv = my_conv2d(shared_output, filters=2, kernel_size=1)
+    policy_conv = tf.nn.relu(my_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
-        tf.reshape(policy_conv, [-1, go.N * go.N * 2]),
+        tf.reshape(policy_conv, [-1, 2 * go.N * go.N]),
         go.N * go.N + 1)
 
     policy_output = tf.nn.softmax(logits, name='policy_output')
 
     # value head
-    value_conv = tf.nn.relu(my_batchn(
-        my_conv2d(shared_output, filters=1, kernel_size=[1, 1]),
-        center=False, scale=False))
+    value_conv = my_conv2d(shared_output, filters=1, kernel_size=1)
+    value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
+
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
         tf.reshape(value_conv, [-1, go.N * go.N]),
         FLAGS.fc_width))
