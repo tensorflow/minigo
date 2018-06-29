@@ -255,86 +255,43 @@ def main():
     stub = inference_service_pb2_grpc.InferenceServiceStub(channel)
 
 
-    while True:
-        A = time.time()
-
-        N = FLAGS.batch_size * go.N * go.N * features_lib.NEW_FEATURES_PLANES
-        f = []
-        features_response = stub.GetFeatures(
-            inference_service_pb2.GetFeaturesRequest())
-
-        B = time.time()
-
-        all_features = features_response.byte_features
-
-        C = time.time()
-
-        for i in range(8):
-            begin = i * N
-            end = begin + N
-            x = np.frombuffer(all_features, dtype=np.int8, count=N, offset=begin)
-            x = x.reshape(
-                [FLAGS.batch_size, go.N, go.N, features_lib.NEW_FEATURES_PLANES])
-            f.append(x)
-
-        D = time.time()
-
-        outputs = sess.run(replicate_outputs, {tuple(features_list): f})
-
-        E = time.time()
-
-        flattened_policy_outputs = [x[0].reshape(-1) for x in outputs]
-        flattened_value_outputs = [x[1].reshape(-1) for x in outputs]
-
-        F = time.time()
-
-        put_outputs_request = inference_service_pb2.PutOutputsRequest(
-             batch_id=features_response.batch_id,
-             policy=np.concatenate(flattened_policy_outputs),
-             value=np.concatenate(flattened_value_outputs))
-
-        G = time.time()
-
-        stub.PutOutputs(put_outputs_request)
-
-        H = time.time()
-
-        print("%.3f  %.3f  %.3F  %.3f  %.3f  %.3f  %.3f" %
-              (B-A, C-B, D-C, E-D, F-E, G-F, H-G))
-
-    """
-    print("running inference")
-    def LOOP(i):
-        features = features_list[i]
-        policy_output = policy_output_list[i]
-        value_output = value_output_list[i]
+    def Loop():
         while True:
+            N = FLAGS.batch_size * go.N * go.N * features_lib.NEW_FEATURES_PLANES
+            f = []
             features_response = stub.GetFeatures(
                 inference_service_pb2.GetFeaturesRequest())
-            f = np.array(features_response.features)
-            f = f.reshape(
-                [FLAGS.batch_size, go.N, go.N, features_lib.NEW_FEATURES_PLANES])
 
-            outputs = sess.run(
-                {'policy_output': policy_output, 'value_output': value_output},
-                {features: f})
+            all_features = features_response.byte_features
+
+            for i in range(8):
+                begin = i * N
+                end = begin + N
+                x = np.frombuffer(all_features, dtype=np.int8, count=N, offset=begin)
+                x = x.reshape(
+                    [FLAGS.batch_size, go.N, go.N, features_lib.NEW_FEATURES_PLANES])
+                f.append(x)
+
+            outputs = sess.run(replicate_outputs, {tuple(features_list): f})
+
+            flattened_policy_outputs = [x[0].reshape(-1) for x in outputs]
+            flattened_value_outputs = [x[1].reshape(-1) for x in outputs]
 
             put_outputs_request = inference_service_pb2.PutOutputsRequest(
                  batch_id=features_response.batch_id,
-                 policy=outputs['policy_output'].reshape(-1),
-                 value=outputs['value_output'].reshape(-1))
+                 policy=np.concatenate(flattened_policy_outputs),
+                 value=np.concatenate(flattened_value_outputs))
 
             stub.PutOutputs(put_outputs_request)
 
-    threads = []
-    for i in range(8):
-        threads.append(threading.Thread(target=LOOP, args=[i]))
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    """
 
+    num_threads = 2
+    threads = []
+    for i in range(num_threads):
+        threads.append(threading.Thread(target=Loop))
+        threads[i].start()
+    for i in range(num_threads):
+        threads[i].join()
 
     print("shutting down TPU")
     sess.run(tpu_shutdown)

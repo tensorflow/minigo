@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <unistd.h>
+#include <stdio.h>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -21,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/base/thread_annotations.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -28,6 +30,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "cc/check.h"
@@ -85,7 +88,7 @@ DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
 DEFINE_int32(batch_size, 8,
              "Number of readouts to run inference on in parallel.");
-DEFINE_int32(remote_batch_size, 32, "");
+DEFINE_int32(remote_batch_size, 128, "");
 DEFINE_int32(parallel_games, 32, "");
 DEFINE_int32(
     ponder_limit, 0,
@@ -105,6 +108,8 @@ DEFINE_double(
 DEFINE_double(decay_factor, 0.98,
               "If time_limit is non-zero, the decay factor used to shorten the "
               "amount of time spent thinking as the game progresses.");
+DEFINE_bool(run_forever, false,
+            "When running 'selfplay' mode, whether to run forever.");
 
 DEFINE_string(mode, "", "Mode to run in: \"selfplay\", \"eval\" or \"gtp\"");
 
@@ -126,18 +131,43 @@ class PlayerFactory {
   PlayerFactory(const MctsPlayer::Options& options, float disable_resign_pct)
       : options_(options),
         disable_resign_pct_(disable_resign_pct) {
-  virtual ~PlayerFactory() = default;
+    inference_worker_thread_ = std::thread([]() {
+      std::vector<std::string> cmd_parts = {
+        "BOARD_SIZE=19",
+        "python",
+        "inference_worker.py",
+        "--model=gs://jacksona-sandbox/models/k256-50c/model.ckpt-48800",
+        "--use_tpu=true",
+        "--tpu_name=grpc://10.240.2.2:8470",
+        "--conv_width=256",
+        "--batch_size=16",
+      };
+      auto cmd = absl::StrJoin(cmd_parts, " ");
+      FILE* f = popen(cmd.c_str(), "r");
+      while (!feof(f)) {
+        char buf[128];
+        auto bytes_read = fread(buf, 1, sizeof(buf) - 1, f);
+        buf[bytes_read] = '\0';
+        fprintf(stderr, buf);
+      }
+      fprintf(stderr, "\n");
+    });
+  }
 
-  virtual std::unique_ptr<MctsPlayer> New(const MctsPlayerOptions& options) = 0;
+  virtual ~PlayerFactory() {
+    inference_worker_thread_.join();
+  }
+
+  virtual std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) = 0;
 
   float rnd() {
     absl::MutexLock lock(&mutex_);
     return rnd_();
   }
 
-  MctsPlayerOptions default_options() const {
+  MctsPlayer::Options default_options() {
     auto options = options_;
-    if (rnd() < disble_resign_pct_) {
+    if (rnd() < disable_resign_pct_) {
       options.resign_threshold = -1;
     }
     return options;
@@ -147,18 +177,22 @@ class PlayerFactory {
   absl::Mutex mutex_;
   Random rnd_ GUARDED_BY(&mutex_);
 
-  const MctsPlayerOptions options_;
+  const MctsPlayer::Options options_;
   const float disable_resign_pct_;
+  std::thread inference_worker_thread_;
 };
 
 class RemotePlayerFactory : public PlayerFactory {
  public:
-  RemotePlayerFactory(int game_batch_size, int inference_batch_size, int port) {
+  RemotePlayerFactory(const MctsPlayer::Options& options,
+                      float disable_resign_pct,
+                      int game_batch_size, int inference_batch_size, int port)
+      : PlayerFactory(options, disable_resign_pct) {
     server_ = absl::make_unique<InferenceServer>(
         game_batch_size, inference_batch_size, port);
   }
 
-  std::unique_ptr<MctsPlayer> New(const MctsPlayerOptions& options) override {
+  std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
     return absl::make_unique<MctsPlayer>(server_->NewDualNet(), options);
   }
 
@@ -167,10 +201,12 @@ class RemotePlayerFactory : public PlayerFactory {
 
 class LocalPlayerFactory : public PlayerFactory {
  public:
-  explicit LocalPlayerFactory(std::string model_path)
-      : model_path_(std::move(model_path)) {}
+  LocalPlayerFactory(const MctsPlayer::Options& options,
+                     float disable_resign_pct, std::string model_path)
+      : PlayerFactory(options, disable_resign_pct),
+        model_path_(std::move(model_path)) {}
 
-  std::unique_ptr<MctsPlayer> New(const MctsPlayerOptions& options) override {
+  std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
     return absl::make_unique<MctsPlayer>(
         absl::make_unique<TfDualNet>(model_path_), options);
   }
@@ -179,17 +215,8 @@ class LocalPlayerFactory : public PlayerFactory {
   const std::string model_path_;
 };
 
-struct GameInfo {
-  std::string player_b;
-  std::string player_w;
-  std::string result_string;
-  float result;
-  MctsPlayer::Options options;
-  std::vector<MctsPlayer::History> history;
-};
-
-std::string GetOutputName(size_t i) {
-  auto timestamp = absl::ToUnixSeconds(absl::Now());
+std::string GetOutputName(absl::Time now, size_t i) {
+  auto timestamp = absl::ToUnixSeconds(now);
   std::string output_name;
   char hostname[64];
   if (gethostname(hostname, sizeof(hostname)) != 0) {
@@ -198,21 +225,26 @@ std::string GetOutputName(size_t i) {
   return absl::StrCat(timestamp, "-", hostname, "-", i);
 }
 
+std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
+  auto sub_dirs = absl::FormatTime("%Y/%m/%d/%H", now, absl::UTCTimeZone());
+  return file::JoinPath(root_dir, sub_dirs);
+}
+
 void WriteExample(const std::string& output_dir, const std::string& output_name,
-                  const GameInfo& info) {
+                  const MctsPlayer& player) {
   MG_CHECK(file::RecursivelyCreateDir(output_dir));
 
   // Write the TensorFlow examples.
   std::vector<tensorflow::Example> examples;
-  examples.reserve(info.history.size());
+  examples.reserve(player.history().size());
   DualNet::BoardFeatures features;
   std::vector<const Position::Stones*> recent_positions;
-  for (const auto& h : info.history) {
+  for (const auto& h : player.history()) {
     h.node->GetMoveHistory(DualNet::kMoveHistory, &recent_positions);
     DualNet::SetFeatures(recent_positions, h.node->position.to_play(),
                          &features);
     examples.push_back(
-        tf_utils::MakeTfExample(features, h.search_pi, info.result));
+        tf_utils::MakeTfExample(features, h.search_pi, player.result()));
   }
 
   auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");
@@ -220,27 +252,29 @@ void WriteExample(const std::string& output_dir, const std::string& output_name,
 }
 
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
-              const GameInfo& info, bool write_comments) {
+              const MctsPlayer& player_b, const MctsPlayer& player_w,
+              bool write_comments) {
   MG_CHECK(file::RecursivelyCreateDir(output_dir));
+  MG_CHECK(player_b.history().size() == player_w.history().size());
 
-  bool log_names = info.player_b != info.player_w;
+  bool log_names = player_b.name() != player_w.name();
 
   std::vector<sgf::MoveWithComment> moves;
-  moves.reserve(info.history.size());
+  moves.reserve(player_b.history().size());
 
-  for (size_t i = 0; i < info.history.size(); ++i) {
-    const auto& h = info.history[i];
+  for (size_t i = 0; i < player_b.history().size(); ++i) {
+    const auto& h = i % 2 == 0 ? player_b.history()[i] : player_w.history()[i];
     const auto& color = h.node->position.to_play();
     std::string comment;
     if (write_comments) {
       if (i == 0) {
         comment = absl::StrCat(
-            "Resign Threshold: ", info.options.resign_threshold, "\n",
+            "Resign Threshold: ", player_b.options().resign_threshold, "\n",
             h.comment);
       } else {
         if (log_names) {
-          const auto& player = i % 2 == 0 ? info.player_b : info.player_w;
-          comment = absl::StrCat(player, "\n", h.comment);
+          comment = absl::StrCat(i % 2 == 0 ? player_b.name() : player_w.name(),
+                                 "\n", h.comment);
         } else {
           comment = h.comment;
         }
@@ -253,14 +287,19 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
 
   std::string player_name(file::Basename(FLAGS_model));
   sgf::CreateSgfOptions options;
-  options.komi = info.options.komi;
-  options.result = info.result_string;
-  options.black_name = info.player_b;
-  options.white_name = info.player_w;
+  options.komi = player_b.options().komi;
+  options.result = player_b.result_string();
+  options.black_name = player_b.name();
+  options.white_name = player_w.name();
   auto sgf_str = sgf::CreateSgfString(moves, options);
 
   auto output_path = file::JoinPath(output_dir, output_name + ".sgf");
   TF_CHECK_OK(tf_utils::WriteFile(output_path, sgf_str));
+}
+
+void WriteSgf(const std::string& output_dir, const std::string& output_name,
+              const MctsPlayer& player, bool write_comments) {
+  WriteSgf(output_dir, output_name, player, player, write_comments);
 }
 
 void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
@@ -277,73 +316,69 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->decay_factor = FLAGS_decay_factor;
 }
 
-std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory) {
-   bool is_holdout = rnd() < FLAGS_holdout_pct;
-   options.verbose = i == 0;
+std::unique_ptr<PlayerFactory> GetPlayerFactory() {
+  MctsPlayer::Options default_options;
+  ParseMctsPlayerOptionsFromFlags(&default_options);
+  if (FLAGS_model == "remote") {
+    return absl::make_unique<RemotePlayerFactory>(
+        default_options, FLAGS_disable_resign_pct, FLAGS_batch_size,
+        FLAGS_remote_batch_size, FLAGS_port);
+  } else {
+    return absl::make_unique<LocalPlayerFactory>(
+        default_options, FLAGS_disable_resign_pct, FLAGS_model);
+  }
+}
 
-  // Convert the unique_ptr to a shared_ptr so we can capture it by value (we're
-  // targeting C++11, which doesn't support generalized lambda capture).
-  std::shared_ptr<MctsPlayer> player(std::move(p));
-  return std::thread([thread_id, player, is_holdout]() mutable {
-    auto start_time = absl::Now();
+std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory,
+                           bool run_forever) {
+  return std::thread([thread_id, player_factory, run_forever]() {
+    do {
+      // Create a new player.
+      auto options = player_factory->default_options();
+      options.verbose = thread_id == 0;
+      auto player = player_factory->New(options);
 
-    while (!player->game_over()) {
-      auto move = player->SuggestMove();
-      if (player->options().verbose) {
-        std::cerr << player->root()->position.ToPrettyString();
-        std::cerr << player->root()->Describe() << std::endl;
+      // Play the game.
+      auto start_time = absl::Now();
+      while (!player->game_over()) {
+        auto move = player->SuggestMove();
+        if (player->options().verbose) {
+          std::cerr << player->root()->Describe() << std::endl;
+          std::cerr << player->root()->position.ToPrettyString();
+        }
+        player->PlayMove(move);
       }
-      player->PlayMove(move);
-    }
+      std::cerr << player->result_string() << std::endl;
+      std::cout << "Playing game: "
+                << absl::ToDoubleSeconds(absl::Now() - start_time) << std::endl;
 
-    std::cerr << player->result_string() << std::endl;
-    std::cout << "Playing game: "
-              << absl::ToDoubleSeconds(absl::Now() - start_time) << std::endl;
+      // Write the outputs.
+      auto now = absl::Now();
+      auto output_name = GetOutputName(now, thread_id);
 
-    auto output_name = GetOutputName(thread_id);
-    auto output_dir = is_holdout ? FLAGS_holdout_dir : FLAGS_output_dir;
+      bool is_holdout = player_factory->rnd() < FLAGS_holdout_pct;
+      auto example_dir = is_holdout ? FLAGS_holdout_dir : FLAGS_output_dir;
+      if (!example_dir.empty()) {
+        WriteExample(GetOutputDir(now, example_dir), output_name, *player);
+      }
 
-    GameInfo info;
-    info.player_b = player->name();
-    info.player_w = player->name();
-    info.result_string = player->result_string();
-    info.result = player->result();
-    info.options = player->options();
-    info.history = player->history();
-
-    if (!output_dir.empty()) {
-      WriteExample(output_dir, output_name, info);
-    }
-
-    if (!FLAGS_sgf_dir.empty()) {
-      WriteSgf(file::JoinPath(FLAGS_sgf_dir, "clean"), output_name, info,
-               false);
-      WriteSgf(file::JoinPath(FLAGS_sgf_dir, "full"), output_name, info, true);
-    }
+      if (!FLAGS_sgf_dir.empty()) {
+        WriteSgf(GetOutputDir(now, file::JoinPath(FLAGS_sgf_dir, "clean")),
+                 output_name, *player, false);
+        WriteSgf(GetOutputDir(now, file::JoinPath(FLAGS_sgf_dir, "full")),
+                 output_name, *player, true);
+      }
+    } while (run_forever);
   });
 }
 
 void SelfPlay() {
-  MctsPlayer::Options options;
-  ParseMctsPlayerOptionsFromFlags(&options);
-  Random rnd;
-  if (rnd() < FLAGS_disable_resign_pct) {
-    options.resign_threshold = -1;
-  }
-
-  std::unique_ptr<PlayerFactory> player_factory;
-  if (FLAGS_model == "remote") {
-    player_factory = absl::make_unique<RemotePlayerFactory>(
-        FLAGS_batch_size, FLAGS_remote_batch_size, FLAGS_port);
-  } else {
-    player_factory = absl::make_unique<LocalPlayerFactory>(FLAGS_model);
-  }
-
+  auto player_factory = GetPlayerFactory();
   std::vector<std::thread> threads;
   for (int i = 0; i < FLAGS_parallel_games; ++i) {
-    threads.push_back(SelfPlayThread(i, player_factory.get()));
+    threads.push_back(
+        SelfPlayThread(i, player_factory.get(), FLAGS_run_forever));
   }
-
   for (auto& t : threads) {
     t.join();
   }
@@ -379,27 +414,13 @@ void Eval() {
   }
   std::cerr << "Black was: " << player->name() << "\n";
 
-  std::string output_name =
-      absl::StrCat(GetOutputName(0), "-", player->name(), other_player->name());
-
-  GameInfo info;
-  info.player_b = player->name();
-  info.player_w = other_player->name();
-  info.result_string = player->result_string();
-  info.result = player->result();
-  info.options = player->options();
-
-  // Interleave the two player's histories so we get comments for every move.
-  MG_CHECK(player->history().size() == other_player->history().size());
-  const auto& h0 = player->history();
-  const auto& h1 = other_player->history();
-  for (size_t i = 0; i < h0.size(); ++i) {
-    info.history.push_back(i % 2 == 0 ? h0[i] : h1[i]);
-  }
+  std::string output_name = absl::StrCat(
+      GetOutputName(absl::Now(), 0), "-", player->name(), "-",
+      other_player->name());
 
   // Write SGF.
   if (!FLAGS_sgf_dir.empty()) {
-    WriteSgf(FLAGS_sgf_dir, output_name, info, true);
+    WriteSgf(FLAGS_sgf_dir, output_name, *player, *other_player, true);
   }
 }
 

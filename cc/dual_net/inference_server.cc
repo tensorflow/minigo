@@ -54,7 +54,6 @@ class InferenceServiceImpl final : public InferenceService::Service {
 
   Status GetConfig(ServerContext* context, const GetConfigRequest* request,
                    GetConfigResponse* response) override {
-    std::cerr << "### GetConfig" << std::endl;
     response->set_board_size(kN);
     response->set_batch_size(inference_batch_size_);
     return Status::OK;
@@ -65,6 +64,8 @@ class InferenceServiceImpl final : public InferenceService::Service {
     std::vector<RemoteInference> game_batches;
 
     {
+      // std::cerr << absl::Now() << " START GetFeatures\n";
+
       // Lock get_features_mutex_ while popping inference requests off the
       // request_queue_: we want make sure that each request fills up as much
       // of a batch as possible. If multiple threads all popped inference
@@ -123,11 +124,14 @@ class InferenceServiceImpl final : public InferenceService::Service {
       pending_inferences_[response->batch_id()] = std::move(game_batches);
     }
 
+    // std::cerr << absl::Now() << " DONE  GetFeatures\n";
+
     return Status::OK;
   }
 
   Status PutOutputs(ServerContext* context, const PutOutputsRequest* request,
                     PutOutputsResponse* response) override {
+    // std::cerr << absl::Now() << " START PutOutputs\n";
     std::vector<RemoteInference> game_batches;
     {
       // std::cerr << "### PutOutputs" << std::endl;
@@ -161,6 +165,8 @@ class InferenceServiceImpl final : public InferenceService::Service {
       game_batch.notification->Notify();
     }
 
+    // std::cerr << absl::Now() << " DONE  PutOutputs\n";
+
     return Status::OK;
   }
 
@@ -172,7 +178,7 @@ class InferenceServiceImpl final : public InferenceService::Service {
   const size_t inference_batch_size_;
 
   std::atomic<int32_t> batch_id_{1};
-  std::atomic<int> num_clients_{0};
+  std::atomic<size_t> num_clients_{0};
 
   // After successfully popping the first request off request_queue, GetFeatures
   // will wait for up to the batch_timeout_ for more inference requests before

@@ -325,8 +325,10 @@ minigo_cc_binary(
         "//cc/dual_net:tf_dual_net",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
     ],
 )

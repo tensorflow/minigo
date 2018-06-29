@@ -100,6 +100,8 @@ void MctsPlayer::NewGame() {
 }
 
 Coord MctsPlayer::SuggestMove() {
+  auto start = absl::Now();
+
   std::array<float, kNumMoves> noise;
   if (options_.inject_noise) {
     // In order to be able to inject noise into the root node, we need to first
@@ -115,7 +117,6 @@ Coord MctsPlayer::SuggestMove() {
   }
   int current_readouts = root_->N();
 
-  auto start = absl::Now();
   if (options_.seconds_per_move > 0) {
     // Use time to limit the number of reads.
     float seconds_per_move = options_.seconds_per_move;
