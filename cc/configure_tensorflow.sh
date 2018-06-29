@@ -28,20 +28,20 @@ git checkout "${commit_tag}"
 # Run the TensorFlow configuration script, setting reasonable values for most
 # of the options.
 echo "Configuring tensorflow"
-CC_OPT_FLAGS="-march=ivybridge" \
-TF_NEED_JEMALLOC=1 \
-TF_NEED_GCP=1 \
-TF_NEED_HDFS=0 \
-TF_NEED_S3=0 \
-TF_NEED_KAFKA=0 \
-TF_NEED_CUDA=1 \
-TF_NEED_GDR=0 \
-TF_NEED_VERBS=0 \
-TF_NEED_OPENCL_SYCL=0 \
-TF_CUDA_CLANG=0 \
-TF_NEED_TENSORRT=0 \
-TF_NEED_MPI=0 \
-TF_SET_ANDROID_WORKSPACE=0 \
+CC_OPT_FLAGS=${CC_OPT_FLAGS:--march=ivybridge} \
+TF_NEED_JEMALLOC=${TF_NEED_JEMALLOC:-1} \
+TF_NEED_GCP=${TF_NEED_GCP:-1} \
+TF_NEED_HDFS=${TF_NEED_HDFS:-0} \
+TF_NEED_S3=${TF_NEED_S3:-0} \
+TF_NEED_KAFKA=${TF_NEED_KAFKA:-0} \
+TF_NEED_CUDA=${TF_NEED_CUDA:-1} \
+TF_NEED_GDR=${TF_NEED_GDR:-0} \
+TF_NEED_VERBS=${TF_NEED_VERBS:-0} \
+TF_NEED_OPENCL_SYCL=${TF_NEED_OPENCL_SYCL:-0} \
+TF_CUDA_CLANG=${TF_CUDA_CLANG:-0} \
+TF_NEED_TENSORRT=${TF_NEED_TENSORRT:-0} \
+TF_NEED_MPI=${TF_NEED_MPI:-0} \
+TF_SET_ANDROID_WORKSPACE=${TF_SET_ANDROID_WORKSPACE:-0} \
 ./configure
 
 echo "Building tensorflow package"

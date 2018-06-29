@@ -40,22 +40,30 @@ class InferenceServiceServicer(object):
   """
 
   def GetConfig(self, request, context):
-    # missing associated documentation comment in .proto file
-    pass
+    """Called by the inference worker to get the server's configuration.
+    """
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
   def GetFeatures(self, request, context):
-    # missing associated documentation comment in .proto file
-    pass
+    """Called by the inference worker to fetch the next batch of features to
+    run. The returned batch is of fixed size, GetConfigResponse.batch_size.
+    If there aren't enough inference requests pending to fill a batch, the
+    batch is padded with zeros.
+    The response is tagged with a batch ID. The same batch ID should be set
+    in the PutOutputResquest that sends the inference output back to the
+    server,
+    """
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
   def PutOutputs(self, request, context):
-    # missing associated documentation comment in .proto file
-    pass
+    """Called by the inference worker to write back the inference outputs.
+    The batch ID in the PutOutputRequest must match the ID from the previous
+    call to GetFeaturesRequest.
+    """
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')

@@ -15,31 +15,36 @@
 #ifndef CC_DUAL_NET_INFERENCE_SERVER_H_
 #define CC_DUAL_NET_INFERENCE_SERVER_H_
 
+#include <atomic>
 #include <memory>
 #include <thread>
 
-#include "absl/synchronization/blocking_counter.h"
+#include "absl/synchronization/notification.h"
 #include "cc/dual_net/dual_net.h"
 #include "cc/thread_safe_queue.h"
 #include "grpc++/server.h"
 
 namespace minigo {
 
-// A single inference request.
+namespace internal {
+class InferenceServiceImpl;
+}  // namespace internal
+
+// A batch of inference requests.
 struct RemoteInference {
-  // The features to run inference on.
-  const DualNet::BoardFeatures* features;
+  // A batch of features to run inference on.
+  absl::Span<const DualNet::BoardFeatures> features;
 
-  // Inference output.
-  DualNet::Output* output;
+  // Inference output for the batch.
+  absl::Span<DualNet::Output> outputs;
 
-  // Decremented when the inference output is available.
-  absl::BlockingCounter* counter;
+  // Notified when the batch is ready.
+  absl::Notification* notification;
 };
 
 class InferenceServer {
  public:
-  explicit InferenceServer(int port);
+  InferenceServer(int max_game_batch_size, int inference_batch_size, int port);
   ~InferenceServer();
 
   // Return a new DualNet instance whose inference requests are performed
@@ -49,9 +54,8 @@ class InferenceServer {
  private:
   std::thread thread_;
   // request_queue_ is owned by the service_ implementation.
-  ThreadSafeQueue<RemoteInference>* request_queue_;
   std::unique_ptr<grpc::Server> server_;
-  std::unique_ptr<grpc::Service> service_;
+  std::unique_ptr<internal::InferenceServiceImpl> service_;
 };
 
 }  // namespace minigo

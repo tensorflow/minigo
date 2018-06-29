@@ -25,6 +25,8 @@ import tensorflow as tf
 from tensorflow.python.framework import dtypes
 from tensorflow.contrib.proto.python.ops import decode_proto_op
 from tensorflow.contrib.proto.python.ops import encode_proto_op
+import threading
+import numpy as np
 from absl import flags
 import grpc
 from proto import inference_service_pb2
@@ -34,29 +36,25 @@ import features as features_lib
 import go
 
 flags.DEFINE_string("model", "", "Path to the TensorFlow model.")
-flags.DEFINE_string("address", "localhost:50051", "Inference server address.")
+flags.DEFINE_string("local_address", "localhost:50051",
+                    "Inference server local address.")
+flags.DEFINE_string("remote_address", "10.128.0.2:50051",
+                    "Inference server remote address.")
 flags.DEFINE_string("descriptor",
                     "proto/inference_service_py_pb2.pb.descriptor_set",
                     "Path to the InferenceService proto descriptor.")
+flags.DEFINE_integer("batch_size", 8, "Batch size.")
 
 FLAGS = flags.FLAGS
 
 
-class InferenceWorkerConfig(object):
-    """Configuration data for the inference worker."""
-
-    def __init__(self, address, get_features_method, put_outputs_method,
-                 batch_size, descriptor_path):
-        self.address = address
-        self.get_features_method = get_features_method
-        self.put_outputs_method = put_outputs_method
-        self.batch_size = batch_size
-        self.descriptor_path = descriptor_path
-
+GRPC_OPTIONS = [
+    ("grpc.max_message_length", 50 *  1024 * 1024),
+    ("grpc.max_receive_message_length", 50 *  1024 * 1024),
+]
 
 def get_server_config():
     """Connects to the inference server and fetches its configuration.
-
     Returns:
         Server's configuration as a inference_service_pb2.GetConfigResponse
         proto.
@@ -64,40 +62,43 @@ def get_server_config():
     while True:
         try:
             # Fetch the server config, used to set batch size.
-            channel = grpc.insecure_channel(FLAGS.address)
+            channel = grpc.insecure_channel(FLAGS.local_address)
             stub = inference_service_pb2_grpc.InferenceServiceStub(channel)
             return stub.GetConfig(inference_service_pb2.GetConfigRequest())
-        except Exception:  # pylint: disable=broad-except
+        except grpc.RpcError:
             print("Waiting for server")
             time.sleep(1)
 
 
-def wrapped_model_inference_fn(config):
-    """Wraps dual_net.model_inference_fn in a loop & RPC ops.
+def const_model_inference_fn(features):
+    def custom_getter(getter, name, *args, **kwargs):
+        with tf.control_dependencies(None):
+            return tf.guarantee_const(
+                getter(name, *args, **kwargs), name=name+"/GuaranteeConst")
+    with tf.variable_scope("", custom_getter=custom_getter):
+        return dual_net.model_inference_fn(features, False)
 
+
+def wrapped_model_inference_fn():
+    """Wraps dual_net.model_inference_fn in a loop & RPC ops.
     The loop runs forever: the top of the loop issues a GetFeatures RPC to
     fetch input features, the bottom of the loop isses a PutOutputs RPC to
     write the inference output back to the server.
-
-    Args:
-        config: InferenceWorkerConfig.
 
     Returns:
         A tensor op that drives the model's infinite loop.
     """
 
-    value_output_size = config.batch_size
-    policy_output_size = config.batch_size * (go.N * go.N + 1)
+    value_output_size = FLAGS.batch_size
+    policy_output_size = FLAGS.batch_size * (go.N * go.N + 1)
 
     def loop_condition(a, unused_b):
         """Loop condition for the tf.while_loop op.
-
         Args:
             a: a constant 0
             unused_b: a string placeholder (to satisfy the requirement that a
                       while_loop's condition and body accept the same args as
                       the loop returns).
-
         Returns:
             A TensorFlow subgraph that returns true.
         """
@@ -109,21 +110,19 @@ def wrapped_model_inference_fn(config):
 
     def loop_body(a, unused_b):
         """Loop body for the tf.while_loop op.
-
         Args:
             a: a constant 0
             unused_b: a string placeholder (to satisfy the requirement that a
                       while_loop's condition and body accept the same args as
                       the loop returns).
-
         Returns:
             A TensorFlow subgraph.
         """
 
         # Request features features.
         raw_response = tf.contrib.rpc.rpc(
-            address=config.address,
-            method=config.get_features_method,
+            address=FLAGS.remote_address,
+            method="/minigo.InferenceService/GetFeatures",
             request="",
             protocol="grpc",
             fail_fast=True,
@@ -136,8 +135,8 @@ def wrapped_model_inference_fn(config):
             message_type='minigo.GetFeaturesResponse',
             field_names=['batch_id', 'features'],
             output_types=[dtypes.int32, dtypes.float32],
-            descriptor_source=config.descriptor_path,
-            name="decode_raw_features")
+            descriptor_source=FLAGS.descriptor,
+            name="decode_raw_features_response")
 
         # Reshape flat features.
         features = tf.reshape(
@@ -145,8 +144,7 @@ def wrapped_model_inference_fn(config):
             name="unflatten_features")
 
         # Run inference.
-        policy_output, value_output, _ = dual_net.model_inference_fn(
-            features, False)
+        policy_output, value_output, _ = const_model_inference_fn(features)
 
         # Flatten model outputs.
         flat_policy = tf.reshape(policy_output, [-1], name="flatten_policy")
@@ -158,22 +156,30 @@ def wrapped_model_inference_fn(config):
             field_names=['batch_id', 'policy', 'value'],
             sizes=[[1, policy_output_size, value_output_size]],
             values=[[batch_id], [flat_policy], [flat_value]],
-            descriptor_source=config.descriptor_path,
+            descriptor_source=FLAGS.descriptor,
             name="encode_outputs")
 
         # Send outputs.
-        response = tf.contrib.rpc.rpc(
-            address=config.address,
-            method=config.put_outputs_method,
+        raw_response = tf.contrib.rpc.rpc(
+            address=FLAGS.remote_address,
+            method="/minigo.InferenceService/GetFeatures",
             request=request_tensors,
             protocol="grpc",
             fail_fast=True,
             timeout_in_ms=0,
             name="put_outputs")
 
-        return a, response[0]
+        _, batch_id = decode_proto_op.decode_proto(
+            bytes=raw_response,
+            message_type='minigo.PutOutputsResponse',
+            field_names=['batch_id'],
+            output_types=[dtypes.int32],
+            descriptor_source=FLAGS.descriptor,
+            name="decode_put_outputs_response")
 
-    loop_vars = [0, ""]
+        return a, tf.reshape(batch_id, (1,))
+
+    loop_vars = [0, tf.constant(0, shape=[1], dtype=dtypes.int32)]
     return tf.while_loop(loop_condition, loop_body, loop_vars,
                          name="inference_worker_loop")
 
@@ -181,30 +187,158 @@ def wrapped_model_inference_fn(config):
 def main():
     """Runs the inference worker."""
 
-    server_config = get_server_config()
-    print("server_config:\n%s" % server_config)
+    tf.logging.set_verbosity(tf.logging.DEBUG)
 
+    server_config = get_server_config()
+    print(server_config)
     if server_config.board_size != go.N:
         raise RuntimeError("Board size mismatch: server=%d, worker=%d" % (
             server_config.board_size, go.N))
+    if server_config.batch_size != 8 * FLAGS.batch_size:
+        raise RuntimeError("Batch size mismatch: server=%d, worker=%d" % (
+            server_config.batch_size, FLAGS.batch_size))
 
-    worker_config = InferenceWorkerConfig(
-        address=FLAGS.address,
-        get_features_method="/minigo.InferenceService/GetFeatures",
-        put_outputs_method="/minigo.InferenceService/PutOutputs",
-        batch_size=server_config.batch_size,
-        descriptor_path=FLAGS.descriptor)
+    tpu_init = tf.contrib.tpu.initialize_system()
+    tpu_shutdown = tf.contrib.tpu.shutdown_system()
 
-    print("building graph")
-    tf_config = tf.ConfigProto()
-    tf_config.gpu_options.allow_growth = True
-    sess = tf.Session(graph=tf.Graph(), config=tf_config)
+    tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver(
+        tpu=[FLAGS.tpu_name]).get_master()
+
+
+    ##################################################
+
+
+    """
+    # sess = tf.Session(tpu_grpc_url, config=tf.ConfigProto(allow_soft_placement=True))
+    sess = tf.Session(tpu_grpc_url)
     with sess.graph.as_default():
-        loop = wrapped_model_inference_fn(worker_config)
+        loop = tf.contrib.tpu.rewrite(wrapped_model_inference_fn, [])
+
         tf.train.Saver().restore(sess, FLAGS.model)
 
-    print("running graph")
-    sess.run(loop)
+    sess.run(tpu_init)
+    outputs = sess.run(loop)
+    """
+
+
+    sess = tf.Session(tpu_grpc_url)
+    features_list = []
+    with sess.graph.as_default():
+        for i in range(8):
+            features = tf.placeholder(
+                tf.float32, [None, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
+                name='pos_tensor')
+            features_list.append((features,))
+
+        replicate_outputs = tf.contrib.tpu.replicate(
+            const_model_inference_fn, features_list)
+
+        tf.train.Saver().restore(sess, FLAGS.model)
+
+    print(replicate_outputs)
+
+    print("initializing tpu")
+    sess.run(tpu_init)
+
+    print("warming up")
+    warm_up = []
+    for i in range(8):
+        warm_up.append(np.random.rand(FLAGS.batch_size, go.N, go.N, features_lib.NEW_FEATURES_PLANES))
+
+    key = tuple(features_list)
+    print("------------------")
+    print(key)
+    print("------------------")
+    outputs = sess.run(replicate_outputs, {key: warm_up})
+
+    channel = grpc.insecure_channel(FLAGS.local_address, GRPC_OPTIONS)
+    stub = inference_service_pb2_grpc.InferenceServiceStub(channel)
+
+
+    while True:
+        A = time.time()
+
+        N = FLAGS.batch_size * go.N * go.N * features_lib.NEW_FEATURES_PLANES
+        f = []
+        features_response = stub.GetFeatures(
+            inference_service_pb2.GetFeaturesRequest())
+
+        B = time.time()
+
+        all_features = features_response.byte_features
+
+        C = time.time()
+
+        for i in range(8):
+            begin = i * N
+            end = begin + N
+            x = np.frombuffer(all_features, dtype=np.int8, count=N, offset=begin)
+            x = x.reshape(
+                [FLAGS.batch_size, go.N, go.N, features_lib.NEW_FEATURES_PLANES])
+            f.append(x)
+
+        D = time.time()
+
+        outputs = sess.run(replicate_outputs, {tuple(features_list): f})
+
+        E = time.time()
+
+        flattened_policy_outputs = [x[0].reshape(-1) for x in outputs]
+        flattened_value_outputs = [x[1].reshape(-1) for x in outputs]
+
+        F = time.time()
+
+        put_outputs_request = inference_service_pb2.PutOutputsRequest(
+             batch_id=features_response.batch_id,
+             policy=np.concatenate(flattened_policy_outputs),
+             value=np.concatenate(flattened_value_outputs))
+
+        G = time.time()
+
+        stub.PutOutputs(put_outputs_request)
+
+        H = time.time()
+
+        print("%.3f  %.3f  %.3F  %.3f  %.3f  %.3f  %.3f" %
+              (B-A, C-B, D-C, E-D, F-E, G-F, H-G))
+
+    """
+    print("running inference")
+    def LOOP(i):
+        features = features_list[i]
+        policy_output = policy_output_list[i]
+        value_output = value_output_list[i]
+        while True:
+            features_response = stub.GetFeatures(
+                inference_service_pb2.GetFeaturesRequest())
+            f = np.array(features_response.features)
+            f = f.reshape(
+                [FLAGS.batch_size, go.N, go.N, features_lib.NEW_FEATURES_PLANES])
+
+            outputs = sess.run(
+                {'policy_output': policy_output, 'value_output': value_output},
+                {features: f})
+
+            put_outputs_request = inference_service_pb2.PutOutputsRequest(
+                 batch_id=features_response.batch_id,
+                 policy=outputs['policy_output'].reshape(-1),
+                 value=outputs['value_output'].reshape(-1))
+
+            stub.PutOutputs(put_outputs_request)
+
+    threads = []
+    for i in range(8):
+        threads.append(threading.Thread(target=LOOP, args=[i]))
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    """
+
+
+    print("shutting down TPU")
+    sess.run(tpu_shutdown)
+    print("all done!")
 
 
 if __name__ == "__main__":

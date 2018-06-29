@@ -48,6 +48,7 @@ class DualNet {
   // Total number of features for the board.
   static constexpr int kNumBoardFeatures = kN * kN * kNumStoneFeatures;
 
+  // TODO(tommadams): Change features type from float to uint8_t.
   using StoneFeatures = std::array<float, kNumStoneFeatures>;
   using BoardFeatures = std::array<float, kNumBoardFeatures>;
 

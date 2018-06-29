@@ -55,6 +55,7 @@ message GetFeaturesRequest {
 message GetFeaturesResponse {
   int32 batch_id = 1;
   repeated float features = 2;
+  bytes byte_features = 3;
 }
 
 message PutOutputsRequest {

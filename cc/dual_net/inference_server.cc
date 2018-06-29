@@ -36,87 +36,91 @@ using grpc::StatusCode;
 
 namespace minigo {
 
-namespace {
+namespace internal {
 
 // Implementation of the InferenceService.
-// The client InferenceServer pushes inference requests onto ServiceImpl's
-// request queue.
-class ServiceImpl final : public InferenceService::Service {
+// The client InferenceServer pushes inference requests onto
+// InferenceServiceImpl's request queue.
+class InferenceServiceImpl final : public InferenceService::Service {
  public:
   // TODO(tommadams): try having the InferenceServer keep track of how many
   // InferenceClients are actively wanting to make inference requests (and their
   // desired batch size). That way it should be possible to know exactly how
   // many inference requests to wait for when batching.
-  ServiceImpl()
-      : batch_size_(8),
-        batch_id_(1),
-        batch_timeout_(absl::Microseconds(1000)) {}
+  InferenceServiceImpl(int max_game_batch_size, int inference_batch_size)
+      : max_game_batch_size_(max_game_batch_size),
+        inference_batch_size_(inference_batch_size),
+        batch_id_(1) {}
 
   Status GetConfig(ServerContext* context, const GetConfigRequest* request,
                    GetConfigResponse* response) override {
+    std::cerr << "### GetConfig" << std::endl;
     response->set_board_size(kN);
-    response->set_batch_size(batch_size_);
+    response->set_batch_size(inference_batch_size_);
     return Status::OK;
   }
 
   Status GetFeatures(ServerContext* context, const GetFeaturesRequest* request,
                      GetFeaturesResponse* response) override {
-    std::vector<RemoteInference> batch;
+    std::vector<RemoteInference> game_batches;
 
     {
-      // Lock batch_mutex_ while popping inference requests off the
+      // Lock get_features_mutex_ while popping inference requests off the
       // request_queue_: we want make sure that each request fills up as much
       // of a batch as possible. If multiple threads all popped inference
       // requests off the queue in parallel, we'd likely end up with multiple
       // partially empty batches.
-      absl::MutexLock lock(&batch_mutex_);
+      absl::MutexLock lock(&get_features_mutex_);
+      // std::cerr << "### GetFeatures" << std::endl;
 
-      // Wait forever until an inference is pushed onto the request_queue_.
-      RemoteInference inference;
-      auto timeout = absl::Milliseconds(100);
-      while (!request_queue_.PopWithTimeout(&inference, timeout)) {
-        if (context->IsCancelled()) {
+      // Each client is guaranteed to never request more than
+      // max_game_batch_size_ inferences in each RemoteInference. Additionally,
+      // each client is only able to have one pending RemoteInference at a
+      // time, and the time between inference requests is very small (typically
+      // less than a millisecond).
+      // 
+      // With this in mind, the inference server accumulates RemoteInference
+      // requests into a single batch until one of the following occurs:
+      //  1) It has accumulated one RemoteInference request from event client.
+      //  2) The current batch has grown large enough that we won't be able to
+      //     fit another max_game_batch_size_ inferences.
+      //
+      // Since a client can terminate (e.g. when a game is complete) while the
+      // inference server is in the middle of processing a GetFeatures request,
+      // we repeatedly pop with a timeout to allow us to periodically check the
+      // current number of clients. Client terminations are rare, so it doesn't
+      // really matter if we hold up one inference batch for a few tens of
+      // milliseconds occasionally.
+      auto timeout = absl::Milliseconds(50);
+      size_t n = 0;
+      RemoteInference game_batch;
+      while (game_batches.size() < num_clients_ &&
+             n + max_game_batch_size_ <= inference_batch_size_) {
+        if (request_queue_.PopWithTimeout(&game_batch, timeout)) {
+          game_batches.push_back(game_batch);
+          n += game_batch.features.size();
+        } else if (context->IsCancelled()) {
           return Status(StatusCode::CANCELLED, "connection terminated");
         }
       }
+    }
 
-      batch.push_back(inference);
-
-      // Once we have the first inference, wait up to batch_timeout_ for more
-      // inferences to arrive until we reach the maximum batch_size_.
-      auto deadline = absl::Now() + batch_timeout_;
-      while (batch.size() < batch_size_) {
-        auto now = absl::Now();
-        if (now >= deadline ||
-            !request_queue_.PopWithTimeout(&inference, deadline - now)) {
-          break;
+    std::string byte_features(
+        inference_batch_size_ * DualNet::kNumBoardFeatures, 0);
+    size_t i = 0;
+    for (const auto& game_batch : game_batches) {
+      for (const auto& features : game_batch.features) {
+        for (float f : features) {
+          byte_features[i++] = f != 0 ? 1 : 0;
         }
-        batch.push_back(inference);
       }
     }
-
-    // Populate the response with the batch we just built.
     response->set_batch_id(batch_id_++);
-    for (const auto& inference : batch) {
-      const auto& src = *inference.features;
-      for (size_t i = 0; i < src.size(); ++i) {
-        response->add_features(src[i]);
-      }
-    }
-
-    // The RPC ops in the worker graph seem to require that the batch size is
-    // known at graph build time, so make sure we always send a batch of size
-    // batch_size_.
-    int padding = batch_size_ - batch.size();
-    for (int i = 0; i < padding; ++i) {
-      for (size_t j = 0; j < DualNet::kNumBoardFeatures; ++j) {
-        response->add_features(0);
-      }
-    }
+    response->set_byte_features(std::move(byte_features));
 
     {
-      absl::MutexLock lock(&pending_batches_mutex_);
-      pending_batches_[response->batch_id()] = std::move(batch);
+      absl::MutexLock lock(&pending_inferences_mutex_);
+      pending_inferences_[response->batch_id()] = std::move(game_batches);
     }
 
     return Status::OK;
@@ -124,50 +128,51 @@ class ServiceImpl final : public InferenceService::Service {
 
   Status PutOutputs(ServerContext* context, const PutOutputsRequest* request,
                     PutOutputsResponse* response) override {
-    std::vector<RemoteInference> batch;
+    std::vector<RemoteInference> game_batches;
     {
-      absl::MutexLock pending_batches_lock(&pending_batches_mutex_);
-      auto it = pending_batches_.find(request->batch_id());
-      MG_CHECK(it != pending_batches_.end());
-      batch = std::move(it->second);
-      pending_batches_.erase(it);
+      // std::cerr << "### PutOutputs" << std::endl;
+      absl::MutexLock lock(&pending_inferences_mutex_);
+      auto it = pending_inferences_.find(request->batch_id());
+      MG_CHECK(it != pending_inferences_.end());
+      game_batches = std::move(it->second);
+      pending_inferences_.erase(it);
     }
 
     // Check we got the expected number of values.
     // (Note that if the prior GetFeatures response was padded, we may have
     // more values than batch_.size()).
-    MG_CHECK(request->value().size() == static_cast<int>(batch_size_))
-        << "Expected " << batch_size_ << " values, got "
+    MG_CHECK(request->value().size() == static_cast<int>(inference_batch_size_))
+        << "Expected " << inference_batch_size_ << " values, got "
         << request->value().size();
 
-    // There should be (N * N + 1) policy values for each inference.
+    // There should be kNumMoves policy values for each inference.
     MG_CHECK(request->policy().size() ==
-             static_cast<int>(batch_size_ * kNumMoves));
+             static_cast<int>(inference_batch_size_ * kNumMoves));
 
-    // Because of padding, it's possible that we have more value & policy
-    // results than were requested: match sure to only extract the first
-    // batch.size() outputs.
-    for (size_t j = 0; j < batch.size(); ++j) {
-      auto& inference = batch[j];
-      auto& dst_policy = inference.output->policy;
-      for (int i = 0; i < kNumMoves; ++i) {
-        dst_policy[i] = request->policy(i + j * kNumMoves);
+    size_t src_policy_idx = 0;
+    for (auto& game_batch : game_batches) {
+      for (size_t j = 0; j < game_batch.outputs.size(); ++j) {
+        auto& dst_policy = game_batch.outputs[j].policy;
+        for (int i = 0; i < kNumMoves; ++i) {
+          dst_policy[i] = request->policy(src_policy_idx++);
+        }
+        game_batch.outputs[j].value = request->value(j);
       }
-      inference.output->value = request->value(j);
-      inference.counter->DecrementCount();
+      game_batch.notification->Notify();
     }
 
     return Status::OK;
   }
 
-  ThreadSafeQueue<RemoteInference>* request_queue() { return &request_queue_; }
-
  private:
-  // GetFeatures will attempt to pop up to this many inference requests off
-  // request_queue_ before replying.
-  const size_t batch_size_;
+  // Guaranteed maximum batch size that each client will send.
+  const size_t max_game_batch_size_;
+
+  // Target size of the batch sent in response to each GetFeaturesRequest.
+  const size_t inference_batch_size_;
 
   std::atomic<int32_t> batch_id_{1};
+  std::atomic<int> num_clients_{0};
 
   // After successfully popping the first request off request_queue, GetFeatures
   // will wait for up to the batch_timeout_ for more inference requests before
@@ -178,49 +183,50 @@ class ServiceImpl final : public InferenceService::Service {
 
   // Mutex that is locked while popping inference requests off request_queue_
   // (see GetFeatures() for why this is needed).
-  absl::Mutex batch_mutex_;
+  absl::Mutex get_features_mutex_;
 
-  // Mutex that protects access to pending_batches_.
-  absl::Mutex pending_batches_mutex_;
+  // Mutex that protects access to pending_inferences_.
+  absl::Mutex pending_inferences_mutex_;
 
   // Map from batch ID to list of remote inference requests in that batch.
-  std::map<int32_t, std::vector<RemoteInference>> pending_batches_
-      GUARDED_BY(&pending_batches_mutex_);
+  std::map<int32_t, std::vector<RemoteInference>> pending_inferences_
+      GUARDED_BY(&pending_inferences_mutex_);
+
+  friend class InferenceClient;
 };
 
 class InferenceClient : public DualNet {
  public:
-  explicit InferenceClient(ThreadSafeQueue<RemoteInference>* request_queue)
-      : request_queue_(request_queue) {}
+  explicit InferenceClient(InferenceServiceImpl* service) : service_(service) {
+    service_->num_clients_++;
+  }
+
+  ~InferenceClient() {
+    service_->num_clients_--;
+  }
 
   void RunMany(absl::Span<const BoardFeatures> features,
                absl::Span<Output> outputs) override {
-    // Counter that blocks until all inferences are complete.
-    absl::BlockingCounter pending_count(features.size());
+    MG_CHECK(features.size() <= service_->max_game_batch_size_);
 
-    // Enqueue all inference requests.
-    // TODO(tommadams): Consider adding a PushMany method to ThreadSafeQueue to
-    // push all requests in a single call.
-    for (size_t i = 0; i < features.size(); ++i) {
-      request_queue_->Push({&features[i], &outputs[i], &pending_count});
-    }
-
-    // Wait for all the inferences to complete.
-    pending_count.Wait();
+    // std::cerr << absl::StrCat("### RunMany ", features.size(), "\n");
+    absl::Notification notification;
+    service_->request_queue_.Push({features, outputs, &notification});
+    notification.WaitForNotification();
   }
 
  private:
-  ThreadSafeQueue<RemoteInference>* request_queue_;
+  InferenceServiceImpl* service_;
+  size_t max_batch_size_;
 };
 
-}  // namespace
+}  // namespace internal
 
-InferenceServer::InferenceServer(int port) {
+InferenceServer::InferenceServer(
+    int max_game_batch_size, int inference_batch_size, int port) {
   auto server_address = absl::StrCat("0.0.0.0:", port);
-
-  auto impl = absl::make_unique<ServiceImpl>();
-  request_queue_ = impl->request_queue();
-  service_ = std::move(impl);
+  service_ = absl::make_unique<internal::InferenceServiceImpl>(
+      max_game_batch_size, inference_batch_size);
 
   ServerBuilder builder;
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -238,7 +244,7 @@ InferenceServer::~InferenceServer() {
 }
 
 std::unique_ptr<DualNet> InferenceServer::NewDualNet() {
-  return absl::make_unique<InferenceClient>(request_queue_);
+  return absl::make_unique<internal::InferenceClient>(service_.get());
 }
 
 }  // namespace minigo

@@ -69,6 +69,9 @@ class MctsPlayer {
     // of time spent thinking as the game progresses.
     float decay_factor = 0.98;
 
+    // If true, print debug info to stderr.
+    bool verbose = true;
+
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 
