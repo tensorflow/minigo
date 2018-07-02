@@ -36,7 +36,7 @@ Before doing anything else, set any environment variables you need by doing:
 export VAR_NAME=blah
 ```
 
-For example:, if you would like to override the CGP Project or image tag, you can set:
+For example: if you would like to override the GCP Project or image tag, you can set:
 
 ```shell
 export PROJECT=my-project

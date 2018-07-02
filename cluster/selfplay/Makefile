@@ -1,5 +1,13 @@
-# Version and project can be overridden with the following:
-#  make target VERSION_TAG=0.XY PROJECT=foo-project
+# See existing images with
+#     gcloud container images list
+#     gcloud container images list-tags gcr.io/$PROJECT/<PLAYER_CONTAINER>
+#
+# Usage:
+# Set environment variables as follows:
+#   - CPU_PLAYER_CONTAINER/GPU_PLAYER_CONTAINER: name of the cpu/gpu player container (e.g. minigo-gpu-player)
+#   - VERSION_TAG: as in the other cluster/ dockerfiles.
+#
+#  	  VERSION_TAG=0.XY make target
 
 gpu-image:
 		mkdir -p staging
@@ -32,10 +40,10 @@ cpu-image-clean:
 		rm staging/player_wrapper.sh
 
 cc-image:
-	  docker build -f Dockerfile-cc -t "gcr.io/$(PROJECT)/$(CC_PLAYER_CONTAINER):$(VERSION_TAG)" .
+	  docker build -f Dockerfile-cc -t "gcr.io/$(PROJECT)/minigo-cc-player:$(VERSION_TAG)" .
 
 cc-push: cc-image
-		gcloud docker -- push "gcr.io/$(PROJECT)/$(CC_PLAYER_CONTAINER):$(VERSION_TAG)"
+		gcloud docker -- push "gcr.io/$(PROJECT)/minigo-cc-player:$(VERSION_TAG)"
 
 cpu-push: cpu-image
 		gcloud docker -- push "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)"

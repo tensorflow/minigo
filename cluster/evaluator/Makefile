@@ -1,5 +1,8 @@
-# Version and project can be overridden with the following:
-#  make target VERSION_TAG=0.XY PROJECT=foo-project
+# See existing images with
+#     gcloud container images list-tags gcr.io/$PROJECT/minigo-cc-evaluator
+#
+# Usage:
+#     VERSION_TAG=0.XY make target
 
 gpu-image:
 		mkdir -p staging
