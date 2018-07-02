@@ -46,7 +46,8 @@ message GetConfigRequest {
 
 message GetConfigResponse {
   int32 board_size = 1;
-  int32 batch_size = 2;
+  int32 virtual_losses = 2;
+  int32 games_per_inference = 3;
 }
 
 message GetFeaturesRequest {

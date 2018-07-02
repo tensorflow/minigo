@@ -49,12 +49,29 @@
 #include "cc/tf_utils.h"
 #include "gflags/gflags.h"
 
+// Game options flags.
+DEFINE_string(mode, "", "Mode to run in: \"selfplay\", \"eval\" or \"gtp\"");
+DEFINE_int32(
+    ponder_limit, 0,
+    "If non-zero and in GTP mode, the number times of times to perform tree "
+    "search while waiting for the opponent to play.");
+DEFINE_bool(
+    courtesy_pass, false,
+    "If true and in GTP mode, we will always pass if the opponent passes.");
+DEFINE_double(resign_threshold, -0.95, "Resign threshold.");
+DEFINE_double(komi, minigo::kDefaultKomi, "Komi.");
+DEFINE_double(disable_resign_pct, 0.1,
+              "Fraction of games to disable resignation for.");
 DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed. "
               "This seed is used to control the moves played, not whether a "
               "game has resignation disabled or is a holdout.");
-DEFINE_double(resign_threshold, -0.95, "Resign threshold.");
-DEFINE_double(komi, minigo::kDefaultKomi, "Komi.");
+
+// Tree search flags.
+DEFINE_int32(num_readouts, 100,
+             "Number of readouts to make during tree search for each move.");
+DEFINE_int32(virtual_losses, 8,
+             "Number of virtual losses when running tree search.");
 DEFINE_bool(inject_noise, true,
             "If true, inject noise into the root position at the start of "
             "each tree search.");
@@ -65,38 +82,8 @@ DEFINE_bool(soft_pick, true,
 DEFINE_bool(random_symmetry, true,
             "If true, randomly flip & rotate the board features before running "
             "the model and apply the inverse transform to the results.");
-DEFINE_string(model, "",
-              "Path to a minigo model serialized as a GraphDef proto, or "
-              "\"remote\" to launch a InferenceService server that delegates "
-              "inference to a separate process.");
-DEFINE_string(model_two, "",
-              "When running 'eval' mode, provide a path to a second minigo "
-              "model, also serialized as a GraphDef proto.");
-DEFINE_int32(port, 50051,
-             "If model=remote, the port opened by the InferenceService "
-             "server.");
-DEFINE_string(output_dir, "",
-              "Output directory. If empty, no examples are written.");
-DEFINE_string(holdout_dir, "",
-              "Holdout directory. If empty, no examples are written.");
-DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
-DEFINE_double(holdout_pct, 0.05,
-              "Fraction of games to hold out for validation.");
-DEFINE_double(disable_resign_pct, 0.1,
-              "Fraction of games to disable resignation for.");
-DEFINE_int32(num_readouts, 100,
-             "Number of readouts to make during tree search for each move.");
-DEFINE_int32(batch_size, 8,
-             "Number of readouts to run inference on in parallel.");
-DEFINE_int32(remote_batch_size, 128, "");
-DEFINE_int32(parallel_games, 32, "");
-DEFINE_int32(
-    ponder_limit, 0,
-    "If non-zero and in GTP mode, the number times of times to perform tree "
-    "search while waiting for the opponent to play.");
-DEFINE_bool(
-    courtesy_pass, false,
-    "If true and in GTP mode, we will always pass if the opponent passes.");
+
+// Time control flags.
 DEFINE_double(seconds_per_move, 0,
               "If non-zero, the number of seconds to spend thinking about each "
               "move instead of using a fixed number of readouts.");
@@ -111,7 +98,31 @@ DEFINE_double(decay_factor, 0.98,
 DEFINE_bool(run_forever, false,
             "When running 'selfplay' mode, whether to run forever.");
 
-DEFINE_string(mode, "", "Mode to run in: \"selfplay\", \"eval\" or \"gtp\"");
+// Inference flags.
+DEFINE_string(model, "",
+              "Path to a minigo model serialized as a GraphDef proto, or "
+              "\"remote\" to launch a InferenceService server that delegates "
+              "inference to a separate process.");
+DEFINE_string(model_two, "",
+              "When running 'eval' mode, provide a path to a second minigo "
+              "model, also serialized as a GraphDef proto.");
+DEFINE_int32(port, 50051,
+             "If model=remote, the port opened by the InferenceService "
+             "server.");
+DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
+DEFINE_int32(games_per_inference, 16,
+             "Number of games to merge together into a single inference batch.");
+DEFINE_int32(parallel_tpus, 8,
+             "If model=remote, the number of TPU cores to run on in parallel.");
+
+// Output flags.
+DEFINE_string(output_dir, "",
+              "Output directory. If empty, no examples are written.");
+DEFINE_string(holdout_dir, "",
+              "Holdout directory. If empty, no examples are written.");
+DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
+DEFINE_double(holdout_pct, 0.05,
+              "Fraction of games to hold out for validation.");
 
 // Self play flags:
 //   --inject_noise=true
@@ -133,24 +144,25 @@ class PlayerFactory {
         disable_resign_pct_(disable_resign_pct) {
     inference_worker_thread_ = std::thread([]() {
       std::vector<std::string> cmd_parts = {
-        "BOARD_SIZE=19",
+        absl::StrCat("BOARD_SIZE=", kN),
         "python",
         "inference_worker.py",
         "--model=gs://jacksona-sandbox/models/k256-50c/model.ckpt-48800",
         "--use_tpu=true",
         "--tpu_name=grpc://10.240.2.2:8470",
         "--conv_width=256",
-        "--batch_size=16",
+        absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
       };
       auto cmd = absl::StrJoin(cmd_parts, " ");
       FILE* f = popen(cmd.c_str(), "r");
-      while (!feof(f)) {
-        char buf[128];
-        auto bytes_read = fread(buf, 1, sizeof(buf) - 1, f);
-        buf[bytes_read] = '\0';
-        fprintf(stderr, buf);
+      for (;;) {
+        int c = fgetc(f);
+        if (c == EOF) {
+          break;
+        }
+        fputc(c, stderr);
       }
-      fprintf(stderr, "\n");
+      fputc('\n', stderr);
     });
   }
 
@@ -186,13 +198,14 @@ class RemotePlayerFactory : public PlayerFactory {
  public:
   RemotePlayerFactory(const MctsPlayer::Options& options,
                       float disable_resign_pct,
-                      int game_batch_size, int inference_batch_size, int port)
+                      int virtual_losses, int games_per_inference, int port)
       : PlayerFactory(options, disable_resign_pct) {
     server_ = absl::make_unique<InferenceServer>(
-        game_batch_size, inference_batch_size, port);
+        virtual_losses, games_per_inference, port);
   }
 
   std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
+      std::cerr << "### " << options.random_seed << std::endl;
     return absl::make_unique<MctsPlayer>(server_->NewDualNet(), options);
   }
 
@@ -307,7 +320,7 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->soft_pick = FLAGS_soft_pick;
   options->random_symmetry = FLAGS_random_symmetry;
   options->resign_threshold = FLAGS_resign_threshold;
-  options->batch_size = FLAGS_batch_size;
+  options->batch_size = FLAGS_virtual_losses;
   options->komi = FLAGS_komi;
   options->random_seed = FLAGS_seed;
   options->num_readouts = FLAGS_num_readouts;
@@ -321,8 +334,8 @@ std::unique_ptr<PlayerFactory> GetPlayerFactory() {
   ParseMctsPlayerOptionsFromFlags(&default_options);
   if (FLAGS_model == "remote") {
     return absl::make_unique<RemotePlayerFactory>(
-        default_options, FLAGS_disable_resign_pct, FLAGS_batch_size,
-        FLAGS_remote_batch_size, FLAGS_port);
+        default_options, FLAGS_disable_resign_pct, FLAGS_virtual_losses,
+        FLAGS_games_per_inference, FLAGS_port);
   } else {
     return absl::make_unique<LocalPlayerFactory>(
         default_options, FLAGS_disable_resign_pct, FLAGS_model);

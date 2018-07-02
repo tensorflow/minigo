@@ -44,7 +44,7 @@ struct RemoteInference {
 
 class InferenceServer {
  public:
-  InferenceServer(int max_game_batch_size, int inference_batch_size, int port);
+  InferenceServer(int virtual_losses, int games_per_inference, int port);
   ~InferenceServer();
 
   // Return a new DualNet instance whose inference requests are performed

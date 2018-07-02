@@ -46,6 +46,7 @@ class MctsPlayer {
     bool soft_pick = true;
     bool random_symmetry = true;
     float resign_threshold = -0.95;
+    // TODO(tommadams): rename batch_size to virtual_losses.
     int batch_size = 8;
     float komi = kDefaultKomi;
     std::string name = "minigo";
