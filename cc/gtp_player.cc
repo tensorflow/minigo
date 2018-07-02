@@ -381,6 +381,10 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(
     return Response::Error("cannot load file");
   }
 
+  // Clear the board before replaying sgf.
+  last_genmove_ = Color::kEmpty;
+  NewGame();
+
   for (const auto& move : sgf::GetMainLineMoves(ast)) {
     PlayMove(move.c);
   }

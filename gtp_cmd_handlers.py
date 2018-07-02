@@ -154,6 +154,10 @@ class RegressionsCmdHandler(object):
         except:
             raise ValueError("Unreadable file: " + filename)
 
+        # Clear the board before replaying sgf
+        # TODO: should this use the sgfs komi?
+        self._player.initialize_game(go.Position())
+
         # This is kinda bad, because replay_sgf is already calling
         # 'play move' on its internal position objects, but we really
         # want to advance the engine along with us rather than try to
