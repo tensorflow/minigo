@@ -1,4 +1,4 @@
-FROM gcr.io/${PROJECT}/cc-base:0.1
+FROM gcr.io/${PROJECT}/cc-base:0.17
 
 RUN apt-get update && apt-get install gettext -y
 
