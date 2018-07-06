@@ -209,9 +209,8 @@ def model_fn(features, labels, mode, params=None):
             logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
     value_cost = tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
-    # TODO(sethtroisi) Add 'beta' to reg_vars
     reg_vars = [v for v in tf.trainable_variables()
-                if not 'bias' in v.name]
+                if not 'bias' in v.name and not 'beta' in v.name]
 
     l2_cost = FLAGS.l2_strength * \
         tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
@@ -326,7 +325,7 @@ def model_inference_fn(features, training):
         kernel_size=3,
         padding="same",
         data_format="channels_last",
-        use_bias=True)
+        use_bias=False)
 
     def my_res_layer(inputs):
         int_layer1 = my_batchn(my_conv2d(inputs))
