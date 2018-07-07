@@ -155,7 +155,7 @@ def _random_rotation(x_tensor, outcome_tensor):
     x_rot_tensor, pi_rot_tensor = tuple(tf.py_func(
         rotate_py_func,
         [x_tensor, pi_tensor],
-        [tf.float32, tf.float32],
+        [x_tensor.dtype, pi_tensor.dtype],
         stateful=False))
 
     x_rot_tensor.set_shape(x_tensor.get_shape())
