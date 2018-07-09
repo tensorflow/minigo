@@ -68,8 +68,8 @@ class GtpPlayer : public MctsPlayer {
     bool ok;
   };
 
-  using CmdHandler = Response (GtpPlayer::*)(
-      absl::string_view, const std::vector<absl::string_view>&);
+  using CmdArgs = const std::vector<absl::string_view>&;
+  using CmdHandler = Response (GtpPlayer::*)(absl::string_view, CmdArgs);
   void RegisterCmd(const std::string& cmd, CmdHandler handler);
 
   // If waiting for the opponent to play, consider thinking for a bit.
@@ -81,61 +81,28 @@ class GtpPlayer : public MctsPlayer {
   bool HandleCmd(const std::string& line);
 
   Response CheckArgsExact(absl::string_view cmd, size_t expected_num_args,
-                          const std::vector<absl::string_view>& args);
+                          CmdArgs args);
   Response CheckArgsRange(absl::string_view cmd, size_t expected_min_args,
-                          size_t expected_max_args,
-                          const std::vector<absl::string_view>& args);
+                          size_t expected_max_args, CmdArgs args);
 
-  Response DispatchCmd(const std::string& cmd,
-                       const std::vector<absl::string_view>& args);
+  Response DispatchCmd(const std::string& cmd, CmdArgs args);
 
-  Response HandleBoardsize(absl::string_view cmd,
-                           const std::vector<absl::string_view>& args);
-
-  Response HandleClearBoard(absl::string_view cmd,
-                            const std::vector<absl::string_view>& args);
-
-  Response HandleEcho(absl::string_view cmd,
-                      const std::vector<absl::string_view>& args);
-
-  Response HandleFinalScore(absl::string_view cmd,
-                            const std::vector<absl::string_view>& args);
-
-  Response HandleGamestate(absl::string_view cmd,
-                           const std::vector<absl::string_view>& args);
-
-  Response HandleGenmove(absl::string_view cmd,
-                         const std::vector<absl::string_view>& args);
-
-  Response HandleInfo(absl::string_view cmd,
-                      const std::vector<absl::string_view>& args);
-
-  Response HandleKnownCommand(absl::string_view cmd,
-                              const std::vector<absl::string_view>& args);
-
-  Response HandleKomi(absl::string_view cmd,
-                             const std::vector<absl::string_view>& args);
-
-  Response HandleListCommands(absl::string_view cmd,
-                              const std::vector<absl::string_view>& args);
-
-  Response HandleLoadsgf(absl::string_view cmd,
-                         const std::vector<absl::string_view>& args);
-
-  Response HandleName(absl::string_view cmd,
-                      const std::vector<absl::string_view>& args);
-
-  Response HandlePlay(absl::string_view cmd,
-                      const std::vector<absl::string_view>& args);
-
-  Response HandlePonderLimit(absl::string_view cmd,
-                             const std::vector<absl::string_view>& args);
-
-  Response HandleReadouts(absl::string_view cmd,
-                          const std::vector<absl::string_view>& args);
-
-  Response HandleReportSearchInterval(
-      absl::string_view cmd, const std::vector<absl::string_view>& args);
+  Response HandleBoardsize(absl::string_view cmd, CmdArgs args);
+  Response HandleClearBoard(absl::string_view cmd, CmdArgs args);
+  Response HandleEcho(absl::string_view cmd, CmdArgs args);
+  Response HandleFinalScore(absl::string_view cmd, CmdArgs args);
+  Response HandleGamestate(absl::string_view cmd, CmdArgs args);
+  Response HandleGenmove(absl::string_view cmd, CmdArgs args);
+  Response HandleInfo(absl::string_view cmd, CmdArgs args);
+  Response HandleKnownCommand(absl::string_view cmd, CmdArgs args);
+  Response HandleKomi(absl::string_view cmd, CmdArgs args);
+  Response HandleListCommands(absl::string_view cmd, CmdArgs args);
+  Response HandleLoadsgf(absl::string_view cmd, CmdArgs args);
+  Response HandleName(absl::string_view cmd, CmdArgs args);
+  Response HandlePlay(absl::string_view cmd, CmdArgs args);
+  Response HandlePonderLimit(absl::string_view cmd, CmdArgs args);
+  Response HandleReadouts(absl::string_view cmd, CmdArgs args);
+  Response HandleReportSearchInterval(absl::string_view cmd, CmdArgs args);
 
   void ReportSearchStatus(const MctsNode* last_read);
 
