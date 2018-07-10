@@ -87,6 +87,7 @@ class GtpPlayer : public MctsPlayer {
 
   Response DispatchCmd(const std::string& cmd, CmdArgs args);
 
+  Response HandleBenchmark(absl::string_view cmd, CmdArgs args);
   Response HandleBoardsize(absl::string_view cmd, CmdArgs args);
   Response HandleClearBoard(absl::string_view cmd, CmdArgs args);
   Response HandleEcho(absl::string_view cmd, CmdArgs args);

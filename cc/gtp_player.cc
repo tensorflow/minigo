@@ -35,6 +35,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
       ponder_limit_(options.ponder_limit),
       courtesy_pass_(options.courtesy_pass) {
+  RegisterCmd("benchmark", &GtpPlayer::HandleBenchmark);
   RegisterCmd("boardsize", &GtpPlayer::HandleBoardsize);
   RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
   RegisterCmd("echo", &GtpPlayer::HandleEcho);
@@ -180,6 +181,41 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(
   }
   auto handler = it->second;
   return (this->*handler)(cmd, args);
+}
+
+GtpPlayer::Response GtpPlayer::HandleBenchmark(
+    absl::string_view cmd, CmdArgs args) {
+  // benchmark [readouts] [batch_size]
+  // Note: By default use current time_control (readouts or time).
+  auto response = CheckArgsRange(cmd, 0, 2, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  auto saved_options = options();
+  MctsPlayer::Options temp_options = options();
+
+  if (args.size() > 0) {
+    temp_options.seconds_per_move = 0;
+    if (!absl::SimpleAtoi(args[0], &temp_options.num_readouts)) {
+      return Response::Error("bad num_readouts");
+    }
+  }
+
+  if (args.size() == 2) {
+    if (!absl::SimpleAtoi(args[1], &temp_options.batch_size)) {
+      return Response::Error("bad batch_size");
+    }
+  }
+
+  // Set options.
+  *mutable_options() = temp_options;
+  // Run benchmark.
+  MctsPlayer::SuggestMove();
+  // Reset options.
+  *mutable_options() = saved_options;
+
+  return Response::Ok();
 }
 
 GtpPlayer::Response GtpPlayer::HandleBoardsize(
