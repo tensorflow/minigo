@@ -100,20 +100,25 @@ DEFINE_bool(run_forever, false,
 
 // Inference flags.
 DEFINE_string(model, "",
-              "Path to a minigo model serialized as a GraphDef proto, or "
-              "\"remote\" to launch a InferenceService server that delegates "
-              "inference to a separate process.");
+              "Path to a minigo model. If remote_inference=false, the model "
+              "should be a serialized GraphDef proto. If "
+              "remote_inference=true, the model should be saved checkpoint.");
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
+DEFINE_bool(remote_inference, false,
+            "If true, run the model using the InferenceServer. This launches "
+            "a Python subprocess that performs the actual inference. Required "
+            "when running on Cloud TPU.");
 DEFINE_int32(port, 50051,
-             "If model=remote, the port opened by the InferenceService "
-             "server.");
+             "The port opened by the InferenceService server.");
+DEFINE_string(tpu_name, "", "Cloud TPU name, e.g. grpc://10.240.2.2:8470.");
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 DEFINE_int32(games_per_inference, 16,
              "Number of games to merge together into a single inference batch.");
 DEFINE_int32(parallel_tpus, 8,
              "If model=remote, the number of TPU cores to run on in parallel.");
+DEFINE_int32(conv_width, 256, "Width of the model's convolution filters.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
@@ -147,10 +152,10 @@ class PlayerFactory {
         absl::StrCat("BOARD_SIZE=", kN),
         "python",
         "inference_worker.py",
-        "--model=gs://jacksona-sandbox/models/k256-50c/model.ckpt-48800",
+        absl::StrCat("--model=", FLAGS_model),
         "--use_tpu=true",
-        "--tpu_name=grpc://10.240.2.2:8470",
-        "--conv_width=256",
+        absl::StrCat("--tpu_name=", FLAGS_tpu_name),
+        absl::StrCat("--conv_width=", FLAGS_conv_width),
         absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
       };
       auto cmd = absl::StrJoin(cmd_parts, " ");
@@ -205,7 +210,6 @@ class RemotePlayerFactory : public PlayerFactory {
   }
 
   std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
-      std::cerr << "### " << options.random_seed << std::endl;
     return absl::make_unique<MctsPlayer>(server_->NewDualNet(), options);
   }
 
@@ -332,7 +336,7 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
 std::unique_ptr<PlayerFactory> GetPlayerFactory() {
   MctsPlayer::Options default_options;
   ParseMctsPlayerOptionsFromFlags(&default_options);
-  if (FLAGS_model == "remote") {
+  if (FLAGS_remote_inference) {
     return absl::make_unique<RemotePlayerFactory>(
         default_options, FLAGS_disable_resign_pct, FLAGS_virtual_losses,
         FLAGS_games_per_inference, FLAGS_port);
@@ -349,6 +353,11 @@ std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory,
       // Create a new player.
       auto options = player_factory->default_options();
       options.verbose = thread_id == 0;
+      // If an random seed was explicitly specified, make sure we use a
+      // different seed for each thread.
+      if (options.random_seed != 0) {
+        options.random_seed += 1299283 * thread_id;
+      }
       auto player = player_factory->New(options);
 
       // Play the game.

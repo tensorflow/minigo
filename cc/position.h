@@ -219,7 +219,7 @@ class Position {
   Coord ko_ = Coord::kInvalid;
 
   // Number of captures for (B, W).
-  std::array<int, 2> num_captures_ = std::array<int, 2>{0, 0};
+  std::array<int, 2> num_captures_{{0, 0}};
 
   int n_;
   int num_consecutive_passes_ = 0;

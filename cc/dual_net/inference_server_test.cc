@@ -41,18 +41,22 @@ class InferenceServerTest : public ::testing::Test {
     value_ = 0.1;
     dual_net_ = absl::make_unique<FakeNet>(priors_, value_);
 
-    server_ = absl::make_unique<InferenceServer>(port_);
-    client_ = server_->NewDualNet();
+    server_ = absl::make_unique<InferenceServer>(virtual_losses_, games_per_inference_, port_);
+    for (int i = 0; i < games_per_inference_; ++i) {
+      clients_.push_back(server_->NewDualNet());
+    }
   }
 
   int port_ = 50051;
+  int virtual_losses_ = 8;
+  int games_per_inference_ = 2;
 
   std::vector<float> priors_;
   float value_;
 
   std::unique_ptr<DualNet> dual_net_;
   std::unique_ptr<InferenceServer> server_;
-  std::unique_ptr<DualNet> client_;
+  std::vector<std::unique_ptr<DualNet>> clients_;
 };
 
 TEST_F(InferenceServerTest, Test) {
@@ -60,7 +64,7 @@ TEST_F(InferenceServerTest, Test) {
   // Unlike the real inference worker, this fake worker doesn't loop, and
   // doesn't add any RPC ops to the TensorFlow graph. Instead, the RPCs and
   // proto marshalling is performed manually.
-  std::thread thread([this]() {
+  std::thread server_thread([this]() {
     InferenceService::Stub stub(grpc::CreateChannel(
         absl::StrCat("localhost:", port_), grpc::InsecureChannelCredentials()));
 
@@ -78,10 +82,13 @@ TEST_F(InferenceServerTest, Test) {
     }
 
     int board_size = get_config_response.board_size();
-    int batch_size = get_config_response.batch_size();
+    int vlosses = get_config_response.virtual_losses();
+    int games_per_inference = get_config_response.games_per_inference();
 
     ASSERT_EQ(kN, board_size);
-    ASSERT_LT(0, batch_size);
+    ASSERT_LT(0, vlosses);
+    ASSERT_LT(0, games_per_inference);
+    int batch_size = vlosses * games_per_inference;
 
     // Get the features.
     GetFeaturesRequest get_features_request;
@@ -97,11 +104,11 @@ TEST_F(InferenceServerTest, Test) {
               get_features_response.features().size());
 
     // Run the model.
+    const std::string& src = get_features_response.features();
     std::vector<DualNet::BoardFeatures> features(batch_size);
     for (int i = 0; i < batch_size; ++i) {
       for (int j = 0; j < DualNet::kNumBoardFeatures; ++j) {
-        features[i][j] =
-            get_features_response.features(i * DualNet::kNumBoardFeatures + j);
+        features[i][j] = static_cast<float>(src[i * DualNet::kNumBoardFeatures + j]);
       }
     }
     std::vector<DualNet::Output> outputs(batch_size);
@@ -126,16 +133,34 @@ TEST_F(InferenceServerTest, Test) {
     }
   });
 
-  DualNet::BoardFeatures features;
-  DualNet::Output output;
-  client_->RunMany({&features, 1}, {&output, 1});
-
-  ASSERT_EQ(value_, output.value);
-  for (int i = 0; i < kNumMoves; ++i) {
-    ASSERT_EQ(priors_[i], output.policy[i]);
+  int vlosses = virtual_losses_;
+  std::vector<DualNet::BoardFeatures> features(vlosses * clients_.size());
+  std::vector<DualNet::Output> outputs(vlosses * clients_.size());
+  std::vector<std::thread> client_threads;
+  for (size_t i = 0; i < clients_.size(); ++i) {
+    auto* client = clients_[i].get();
+    auto* client_features = &features[i * vlosses];
+    auto* client_output = &outputs[i * vlosses];
+    client_threads.emplace_back([=]() {
+      auto size = static_cast<size_t>(vlosses);
+      client->RunMany({client_features, size}, {client_output, size});
+    });
+  }
+  for (auto& thread : client_threads) {
+    thread.join();
   }
 
-  thread.join();
+  for (size_t i = 0; i < clients_.size(); ++i) {
+    for (int vloss = 0; vloss < vlosses; ++vloss) {
+      const auto& output = outputs[i * vlosses + vloss];
+      ASSERT_EQ(value_, output.value);
+      for (int i = 0; i < kNumMoves; ++i) {
+        ASSERT_EQ(priors_[i], output.policy[i]);
+      }
+    }
+  }
+
+  server_thread.join();
 }
 
 }  // namespace

@@ -34,6 +34,7 @@ using grpc::ServerContext;
 using grpc::Status;
 using grpc::StatusCode;
 
+
 namespace minigo {
 
 namespace internal {
@@ -112,7 +113,7 @@ class InferenceServiceImpl final : public InferenceService::Service {
       }
     }
     response->set_batch_id(batch_id_++);
-    response->set_byte_features(std::move(byte_features));
+    response->set_features(std::move(byte_features));
 
     {
       absl::MutexLock lock(&pending_inferences_mutex_);
@@ -150,18 +151,18 @@ class InferenceServiceImpl final : public InferenceService::Service {
              static_cast<int>(request->value().size() * kNumMoves));
 
     size_t src_policy_idx = 0;
+    size_t src_value_idx = 0;
     for (auto& game : inferences) {
-      for (size_t j = 0; j < game.outputs.size(); ++j) {
-        auto& dst_policy = game.outputs[j].policy;
+      for (size_t vloss = 0; vloss < game.outputs.size(); ++vloss) {
+        auto& dst_policy = game.outputs[vloss].policy;
         for (int i = 0; i < kNumMoves; ++i) {
           dst_policy[i] = request->policy(src_policy_idx++);
         }
-        game.outputs[j].value = request->value(j);
+        game.outputs[vloss].value = request->value(src_value_idx++);
       }
+
       game.notification->Notify();
     }
-
-    // std::cerr << absl::Now() << " DONE  PutOutputs\n";
 
     return Status::OK;
   }
@@ -211,7 +212,6 @@ class InferenceClient : public DualNet {
                absl::Span<Output> outputs) override {
     MG_CHECK(features.size() <= service_->virtual_losses_);
 
-    // std::cerr << absl::StrCat("### RunMany ", features.size(), "\n");
     absl::Notification notification;
     service_->request_queue_.Push({features, outputs, &notification});
     notification.WaitForNotification();
@@ -219,7 +219,6 @@ class InferenceClient : public DualNet {
 
  private:
   InferenceServiceImpl* service_;
-  size_t max_batch_size_;
 };
 
 }  // namespace internal
