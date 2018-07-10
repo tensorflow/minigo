@@ -105,7 +105,7 @@ def rl_loop():
         main.train_dir(gather_dir,
                        next_model_save_file)
         print("Trying validate on 'holdout' game...")
-        main.validate(working_dir, holdout_dir)
+        main.validate(holdout_dir)
         print("Verifying that new checkpoint is playable...")
         main.selfplay(
             load_file=next_model_save_file,

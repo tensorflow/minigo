@@ -17,7 +17,7 @@ Features used by AlphaGo Zero, in approximate order of importance.
 Feature                 # Notes
 Stone History           16 The stones of each color during the last 8 moves.
 Ones                    1  Constant plane of 1s
-All features with 8 planes are 1-hot encoded, with plane i marked with 1 
+All features with 8 planes are 1-hot encoded, with plane i marked with 1
 only if the feature was equal to i. Any features >= 8 would be marked as 8.
 
 This file includes the features from the first paper as DEFAULT_FEATURES
@@ -149,12 +149,3 @@ NEW_FEATURES_PLANES = sum(f.planes for f in NEW_FEATURES)
 
 def extract_features(position, features=NEW_FEATURES):
     return np.concatenate([feature(position) for feature in features], axis=2)
-
-
-def bulk_extract_features(positions, features=NEW_FEATURES):
-    num_positions = len(positions)
-    num_planes = sum(f.planes for f in features)
-    output = np.zeros([num_positions, go.N, go.N, num_planes], dtype=np.uint8)
-    for i, pos in enumerate(positions):
-        output[i] = extract_features(pos, features=features)
-    return output

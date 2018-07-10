@@ -461,10 +461,9 @@ def train(*tf_records, steps=None):
     estimator.train(input_fn, steps=int(steps), hooks=hooks)
 
 
-def validate(tf_records, checkpoint_name=None, validate_name=None):
+def validate(tf_records, validate_name=None):
     estimator = get_estimator(FLAGS.model_dir)
     validate_name = validate_name or "selfplay"
-    checkpoint_name = checkpoint_name or estimator.latest_checkpoint()
 
     def input_fn():
         return preprocessing.get_input_tensors(

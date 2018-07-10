@@ -93,9 +93,7 @@ def train(tf_records: 'list of files of tf_records to train on',
 
 
 def validate(
-        working_dir: 'tf.estimator working directory',
         *tf_record_dirs: 'Directories where holdout data are',
-        checkpoint_name: 'Which checkpoint to evaluate (None=latest)'=None,
         validate_name: 'Name for validation set (i.e., selfplay or human)'=None):
     tf_records = []
     with utils.logged_timer("Building lists of holdout files"):
@@ -105,9 +103,7 @@ def validate(
     first_record = os.path.basename(tf_records[0])
     last_record = os.path.basename(tf_records[-1])
     with utils.logged_timer("Validating from {} to {}".format(first_record, last_record)):
-        dual_net.validate(
-            tf_records, checkpoint_name=checkpoint_name,
-            validate_name=validate_name)
+        dual_net.validate(tf_records, validate_name=validate_name)
 
 
 def evaluate(

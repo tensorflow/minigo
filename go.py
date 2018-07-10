@@ -312,7 +312,6 @@ class Position():
         self.board_deltas = board_deltas if board_deltas is not None else np.zeros([
                                                                                    0, N, N], dtype=np.int8)
         self.to_play = to_play
-        self.last_eight = None
 
     def __deepcopy__(self, memodict={}):
         new_board = np.copy(self.board)
