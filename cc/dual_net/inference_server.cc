@@ -62,15 +62,12 @@ class InferenceServiceImpl final : public InferenceService::Service {
     std::vector<RemoteInference> inferences;
 
     {
-      // std::cerr << absl::Now() << " START GetFeatures\n";
-
       // Lock get_features_mutex_ while popping inference requests off the
       // request_queue_: we want make sure that each request fills up as much
       // of a batch as possible. If multiple threads all popped inference
       // requests off the queue in parallel, we'd likely end up with multiple
       // partially empty batches.
       absl::MutexLock lock(&get_features_mutex_);
-      // std::cerr << "### GetFeatures" << std::endl;
 
       // Each client is guaranteed to never request more than
       // virtual_losses_ inferences in each RemoteInference. Additionally,
@@ -80,7 +77,7 @@ class InferenceServiceImpl final : public InferenceService::Service {
       // 
       // With this in mind, the inference server accumulates RemoteInference
       // requests into a single batch until one of the following occurs:
-      //  1) It has accumulated one RemoteInference request from event client.
+      //  1) It has accumulated one RemoteInference request from every client.
       //  2) The current batch has grown large enough that we won't be able to
       //     fit another virtual_losses_ inferences.
       //
