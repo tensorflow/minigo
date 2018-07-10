@@ -40,7 +40,7 @@ namespace minigo {
 namespace internal {
 
 // Implementation of the InferenceService.
-// The client InferenceServer pushes inference requests onto
+// The client InferenceClient pushes inference requests onto
 // InferenceServiceImpl's request queue.
 class InferenceServiceImpl final : public InferenceService::Service {
  public:

@@ -113,7 +113,11 @@ DEFINE_bool(remote_inference, false,
 DEFINE_int32(port, 50051,
              "The port opened by the InferenceService server.");
 DEFINE_string(tpu_name, "", "Cloud TPU name, e.g. grpc://10.240.2.2:8470.");
-DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
+DEFINE_int32(parallel_games, 32,
+             "Number of games to play in parallel. For performance reasons, "
+             "parallel_games should equal games_per_inference * 2 because this "
+             "allows the transfer of inference requests & responses to be "
+             "overlapped with model evaluation.");
 DEFINE_int32(games_per_inference, 16,
              "Number of games to merge together into a single inference batch.");
 DEFINE_int32(parallel_tpus, 8,
@@ -177,6 +181,10 @@ class PlayerFactory {
 
   virtual std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) = 0;
 
+  // Thread safe random number generator, provided for convenience: when
+  // multiple players are running in parallel, they will need access to a thread
+  // safe random number generator for decisions like whether or not to holdout
+  // a game or disable resign.
   float rnd() {
     absl::MutexLock lock(&mutex_);
     return rnd_();

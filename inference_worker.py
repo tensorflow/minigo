@@ -78,6 +78,14 @@ def get_server_config():
 
 
 def const_model_inference_fn(features):
+    """Builds the model graph with weights marked as constant.
+
+    This improves TPU inference performance because it prevents the weights
+    being transferred to the TPU every call to Session.run().
+
+    Returns:
+        (policy_output, value_output, logits) tuple of tensors.
+    """
     def custom_getter(getter, name, *args, **kwargs):
         with tf.control_dependencies(None):
             return tf.guarantee_const(
