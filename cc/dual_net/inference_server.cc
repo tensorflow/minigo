@@ -157,6 +157,9 @@ class InferenceServiceImpl final : public InferenceService::Service {
         }
         game.outputs[vloss].value = request->value(src_value_idx++);
       }
+      if (game.model != nullptr) {
+        *game.model = request->model_path();
+      }
 
       game.notification->Notify();
     }
@@ -206,11 +209,11 @@ class InferenceClient : public DualNet {
   }
 
   void RunMany(absl::Span<const BoardFeatures> features,
-               absl::Span<Output> outputs) override {
+               absl::Span<Output> outputs, std::string* model) override {
     MG_CHECK(features.size() <= service_->virtual_losses_);
 
     absl::Notification notification;
-    service_->request_queue_.Push({features, outputs, &notification});
+    service_->request_queue_.Push({features, outputs, model, &notification});
     notification.WaitForNotification();
   }
 

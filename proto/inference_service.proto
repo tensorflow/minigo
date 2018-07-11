@@ -62,6 +62,7 @@ message PutOutputsRequest {
   int32 batch_id = 1;
   repeated float policy = 2;
   repeated float value = 3;
+  string model_path = 4;
 }
 
 message PutOutputsResponse {

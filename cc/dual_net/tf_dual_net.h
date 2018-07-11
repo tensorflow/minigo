@@ -35,13 +35,14 @@ class TfDualNet : public DualNet {
   ~TfDualNet() override;
 
   void RunMany(absl::Span<const BoardFeatures> features,
-               absl::Span<Output> outputs) override;
+               absl::Span<Output> outputs, std::string* model) override;
 
  private:
   std::unique_ptr<tensorflow::Session> session_;
   std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
   std::vector<std::string> output_names_;
   std::vector<tensorflow::Tensor> outputs_;
+  std::string graph_path_;
 };
 
 }  // namespace minigo

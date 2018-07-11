@@ -103,6 +103,11 @@ DEFINE_string(model, "",
               "Path to a minigo model. If remote_inference=false, the model "
               "should be a serialized GraphDef proto. If "
               "remote_inference=true, the model should be saved checkpoint.");
+DEFINE_string(checkpoint_dir, "",
+              "Path to a directory containing TensorFlow model checkpoints. "
+              "The inference worker will monitor this when a new checkpoint "
+              "is found, load the model and use it for futher inferences. "
+              "Only valid when remote inference is enabled.");
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
@@ -157,6 +162,7 @@ class PlayerFactory {
         "python",
         "inference_worker.py",
         absl::StrCat("--model=", FLAGS_model),
+        absl::StrCat("--checkpoint_dir=", FLAGS_checkpoint_dir),
         "--use_tpu=true",
         absl::StrCat("--tpu_name=", FLAGS_tpu_name),
         absl::StrCat("--conv_width=", FLAGS_conv_width),

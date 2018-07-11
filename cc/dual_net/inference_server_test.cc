@@ -112,7 +112,7 @@ TEST_F(InferenceServerTest, Test) {
       }
     }
     std::vector<DualNet::Output> outputs(batch_size);
-    dual_net_->RunMany(features, absl::MakeSpan(outputs));
+    dual_net_->RunMany(features, absl::MakeSpan(outputs), nullptr);
 
     // Put the outputs.
     PutOutputsRequest put_outputs_request;
@@ -143,7 +143,7 @@ TEST_F(InferenceServerTest, Test) {
     auto* client_output = &outputs[i * vlosses];
     client_threads.emplace_back([=]() {
       auto size = static_cast<size_t>(vlosses);
-      client->RunMany({client_features, size}, {client_output, size});
+      client->RunMany({client_features, size}, {client_output, size}, nullptr);
     });
   }
   for (auto& thread : client_threads) {

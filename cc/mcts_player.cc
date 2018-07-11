@@ -87,6 +87,16 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
   InitializeGame({&bv_, &gv_, Color::kBlack});
 }
 
+MctsPlayer::~MctsPlayer() {
+  if (options_.verbose) {
+    std::cerr << "Inference history:" << std::endl;
+    for (const auto& info : inference_info_) {
+      std::cerr << info.model << " [" << info.first_move << ", "
+                << info.last_move << "]" << std::endl;
+    }
+  }
+}
+
 void MctsPlayer::InitializeGame(const Position& position) {
   game_root_ = {&dummy_stats_, Position(&bv_, &gv_, position)};
   root_ = &game_root_;
@@ -331,7 +341,14 @@ void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves) {
 
   // Run inference.
   outputs_.resize(leaves.size());
-  network_->RunMany(features_, absl::MakeSpan(outputs_));
+  network_->RunMany(features_, absl::MakeSpan(outputs_), &model_);
+
+  // Record some information about the inference.
+  if (inference_info_.empty() || model_ != inference_info_.back().model) {
+    inference_info_.emplace_back(model_, root_->position.n());
+  }
+  inference_info_.back().last_move = root_->position.n();
+  inference_info_.back().total_count += leaves.size();
 
   // Incorporate the inference outputs back into tree search, undoing any
   // previously applied random symmetries.

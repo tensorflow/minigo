@@ -32,7 +32,8 @@ using tensorflow::TensorShape;
 
 namespace minigo {
 
-TfDualNet::TfDualNet(const std::string& graph_path) {
+TfDualNet::TfDualNet(const std::string& graph_path)
+    : graph_path_(graph_path) {
   GraphDef graph_def;
   TF_CHECK_OK(ReadBinaryProto(Env::Default(), graph_path, &graph_def));
 
@@ -55,7 +56,7 @@ TfDualNet::TfDualNet(const std::string& graph_path) {
   // explicitly run inference once during construction.
   Output output;
   BoardFeatures features;
-  RunMany({&features, 1}, {&output, 1});
+  RunMany({&features, 1}, {&output, 1}, nullptr);
 }
 
 TfDualNet::~TfDualNet() {
@@ -65,7 +66,7 @@ TfDualNet::~TfDualNet() {
 }
 
 void TfDualNet::RunMany(absl::Span<const BoardFeatures> features,
-                        absl::Span<Output> outputs) {
+                        absl::Span<Output> outputs, std::string* model) {
   MG_DCHECK(features.size() == outputs.size());
 
   int batch_size = static_cast<int>(features.size());
@@ -91,6 +92,10 @@ void TfDualNet::RunMany(absl::Span<const BoardFeatures> features,
     memcpy(outputs[i].policy.data(), policy_tensor.data() + i * kNumMoves,
            sizeof(outputs[i].policy));
     outputs[i].value = value_tensor.data()[i];
+  }
+
+  if (model != nullptr) {
+    *model = graph_path_;
   }
 }
 

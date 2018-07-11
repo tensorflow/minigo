@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <memory>
+#include <string>
 #include <thread>
 
 #include "absl/synchronization/notification.h"
@@ -37,6 +38,9 @@ struct RemoteInference {
 
   // Inference output for the batch.
   absl::Span<DualNet::Output> outputs;
+
+  // Model used for the inference.
+  std::string* model;
 
   // Notified when the batch is ready.
   absl::Notification* notification;

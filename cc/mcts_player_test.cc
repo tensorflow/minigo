@@ -393,9 +393,12 @@ TEST(MctsPlayerTest, ExtractDataResignEnd) {
 class MergeFeaturesNet : public DualNet {
  public:
   void RunMany(absl::Span<const BoardFeatures> features,
-               absl::Span<Output> outputs) override {
+               absl::Span<Output> outputs, std::string* model) override {
     for (size_t i = 0; i < features.size(); ++i) {
       Run(features[i], &outputs[i]);
+    }
+    if (model != nullptr) {
+      *model = "MergeFeaturesNet";
     }
   }
 

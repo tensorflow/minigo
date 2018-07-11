@@ -27,7 +27,7 @@ class FakeNet : public DualNet {
   FakeNet(absl::Span<const float> priors, float value);
 
   void RunMany(absl::Span<const BoardFeatures> features,
-               absl::Span<Output> outputs) override;
+               absl::Span<Output> outputs, std::string* model) override;
 
  private:
   std::array<float, kNumMoves> priors_;

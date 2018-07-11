@@ -69,13 +69,15 @@ class DualNet {
   virtual ~DualNet();
 
   // Runs inference on a batch of input features.
+  // If `model` is non-null, it will be set with the name of the model used for
+  // the inference.
   virtual void RunMany(absl::Span<const BoardFeatures> features,
-                       absl::Span<Output> outputs) = 0;
+                       absl::Span<Output> outputs, std::string* model) = 0;
 
-  // Runst inference on features from a single position.
-  Output Run(const BoardFeatures features) {
+  // Runs inference on features from a single position.
+  Output Run(const BoardFeatures features, std::string* model) {
     Output output;
-    RunMany({&features, 1}, {&output, 1});
+    RunMany({&features, 1}, {&output, 1}, model);
     return output;
   }
 };
