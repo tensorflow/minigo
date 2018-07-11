@@ -272,5 +272,34 @@ TEST(MctsNodeTest, TestSelectLeaf) {
   EXPECT_LE(2, leaves.size());
 }
 
+TEST(MctsNodeTest, NormalizeTest) {
+  // Generate probability with sum of policy less than 1
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.001;
+  }
+  // Five times larger to test normalization
+  probs[17] = 0.005;
+  probs[18] = 0;
+
+  MctsNode::EdgeStats root_stats;
+  auto board = TestablePosition("");
+  MctsNode root(&root_stats, board);
+  root.IncorporateResults(probs, 0, &root);
+
+  // Adjust for the one value that is five times larger and one missing value.
+  float normalized = 1.0 / (kNumMoves - 1 + 4);
+  for (int i = 0; i < kNumMoves; ++i) {
+    if (i == 17) {
+      EXPECT_FLOAT_EQ(5 * normalized, root.child_P(i));
+    } else if (i == 18) {
+      EXPECT_FLOAT_EQ(0, root.child_P(i));
+    } else {
+      EXPECT_FLOAT_EQ(normalized, root.child_P(i));
+    }
+  }
+}
+
+
 }  // namespace
 }  // namespace minigo

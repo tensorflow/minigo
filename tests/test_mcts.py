@@ -192,3 +192,15 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # hasn't yet been sent to neural net for eval + result incorporation
         leaf2 = root.select_leaf()
         self.assertIs(leaf1, leaf2)
+
+    def test_normalize_policy(self):
+        # sum of probs > 1.0
+        probs = np.array([2.0] * (go.N * go.N + 1))
+
+        root = mcts.MCTSNode(SEND_TWO_RETURN_ONE)
+        root.incorporate_results(probs, 0, root)
+        root.N = 0
+
+        # Policy sums to 1.0, only legal moves have non-zero values.
+        self.assertAlmostEqual(sum(root.child_prior), 1.0)
+        self.assertEqual(np.count_nonzero(root.child_prior), 6)

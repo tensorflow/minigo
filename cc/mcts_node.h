@@ -126,7 +126,7 @@ class MctsNode {
   std::array<EdgeStats, kNumMoves> edges;
 
   // TODO(tommadams): a more compact representation.
-  std::array<float, kNumMoves> illegal_moves;
+  std::array<bool, kNumMoves> illegal_moves;
 
   // Map from move to resulting MctsNode.
   // TODO(tommadams): use a better containiner.

@@ -29,7 +29,9 @@ constexpr char kPrintBlack[] = "\x1b[0;31;40m";
 constexpr char kPrintEmpty[] = "\x1b[0;31;43m";
 constexpr char kPrintNormal[] = "\x1b[0m";
 
-std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
+}  // namespace
+
+const std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
   std::array<inline_vector<Coord, 4>, kN * kN> result;
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
@@ -50,12 +52,6 @@ std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
   }
   return result;
 }();
-
-inline const inline_vector<Coord, 4>& GetNeighborCoords(Coord c) {
-  return kNeighborCoords[c];
-}
-
-}  // namespace
 
 Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play, int n)
     : board_visitor_(bv), group_visitor_(gv), to_play_(to_play), n_(n) {}
@@ -178,7 +174,7 @@ void Position::AddStoneToBoard(Coord c, Color color) {
   inline_vector<Coord, 4> liberties;
   tiny_set<GroupId, 4> opponent_groups;
   tiny_set<GroupId, 4> neighbor_groups;
-  for (auto nc : GetNeighborCoords(c)) {
+  for (auto nc : kNeighborCoords[c]) {
     auto neighbor = stones_[nc];
     auto neighbor_color = neighbor.color();
     auto neighbor_group_id = neighbor.group_id();
@@ -270,7 +266,7 @@ void Position::RemoveGroup(Coord c) {
     MG_CHECK(stones_[c].group_id() == removed_group_id);
     stones_[c] = {};
     tiny_set<GroupId, 4> other_groups;
-    for (auto nc : GetNeighborCoords(c)) {
+    for (auto nc : kNeighborCoords[c]) {
       auto ns = stones_[nc];
       auto neighbor_color = ns.color();
       auto neighbor_group_id = ns.group_id();
@@ -303,7 +299,7 @@ void Position::MergeGroup(Coord c) {
       MG_CHECK(stones_[c].color() == color);
       ++group.size;
       stones_[c] = s;
-      for (auto nc : GetNeighborCoords(c)) {
+      for (auto nc : kNeighborCoords[c]) {
         if (stones_[nc].color() != opponent_color) {
           // We visit neighboring stones of the same color and empty coords.
           // Visiting empty coords through the BoardVisitor API ensures that
@@ -322,7 +318,7 @@ Color Position::IsKoish(Coord c) const {
   }
 
   Color ko_color = Color::kEmpty;
-  for (Coord nc : GetNeighborCoords(c)) {
+  for (Coord nc : kNeighborCoords[c]) {
     Stone s = stones_[nc];
     if (s.empty()) {
       return Color::kEmpty;
@@ -356,7 +352,7 @@ bool Position::IsMoveLegal(Coord c) const {
 
 bool Position::IsMoveSuicidal(Coord c, Color color) const {
   auto other_color = OtherColor(color);
-  for (auto nc : GetNeighborCoords(c)) {
+  for (auto nc : kNeighborCoords[c]) {
     Stone s = stones_[nc];
     if (s.empty()) {
       // At least one liberty at nc after playing at c.
@@ -377,7 +373,7 @@ bool Position::IsMoveSuicidal(Coord c, Color color) const {
 }
 
 bool Position::HasNeighboringGroup(Coord c, GroupId group_id) const {
-  for (auto nc : GetNeighborCoords(c)) {
+  for (auto nc : kNeighborCoords[c]) {
     Stone s = stones_[nc];
     if (!s.empty() && s.group_id() == group_id) {
       return true;
@@ -399,7 +395,7 @@ float Position::CalculateScore(float komi) {
     do {
       c = board_visitor_->Next();
       ++num_visited;
-      for (auto nc : GetNeighborCoords(c)) {
+      for (auto nc : kNeighborCoords[c]) {
         Color color = stones_[nc].color();
         if (color == Color::kEmpty) {
           board_visitor_->Visit(nc);

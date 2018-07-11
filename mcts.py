@@ -80,7 +80,7 @@ class MCTSNode(object):
         self.is_expanded = False
         self.losses_applied = 0  # number of virtual losses on this node
         # using child_() allows vectorized computation of action score.
-        self.illegal_moves = 1000 * (1 - self.position.all_legal_moves())
+        self.illegal_moves = 1 - self.position.all_legal_moves()
         self.child_N = np.zeros([go.N * go.N + 1], dtype=np.float32)
         self.child_W = np.zeros([go.N * go.N + 1], dtype=np.float32)
         # save a copy of the original prior before it gets mutated by d-noise.
@@ -94,7 +94,9 @@ class MCTSNode(object):
 
     @property
     def child_action_score(self):
-        return self.child_Q * self.position.to_play + self.child_U - self.illegal_moves
+        return (self.child_Q * self.position.to_play
+            + self.child_U
+            - 1000 * self.illegal_moves)
 
     @property
     def child_Q(self):
@@ -207,7 +209,15 @@ class MCTSNode(object):
             self.revert_visits(up_to=up_to)
             return
         self.is_expanded = True
-        self.original_prior = self.child_prior = move_probabilities
+
+        # Zero out illegal moves.
+        move_probs = move_probabilities * (1 - self.illegal_moves)
+        scale = sum(move_probs)
+        if scale > 0:
+            # Re-normalize move_probabilities.
+            move_probs *= 1 / scale
+
+        self.original_prior = self.child_prior = move_probs
         # initialize child Q as current node's value, to prevent dynamics where
         # if B is winning, then B will only ever explore 1 move, because the Q
         # estimation will be so much larger than the 0 of the other moves.

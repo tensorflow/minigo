@@ -30,6 +30,7 @@
 #include "cc/stone.h"
 
 namespace minigo {
+extern const std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords;
 
 // BoardVisitor visits points on the board only once.
 // A simple example that visits all points on the board only once:

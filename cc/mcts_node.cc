@@ -31,7 +31,7 @@ MctsNode::MctsNode(EdgeStats* stats, const Position& position)
   // TODO(tommadams): Only call IsMoveLegal if we want to select a leaf for
   // expansion.
   for (int i = 0; i < kNumMoves; ++i) {
-    illegal_moves[i] = position.IsMoveLegal(i) ? 0 : 1000;
+    illegal_moves[i] = !position.IsMoveLegal(i);
   }
 }
 
@@ -44,7 +44,7 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
   // TODO(tommadams): Only call IsMoveLegal if we want to select a leaf for
   // expansion.
   for (int i = 0; i < kNumMoves; ++i) {
-    illegal_moves[i] = position.IsMoveLegal(i) ? 0 : 1000;
+    illegal_moves[i] = !position.IsMoveLegal(i);
   }
 }
 
@@ -186,9 +186,22 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
     return;
   }
 
+  float policy_scalar = 0;
+  for (int i = 0; i < kNumMoves; ++i) {
+    if (!illegal_moves[i]) {
+        policy_scalar += move_probabilities[i];
+    }
+  }
+  if (policy_scalar > std::numeric_limits<float>::min()) {
+    policy_scalar = 1 / policy_scalar;
+  }
+
   is_expanded = true;
   for (int i = 0; i < kNumMoves; ++i) {
-    edges[i].original_P = edges[i].P = move_probabilities[i];
+    // Zero out illegal moves, and re-normalize move_probabilities.
+    float move_prob = illegal_moves[i] ? 0 : policy_scalar * move_probabilities[i];
+
+    edges[i].original_P = edges[i].P = move_prob;
     // Initialize child Q as current node's value, to prevent dynamics where
     // if B is winning, then B will only ever explore 1 move, because the Q
     // estimation will be so much larger than the 0 of the other moves.
@@ -265,7 +278,7 @@ std::array<float, kNumMoves> MctsNode::CalculateChildActionScore() const {
   for (int i = 0; i < kNumMoves; ++i) {
     float Q = child_Q(i);
     float U = U_scale * child_P(i) / (1 + child_N(i));
-    result[i] = Q * to_play + U - illegal_moves[i];
+    result[i] = Q * to_play + U - 1000.0f * illegal_moves[i];
   }
   return result;
 }
