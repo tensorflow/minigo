@@ -54,10 +54,10 @@ flags.DEFINE_integer('trunk_layers', go.N,
                      'The number of resnet layers in the shared trunk.')
 
 flags.DEFINE_multi_integer('lr_boundaries', [10000, 30000],
-                     'The number of steps at which the learning rate will decay')
+                           'The number of steps at which the learning rate will decay')
 
 flags.DEFINE_multi_float('lr_rates', [2e-2, 1e-3, 1e-4],
-                     'The different learning rates')
+                         'The different learning rates')
 
 flags.DEFINE_float('l2_strength', 1e-4,
                    'The L2 regularization parameter applied to weights.')
@@ -81,7 +81,7 @@ flags.DEFINE_string(
 
 flags.register_multi_flags_validator(
     ['use_tpu', 'tpu_name'],
-    lambda flags: bool(flags['use_tpu']) == bool(flags['tpu_name']),
+    lambda flags: flags['use_tpu'] == bool(flags['tpu_name']),
     'If use_tpu is set, tpu_name must also be set.')
 
 flags.register_multi_flags_validator(
@@ -90,7 +90,7 @@ flags.register_multi_flags_validator(
     'Number of learning rates must be exactly one greater than the number of boundaries')
 
 flags.DEFINE_integer(
-    'iterations_per_loop', 200,
+    'iterations_per_loop', 250,
     help=('Number of steps to run on TPU before outfeeding metrics to the CPU.'
           ' If the number of iterations in the loop would exceed the number of'
           ' train steps, the loop will exit before reaching'
@@ -102,11 +102,15 @@ flags.DEFINE_integer(
     help=('Number of TPU cores. For a single TPU device, this is 8 because each'
           ' TPU has 4 chips each with 2 cores.'))
 
-flags.DEFINE_enum(
-    'precision', 'float32', ['bfloat16', 'float32'],
-    help=('Precision to use for training ; one of: {bfloat16, float32}. '
-          'Does not affect the saved model output - bfloat16 training outputs '
-          'float32 weights (least significant 16 bits all end up zero)'))
+flags.DEFINE_integer(
+    'summary_steps', default=500,
+    help='Number of steps between logging summary scalars.')
+
+flags.register_multi_flags_validator(
+    ['use_tpu', 'iterations_per_loop', 'summary_steps'],
+    lambda flags: (not flags['use_tpu'] or
+                   flags['summary_steps'] % flags['iterations_per_loop'] == 0),
+    'If use_tpu, summary_steps must be a multiple of iterations_per_loop')
 
 FLAGS = flags.FLAGS
 
@@ -226,8 +230,8 @@ def model_fn(features, labels, mode, params=None):
         train_op = optimizer.minimize(combined_cost, global_step=global_step)
 
     # Computations to be executed on CPU, outside of the main TPU queues.
-    def host_call_fn(policy_output, value_output, pi_tensor, policy_cost,
-                     value_cost, l2_cost, combined_cost):
+    def eval_metrics_host_call_fn(policy_output, value_output, pi_tensor, policy_cost,
+                                  value_cost, l2_cost, combined_cost):
         policy_entropy = -tf.reduce_mean(tf.reduce_sum(
             policy_output * tf.log(policy_output), axis=1))
         # pi_tensor is one_hot when generated from sgfs (for supervised learning)
@@ -260,42 +264,39 @@ def model_fn(features, labels, mode, params=None):
         }
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
-        if FLAGS.use_tpu:
-            with summary.create_file_writer(FLAGS.model_dir).as_default(), summary.record_summaries_every_n_global_steps(FLAGS.iterations_per_loop * 2):
-                for metric_name, metric_op in metric_ops.items():
-                    summary.scalar(metric_name, metric_op[1])
-            return summary.all_summary_ops()
-        else:
+        summary_writer = summary.create_file_writer(FLAGS.model_dir)
+        with summary_writer.as_default(), \
+                summary.record_summaries_every_n_global_steps(FLAGS.summary_steps):
             for metric_name, metric_op in metric_ops.items():
-                tf.summary.scalar(metric_name, metric_op[1])
-            return metric_ops
+                summary.scalar(metric_name, metric_op[1])
+        return summary.all_summary_ops()
 
+    metric_args = [
+        policy_output,
+        value_output,
+        labels['pi_tensor'],
+        tf.reshape(policy_cost, [1]),
+        tf.reshape(value_cost, [1]),
+        tf.reshape(l2_cost, [1]),
+        tf.reshape(combined_cost, [1]),
+    ]
+
+    predictions = {
+        'policy_output': policy_output,
+        'value_output': value_output,
+    }
+
+    tpu_estimator_spec = tpu_estimator.TPUEstimatorSpec(
+        mode=mode,
+        predictions=predictions,
+        loss=combined_cost,
+        train_op=train_op,
+        host_call=(eval_metrics_host_call_fn, metric_args)
+    )
     if FLAGS.use_tpu:
-        return tpu_estimator.TPUEstimatorSpec(
-            mode=mode,
-            loss=combined_cost,
-            train_op=train_op,
-            host_call=(host_call_fn, [
-                policy_output,
-                value_output,
-                labels['pi_tensor'],
-                tf.reshape(policy_cost, [1]),
-                tf.reshape(value_cost, [1]),
-                tf.reshape(l2_cost, [1]),
-                tf.reshape(combined_cost, [1])]))
+        return tpu_estimator_spec
     else:
-        metric_ops = host_call_fn(policy_output, value_output, labels['pi_tensor'],
-                                  policy_cost, value_cost, l2_cost, combined_cost)
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            predictions={
-                'policy_output': policy_output,
-                'value_output': value_output,
-            },
-            loss=combined_cost,
-            train_op=train_op,
-            eval_metric_ops=metric_ops,
-        )
+        return tpu_estimator_spec.as_estimator_spec()
 
 
 def model_inference_fn(features, training):
@@ -365,7 +366,7 @@ def model_inference_fn(features, training):
 
 
 def get_estimator(working_dir):
-    run_config = tf.estimator.RunConfig(save_summary_steps=500)
+    run_config = tf.estimator.RunConfig(save_summary_steps=FLAGS.summary_steps)
     return tf.estimator.Estimator(
         model_fn,
         model_dir=working_dir,
@@ -427,7 +428,8 @@ def train(*tf_records, steps=None):
             evaluation_master=tpu_grpc_url,
             model_dir=FLAGS.model_dir,
             save_checkpoints_steps=max(800, FLAGS.iterations_per_loop),
-            session_config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True),
+            session_config=tf.ConfigProto(
+                allow_soft_placement=True, log_device_placement=True),
             tpu_config=tpu_config.TPUConfig(
                 iterations_per_loop=FLAGS.iterations_per_loop,
                 num_shards=FLAGS.num_tpu_cores,
