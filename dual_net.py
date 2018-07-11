@@ -262,6 +262,7 @@ def model_fn(features, labels, mode, params=None):
                 policy_target_top_1_confidence),
             'value_confidence': tf.metrics.mean(tf.abs(value_output)),
         }
+
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
         summary_writer = summary.create_file_writer(FLAGS.model_dir)
@@ -366,11 +367,40 @@ def model_inference_fn(features, training):
 
 
 def get_estimator(working_dir):
+    if FLAGS.use_tpu:
+        return get_tpu_estimator(working_dir)
+
     run_config = tf.estimator.RunConfig(save_summary_steps=FLAGS.summary_steps)
     return tf.estimator.Estimator(
         model_fn,
         model_dir=working_dir,
         config=run_config)
+
+
+def get_tpu_estimator(working_dir):
+    tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+        FLAGS.tpu_name, zone=None, project=None)
+    tpu_grpc_url = tpu_cluster_resolver.get_master()
+
+    run_config = tpu_config.RunConfig(
+        master=tpu_grpc_url,
+        evaluation_master=tpu_grpc_url,
+        model_dir=working_dir,
+        save_checkpoints_steps=max(800, FLAGS.iterations_per_loop),
+        save_summary_steps=FLAGS.summary_steps,
+        session_config=tf.ConfigProto(
+            allow_soft_placement=True, log_device_placement=True),
+        tpu_config=tpu_config.TPUConfig(
+            iterations_per_loop=FLAGS.iterations_per_loop,
+            num_shards=FLAGS.num_tpu_cores,
+            per_host_input_for_training=tpu_config.InputPipelineConfig.PER_HOST_V2))
+
+    return tpu_estimator.TPUEstimator(
+        use_tpu=FLAGS.use_tpu,
+        model_fn=model_fn,
+        config=run_config,
+        train_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores,
+        eval_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores)
 
 
 def bootstrap(working_dir):
@@ -418,37 +448,15 @@ def export_model(working_dir, model_path):
 
 def train(*tf_records, steps=None):
     tf.logging.set_verbosity(tf.logging.INFO)
+
+    estimator = get_estimator(FLAGS.model_dir)
     if FLAGS.use_tpu:
-        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
-            FLAGS.tpu_name, zone=None, project=None)
-        tpu_grpc_url = tpu_cluster_resolver.get_master()
-
-        config = tpu_config.RunConfig(
-            master=tpu_grpc_url,
-            evaluation_master=tpu_grpc_url,
-            model_dir=FLAGS.model_dir,
-            save_checkpoints_steps=max(800, FLAGS.iterations_per_loop),
-            session_config=tf.ConfigProto(
-                allow_soft_placement=True, log_device_placement=True),
-            tpu_config=tpu_config.TPUConfig(
-                iterations_per_loop=FLAGS.iterations_per_loop,
-                num_shards=FLAGS.num_tpu_cores,
-                per_host_input_for_training=tpu_config.InputPipelineConfig.PER_HOST_V2))  # pylint: disable=line-too-long
-
-        estimator = tpu_estimator.TPUEstimator(
-            use_tpu=FLAGS.use_tpu,
-            model_fn=model_fn,
-            config=config,
-            train_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores,
-            eval_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores)
-
         def input_fn(params):
             return preprocessing.get_tpu_input_tensors(params['batch_size'], tf_records)
+
         # TODO: get hooks working again with TPUestimator.
         hooks = []
     else:
-        estimator = get_estimator(FLAGS.model_dir)
-
         def input_fn():
             return preprocessing.get_input_tensors(
                 FLAGS.train_batch_size, tf_records, filter_amount=1.0,
@@ -464,14 +472,20 @@ def train(*tf_records, steps=None):
 
 
 def validate(tf_records, validate_name=None):
-    estimator = get_estimator(FLAGS.model_dir)
     validate_name = validate_name or "selfplay"
 
-    def input_fn():
-        return preprocessing.get_input_tensors(
-            FLAGS.train_batch_size, tf_records, filter_amount=0.05,
-            shuffle_buffer_size=20000)
+    if FLAGS.use_tpu:
+        def input_fn(params):
+            return preprocessing.get_tpu_input_tensors(
+                params['batch_size'],
+                tf_records)
+    else:
+        def input_fn():
+            return preprocessing.get_input_tensors(
+                FLAGS.train_batch_size, tf_records, filter_amount=0.05,
+                shuffle_buffer_size=20000)
 
+    estimator = get_estimator(FLAGS.model_dir)
     estimator.evaluate(input_fn, steps=500, name=validate_name)
 
 
