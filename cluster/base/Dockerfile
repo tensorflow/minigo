@@ -63,6 +63,7 @@ WORKDIR /app
 
 # For the slow stuff, copy just the needed scripts so we don't break the docker cache
 COPY staging/cc/configure_tensorflow.sh cc/configure_tensorflow.sh
+ENV CC_OPT_FLAGS -march=ivybridge
 RUN cc/configure_tensorflow.sh
 
 # Now bring in the rest of our code; changing our code will only trigger rebuilds below here
