@@ -74,7 +74,7 @@ print = functools.partial(print, file=sys.stderr, flush=True)
 class RwLock(object):
     """A simple read/write mutex.
 
-    I'm kind of surprised Python doesn't provide one of these by default.
+    I'm surprised Python doesn't provide one of these by default.
     """
     def __init__(self):
         self._resource_lock = threading.Semaphore()
@@ -197,7 +197,7 @@ class Worker(object):
         """Run inference threads and optionally a thread that updates the model.
 
         Synchronization between the inference threads and the model update
-        thread is performed using a RwLock that protections access to self.sess.
+        thread is performed using a RwLock that protects access to self.sess.
         The inference threads enter the critical section using a read lock, so
         they can both run inference concurrently. The model update thread enters
         the critical section using a write lock for exclusive access.
