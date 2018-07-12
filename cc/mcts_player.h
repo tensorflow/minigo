@@ -201,7 +201,7 @@ class MctsPlayer {
     int last_move = 0;
   };
   std::string model_;
-  std::vector<InferenceInfo> inference_info_;
+  std::vector<InferenceInfo> inferences_;
 
   // Vectors reused when running TreeSearch.
   std::vector<MctsNode*> leaves_;

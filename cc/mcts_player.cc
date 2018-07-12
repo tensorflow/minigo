@@ -22,6 +22,8 @@
 #include <utility>
 
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/time/clock.h"
 #include "cc/check.h"
 #include "cc/random.h"
@@ -90,7 +92,7 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
 MctsPlayer::~MctsPlayer() {
   if (options_.verbose) {
     std::cerr << "Inference history:" << std::endl;
-    for (const auto& info : inference_info_) {
+    for (const auto& info : inferences_) {
       std::cerr << info.model << " [" << info.first_move << ", "
                 << info.last_move << "]" << std::endl;
     }
@@ -290,6 +292,23 @@ void MctsPlayer::PushHistory(Coord c) {
   history.comment = root_->Describe();
   history.node = root_;
 
+  if (!inferences_.empty()) {
+    // Record which model(s) were used when running tree search for this move.
+    std::vector<std::string> models;
+    for (auto it = inferences_.rbegin(); it != inferences_.rend(); ++it) {
+      if (it->last_move < root_->position.n()) {
+        break;
+      }
+      models.push_back(it->model);
+    }
+    std::reverse(models.begin(), models.end());
+    auto model_comment = absl::StrCat("models:", absl::StrJoin(models, ","));
+    history.comment = absl::StrCat(model_comment, "\n", history.comment);
+    if (options_.verbose) {
+      std::cerr << model_comment << std::endl;
+    }
+  }
+
   // Convert child visit counts to a probability distribution, pi.
   // For moves before the temperature cutoff, exponentiate the probabilities by
   // a temperature slightly larger than unity to encourage diversity in early
@@ -344,11 +363,13 @@ void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves) {
   network_->RunMany(features_, absl::MakeSpan(outputs_), &model_);
 
   // Record some information about the inference.
-  if (inference_info_.empty() || model_ != inference_info_.back().model) {
-    inference_info_.emplace_back(model_, root_->position.n());
+  if (!model_.empty()) {
+    if (inferences_.empty() || model_ != inferences_.back().model) {
+      inferences_.emplace_back(model_, root_->position.n());
+    }
+    inferences_.back().last_move = root_->position.n();
+    inferences_.back().total_count += leaves.size();
   }
-  inference_info_.back().last_move = root_->position.n();
-  inference_info_.back().total_count += leaves.size();
 
   // Incorporate the inference outputs back into tree search, undoing any
   // previously applied random symmetries.

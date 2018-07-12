@@ -19,6 +19,7 @@ fetched via RPC at the top of the loop, and inference output is written back
 at the bottom (again, via RPC).
 """
 
+import functools
 import sys
 import time
 import tensorflow as tf
@@ -26,7 +27,6 @@ from tensorflow.python.framework import dtypes
 from tensorflow.python.training import saver
 from tensorflow.contrib.proto.python.ops import decode_proto_op
 from tensorflow.contrib.proto.python.ops import encode_proto_op
-import signal
 import threading
 import numpy as np
 from absl import flags
@@ -66,6 +66,9 @@ GRPC_OPTIONS = [
 ]
 
 NUM_WORKER_THREADS = 2
+
+# Print to stderr and flush by default.
+print = functools.partial(print, file=sys.stderr, flush=True)
 
 
 class RwLock(object):
@@ -124,8 +127,13 @@ class Worker(object):
         self._init_sess()
 
     def run(self):
-        self._run_threads()
-        self._shutdown_sess()
+        self._running = True
+        try:
+            self._run_threads()
+        finally:
+            self._running = False
+            print("Shutting down session")
+            self._shutdown_sess()
 
     def _get_server_config(self):
         while True:
@@ -137,7 +145,7 @@ class Worker(object):
                     inference_service_pb2.GetConfigRequest())
                 break
             except grpc.RpcError:
-                print("Waiting for server", flush=True)
+                print("Waiting for server")
                 time.sleep(1)
 
         if config.board_size != go.N:
@@ -157,7 +165,6 @@ class Worker(object):
         print("virtual_losses = %d" % config.virtual_losses)
         print("positions_per_inference = %d" % positions_per_inference)
         print("batch_size = %d" % self.batch_size)
-        sys.stdout.flush()
 
     def _init_sess(self):
         tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver(
@@ -183,10 +190,10 @@ class Worker(object):
                 tf.train.Saver().restore(self.sess, FLAGS.model)
                 self.model_available.set()
 
-        print("initializing tpu", flush=True)
+        print("initializing tpu")
         tpu_init = tf.contrib.tpu.initialize_system()
         self.sess.run(tpu_init)
-        print("tpu ready", flush=True)
+        print("tpu ready")
 
     def _run_threads(self):
         """Run inference threads and optionally a thread that updates the model.
@@ -201,40 +208,51 @@ class Worker(object):
         self.model_path = None
 
         threads = []
-        if FLAGS.checkpoint_dir:
-            threads.append(threading.Thread(target=self._checkpoint_thread))
+        # Start the worker threads before the checkpoint thread: if the parent
+        # process dies, the worker thread RPCs will fail and the thread will
+        # exit. This gives us a chance below to set self._running to False,
+        # telling the checkpoint thread to exit.
         for i in range(NUM_WORKER_THREADS):
             threads.append(threading.Thread(target=self._worker_thread))
+        if FLAGS.checkpoint_dir:
+            threads.append(threading.Thread(target=self._checkpoint_thread))
+
         for t in threads:
             t.start()
-        for t in threads:
+        for i, t in enumerate(threads):
             t.join()
+            print("joined thread %d" % i)
+            # Once the first thread has joined, tell the remaining ones to stop.
+            self._running = False
 
     def _checkpoint_thread(self):
-        print("starting model loader thread", flush=True)
-        while True:
+        print("starting model loader thread")
+        while self._running:
             freshest = saver.latest_checkpoint(FLAGS.checkpoint_dir)
-            print("freshest model = %s" % freshest, flush=True)
-            if not freshest or freshest == self.model_path:
-                time.sleep(10)
-                continue
-
-            self.lock.acquire_write()
-            print("loading %s" % freshest, flush=True)
-            try:
-                with self.sess.graph.as_default():
-                    tf.train.Saver().restore(self.sess, freshest)
-                self.model_path = freshest
-                self.model_available.set()
-            finally:
-                self.lock.release_write()
+            if freshest and freshest != self.model_path:
+                print("fresh model found %s" % freshest)
+                self.lock.acquire_write()
+                print("loading %s" % freshest)
+                try:
+                    with self.sess.graph.as_default():
+                        tf.train.Saver().restore(self.sess, freshest)
+                    self.model_path = freshest
+                    self.model_available.set()
+                    print("loaded %s" % freshest)
+                finally:
+                    self.lock.release_write()
+            # Wait a few seconds before checking again.
+            time.sleep(5)
 
     def _worker_thread(self):
         num_board_features = go.N * go.N * features_lib.NEW_FEATURES_PLANES
 
-        print("waiting for model", flush=True)
-        self.model_available.wait()
-        while True:
+        print("waiting for model")
+        while self._running and not self.model_available.wait(1):
+            pass
+
+        print("running worker")
+        while self._running:
             features_response = self.stub.GetFeatures(
                 inference_service_pb2.GetFeaturesRequest())
             all_features = features_response.features
@@ -274,18 +292,12 @@ class Worker(object):
 
     def _shutdown_sess(self):
         tpu_shutdown = tf.contrib.tpu.shutdown_system()
-        print("shutting down TPU", flush=True)
+        print("shutting down TPU")
         self.sess.run(tpu_shutdown)
-        print("all done!", flush=True)
+        print("all done!")
 
 
 def main():
-    # Tell Python to use the system's default signal handler when handling
-    # SIGINT. This will stop the inference worker child process becoming
-    # orphaned in some cases when the process group is interrupted (e.g. with
-    # ctrl-C).
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-
     tf.logging.set_verbosity(tf.logging.DEBUG)
     worker = Worker()
     worker.run()
