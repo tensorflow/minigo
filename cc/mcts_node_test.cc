@@ -300,7 +300,6 @@ TEST(MctsNodeTest, NormalizeTest) {
   }
 }
 
-
 TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
   // Give moves a uniform policy value.
   std::array<float, kNumMoves> probs;
@@ -318,9 +317,9 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
 
   for (int i = 0; i < kNumMoves; ++i) {
     if (root.illegal_moves[i]) {
-        EXPECT_FLOAT_EQ(0, root.edges[i].P);
+      EXPECT_FLOAT_EQ(0, root.edges[i].P);
     } else {
-        EXPECT_FLOAT_EQ(uniform_policy, root.edges[i].P);
+      EXPECT_FLOAT_EQ(uniform_policy, root.edges[i].P);
     }
   }
 
@@ -332,14 +331,13 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
 
   for (int i = 0; i < kNumMoves; ++i) {
     if (root.illegal_moves[i]) {
-        EXPECT_FLOAT_EQ(0, root.edges[i].P);
+      EXPECT_FLOAT_EQ(0, root.edges[i].P);
     } else {
-        EXPECT_LT(0.75 * uniform_policy, root.edges[i].P);
-        EXPECT_GT(0.75 * uniform_policy + 0.25, root.edges[i].P);
+      EXPECT_LT(0.75 * uniform_policy, root.edges[i].P);
+      EXPECT_GT(0.75 * uniform_policy + 0.25, root.edges[i].P);
     }
   }
 }
-
 
 }  // namespace
 }  // namespace minigo

@@ -36,8 +36,7 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
      << " soft_pick:" << options.soft_pick
      << " random_symmetry:" << options.random_symmetry
      << " resign_threshold:" << options.resign_threshold
-     << " batch_size:" << options.batch_size
-     << " komi:" << options.komi
+     << " batch_size:" << options.batch_size << " komi:" << options.komi
      << " num_readouts:" << options.num_readouts
      << " seconds_per_move:" << options.seconds_per_move
      << " time_limit:" << options.time_limit

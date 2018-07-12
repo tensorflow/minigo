@@ -155,7 +155,7 @@ void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise) {
   }
 
   if (scalar > std::numeric_limits<float>::min()) {
-      scalar = 1.0 / scalar;
+    scalar = 1.0 / scalar;
   }
 
   for (int i = 0; i < kNumMoves; ++i) {
@@ -204,7 +204,7 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
   float policy_scalar = 0;
   for (int i = 0; i < kNumMoves; ++i) {
     if (!illegal_moves[i]) {
-        policy_scalar += move_probabilities[i];
+      policy_scalar += move_probabilities[i];
     }
   }
   if (policy_scalar > std::numeric_limits<float>::min()) {
@@ -214,7 +214,8 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
   is_expanded = true;
   for (int i = 0; i < kNumMoves; ++i) {
     // Zero out illegal moves, and re-normalize move_probabilities.
-    float move_prob = illegal_moves[i] ? 0 : policy_scalar * move_probabilities[i];
+    float move_prob =
+        illegal_moves[i] ? 0 : policy_scalar * move_probabilities[i];
 
     edges[i].original_P = edges[i].P = move_prob;
     // Initialize child Q as current node's value, to prevent dynamics where

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <unistd.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -115,16 +115,16 @@ DEFINE_bool(remote_inference, false,
             "If true, run the model using the InferenceServer. This launches "
             "a Python subprocess that performs the actual inference. Required "
             "when running on Cloud TPU.");
-DEFINE_int32(port, 50051,
-             "The port opened by the InferenceService server.");
+DEFINE_int32(port, 50051, "The port opened by the InferenceService server.");
 DEFINE_string(tpu_name, "", "Cloud TPU name, e.g. grpc://10.240.2.2:8470.");
 DEFINE_int32(parallel_games, 32,
              "Number of games to play in parallel. For performance reasons, "
              "parallel_games should equal games_per_inference * 2 because this "
              "allows the transfer of inference requests & responses to be "
              "overlapped with model evaluation.");
-DEFINE_int32(games_per_inference, 16,
-             "Number of games to merge together into a single inference batch.");
+DEFINE_int32(
+    games_per_inference, 16,
+    "Number of games to merge together into a single inference batch.");
 DEFINE_int32(parallel_tpus, 8,
              "If model=remote, the number of TPU cores to run on in parallel.");
 DEFINE_int32(conv_width, 256, "Width of the model's convolution filters.");
@@ -154,19 +154,18 @@ namespace {
 class PlayerFactory {
  public:
   PlayerFactory(const MctsPlayer::Options& options, float disable_resign_pct)
-      : options_(options),
-        disable_resign_pct_(disable_resign_pct) {
+      : options_(options), disable_resign_pct_(disable_resign_pct) {
     inference_worker_thread_ = std::thread([]() {
       std::vector<std::string> cmd_parts = {
-        absl::StrCat("BOARD_SIZE=", kN),
-        "python",
-        "inference_worker.py",
-        absl::StrCat("--model=", FLAGS_model),
-        absl::StrCat("--checkpoint_dir=", FLAGS_checkpoint_dir),
-        "--use_tpu=true",
-        absl::StrCat("--tpu_name=", FLAGS_tpu_name),
-        absl::StrCat("--conv_width=", FLAGS_conv_width),
-        absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
+          absl::StrCat("BOARD_SIZE=", kN),
+          "python",
+          "inference_worker.py",
+          absl::StrCat("--model=", FLAGS_model),
+          absl::StrCat("--checkpoint_dir=", FLAGS_checkpoint_dir),
+          "--use_tpu=true",
+          absl::StrCat("--tpu_name=", FLAGS_tpu_name),
+          absl::StrCat("--conv_width=", FLAGS_conv_width),
+          absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
       };
       auto cmd = absl::StrJoin(cmd_parts, " ");
       FILE* f = popen(cmd.c_str(), "r");
@@ -181,11 +180,10 @@ class PlayerFactory {
     });
   }
 
-  virtual ~PlayerFactory() {
-    inference_worker_thread_.join();
-  }
+  virtual ~PlayerFactory() { inference_worker_thread_.join(); }
 
-  virtual std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) = 0;
+  virtual std::unique_ptr<MctsPlayer> New(
+      const MctsPlayer::Options& options) = 0;
 
   // Thread safe random number generator, provided for convenience: when
   // multiple players are running in parallel, they will need access to a thread
@@ -216,11 +214,11 @@ class PlayerFactory {
 class RemotePlayerFactory : public PlayerFactory {
  public:
   RemotePlayerFactory(const MctsPlayer::Options& options,
-                      float disable_resign_pct,
-                      int virtual_losses, int games_per_inference, int port)
+                      float disable_resign_pct, int virtual_losses,
+                      int games_per_inference, int port)
       : PlayerFactory(options, disable_resign_pct) {
-    server_ = absl::make_unique<InferenceServer>(
-        virtual_losses, games_per_inference, port);
+    server_ = absl::make_unique<InferenceServer>(virtual_losses,
+                                                 games_per_inference, port);
   }
 
   std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
@@ -299,9 +297,9 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
     std::string comment;
     if (write_comments) {
       if (i == 0) {
-        comment = absl::StrCat(
-            "Resign Threshold: ", player_b.options().resign_threshold, "\n",
-            h.comment);
+        comment =
+            absl::StrCat("Resign Threshold: ",
+                         player_b.options().resign_threshold, "\n", h.comment);
       } else {
         if (log_names) {
           comment = absl::StrCat(i % 2 == 0 ? player_b.name() : player_w.name(),
@@ -450,9 +448,9 @@ void Eval() {
   }
   std::cerr << "Black was: " << player->name() << "\n";
 
-  std::string output_name = absl::StrCat(
-      GetOutputName(absl::Now(), 0), "-", player->name(), "-",
-      other_player->name());
+  std::string output_name =
+      absl::StrCat(GetOutputName(absl::Now(), 0), "-", player->name(), "-",
+                   other_player->name());
 
   // Write SGF.
   if (!FLAGS_sgf_dir.empty()) {

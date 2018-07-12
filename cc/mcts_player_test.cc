@@ -408,7 +408,7 @@ class MergeFeaturesNet : public DualNet {
       bool present = false;
       for (const auto n : kNeighborCoords[c]) {
         const float* src = features.data() + n * DualNet::kNumStoneFeatures;
-        for (int f = 0; f < DualNet::kNumStoneFeatures-1; ++f) {
+        for (int f = 0; f < DualNet::kNumStoneFeatures - 1; ++f) {
           if (src[f] != 0) {
             present = true;
           }
@@ -456,11 +456,11 @@ TEST(MctsPlayerTest, SymmetriesTest) {
     player.ProcessLeaves({&leaf, 1});
     ASSERT_EQ(0.0, leaf->child_P(Coord::FromKgs("pass")));
     for (const auto move : moves) {
-        // Playing where stones exist is illegal and should have been marked as 0.
-        ASSERT_EQ(0.0, leaf->child_P(Coord::FromKgs(move)));
-        for (const auto n : kNeighborCoords[Coord::FromKgs(move)]) {
-            ASSERT_NEAR(policy_fraction, leaf->child_P(n), 1e-7);
-        }
+      // Playing where stones exist is illegal and should have been marked as 0.
+      ASSERT_EQ(0.0, leaf->child_P(Coord::FromKgs(move)));
+      for (const auto n : kNeighborCoords[Coord::FromKgs(move)]) {
+        ASSERT_NEAR(policy_fraction, leaf->child_P(n), 1e-7);
+      }
     }
   }
 }

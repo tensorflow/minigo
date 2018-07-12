@@ -122,6 +122,7 @@ class Worker(object):
         # Event that gets set after a model is loaded.
         # The worker threads wait for this event before starting inference.
         self.model_available = threading.Event()
+        self.model_path = None
 
         self._get_server_config()
         self._init_sess()
@@ -132,8 +133,9 @@ class Worker(object):
             self._run_threads()
         finally:
             self._running = False
-            print("Shutting down session")
-            self._shutdown_sess()
+            print("shutting down TPU")
+            self.sess.run(self._tpu_shutdown)
+            print("all done!")
 
     def _get_server_config(self):
         while True:
@@ -167,6 +169,9 @@ class Worker(object):
         print("batch_size = %d" % self.batch_size)
 
     def _init_sess(self):
+        self._tpu_init = tf.contrib.tpu.initialize_system()
+        self._tpu_shutdown = tf.contrib.tpu.shutdown_system()
+
         tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver(
             tpu=[FLAGS.tpu_name]).get_master()
         self.sess = tf.Session(tpu_grpc_url)
@@ -185,15 +190,8 @@ class Worker(object):
             # tpu.replicate requires a list, but sess.run requires a tuple...
             self.feature_placeholders = tuple(self.feature_placeholders)
 
-            # TODO(tommadams): remove this
-            if FLAGS.model:
-                tf.train.Saver().restore(self.sess, FLAGS.model)
-                self.model_available.set()
-
-        print("initializing tpu")
-        tpu_init = tf.contrib.tpu.initialize_system()
-        self.sess.run(tpu_init)
-        print("tpu ready")
+        if FLAGS.model:
+            self._load_model(FLAGS.model)
 
     def _run_threads(self):
         """Run inference threads and optionally a thread that updates the model.
@@ -205,7 +203,6 @@ class Worker(object):
         the critical section using a write lock for exclusive access.
         """
         self.lock = RwLock()
-        self.model_path = None
 
         threads = []
         # Start the worker threads before the checkpoint thread: if the parent
@@ -225,6 +222,21 @@ class Worker(object):
             # Once the first thread has joined, tell the remaining ones to stop.
             self._running = False
 
+    def _load_model(self, path):
+        if self.model_path:
+            print("shutting down tpu")
+            self.sess.run(self._tpu_shutdown)
+
+        print("loading %s" % path)
+        with self.sess.graph.as_default():
+            tf.train.Saver().restore(self.sess, path)
+        print("loaded %s" % path)
+        self.model_path = path
+
+        print("initializing tpu")
+        self.sess.run(self._tpu_init)
+        self.model_available.set()
+
     def _checkpoint_thread(self):
         print("starting model loader thread")
         while self._running:
@@ -232,13 +244,8 @@ class Worker(object):
             if freshest and freshest != self.model_path:
                 print("fresh model found %s" % freshest)
                 self.lock.acquire_write()
-                print("loading %s" % freshest)
                 try:
-                    with self.sess.graph.as_default():
-                        tf.train.Saver().restore(self.sess, freshest)
-                    self.model_path = freshest
-                    self.model_available.set()
-                    print("loaded %s" % freshest)
+                    self._load_model(freshest)
                 finally:
                     self.lock.release_write()
             # Wait a few seconds before checking again.
@@ -289,12 +296,6 @@ class Worker(object):
                  policy=np.concatenate(flat_policy), value=value,
                  model_path=local_model_path)
             self.stub.PutOutputs(put_outputs_request)
-
-    def _shutdown_sess(self):
-        tpu_shutdown = tf.contrib.tpu.shutdown_system()
-        print("shutting down TPU")
-        self.sess.run(tpu_shutdown)
-        print("all done!")
 
 
 def main():
