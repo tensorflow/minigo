@@ -67,7 +67,7 @@ class TestablePlayer : public MctsPlayer {
   }
 
   DualNet::Output Run(const DualNet::BoardFeatures& features) {
-    return network()->Run(features);
+    return network()->Run(features, nullptr);
   }
 };
 
