@@ -248,10 +248,12 @@ class MCTSNode(object):
         return self.position.is_game_over() or self.position.n >= FLAGS.max_game_length
 
     def inject_noise(self):
-        dirch = np.random.dirichlet(
-            [FLAGS.dirichlet_noise_alpha] * ((go.N * go.N) + 1))
+        epsilon = 1e-5
+        legal_moves = (1 - self.illegal_moves) + epsilon
+        a = legal_moves * ([FLAGS.dirichlet_noise_alpha] * (go.N * go.N + 1))
+        dirichlet = np.random.dirichlet(a)
         self.child_prior = (self.child_prior * (1 - FLAGS.dirichlet_noise_weight) +
-                            dirch * FLAGS.dirichlet_noise_weight)
+                            dirichlet * FLAGS.dirichlet_noise_weight)
 
     def children_as_pi(self, squash=False):
         """Returns the child visit counts as a probability distribution, pi

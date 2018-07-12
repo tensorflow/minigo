@@ -197,10 +197,32 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # sum of probs > 1.0
         probs = np.array([2.0] * (go.N * go.N + 1))
 
-        root = mcts.MCTSNode(SEND_TWO_RETURN_ONE)
+        root = mcts.MCTSNode(TEST_POSITION)
         root.incorporate_results(probs, 0, root)
         root.N = 0
 
         # Policy sums to 1.0, only legal moves have non-zero values.
         self.assertAlmostEqual(sum(root.child_prior), 1.0)
         self.assertEqual(np.count_nonzero(root.child_prior), 6)
+        self.assertEqual(sum(root.child_prior * root.illegal_moves), 0)
+
+    def test_inject_noise_only_legal_moves(self):
+        probs = np.array([0.02] * (go.N * go.N + 1))
+        root = mcts.MCTSNode(TEST_POSITION)
+        root.incorporate_results(probs, 0, root)
+        root.N = 0
+
+        uniform_policy = 1 / sum(root.illegal_moves == 0)
+        expected_policy = uniform_policy * (1 - root.illegal_moves)
+
+        self.assertTrue((root.child_prior == expected_policy).all())
+
+        root.inject_noise()
+
+        # 0.75/0.25 derived from default dirichlet_noise_weight.
+        self.assertTrue((0.75 * expected_policy <= root.child_prior).all())
+        self.assertTrue(
+            (0.75 * expected_policy + 0.25 >= root.child_prior).all())
+        # Policy sums to 1.0, only legal moves have non-zero values.
+        self.assertAlmostEqual(sum(root.child_prior), 1.0)
+        self.assertEqual(sum(root.child_prior * root.illegal_moves), 0)
