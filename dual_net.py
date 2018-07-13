@@ -80,11 +80,6 @@ flags.DEFINE_string(
     'when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 url.')
 
 flags.register_multi_flags_validator(
-    ['use_tpu', 'tpu_name'],
-    lambda flags: flags['use_tpu'] == bool(flags['tpu_name']),
-    'If use_tpu is set, tpu_name must also be set.')
-
-flags.register_multi_flags_validator(
     ['lr_boundaries', 'lr_rates'],
     lambda flags: len(flags['lr_boundaries']) == len(flags['lr_rates']) - 1,
     'Number of learning rates must be exactly one greater than the number of boundaries')
@@ -448,7 +443,6 @@ def export_model(working_dir, model_path):
 
 def train(*tf_records, steps=None):
     tf.logging.set_verbosity(tf.logging.INFO)
-
     estimator = get_estimator(FLAGS.model_dir)
     if FLAGS.use_tpu:
         def input_fn(params):

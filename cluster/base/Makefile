@@ -8,6 +8,7 @@ base-image:
 		mkdir -p staging/cc
 		cp ../../WORKSPACE staging/
 		cp -r -p ../../cc/ staging/
+		cp -r -p ../../proto/ staging/
 		rm -rfd staging/cc/tensorflow
 		docker build -t "gcr.io/${PROJECT}/cc-base:${VERSION_TAG}" .
 		rm -rfd staging/

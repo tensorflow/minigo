@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: minigo-tpu-player
+  annotations:
+    tf-version.cloud-tpus.google.com: "1.8"
+spec:
+  containers:
+  - name: minigo-tpu-player-container
+    image: gcr.io/tensor-go/minigo-tpu-player:0.1
+    imagePullPolicy: Always
+    resources:
+      limits:
+        cloud-tpus.google.com/v2: 8
+    volumeMounts:
+    - name: service-credentials
+      mountPath: /etc/credentials
+    env:
+    - name: GOOGLE_APPLICATION_CREDENTIALS
+      value: /etc/credentials/service-account.json
+  volumes:
+  - name: service-credentials
+    secret:
+      secretName: minigo-services2-creds
+  restartPolicy: OnFailure

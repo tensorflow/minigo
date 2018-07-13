@@ -297,9 +297,9 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
     std::string comment;
     if (write_comments) {
       if (i == 0) {
-        comment =
-            absl::StrCat("Resign Threshold: ",
-                         player_b.options().resign_threshold, "\n", h.comment);
+        comment = absl::StrCat(
+            "Resign Threshold: ", player_b.options().resign_threshold, "\n",
+            h.comment);
       } else {
         if (log_names) {
           comment = absl::StrCat(i % 2 == 0 ? player_b.name() : player_w.name(),

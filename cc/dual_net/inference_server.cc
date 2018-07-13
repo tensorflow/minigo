@@ -34,7 +34,6 @@ using grpc::ServerContext;
 using grpc::Status;
 using grpc::StatusCode;
 
-
 namespace minigo {
 
 namespace internal {
@@ -74,7 +73,7 @@ class InferenceServiceImpl final : public InferenceService::Service {
       // each client is only able to have one pending RemoteInference at a
       // time, and the time between inference requests is very small (typically
       // less than a millisecond).
-      // 
+      //
       // With this in mind, the inference server accumulates RemoteInference
       // requests into a single batch until one of the following occurs:
       //  1) It has accumulated one RemoteInference request from every client.
@@ -117,17 +116,13 @@ class InferenceServiceImpl final : public InferenceService::Service {
       pending_inferences_[response->batch_id()] = std::move(inferences);
     }
 
-    // std::cerr << absl::Now() << " DONE  GetFeatures\n";
-
     return Status::OK;
   }
 
   Status PutOutputs(ServerContext* context, const PutOutputsRequest* request,
                     PutOutputsResponse* response) override {
-    // std::cerr << absl::Now() << " START PutOutputs\n";
     std::vector<RemoteInference> inferences;
     {
-      // std::cerr << "### PutOutputs" << std::endl;
       absl::MutexLock lock(&pending_inferences_mutex_);
       auto it = pending_inferences_.find(request->batch_id());
       MG_CHECK(it != pending_inferences_.end());
@@ -204,9 +199,7 @@ class InferenceClient : public DualNet {
     service_->num_clients_++;
   }
 
-  ~InferenceClient() {
-    service_->num_clients_--;
-  }
+  ~InferenceClient() { service_->num_clients_--; }
 
   void RunMany(absl::Span<const BoardFeatures> features,
                absl::Span<Output> outputs, std::string* model) override {
@@ -223,8 +216,8 @@ class InferenceClient : public DualNet {
 
 }  // namespace internal
 
-InferenceServer::InferenceServer(
-    int virtual_losses, int games_per_inference, int port) {
+InferenceServer::InferenceServer(int virtual_losses, int games_per_inference,
+                                 int port) {
   auto server_address = absl::StrCat("0.0.0.0:", port);
   service_ = absl::make_unique<internal::InferenceServiceImpl>(
       virtual_losses, games_per_inference);

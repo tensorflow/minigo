@@ -116,7 +116,6 @@ def const_model_inference_fn(features):
     with tf.variable_scope("", custom_getter=custom_getter):
         return dual_net.model_inference_fn(features, False)
 
-
 class Worker(object):
     def __init__(self):
         # Event that gets set after a model is loaded.
@@ -172,8 +171,11 @@ class Worker(object):
         self._tpu_init = tf.contrib.tpu.initialize_system()
         self._tpu_shutdown = tf.contrib.tpu.shutdown_system()
 
-        tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver(
-            tpu=[FLAGS.tpu_name]).get_master()
+        if FLAGS.tpu_name:
+            tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver(
+                tpu=[FLAGS.tpu_name]).get_master()
+        else:
+            tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver().get_master()
         self.sess = tf.Session(tpu_grpc_url)
 
         self.feature_placeholders = []

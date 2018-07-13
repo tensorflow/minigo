@@ -9,46 +9,47 @@
 #
 #  	  VERSION_TAG=0.XY make target
 
+define staging =
+	mkdir -p staging
+	cp ../../WORKSPACE staging/
+	cp -r -p ../../cc/ staging/
+	cp -r -p ../../proto/ staging/
+	rm -rfd staging/cc/tensorflow
+	cp ../../*.py staging/
+	cp ../../requirements.txt staging/
+	cp player_wrapper.sh staging/
+	cp tpu_wrapper.sh staging/
+endef
+
+tpu-image:
+	$(staging)
+	docker build -f Dockerfile.tpu -t "gcr.io/$(PROJECT)/minigo-tpu-player:0.1" .
+#	rm -rfd staging
+
 gpu-image:
-		mkdir -p staging
-		cp ../../*.py staging/
-		cp ../../requirements.txt staging/
-		cp player_wrapper.sh staging/
-	    docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
-		rm staging/*.py
-		rm staging/requirements.txt
-		rm staging/player_wrapper.sh
+	$(staging)
+	docker build -f Dockerfile.gpu -t "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
+	rm -rfd staging
 
-cpu-image:
-		mkdir -p staging
-		cp ../../*.py staging/
-		cp ../../requirements.txt staging/
-		cp player_wrapper.sh staging/
-	    docker build -t "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
-		rm staging/*.py
-		rm staging/requirements.txt
-		rm staging/player_wrapper.sh
-
-cpu-image-clean:
-		mkdir -p staging/
-		cp ../../*.py staging/
-		cp ../../requirements.txt staging/
-		cp player_wrapper.sh staging/
-	    docker build --no-cache -t "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
-		rm staging/*.py
-		rm staging/requirements.txt
-		rm staging/player_wrapper.sh
+py-image:
+	$(staging)
+	docker build -t "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)" .
+	rm -rfd staging
 
 cc-image:
-	  docker build -f Dockerfile-cc -t "gcr.io/$(PROJECT)/minigo-cc-player:$(VERSION_TAG)" .
+	$(staging)
+	docker build -f Dockerfile-cc -t "gcr.io/$(PROJECT)/$(CC_PLAYER_CONTAINER):$(VERSION_TAG)" .
 
 cc-push: cc-image
-		gcloud docker -- push "gcr.io/$(PROJECT)/minigo-cc-player:$(VERSION_TAG)"
+	gcloud docker -- push "gcr.io/$(PROJECT)/$(CC_PLAYER_CONTAINER):$(VERSION_TAG)"
 
-cpu-push: cpu-image
-		gcloud docker -- push "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)"
+py-push: py-image
+	gcloud docker -- push "gcr.io/$(PROJECT)/$(CPU_PLAYER_CONTAINER):$(VERSION_TAG)"
 
 gpu-push: gpu-image
-		gcloud docker -- push "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)"
+	gcloud docker -- push "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)"
 
-.PHONY: cpu-image image-push
+tpu-push: tpu-image
+	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-tpu-player:0.1"
+
+.PHONY: cc-image cpu-image tpu-image gpu-image image-push cc-push cpu-push gpu-push tpu-push
