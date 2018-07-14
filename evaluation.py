@@ -19,7 +19,7 @@ import time
 from absl import flags
 from tensorflow import gfile
 
-from gtp_wrapper import MCTSPlayer
+from strategies import MCTSPlayer
 import sgf_wrapper
 
 

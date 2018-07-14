@@ -25,7 +25,6 @@ import dual_net
 import evaluation
 import preprocessing
 import selfplay_mcts
-from gtp_wrapper import make_gtp_instance
 import utils
 
 import cloud_logging
@@ -40,20 +39,6 @@ EXAMPLES_PER_RECORD = 10000
 # How many positions to draw from for our training window.
 # AGZ used the most recent 500k games, which, assuming 250 moves/game = 125M
 WINDOW_SIZE = 125000000
-
-
-def gtp(load_file: 'The path to the network model files'=None,
-        cgos_mode: 'Whether to use CGOS time constraints'=False,
-        kgs_mode: 'Whether to use KGS courtesy-pass'=False,
-        verbose=1):
-    engine = make_gtp_instance(load_file,
-                               verbosity=verbose,
-                               cgos_mode=cgos_mode,
-                               kgs_mode=kgs_mode)
-    print("GTP engine ready\n", file=sys.stderr, flush=True)
-    for msg in sys.stdin:
-        if not engine.handle_msg(msg.strip()):
-            break
 
 
 def bootstrap(
@@ -203,7 +188,7 @@ def freeze_graph(load_file):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train, train_dir, freeze_graph,
+argh.add_commands(parser, [bootstrap, train, train_dir, freeze_graph,
                            selfplay, evaluate, validate, convert])
 
 if __name__ == '__main__':

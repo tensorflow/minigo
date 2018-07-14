@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 import coords
 import fsdb
-from gtp_wrapper import MCTSPlayer
+from strategies import MCTSPlayer
 import oneoff_utils
 
 flags.DEFINE_string("sgf_dir", None, "sgf database")
