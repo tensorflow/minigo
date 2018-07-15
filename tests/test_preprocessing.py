@@ -133,7 +133,7 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
                     return sym
 
             assert False, "No rotation makes {} equal {}".format(
-                pi1.reshape((go.N, go.N)), pi2((go.N, go.N)))
+                pi.reshape((go.N, go.N)), pi2((go.N, go.N)))
 
         def x_and_pi_same(run_a, run_b):
             x_a, pi_a, values_a = zip(*run_a)
