@@ -199,10 +199,10 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
              if tf.gfile.Exists(os.path.join(LOCAL_DIR, d)))
     files = itertools.islice(files, 500000) 
 
+    models = fsdb.get_models()
     buf.parallel_fill(list(itertools.chain.from_iterable(files)), threads=threads)
     print("Filled buffer, watching for new games")
 
-    models = fsdb.get_models()
     while (fsdb.get_latest_model() == models[-1] or buf.total_updates < MINIMUM_NEW_GAMES):
         with timer("Rsync"):
             time_rsync(start_from - dt.timedelta(minutes=60))
