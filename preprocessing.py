@@ -189,7 +189,7 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
     return dataset.make_one_shot_iterator().get_next()
 
 
-def get_tpu_input_tensors(batch_size, tf_records):
+def get_tpu_input_tensors(batch_size, tf_records, filter_amount=1.0):
     dataset = read_tf_records(batch_size, tf_records, shuffle_records=True,
         shuffle_buffer_size=1024, num_repeats=1)
     # TODO take a bfloat16 param and cast the dataset/labels to bfloat16

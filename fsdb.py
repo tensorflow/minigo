@@ -20,6 +20,7 @@ import os
 
 from absl import flags
 from tensorflow import gfile
+import re
 
 import shipname
 
@@ -82,6 +83,12 @@ def get_model(model_num):
     """Given a model number 17, returns its full name 000017-modelname."""
     model_names_by_num = dict(get_models())
     return model_names_by_num[model_num]
+
+def get_hour_dirs(root=None):
+    """Gets the directories under selfplay_dir that match YYYY-MM-DD-HH."""
+    root = root or selfplay_dir()
+    return list(filter(lambda s: re.match(r"\d{4}-\d{2}-\d{2}-\d{2}", s),
+                       gfile.ListDirectory(root)))
 
 
 def game_counts(n_back=20):

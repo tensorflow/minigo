@@ -44,7 +44,7 @@ flags.DEFINE_integer('train_batch_size', 256,
                      'this is batch size as expected. If \"use_tpu\" is set,'
                      'final batch size will be = train_batch_size * num_tpu_cores')
 
-flags.DEFINE_integer('conv_width', 128 if go.N == 19 else 32,
+flags.DEFINE_integer('conv_width', 256 if go.N == 19 else 32,
                      'The width of each conv layer in the shared trunk.')
 
 flags.DEFINE_integer('fc_width', 256 if go.N == 19 else 64,
@@ -53,10 +53,10 @@ flags.DEFINE_integer('fc_width', 256 if go.N == 19 else 64,
 flags.DEFINE_integer('trunk_layers', go.N,
                      'The number of resnet layers in the shared trunk.')
 
-flags.DEFINE_multi_integer('lr_boundaries', [10000, 30000],
+flags.DEFINE_multi_integer('lr_boundaries', [400000, 600000],
                            'The number of steps at which the learning rate will decay')
 
-flags.DEFINE_multi_float('lr_rates', [2e-2, 1e-3, 1e-4],
+flags.DEFINE_multi_float('lr_rates', [0.01, 0.001, 0.0001],
                          'The different learning rates')
 
 flags.DEFINE_float('l2_strength', 1e-4,
@@ -69,7 +69,7 @@ flags.DEFINE_string('model_dir', None,
                     'The working directory of the model')
 
 # See www.moderndescartes.com/essays/shuffle_viz for discussion on sizing
-flags.DEFINE_integer('shuffle_buffer_size', 20000,
+flags.DEFINE_integer('shuffle_buffer_size', 2000,
                      'Size of buffer used to shuffle train examples.')
 
 flags.DEFINE_bool('use_tpu', False, 'Whether to use TPU for training.')
@@ -85,7 +85,7 @@ flags.register_multi_flags_validator(
     'Number of learning rates must be exactly one greater than the number of boundaries')
 
 flags.DEFINE_integer(
-    'iterations_per_loop', 250,
+    'iterations_per_loop', 128,
     help=('Number of steps to run on TPU before outfeeding metrics to the CPU.'
           ' If the number of iterations in the loop would exceed the number of'
           ' train steps, the loop will exit before reaching'
@@ -98,7 +98,7 @@ flags.DEFINE_integer(
           ' TPU has 4 chips each with 2 cores.'))
 
 flags.DEFINE_integer(
-    'summary_steps', default=500,
+    'summary_steps', default=256,
     help='Number of steps between logging summary scalars.')
 
 flags.register_multi_flags_validator(
@@ -110,10 +110,9 @@ flags.register_multi_flags_validator(
 FLAGS = flags.FLAGS
 
 
-# TODO: Clean up dual_net.EXAMPLES_PER_GENERATION, main.EXAMPLES_PER_RECORD/main.WINDOW_SIZE
 # How many positions to look at per generation.
 # Per AGZ, 2048 minibatch * 1k = 2M positions/generation
-EXAMPLES_PER_GENERATION = 2000000
+EXAMPLES_PER_GENERATION = 2 ** 21
 
 
 class DualNetwork():
@@ -226,7 +225,8 @@ def model_fn(features, labels, mode, params=None):
 
     # Computations to be executed on CPU, outside of the main TPU queues.
     def eval_metrics_host_call_fn(policy_output, value_output, pi_tensor, policy_cost,
-                                  value_cost, l2_cost, combined_cost):
+                                  value_cost, l2_cost, combined_cost,
+                                  est_mode=tf.estimator.ModeKeys.TRAIN):
         policy_entropy = -tf.reduce_mean(tf.reduce_sum(
             policy_output * tf.log(policy_output), axis=1))
         # pi_tensor is one_hot when generated from sgfs (for supervised learning)
@@ -257,6 +257,8 @@ def model_fn(features, labels, mode, params=None):
                 policy_target_top_1_confidence),
             'value_confidence': tf.metrics.mean(tf.abs(value_output)),
         }
+        if est_mode == tf.estimator.ModeKeys.EVAL:
+            return metric_ops
 
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
@@ -282,12 +284,16 @@ def model_fn(features, labels, mode, params=None):
         'value_output': value_output,
     }
 
+    eval_metrics_only_fn = functools.partial(eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.EVAL)
+    host_call_fn = functools.partial(eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.TRAIN)
+
     tpu_estimator_spec = tpu_estimator.TPUEstimatorSpec(
         mode=mode,
         predictions=predictions,
         loss=combined_cost,
         train_op=train_op,
-        host_call=(eval_metrics_host_call_fn, metric_args)
+        eval_metrics=(eval_metrics_only_fn, metric_args),
+        host_call=(host_call_fn, metric_args)
     )
     if FLAGS.use_tpu:
         return tpu_estimator_spec
@@ -381,7 +387,7 @@ def get_tpu_estimator(working_dir):
         master=tpu_grpc_url,
         evaluation_master=tpu_grpc_url,
         model_dir=working_dir,
-        save_checkpoints_steps=max(800, FLAGS.iterations_per_loop),
+        save_checkpoints_steps=max(1000, FLAGS.iterations_per_loop),
         save_summary_steps=FLAGS.summary_steps,
         session_config=tf.ConfigProto(
             allow_soft_placement=True, log_device_placement=True),
@@ -444,12 +450,15 @@ def export_model(working_dir, model_path):
 def train(*tf_records, steps=None):
     tf.logging.set_verbosity(tf.logging.INFO)
     estimator = get_estimator(FLAGS.model_dir)
+    if steps is None:
+        steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
     if FLAGS.use_tpu:
         def input_fn(params):
             return preprocessing.get_tpu_input_tensors(params['batch_size'], tf_records)
 
         # TODO: get hooks working again with TPUestimator.
         hooks = []
+        steps //= FLAGS.num_tpu_cores
     else:
         def input_fn():
             return preprocessing.get_input_tensors(
@@ -459,8 +468,6 @@ def train(*tf_records, steps=None):
         hooks = [UpdateRatioSessionHook(FLAGS.model_dir),
                  EchoStepCounterHook(output_dir=FLAGS.model_dir)]
 
-    if steps is None:
-        steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
     print("Training, steps = {}".format(steps))
     estimator.train(input_fn, steps=int(steps), hooks=hooks)
 
@@ -472,7 +479,7 @@ def validate(tf_records, validate_name=None):
         def input_fn(params):
             return preprocessing.get_tpu_input_tensors(
                 params['batch_size'],
-                tf_records)
+                tf_records, filter_amount=0.05)
     else:
         def input_fn():
             return preprocessing.get_input_tensors(
@@ -480,7 +487,7 @@ def validate(tf_records, validate_name=None):
                 shuffle_buffer_size=20000)
 
     estimator = get_estimator(FLAGS.model_dir)
-    estimator.evaluate(input_fn, steps=500, name=validate_name)
+    estimator.evaluate(input_fn, steps=20, name=validate_name)
 
 
 def compute_update_ratio(weight_tensors, before_weights, after_weights):
@@ -535,7 +542,7 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train])
+argh.add_commands(parser, [train, export_model])
 
 if __name__ == '__main__':
     # Let absl.flags parse known flags from argv, then pass the remaining flags

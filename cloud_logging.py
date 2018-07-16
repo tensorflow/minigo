@@ -38,11 +38,11 @@ def configure(project=LOGGING_PROJECT):
                          'Cloud logging is disabled.\n')
         return
 
-    logging.basicConfig(level=logging.INFO)
     try:
         # if this fails, redirect stderr to /dev/null so no startup spam.
         with contextlib.redirect_stderr(io.StringIO()):
             client = glog.Client(project)
             client.setup_logging(logging.INFO)
     except:
+        logging.basicConfig(level=logging.INFO)
         sys.stderr.write('!! Cloud logging disabled\n')

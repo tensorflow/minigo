@@ -255,7 +255,7 @@ std::string GetOutputName(absl::Time now, size_t i) {
 }
 
 std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
-  auto sub_dirs = absl::FormatTime("%Y/%m/%d/%H", now, absl::UTCTimeZone());
+  auto sub_dirs = absl::FormatTime("%Y-%m-%d-%H", now, absl::UTCTimeZone());
   return file::JoinPath(root_dir, sub_dirs);
 }
 

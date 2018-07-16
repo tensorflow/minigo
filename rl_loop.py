@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Wrapper scripts to ensure that main.py commands are called correctly."""
+"""Bookkeeping around other entry points to automate the rl pipeline."""
 import argparse
 import logging
 import os
@@ -22,8 +22,11 @@ import time
 from absl import flags
 import argh
 from tensorflow import gfile
+import itertools
+import random
 
 import cloud_logging
+import dual_net
 import fsdb
 import main
 import shipname
@@ -71,15 +74,6 @@ def selfplay(verbose=2):
 def train(working_dir):
     model_num, model_name = fsdb.get_latest_model()
 
-    games = gfile.Glob(os.path.join(fsdb.selfplay_dir(), model_name, '*.zz'))
-    if len(games) < MIN_GAMES_PER_GENERATION:
-        print("{} doesn't have enough games to train a new model yet ({})".format(
-            model_name, len(games)))
-        print("Sleeping...")
-        time.sleep(10*60)
-        print("Done...")
-        sys.exit(1)
-
     print("Training on gathered game data, initializing from {}".format(model_name))
     new_model_num = model_num + 1
     new_model_name = shipname.generate(new_model_num)
@@ -91,17 +85,18 @@ def train(working_dir):
         time.sleep(1*60)
     print("Using Golden File:", training_file)
 
-    local_copy = os.path.join(working_dir, str(new_model_num) + '.tfrecord.zz')
-    print("Copying locally to ", local_copy)
-    gfile.Copy(training_file, local_copy, overwrite=True)
-
     try:
         save_file = os.path.join(fsdb.models_dir(), new_model_name)
-        main.train(working_dir, [local_copy], save_file)
-    except:
+        print("Training model")
+        dual_net.train(training_file)
+        print("Exporting model to ", save_file)
+        dual_net.export_model(working_dir, save_file)
+    except Exception as e:
+        import traceback
+        logging.error(traceback.format_exc())
+        print(traceback.format_exc())
         logging.exception("Train error")
-    finally:
-        os.remove(local_copy)
+        sys.exit(1)
 
 
 def validate(working_dir, model_num=None, validate_name=None):
@@ -125,8 +120,20 @@ def validate(working_dir, model_num=None, validate_name=None):
                     for pair in models[-30:]]
 
     main.validate(working_dir, *holdout_dirs,
-                  checkpoint_name=os.path.join(fsdb.models_dir(), model_name),
                   validate_name=validate_name)
+
+def validate_hourly(working_dir, validate_name=None):
+    """ compiles a list of games based on the new hourly directory format. Then
+    calls validate on it """
+
+    holdout_dirs = gfile.ListDirectory(fsdb.holdout_dir())
+    holdout_files = (os.path.join(fsdb.holdout_dir(), d, f)
+                     for d in reversed(gfile.ListDirectory(fsdb.holdout_dir()))
+                     for f in gfile.ListDirectory(os.path.join(fsdb.holdout_dir(),d))
+                     if gfile.IsDirectory(os.path.join(fsdb.holdout_dir(),d)))
+    holdout_files = itertools.islice(holdout_files, 20000)
+    random.shuffle(holdout_files)
+    dual_net.validate(holdout_files)
 
 
 def backfill():
@@ -154,7 +161,8 @@ def backfill():
 parser = argparse.ArgumentParser()
 
 argh.add_commands(parser, [train, selfplay, backfill,
-                           bootstrap, fsdb.game_counts, validate])
+                           bootstrap, fsdb.game_counts, validate,
+                           validate_hourly])
 
 if __name__ == '__main__':
     cloud_logging.configure()

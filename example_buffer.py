@@ -6,6 +6,7 @@ import itertools
 import multiprocessing as mp
 import os
 import random
+import re
 import subprocess
 import time
 from collections import deque
@@ -23,6 +24,8 @@ import fsdb
 READ_OPTS = preprocessing.TF_RECORD_CONFIG
 
 LOCAL_DIR = "data/"
+
+MINIMUM_NEW_GAMES = 5000
 
 
 def pick_examples_from_tfrecord(filename, samples_per_game=4):
@@ -53,12 +56,13 @@ def _ts_to_str(timestamp):
 
 
 class ExampleBuffer():
-    def __init__(self, max_size=2000000, samples_per_game=4):
+    def __init__(self, max_size=2**21, samples_per_game=4):
         self.examples = deque(maxlen=max_size)
         self.max_size = max_size
         self.samples_per_game = samples_per_game
         self.func = functools.partial(
             choose, samples_per_game=self.samples_per_game)
+        self.total_updates = 0
 
     def parallel_fill(self, games, threads=8):
         """ games is a list of .tfrecord.zz game records. """
@@ -68,23 +72,30 @@ class ExampleBuffer():
         if len(games) > max_games:
             games = games[-max_games:]
 
-        with mp.Pool(threads) as pool:
-            res = tqdm(pool.imap(self.func, games), total=len(games))
-            self.examples.extend(itertools.chain(*res))
+        while len(self.examples) < self.max_size:
+            with mp.Pool(threads) as pool:
+                res = tqdm(pool.imap(self.func, games), total=len(games))
+                self.examples.extend(itertools.chain.from_iterable(res))
+            print("Got", len(self.examples))
 
     def update(self, new_games):
         """ new_games is a list of .tfrecord.zz new game records. """
         new_games.sort(key=os.path.basename)
+        print("Updating ", len(new_games), "possible new games")
         first_new_game = None
-        for idx, game in enumerate(tqdm(new_games)):
+        for idx, game in enumerate(new_games):
             timestamp = file_timestamp(game)
             if timestamp <= self.examples[-1][0]:
                 continue
             elif first_new_game is None:
                 first_new_game = idx
+                num_new_games = len(new_games) - idx
                 print("Found {}/{} new games".format(
-                    len(new_games) - idx, len(new_games)))
+                    num_new_games, len(new_games)))
+                self.total_updates += num_new_games
             self.examples.extend(self.func(game))
+        if first_new_game is None:
+            print ("No new games", file_timestamp(new_games[-1]), self.examples[-1][0])
 
     def flush(self, path):
         # random.shuffle on deque is O(n^2) convert to list for O(n)
@@ -112,7 +123,6 @@ class ExampleBuffer():
 def files_for_model(model):
     return tf.gfile.Glob(os.path.join(LOCAL_DIR, model[1], '*.zz'))
 
-
 def smart_rsync(
         from_model_num=0,
         source_dir=None,
@@ -124,6 +134,16 @@ def smart_rsync(
         _rsync_dir(os.path.join(
             source_dir, model), os.path.join(dest_dir, model))
 
+def time_rsync(from_date,
+               source_dir=None,
+               dest_dir=LOCAL_DIR):
+    source_dir = source_dir or fsdb.selfplay_dir()
+    while from_date < dt.datetime.utcnow():
+        src = os.path.join(source_dir, from_date.strftime("%Y-%m-%d-%H"))
+        if tf.gfile.Exists(src):
+            _rsync_dir(src, os.path.join(dest_dir, from_date.strftime("%Y-%m-%d-%H")))
+        from_date = from_date + dt.timedelta(hours=1)
+
 
 def _rsync_dir(source_dir, dest_dir):
     ensure_dir_exists(dest_dir)
@@ -132,10 +152,80 @@ def _rsync_dir(source_dir, dest_dir):
                         stderr=rsync_log)
 
 
-def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
+def _determine_chunk_to_make(write_dir):
+    """
+    Returns the full path of the chunk to make (gs://...)
+    and a boolean, indicating whether we should wait for a new model
+    or if we're 'behind' and should just write out our current chunk immediately
+    True == write immediately.
+    """
+    models = fsdb.get_models()
+    # Last model is N.  N+1 (should be) training.  We should gather games for N+2.
+    chunk_to_make = os.path.join(write_dir, str(
+        models[-1][0] + 1) + '.tfrecord.zz')
+    if not tf.gfile.Exists(chunk_to_make):
+        # N+1 is missing.  Write it out ASAP
+        print("Making chunk ASAP:", chunk_to_make)
+        return chunk_to_make, True
+    chunk_to_make = os.path.join(write_dir, str(
+        models[-1][0] + 2) + '.tfrecord.zz')
+    while tf.gfile.Exists(chunk_to_make):
+        print("Chunk for next model ({}) already exists.  Sleeping.".format(chunk_to_make))
+        time.sleep(5 * 60)
+        models = fsdb.get_models()
+        chunk_to_make = os.path.join(write_dir, str(
+            models[-1][0] + 2) + '.tfrecord.zz')
+    print("Making chunk:", chunk_to_make)
+
+    return chunk_to_make, False
+
+def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
                   write_dir=None,
-                  model_window=100,
+                  threads=32,
+                  start_from=None):
+    start_from = start_from or dt.datetime.utcnow()
+    write_dir = write_dir or fsdb.golden_chunk_dir()
+    buf = ExampleBuffer(bufsize)
+    chunk_to_make, fast_write = _determine_chunk_to_make(write_dir)
+
+    hours = fsdb.get_hour_dirs()
+    with timer("Rsync"):
+        time_rsync(min(dt.datetime.strptime(hours[-1], "%Y-%m-%d-%H/"), start_from))
+        start_from = dt.datetime.utcnow()
+
+    hours = fsdb.get_hour_dirs()
+    files = (tf.gfile.Glob(os.path.join(LOCAL_DIR, d, "*.zz"))
+                 for d in reversed(hours)
+             if tf.gfile.Exists(os.path.join(LOCAL_DIR, d)))
+    files = itertools.islice(files, 500000) 
+
+    buf.parallel_fill(list(itertools.chain.from_iterable(files)), threads=threads)
+    print("Filled buffer, watching for new games")
+
+    models = fsdb.get_models()
+    while (fsdb.get_latest_model() == models[-1] or buf.total_updates < MINIMUM_NEW_GAMES):
+        with timer("Rsync"):
+            time_rsync(start_from - dt.timedelta(minutes=60))
+        start_from = dt.datetime.utcnow()
+        hours = sorted(fsdb.get_hour_dirs(LOCAL_DIR))
+        new_files = list(map(lambda d: tf.gfile.Glob(
+                os.path.join(LOCAL_DIR, d, '*.zz')), hours[-2:]))
+        buf.update(list(itertools.chain.from_iterable(new_files)))
+        if fast_write:
+            break
+        time.sleep(30)
+        if fsdb.get_latest_model() != models[-1]:
+            print ("New model!  Waiting for games. Only got ", buf.total_updates, "new games so far")
+
+    latest = fsdb.get_latest_model()
+    print("New model!", latest[1], "!=", models[-1][1])
+    print(buf)
+    buf.flush(chunk_to_make)
+
+def fill_and_wait_models(bufsize=dual_net.EXAMPLES_PER_GENERATION,
+                  write_dir=None,
                   threads=8,
+                  model_window=100,
                   skip_first_rsync=False):
     """ Fills a ringbuffer with positions from the most recent games, then
     continually rsync's and updates the buffer until a new model is promoted.
@@ -144,15 +234,8 @@ def fill_and_wait(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     """
     write_dir = write_dir or fsdb.golden_chunk_dir()
     buf = ExampleBuffer(bufsize)
+    chunk_to_make = _determine_chunk_to_make(write_dir)
     models = fsdb.get_models()[-model_window:]
-    # Last model is N.  N+1 is training.  We should gather games for N+2.
-    chunk_to_make = os.path.join(write_dir, str(
-        models[-1][0] + 2) + '.tfrecord.zz')
-    while tf.gfile.Exists(chunk_to_make):
-        print("Chunk for next model ({}) already exists.  Sleeping.".format(chunk_to_make))
-        time.sleep(5 * 60)
-        models = fsdb.get_models()[-model_window:]
-    print("Making chunk:", chunk_to_make)
     if not skip_first_rsync:
         with timer("Rsync"):
             smart_rsync(models[-1][0] - 6)
@@ -212,7 +295,8 @@ def make_chunk_for(output_dir=LOCAL_DIR,
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [fill_and_wait, smart_rsync, make_chunk_for])
+argh.add_commands(parser, [fill_and_wait_models, fill_and_wait_time,
+                           smart_rsync, make_chunk_for])
 
 if __name__ == "__main__":
     import sys

@@ -16,6 +16,7 @@
 
 #include <atomic>
 #include <functional>
+#include <future>
 #include <map>
 #include <string>
 #include <utility>
@@ -207,7 +208,10 @@ class InferenceClient : public DualNet {
 
     absl::Notification notification;
     service_->request_queue_.Push({features, outputs, model, &notification});
-    notification.WaitForNotification();
+    if (!notification.WaitForNotificationWithTimeout(absl::Minutes(2))) {
+      std::cerr << "== Timed out waiting for notification";
+      std::exit(1);
+    }
   }
 
  private:

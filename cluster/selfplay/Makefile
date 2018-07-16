@@ -23,7 +23,7 @@ endef
 
 tpu-image:
 	$(staging)
-	docker build -f Dockerfile.tpu -t "gcr.io/$(PROJECT)/minigo-tpu-player:0.1" .
+	docker build -f Dockerfile.tpu -t "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)" .
 #	rm -rfd staging
 
 gpu-image:
@@ -50,6 +50,6 @@ gpu-push: gpu-image
 	gcloud docker -- push "gcr.io/$(PROJECT)/$(GPU_PLAYER_CONTAINER):$(VERSION_TAG)"
 
 tpu-push: tpu-image
-	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-tpu-player:0.1"
+	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)"
 
 .PHONY: cc-image cpu-image tpu-image gpu-image image-push cc-push cpu-push gpu-push tpu-push

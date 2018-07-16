@@ -19,10 +19,11 @@
 set -e
 
 : ${BUCKET_NAME?"Bucket name must be set!"}
+: ${WORK_DIR?"Working directory must be set!"}
 
 bazel-bin/cc/main \
   --remote_inference=true \
-  --model=gs://tensor-go-minigo-v7-19/models/000485-onslaught \
+  --checkpoint-dir=${WORK_DIR}\
   --inject_noise=true \
   --soft_pick=true \
   --random_symmetry=true \
@@ -31,7 +32,8 @@ bazel-bin/cc/main \
   --parallel_games=32 \
   --num_readouts=800 \
   --resign_threshold=-0.95 \
-  --output_dir=gs://$BUCKET_NAME/data/selfplay \
+  --disable_resign_pct=0.15 \
+  --output_dir=gs://${BUCKET_NAME}/data/selfplay \
   --holdout_dir=gs://${BUCKET_NAME}/data/holdout \
   --sgf_dir=gs://${BUCKET_NAME}/sgf \
   --mode=selfplay \

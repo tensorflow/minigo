@@ -31,6 +31,7 @@ def loop(working_dir='estimator_working_dir'):
     flags = [
         working_dir,
         '--bucket_name', BUCKET_NAME,
+        '--model_dir', working_dir,
     ]
     while True:
         print("==================================")
@@ -41,7 +42,7 @@ def loop(working_dir='estimator_working_dir'):
                 continue
 
         with timer("validate"):
-            subprocess.call(['python', 'rl_loop.py', 'validate'] + flags)
+            subprocess.call(['python', 'rl_loop.py', 'validate-hourly'] + flags)
 
 
 if __name__ == '__main__':
