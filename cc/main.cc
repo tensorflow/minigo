@@ -379,8 +379,8 @@ std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory,
       while (!player->game_over()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
-          std::cerr << player->root()->Describe() << std::endl;
           std::cerr << player->root()->position.ToPrettyString();
+          std::cerr << player->root()->Describe() << std::endl;
         }
         player->PlayMove(move);
       }

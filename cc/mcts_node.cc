@@ -73,9 +73,6 @@ std::string MctsNode::Describe() const {
   }
   for (int rank = 0; rank < 15; ++rank) {
     Coord i = std::get<2>(sort_order[rank]);
-    if (child_N(i) == 0) {
-      break;
-    }
     float soft_N = child_N(i) / child_N_sum;
     float p_delta = soft_N - child_P(i);
     float p_rel = p_delta / child_P(i);
