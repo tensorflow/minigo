@@ -258,6 +258,7 @@ minigo_cc_test_9_only(
     deps = [
         ":base",
         ":position",
+        ":random",
         ":test_utils",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",

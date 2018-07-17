@@ -116,9 +116,8 @@ std::string Position::ToGroupString() const {
         oss << std::setw(2) << s.group_id() << " ";
       }
     }
-    oss << "\n";
+    oss << kPrintNormal << "\n";
   }
-  oss << kPrintNormal;
   return oss.str();
 }
 
@@ -279,6 +278,8 @@ void Position::RemoveGroup(Coord c) {
       }
     }
   }
+
+  groups_.free(removed_group_id);
 }
 
 void Position::MergeGroup(Coord c) {

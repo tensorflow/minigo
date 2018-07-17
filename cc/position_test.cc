@@ -21,6 +21,7 @@
 
 #include "absl/strings/ascii.h"
 #include "cc/constants.h"
+#include "cc/random.h"
 #include "cc/test_utils.h"
 #include "gtest/gtest.h"
 
@@ -450,6 +451,30 @@ TEST(PositionTest, PlayGame) {
   std::array<int, 2> expected_captures = {10, 2};
   EXPECT_EQ(expected_captures, board.num_captures());
   EXPECT_EQ(-0.5, board.CalculateScore(kDefaultKomi));
+}
+
+// A regression test for a bug where Position::RemoveGroup didn't recycle the
+// removed group's ID. The test plays repeatedly plays a random legal move (or
+// passes if the player has no legal moves). Under these conditions, the game
+// will never end.
+TEST(PositionTest, PlayRandomLegalMoves) {
+  Random rnd(983465983);
+  TestablePosition position("");
+
+  for (int i = 0; i < 10000; ++i) {
+    std::vector<Coord> legal_moves;
+    for (int c = 0; c < kN * kN; ++c) {
+      if (position.IsMoveLegal(c)) {
+        legal_moves.push_back(c);
+      }
+    }
+    if (!legal_moves.empty()) {
+      auto c = legal_moves[rnd.UniformInt(0, legal_moves.size() - 1)];
+      position.PlayMove(c, position.to_play());
+    } else {
+      position.PlayMove(Coord::kPass, position.to_play());
+    }
+  }
 }
 
 }  // namespace

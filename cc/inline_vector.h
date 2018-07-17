@@ -78,14 +78,14 @@ class inline_vector {
   }
 
   void push_back(const T& t) {
-    MG_DCHECK(size_ < Capacity);
+    MG_CHECK(size_ < Capacity);
     new (data() + size_) T(t);
     ++size_;
   }
 
   template <typename... Args>
   void emplace_back(Args&&... args) {
-    MG_DCHECK(size_ < Capacity);
+    MG_CHECK(size_ < Capacity);
     new (data() + size_) T(std::forward<Args>(args)...);
     ++size_;
   }
@@ -94,7 +94,7 @@ class inline_vector {
   const T& back() const { return data()[size_ - 1]; }
 
   void pop_back() {
-    MG_DCHECK(size_ > 0);
+    MG_CHECK(size_ > 0);
     --size_;
   }
 

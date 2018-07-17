@@ -33,6 +33,8 @@ class TestablePosition : public Position {
   TestablePosition(absl::string_view board_str, Color to_play = Color::kBlack,
                    int n = 0);
 
+  using Position::PlayMove;
+
   // Convenience functions that automatically parse coords.
   void PlayMove(absl::string_view str, Color color = Color::kEmpty) {
     Position::PlayMove(Coord::FromString(str), color);
