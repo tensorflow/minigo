@@ -200,15 +200,17 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             run_one = self.extract_tpu_data(f.name, random_rotation=False)
 
             self.reset_random()
-            run_two = self.extract_tpu_data(f.name, random_rotation=False)
+            run_two = self.extract_tpu_data(f.name, random_rotation=True)
 
             self.reset_random()
-            run_three = self.extract_tpu_data(f.name, random_rotation=False)
+            run_three = self.extract_tpu_data(f.name, random_rotation=True)
 
         self.assertTrue(
             self.x_and_pi_same(run_two, run_three),
             "Not deterministic")
-        # TODO(sethtroisi): Add rotation test when TPU support random_rotation.
+        self.assertFalse(
+            self.x_and_pi_same(run_one, run_two),
+            "Not randomly rotated")
 
         syms = []
         for (x, pi, v), (x2, pi2, v2) in zip(run_one, run_two):
@@ -217,5 +219,6 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             syms.extend(
                 map(lambda r: self.find_symmetry(*r), zip(x, pi, x2, pi2)))
 
+        difference = set(symmetries.SYMMETRIES) - set(syms)
         self.assertEqual(len(syms), num_records, "Not same number of records")
-        self.assertEqual(set(syms), {"identity"})
+        self.assertEqual(difference, set(), "Didn't find these rotations")

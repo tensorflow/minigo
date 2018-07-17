@@ -145,7 +145,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
     return dataset
 
 
-def _random_rotation(x_tensor, outcome_tensor):
+def _random_rotation_pyfunc(x_tensor, outcome_tensor):
     def rotate_py_func(x, pi):
         syms, x_rot = symmetries.randomize_symmetries_feat(x)
         pi_rot = [symmetries.apply_symmetry_pi(s, p) for s, p in zip(syms, pi)]
@@ -161,6 +161,16 @@ def _random_rotation(x_tensor, outcome_tensor):
 
     x_rot_tensor.set_shape(x_tensor.get_shape())
     pi_rot_tensor.set_shape(pi_tensor.get_shape())
+
+    outcome_tensor['pi_tensor'] = pi_rot_tensor
+    return x_rot_tensor, outcome_tensor
+
+
+def _random_rotation_pure_tf(x_tensor, outcome_tensor):
+    pi_tensor = outcome_tensor['pi_tensor']
+    x_rot_tensor, pi_rot_tensor = symmetries.rotate_train(
+        x_tensor,
+        pi_tensor)
 
     outcome_tensor['pi_tensor'] = pi_rot_tensor
     return x_rot_tensor, outcome_tensor
@@ -188,7 +198,7 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
     dataset = dataset.map(
         functools.partial(batch_parse_tf_example, batch_size))
     if random_rotation:
-        dataset = dataset.map(_random_rotation)
+        dataset = dataset.map(_random_rotation_pyfunc)
 
     return dataset.make_one_shot_iterator().get_next()
 
@@ -210,7 +220,12 @@ def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
         functools.partial(batch_parse_tf_example, batch_size))
 
     if random_rotation:
-        raise ValueError("random_rotation not yet supported on TPU")
+        # Unbatch the dataset so we can rotate it
+        dataset = dataset.apply(tf.contrib.data.unbatch())
+        dataset = dataset.apply(tf.contrib.data.map_and_batch(
+            _random_rotation_pure_tf,
+            batch_size,
+            drop_remainder=True))
 
     dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
     return dataset
