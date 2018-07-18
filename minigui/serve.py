@@ -75,6 +75,7 @@ if args.engine == "py":
                    "main.py", "gtp",
                    "--load-file", args.model,
                    "--num_readouts", "1000",
+                   "--conv_width", "128",
                    "-v", "2"]
 elif args.engine == "cc":
     GTP_COMMAND = [

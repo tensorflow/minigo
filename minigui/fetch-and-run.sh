@@ -60,26 +60,29 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     fi
   done
 
-  # Assume models need to be converted if .converted.meta doesn't exist.
-  # TODO(amj): Backfill all the models and remove this.
+  # Assume models need to be frozen if .pb doesn't exist.
   cd ..
-  if [[ ! -f "${MINIGUI_MODEL_TMPDIR}/${MINIGUI_MODEL}.converted.meta" ]]; then
+  model_path="${MINIGUI_MODEL_TMPDIR}/${MINIGUI_MODEL}"
+  if [[ ! -f "${model_path}.pb" ]]; then
     echo
-    echo "Converting model-data type"
+    echo "Freezing model"
     echo "--------------------------------------------------"
-    (export BOARD_SIZE=$MINIGUI_BOARD_SIZE; $MINIGUI_PYTHON main.py convert $MINIGUI_MODEL_TMPDIR/$MINIGUI_MODEL $MINIGUI_MODEL_TMPDIR/$MINIGUI_MODEL.converted)
+
+    BOARD_SIZE=$MINIGUI_BOARD_SIZE $MINIGUI_PYTHON main.py freeze-graph \
+        $model_path --conv_width=128
   fi
 
   echo
   echo "Running Minigui!"
   echo "--------------------------------------------------"
-  echo "Model: $MINIGUI_MODEL_TMPDIR/$MINIGUI_MODEL.converted"
+  echo "Model: $model_path"
   echo "Size:  $MINIGUI_BOARD_SIZE"
 
   $MINIGUI_PYTHON minigui/serve.py \
-  --model="$MINIGUI_MODEL_TMPDIR/$MINIGUI_MODEL.converted" \
+  --model="$model_path" \
   --board_size="$MINIGUI_BOARD_SIZE" \
   --port=$MINIGUI_PORT \
   --host=$MINIGUI_HOST \
-  --python_for_engine=${MINIGUI_PYTHON}
+  --python_for_engine=${MINIGUI_PYTHON} \
+  --engine=cc
 }
