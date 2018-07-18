@@ -1,8 +1,6 @@
 Minigo: A minimalist Go engine modeled after AlphaGo Zero, built on MuGo
 ==================================================
 
-[Test Dashboard](https://k8s-testgrid.appspot.com/sig-big-data#tf-minigo-presubmit)
-
 This is a pure Python implementation of a neural-network based Go AI, using
 TensorFlow. While inspired by DeepMind's AlphaGo algorithm, this project is not
 a DeepMind project nor is it affiliated with the official AlphaGo project.
@@ -119,6 +117,8 @@ Running unit tests
 
 Automated Tests
 ----------------
+
+[Test Dashboard](https://k8s-testgrid.appspot.com/sig-big-data#tf-minigo-presubmit)
 
 To automatically test PRs, Minigo uses
 [Prow](https://github.com/kubernetes/test-infra/tree/master/prow), which is a
@@ -250,7 +250,7 @@ Bootstrap
 ---------
 
 This command initializes your working directory for the trainer and a random
-model. This random model is also exported to `--model-save-path` so that 
+model. This random model is also exported to `--model-save-path` so that
 selfplay can immediately start playing with this random model.
 
 If these directories don't exist, bootstrap will create them for you.
@@ -295,7 +295,7 @@ BOARD_SIZE=19 python3 main.py train-dir \
   --model_dir estimator_working_dir
 ```
 
-At the end of training, the latest checkpoint will be exported to the directory with the given name.  
+At the end of training, the latest checkpoint will be exported to the directory with the given name.
 Additionally, you can follow along with the training progress with
 TensorBoard - if you point TensorBoard at the estimator working dir, it will
 find the training log files and display them.
