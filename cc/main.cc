@@ -154,39 +154,9 @@ namespace {
 class PlayerFactory {
  public:
   PlayerFactory(const MctsPlayer::Options& options, float disable_resign_pct)
-      : options_(options), disable_resign_pct_(disable_resign_pct) {
-    if (FLAGS_remote_inference) {
-      inference_worker_thread_ = std::thread([]() {
-        std::vector<std::string> cmd_parts = {
-            absl::StrCat("BOARD_SIZE=", kN),
-            "python",
-            "inference_worker.py",
-            absl::StrCat("--model=", FLAGS_model),
-            absl::StrCat("--checkpoint_dir=", FLAGS_checkpoint_dir),
-            "--use_tpu=true",
-            absl::StrCat("--tpu_name=", FLAGS_tpu_name),
-            absl::StrCat("--conv_width=", FLAGS_conv_width),
-            absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
-        };
-        auto cmd = absl::StrJoin(cmd_parts, " ");
-        FILE* f = popen(cmd.c_str(), "r");
-        for (;;) {
-          int c = fgetc(f);
-          if (c == EOF) {
-            break;
-          }
-          fputc(c, stderr);
-        }
-        fputc('\n', stderr);
-      });
-    }
-  }
+      : options_(options), disable_resign_pct_(disable_resign_pct) {}
 
-  virtual ~PlayerFactory() {
-    if (inference_worker_thread_.joinable()) {
-      inference_worker_thread_.join();
-    }
-  }
+  virtual ~PlayerFactory() = default;
 
   virtual std::unique_ptr<MctsPlayer> New(
       const MctsPlayer::Options& options) = 0;
@@ -214,7 +184,6 @@ class PlayerFactory {
 
   const MctsPlayer::Options options_;
   const float disable_resign_pct_;
-  std::thread inference_worker_thread_;
 };
 
 class RemotePlayerFactory : public PlayerFactory {
@@ -223,14 +192,41 @@ class RemotePlayerFactory : public PlayerFactory {
                       float disable_resign_pct, int virtual_losses,
                       int games_per_inference, int port)
       : PlayerFactory(options, disable_resign_pct) {
+    inference_worker_thread_ = std::thread([]() {
+      std::vector<std::string> cmd_parts = {
+          absl::StrCat("BOARD_SIZE=", kN),
+          "python",
+          "inference_worker.py",
+          absl::StrCat("--model=", FLAGS_model),
+          absl::StrCat("--checkpoint_dir=", FLAGS_checkpoint_dir),
+          "--use_tpu=true",
+          absl::StrCat("--tpu_name=", FLAGS_tpu_name),
+          absl::StrCat("--conv_width=", FLAGS_conv_width),
+          absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
+      };
+      auto cmd = absl::StrJoin(cmd_parts, " ");
+      FILE* f = popen(cmd.c_str(), "r");
+      for (;;) {
+        int c = fgetc(f);
+        if (c == EOF) {
+          break;
+        }
+        fputc(c, stderr);
+      }
+      fputc('\n', stderr);
+    });
+
     server_ = absl::make_unique<InferenceServer>(virtual_losses,
                                                  games_per_inference, port);
   }
+
+  ~RemotePlayerFactory() override { inference_worker_thread_.join(); }
 
   std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
     return absl::make_unique<MctsPlayer>(server_->NewDualNet(), options);
   }
 
+  std::thread inference_worker_thread_;
   std::unique_ptr<InferenceServer> server_;
 };
 
