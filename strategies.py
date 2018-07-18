@@ -90,11 +90,9 @@ class MCTSPlayer(MCTSPlayerInterface):
             self.temp_threshold = -1
         else:
             self.temp_threshold = FLAGS.softpick_move_cutoff
-        self.comments = []
-        self.searches_pi = []
+
+        self.initialize_game()
         self.root = None
-        self.result = 0
-        self.result_string = None
         self.resign_threshold = resign_threshold or FLAGS.resign_threshold
         self.timed_match = timed_match
         assert (self.timed_match and self.seconds_per_move >
@@ -155,8 +153,8 @@ class MCTSPlayer(MCTSPlayerInterface):
             `inject_noise` calls.
         '''
         if not self.two_player_mode:
-            self.searches_pi.append(
-                self.root.children_as_pi(self.root.position.n <= self.temp_threshold))
+            self.searches_pi.append(self.root.children_as_pi(
+                self.root.position.n < self.temp_threshold))
         self.comments.append(self.root.describe())
         try:
             self.root = self.root.maybe_add_child(coords.to_flat(c))
@@ -175,14 +173,17 @@ class MCTSPlayer(MCTSPlayerInterface):
 
         Highest N is most robust indicator. In the early stage of the game, pick
         a move weighted by visit count; later on, pick the absolute max.'''
-        if self.root.position.n >= self.temp_threshold:
-            fcoord = np.argmax(self.root.child_N)
-        else:
-            cdf = self.root.child_N.cumsum()
+        if (not self.two_player_mode and
+                self.root.position.n < self.temp_threshold):
+            cdf = self.root.children_as_pi(squash=True).cumsum()
             cdf /= cdf[-2]  # Prevents passing via softpick.
             selection = random.random()
             fcoord = cdf.searchsorted(selection)
             assert self.root.child_N[fcoord] != 0
+        else:
+            # break ties in N by looking at action_score
+            fcoord = np.argmax(self.root.child_N +
+                               self.root.child_action_score / 1000)
         return coords.from_flat(fcoord)
 
     def tree_search(self, parallel_readouts=None):
