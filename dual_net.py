@@ -26,6 +26,7 @@ import os.path
 import sys
 
 import argh
+from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import summary
@@ -453,11 +454,26 @@ def export_model(working_dir, model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def train(*tf_records, steps=None):
+def train(
+        *tf_records: "Records to train on",
+        steps: "Number of steps to train. If not set iterates over "
+               "tf_records and sets steps to examples / batch_size"=-1):
     tf.logging.set_verbosity(tf.logging.INFO)
     estimator = get_estimator(FLAGS.model_dir)
-    if steps is None:
-        steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
+
+    if steps is -1:
+        def count_examples(tf_record):
+            opts = preprocessing.TF_RECORD_CONFIG
+            return sum(1 for _ in tqdm(
+                tf.python_io.tf_record_iterator(tf_record, opts),
+                desc=tf_record))
+
+        total_examples = sum(map(count_examples, tf_records))
+        batch_size = FLAGS.train_batch_size
+        if FLAGS.use_tpu:
+            batch_size *= FLAGS.num_tpu_cores
+        steps = total_examples // FLAGS.train_batch_size
+
     if FLAGS.use_tpu:
         def input_fn(params):
             return preprocessing.get_tpu_input_tensors(params['batch_size'], tf_records)
