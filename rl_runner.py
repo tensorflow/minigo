@@ -28,7 +28,7 @@ import sys
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
 
-def loop(working_dir='estimator_working_dir', tpu_name):
+def loop(working_dir='estimator_working_dir', tpu_name=None):
     """Run train and validate as subprocesses."""
     flags = [
         working_dir,
