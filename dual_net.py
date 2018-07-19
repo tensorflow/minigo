@@ -62,6 +62,10 @@ flags.DEFINE_multi_float('lr_rates', [0.01, 0.001, 0.0001],
 flags.DEFINE_float('l2_strength', 1e-4,
                    'The L2 regularization parameter applied to weights.')
 
+flags.DEFINE_float('value_cost_weight', 1.0,
+                   'Scalar for value_cost, AGZ paper suggests 1/100 for '
+                   'supervised learning')
+
 flags.DEFINE_float('sgd_momentum', 0.9,
                    'Momentum parameter for learning rate.')
 
@@ -201,23 +205,25 @@ def model_fn(features, labels, mode, params=None):
         features, mode == tf.estimator.ModeKeys.TRAIN)
 
     # train ops
-    global_step = tf.train.get_or_create_global_step()
     policy_cost = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
-    value_cost = tf.reduce_mean(
+
+    value_cost = FLAGS.value_cost_weight * tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
+
     reg_vars = [v for v in tf.trainable_variables()
                 if not 'bias' in v.name and not 'beta' in v.name]
-
     l2_cost = FLAGS.l2_strength * \
         tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
+
     combined_cost = policy_cost + value_cost + l2_cost
+
+    global_step = tf.train.get_or_create_global_step()
     learning_rate = tf.train.piecewise_constant(
         global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    optimizer = tf.train.MomentumOptimizer(
-        learning_rate, FLAGS.sgd_momentum)
+    optimizer = tf.train.MomentumOptimizer(learning_rate, FLAGS.sgd_momentum)
     if FLAGS.use_tpu:
         optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
     with tf.control_dependencies(update_ops):
