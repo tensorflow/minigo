@@ -264,8 +264,6 @@ def model_fn(features, labels, mode, params=None):
                 policy_target_top_1_confidence),
             'value_confidence': tf.metrics.mean(tf.abs(value_output)),
         }
-        if est_mode == tf.estimator.ModeKeys.EVAL:
-            return metric_ops
 
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
@@ -274,6 +272,9 @@ def model_fn(features, labels, mode, params=None):
                 summary.record_summaries_every_n_global_steps(FLAGS.summary_steps):
             for metric_name, metric_op in metric_ops.items():
                 summary.scalar(metric_name, metric_op[1])
+
+        if est_mode == tf.estimator.ModeKeys.EVAL:
+            return metric_ops
         return summary.all_summary_ops()
 
     metric_args = [
@@ -322,7 +323,7 @@ def model_inference_fn(features, training):
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
         axis=-1,
-        momentum=.997,
+        momentum=.95,
         epsilon=1e-5,
         center=True,
         scale=True,
@@ -509,7 +510,7 @@ def validate(tf_records, validate_name=None):
                 shuffle_buffer_size=20000)
 
     estimator = get_estimator(FLAGS.model_dir)
-    estimator.evaluate(input_fn, steps=20, name=validate_name)
+    estimator.evaluate(input_fn, steps=50, name=validate_name)
 
 
 def compute_update_ratio(weight_tensors, before_weights, after_weights):
@@ -564,7 +565,7 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train, export_model])
+argh.add_commands(parser, [train, export_model, validate])
 
 if __name__ == '__main__':
     # Let absl.flags parse known flags from argv, then pass the remaining flags

@@ -131,7 +131,7 @@ def validate_hourly(working_dir, validate_name=None):
                      for d in reversed(gfile.ListDirectory(fsdb.holdout_dir()))
                      for f in gfile.ListDirectory(os.path.join(fsdb.holdout_dir(),d))
                      if gfile.IsDirectory(os.path.join(fsdb.holdout_dir(),d)))
-    holdout_files = itertools.islice(holdout_files, 20000)
+    holdout_files = list(itertools.islice(holdout_files, 20000))
     random.shuffle(holdout_files)
     dual_net.validate(holdout_files)
 
