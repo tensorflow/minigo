@@ -116,6 +116,9 @@ DEFINE_bool(remote_inference, false,
             "a Python subprocess that performs the actual inference. Required "
             "when running on Cloud TPU.");
 DEFINE_int32(port, 50051, "The port opened by the InferenceService server.");
+DEFINE_bool(use_tpu, false,
+            "If true, the remote inference will be run on a TPU. Ignored when "
+            "remote_inference=false.");
 DEFINE_string(tpu_name, "", "Cloud TPU name, e.g. grpc://10.240.2.2:8470.");
 DEFINE_int32(parallel_games, 32,
              "Number of games to play in parallel. For performance reasons, "
@@ -199,7 +202,7 @@ class RemotePlayerFactory : public PlayerFactory {
           "inference_worker.py",
           absl::StrCat("--model=", FLAGS_model),
           absl::StrCat("--checkpoint_dir=", FLAGS_checkpoint_dir),
-          "--use_tpu=true",
+          absl::StrCat("--use_tpu=", FLAGS_use_tpu),
           absl::StrCat("--tpu_name=", FLAGS_tpu_name),
           absl::StrCat("--conv_width=", FLAGS_conv_width),
           absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
@@ -220,7 +223,10 @@ class RemotePlayerFactory : public PlayerFactory {
                                                  games_per_inference, port);
   }
 
-  ~RemotePlayerFactory() override { inference_worker_thread_.join(); }
+  ~RemotePlayerFactory() override {
+    server_.reset(nullptr);
+    inference_worker_thread_.join();
+  }
 
   std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
     return absl::make_unique<MctsPlayer>(server_->NewDualNet(), options);
@@ -351,6 +357,11 @@ std::unique_ptr<PlayerFactory> GetPlayerFactory() {
   MctsPlayer::Options default_options;
   ParseMctsPlayerOptionsFromFlags(&default_options);
   if (FLAGS_remote_inference) {
+    if (FLAGS_games_per_inference > FLAGS_parallel_games) {
+      std::cerr << "Clamping games_per_inference to " << FLAGS_parallel_games
+                << std::endl;
+      FLAGS_games_per_inference = FLAGS_parallel_games;
+    }
     return absl::make_unique<RemotePlayerFactory>(
         default_options, FLAGS_disable_resign_pct, FLAGS_virtual_losses,
         FLAGS_games_per_inference, FLAGS_port);
@@ -363,6 +374,10 @@ std::unique_ptr<PlayerFactory> GetPlayerFactory() {
 std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory,
                            bool run_forever) {
   return std::thread([thread_id, player_factory, run_forever]() {
+    // Only print the board using ANSI colors if stderr is sent to the
+    // terminal.
+    const bool use_ansi_colors = isatty(fileno(stderr));
+
     do {
       // Create a new player.
       auto options = player_factory->default_options();
@@ -379,7 +394,7 @@ std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory,
       while (!player->game_over()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
-          std::cerr << player->root()->position.ToPrettyString();
+          std::cerr << player->root()->position.ToPrettyString(use_ansi_colors);
           std::cerr << player->root()->Describe() << std::endl;
         }
         player->PlayMove(move);

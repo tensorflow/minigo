@@ -292,8 +292,10 @@ def model_fn(features, labels, mode, params=None):
         'value_output': value_output,
     }
 
-    eval_metrics_only_fn = functools.partial(eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.EVAL)
-    host_call_fn = functools.partial(eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.TRAIN)
+    eval_metrics_only_fn = functools.partial(
+        eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.EVAL)
+    host_call_fn = functools.partial(
+        eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.TRAIN)
 
     tpu_estimator_spec = tpu_estimator.TPUEstimatorSpec(
         mode=mode,

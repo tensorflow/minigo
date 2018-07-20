@@ -121,7 +121,7 @@ std::string Position::ToGroupString() const {
   return oss.str();
 }
 
-std::string Position::ToPrettyString() const {
+std::string Position::ToPrettyString(bool use_ansi_colors) const {
   std::ostringstream oss;
 
   auto format_cols = [&oss]() {
@@ -132,6 +132,11 @@ std::string Position::ToPrettyString() const {
     oss << "\n";
   };
 
+  const char* print_white = use_ansi_colors ? kPrintWhite : "";
+  const char* print_black = use_ansi_colors ? kPrintBlack : "";
+  const char* print_empty = use_ansi_colors ? kPrintEmpty : "";
+  const char* print_normal = use_ansi_colors ? kPrintNormal : "";
+
   format_cols();
   for (int row = 0; row < kN; ++row) {
     oss << std::setw(2) << (kN - row) << " ";
@@ -139,14 +144,14 @@ std::string Position::ToPrettyString() const {
       Coord c(row, col);
       auto color = stones_[c].color();
       if (color == Color::kWhite) {
-        oss << kPrintWhite << "O ";
+        oss << print_white << "O ";
       } else if (color == Color::kBlack) {
-        oss << kPrintBlack << "X ";
+        oss << print_black << "X ";
       } else {
-        oss << kPrintEmpty << (c == ko_ ? "* " : ". ");
+        oss << print_empty << (c == ko_ ? "* " : ". ");
       }
     }
-    oss << kPrintNormal << std::setw(2) << (kN - row);
+    oss << print_normal << std::setw(2) << (kN - row);
     oss << "\n";
   }
   format_cols();

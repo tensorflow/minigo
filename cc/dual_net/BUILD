@@ -63,6 +63,7 @@ minigo_cc_library(
         "//cc:position",
         "//cc:symmetries",
         "//cc:tensorflow",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )
