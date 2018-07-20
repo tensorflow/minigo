@@ -20,6 +20,7 @@ at the bottom (again, via RPC).
 """
 
 import abc
+from contextlib import contextmanager
 import functools
 import sys
 import time
@@ -72,7 +73,7 @@ NUM_WORKER_THREADS = 2
 print = functools.partial(print, file=sys.stderr, flush=True)
 
 
-class RwLock(object):
+class RwMutex(object):
     """A simple read/write mutex.
 
     I'm surprised Python doesn't provide one of these by default.
@@ -83,19 +84,35 @@ class RwLock(object):
         self._read_lock = threading.Semaphore()
         self._read_count = 0
 
-    def acquire_write(self):
+    @contextmanager
+    def write_lock(self):
+        self._acquire_write()
+        try:
+            yield
+        finally:
+            self._release_write()
+
+    @contextmanager
+    def read_lock(self):
+        self._acquire_read()
+        try:
+            yield
+        finally:
+            self._release_read()
+
+    def _acquire_write(self):
         self._resource_lock.acquire()
 
-    def release_write(self):
+    def _release_write(self):
         self._resource_lock.release()
 
-    def acquire_read(self):
+    def _acquire_read(self):
         with self._read_lock:
             self._read_count += 1
             if self._read_count == 1:
                 self._resource_lock.acquire()
 
-    def release_read(self):
+    def _release_read(self):
         with self._read_lock:
             self._read_count -= 1
             if self._read_count == 0:
@@ -127,37 +144,34 @@ class Session(abc.ABC):
         # The worker threads wait for this event before starting inference.
         self.model_available = threading.Event()
         self._model_path = None
-        self._lock = RwLock()
+        self._mutex = RwMutex()
 
-    def load_model(self, path):
-        """Loads a model."""
-        self._lock.acquire_write()
-        try:
+    def maybe_load_model(self, path):
+        """Loads the given model if it's different from the current one."""
+        with self._mutex.read_lock():
+            if path == self._model_path:
+                return
+
+        with self._mutex.write_lock():
             print(time.time(), "loading %s" % path)
             self._locked_load_model(path)
+            self._model_path = path
             print(time.time(), "loaded %s" % path)
-        finally:
-            self._lock.release_write()
         self.model_available.set()
 
     def run(self, raw_features):
         """Performs inference on the given raw features."""
         features = self._prepare_features(raw_features)
-        try:
-            self._lock.acquire_read()
+        with self._mutex.read_lock():
             policy, value = self._locked_run(features)
-            # Make a local copy of self.model_path while we have the read lock
-            # held.
             local_model_path = self._model_path
-        finally:
-            self._lock.release_read()
 
         return policy, value, local_model_path
 
-    @abc.abstractmethod
     def shutdown(self):
         """Shuts down the session."""
-        pass
+        with self._mutex.write_lock():
+            self._locked_shutdown()
 
     @abc.abstractmethod
     def _locked_load_model(self, path):
@@ -169,15 +183,26 @@ class Session(abc.ABC):
 
     @abc.abstractmethod
     def _locked_run(self, raw_features):
-        """Evaluates the model with the given raw features.
+        """Device-specific evaluation of the model with the given raw features.
 
         Must be called with self._lock held for read.
         """
         pass
 
     @abc.abstractmethod
+    def _locked_shutdown(self, raw_features):
+        """Device-specific shutdown.
+
+        Must be called with self._lock held for write.
+        """
+        pass
+
+    @abc.abstractmethod
     def _prepare_features(self, raw_features):
-        """Device-specific preparation of raw features."""
+        """Device-specific preparation of raw features.
+
+        Does not require a lock to be held.
+        """
         pass
 
 
@@ -191,7 +216,7 @@ class BasicSession(Session):
                              features_lib.NEW_FEATURES_PLANES],
                 name='pos_tensor')
 
-    def shutdown(self):
+    def _locked_shutdown(self):
         pass
 
     def _locked_load_model(self, path):
@@ -247,12 +272,12 @@ class TpuSession(Session):
                 self._feature_placeholders.append((features,))
 
             self._outputs = tf.contrib.tpu.replicate(
-                const_model_inference_fn, self.feature_placeholders)
+                const_model_inference_fn, self._feature_placeholders)
 
             # tpu.replicate requires a list, but sess.run requires a tuple...
-            self._feature_placeholders = tuple(self.feature_placeholders)
+            self._feature_placeholders = tuple(self._feature_placeholders)
 
-    def shutdown(self):
+    def _locked_shutdown(self):
         self._sess.run(self._tpu_shutdown)
 
     def _locked_load_model(self, path):
@@ -287,7 +312,7 @@ class TpuSession(Session):
             end = begin + num_features
             x = np.frombuffer(
                 raw_features, dtype=np.int8, count=num_features, offset=begin)
-            x = x.reshape([self.batch_size, go.N, go.N,
+            x = x.reshape([self._batch_size, go.N, go.N,
                            features_lib.NEW_FEATURES_PLANES])
             features.append(x)
         return features
@@ -301,12 +326,12 @@ class Worker(object):
 
         if FLAGS.use_tpu:
             self.sess = TpuSession(
-                FLAGS.tpu_name, parallel_inferences, self.batch_size)
+                FLAGS.tpu_name, self.parallel_inferences, self.batch_size)
         else:
             self.sess = BasicSession()
 
         if FLAGS.model:
-            self.sess.load_model(FLAGS.model)
+            self.sess.maybe_load_model(FLAGS.model)
 
     def run(self):
         self._running = True
@@ -381,8 +406,8 @@ class Worker(object):
         print("starting model loader thread")
         while self._running:
             freshest = saver.latest_checkpoint(FLAGS.checkpoint_dir)
-            if freshest and freshest != self.model_path:
-                self.sess.load_model(freshest)
+            if freshest:
+                self.sess.maybe_load_model(freshest)
             # Wait a few seconds before checking again.
             time.sleep(5)
 
