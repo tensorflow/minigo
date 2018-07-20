@@ -28,7 +28,9 @@ git checkout "${commit_tag}"
 # Run the TensorFlow configuration script, setting reasonable values for most
 # of the options.
 echo "Configuring tensorflow"
-CC_OPT_FLAGS=${CC_OPT_FLAGS:--march=native} \
+cc_opt_flags="${CC_OPT_FLAGS:--march=native}"
+
+CC_OPT_FLAGS="${cc_opt_flags}" \
 TF_NEED_JEMALLOC=${TF_NEED_JEMALLOC:-1} \
 TF_NEED_GCP=${TF_NEED_GCP:-1} \
 TF_NEED_HDFS=${TF_NEED_HDFS:-0} \
@@ -46,7 +48,7 @@ TF_SET_ANDROID_WORKSPACE=${TF_SET_ANDROID_WORKSPACE:-0} \
 
 
 echo "Building tensorflow package"
-bazel build -c opt --config=opt --copt="$CC_OPT_FLAGS" //tensorflow/tools/pip_package:build_pip_package
+bazel build -c opt --config=opt --copt="${cc_opt_flags}" //tensorflow/tools/pip_package:build_pip_package
 bazel-bin/tensorflow/tools/pip_package/build_pip_package ${tmp_pkg_dir}
 
 echo "Tensorflow built-ish"
@@ -57,13 +59,13 @@ echo "Copying tensor flow headers to ${dst_dir}"
 cp -r ${tmp_dir}/tensorflow-*.data/purelib/tensorflow/include "${dst_dir}"
 
 echo "Building tensorflow libraries"
-bazel build -c opt --config=opt --copt="$CC_OPT_FLAGS" /a/tensorflow:libtensorflow_cc.so //tensorflow:libtensorflow_framework.so
+bazel build -c opt --config=opt --copt="${cc_opt_flags}" /a/tensorflow:libtensorflow_cc.so //tensorflow:libtensorflow_framework.so
 
 echo "Copying tensorflow libraries to ${dst_dir}"
 cp bazel-bin/tensorflow/libtensorflow_*.so "${dst_dir}"
 
 echo "Building toco"
-bazel build -c opt --config=opt --copt="$CC_OPT_FLAGS" //tensorflow/contrib/lite/toco:toco
+bazel build -c opt --config=opt --copt="${cc_opt_flags}" //tensorflow/contrib/lite/toco:toco
 cp bazel-bin/tensorflow/contrib/lite/toco/toco "${dst_dir}"
 
 popd
