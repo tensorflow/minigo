@@ -59,7 +59,7 @@ echo "Copying tensor flow headers to ${dst_dir}"
 cp -r ${tmp_dir}/tensorflow-*.data/purelib/tensorflow/include "${dst_dir}"
 
 echo "Building tensorflow libraries"
-bazel build -c opt --config=opt --copt="${cc_opt_flags}" /a/tensorflow:libtensorflow_cc.so //tensorflow:libtensorflow_framework.so
+bazel build -c opt --config=opt --copt="${cc_opt_flags}" //tensorflow:libtensorflow_cc.so //tensorflow:libtensorflow_framework.so
 
 echo "Copying tensorflow libraries to ${dst_dir}"
 cp bazel-bin/tensorflow/libtensorflow_*.so "${dst_dir}"
