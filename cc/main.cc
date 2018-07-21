@@ -116,7 +116,7 @@ DEFINE_bool(remote_inference, false,
             "a Python subprocess that performs the actual inference. Required "
             "when running on Cloud TPU.");
 DEFINE_int32(port, 50051, "The port opened by the InferenceService server.");
-DEFINE_bool(use_tpu, false,
+DEFINE_bool(use_tpu, true,
             "If true, the remote inference will be run on a TPU. Ignored when "
             "remote_inference=false.");
 DEFINE_string(tpu_name, "", "Cloud TPU name, e.g. grpc://10.240.2.2:8470.");
