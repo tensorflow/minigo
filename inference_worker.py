@@ -258,9 +258,12 @@ class TpuSession(Session):
         Session.__init__(self, sess)
 
         self._parallel_tpus = parallel_tpus
+        self._batch_size = batch_size
+
+        # Create init & shutdown ops up front. This is probably not really
+        # necessary but it's what the sample code does.
         self._tpu_init = tf.contrib.tpu.initialize_system()
         self._tpu_shutdown = tf.contrib.tpu.shutdown_system()
-        self._batch_size = batch_size
 
         self._feature_placeholders = []
         with self._sess.graph.as_default():
