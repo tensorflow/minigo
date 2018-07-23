@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+'''Python implementation of selfplay worker.
+
+This worker is used to set up many parallel selfplay instances.'''
+
 
 import random
 import os
@@ -32,6 +36,8 @@ flags.DEFINE_string('selfplay_dir', None, 'Where to write game data.')
 flags.DEFINE_string('holdout_dir', None, 'Where to write held-out game data.')
 flags.DEFINE_string('sgf_dir', None, 'Where to write human-readable SGFs.')
 flags.DEFINE_float('holdout_pct', 0.05, 'What percent of games to hold out.')
+flags.DEFINE_float('resign_disable_pct', 0.05,
+                   'What percent of games to disable resign for.')
 
 # this should be called "verbosity" but flag name conflicts with absl.logging.
 flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
@@ -39,14 +45,14 @@ flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
 FLAGS = flags.FLAGS
 
 def play(network, verbosity=0):
-    ''' Plays out a self-play match, returning
-    - the final position
-    - the n x 362 tensor of floats representing the mcts search probabilities
-    - the n-ary tensor of floats representing the original value-net estimate
-    where n is the number of moves in the game'''
+    ''' Plays out a self-play match, returning a MCTSPlayer object wrapping:
+        - the final position
+        - the n x 362 tensor of floats representing the mcts search probabilities
+        - the n-ary tensor of floats representing the original value-net estimate
+          where n is the number of moves in the game'''
     readouts = FLAGS.num_readouts  # defined in strategies.py
     # Disable resign in 5% of games
-    if random.random() < 0.05:
+    if random.random() < FLAGS.resign_disable_pct:
         resign_threshold = -1.0
     else:
         resign_threshold = None
@@ -103,6 +109,7 @@ def play(network, verbosity=0):
 
 def run_game(load_file, selfplay_dir, holdout_dir,
              sgf_dir, holdout_pct=0.05, verbose=1):
+    '''Takes a played game and record results and game data.'''
     minimal_sgf_dir = os.path.join(sgf_dir, 'clean')
     full_sgf_dir = os.path.join(sgf_dir, 'full')
     utils.ensure_dir_exists(minimal_sgf_dir)
@@ -139,6 +146,7 @@ def run_game(load_file, selfplay_dir, holdout_dir,
 
 
 def main(argv):
+    '''Entry point for running one selfplay game.'''
     del argv  # Unused
     flags.mark_flags_as_required([
         'load_file', 'selfplay_dir', 'holdout_dir', 'sgf_dir'])
