@@ -17,13 +17,13 @@
 We run as subprocesses because it gives us some isolation.
 """
 
+import datetime as dt
 import os
 import subprocess
+import sys
 
 import argh
-import datetime as dt
 from utils import timer
-import sys
 
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
@@ -49,7 +49,9 @@ def loop(working_dir='estimator_working_dir', tpu_name=None):
 
         with timer("validate"):
             subprocess.call(['python', 'rl_loop.py', 'validate-hourly'] + flags)
-            subprocess.call(['python', 'main.py', 'validate', 'gs://jacksona-sandbox/data/validate', '--validate-name=pro'] + flags[3:])
+            subprocess.call(['python', 'main.py', 'validate',
+                             'gs://jacksona-sandbox/data/validate',
+                             '--validate-name=pro'] + flags[3:])
 
 
 if __name__ == '__main__':
