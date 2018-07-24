@@ -25,12 +25,12 @@ READ_OPTS = preprocessing.TF_RECORD_CONFIG
 
 LOCAL_DIR = "data/"
 
-MINIMUM_NEW_GAMES = 5000
+MINIMUM_NEW_GAMES = 12000
 
 
 def pick_examples_from_tfrecord(filename, samples_per_game=4):
     protos = list(tf.python_io.tf_record_iterator(filename, READ_OPTS))
-    if len(protos) < 20:  # Filter games with less than 20 moves
+    if len(protos) < 50:  # Filter games with less than 20 moves
         return []
     choices = random.sample(protos, min(len(protos), samples_per_game))
 
@@ -68,20 +68,18 @@ class ExampleBuffer():
         """ games is a list of .tfrecord.zz game records. """
         games.sort(key=os.path.basename)
         # A couple extra in case parsing fails
-        max_games = self.max_size // self.samples_per_game + 10
+        max_games = (self.max_size // self.samples_per_game) + 480
         if len(games) > max_games:
             games = games[-max_games:]
 
-        while len(self.examples) < self.max_size:
-            with mp.Pool(threads) as pool:
-                res = tqdm(pool.imap(self.func, games), total=len(games))
-                self.examples.extend(itertools.chain.from_iterable(res))
-            print("Got", len(self.examples))
+        with mp.Pool(threads) as pool:
+            res = tqdm(pool.imap(self.func, games), total=len(games))
+            self.examples.extend(itertools.chain.from_iterable(res))
+        print("Got", len(self.examples))
 
     def update(self, new_games):
         """ new_games is a list of .tfrecord.zz new game records. """
         new_games.sort(key=os.path.basename)
-        print("Updating ", len(new_games), "possible new games")
         first_new_game = None
         for idx, game in enumerate(new_games):
             timestamp = file_timestamp(game)
@@ -215,7 +213,7 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
             break
         time.sleep(30)
         if fsdb.get_latest_model() != models[-1]:
-            print ("New model!  Waiting for games. Only got ", buf.total_updates, "new games so far")
+            print ("New model!  Waiting for games. Got", buf.total_updates, "new games so far")
 
     latest = fsdb.get_latest_model()
     print("New model!", latest[1], "!=", models[-1][1])
