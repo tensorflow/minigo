@@ -274,11 +274,13 @@ gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
 ```
 
 ```bash
-BOARD_SIZE=19 python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
+BOARD_SIZE=19 python3 selfplay.py \
+  --load_file=gs://$BUCKET_NAME/models/$MODEL_NAME \
   --num_readouts 10 \
-  -v 3 \
-  --output-dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
-  --output-sgf=gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker
+  --verbose 3 \
+  --selfplay_dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
+  --holdout_dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
+  --sgf_dir=gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker
 ```
 
 Training

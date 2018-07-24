@@ -45,7 +45,7 @@ flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
 FLAGS = flags.FLAGS
 
 def play(network, verbosity=0):
-    ''' Plays out a self-play match, returning a MCTSPlayer object wrapping:
+    ''' Plays out a self-play match, returning a MCTSPlayer object containing:
         - the final position
         - the n x 362 tensor of floats representing the mcts search probabilities
         - the n-ary tensor of floats representing the original value-net estimate
