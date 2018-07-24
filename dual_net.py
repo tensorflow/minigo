@@ -479,16 +479,21 @@ def train(
 
     if FLAGS.use_tpu:
         def input_fn(params):
-            return preprocessing.get_tpu_input_tensors(params['batch_size'], tf_records)
-
+            return preprocessing.get_tpu_input_tensors(
+                params['batch_size'],
+                tf_records,
+                random_rotation=True)
         # TODO: get hooks working again with TPUestimator.
         hooks = []
         steps //= FLAGS.num_tpu_cores
     else:
         def input_fn():
             return preprocessing.get_input_tensors(
-                FLAGS.train_batch_size, tf_records, filter_amount=1.0,
-                shuffle_buffer_size=FLAGS.shuffle_buffer_size)
+                FLAGS.train_batch_size,
+                tf_records,
+                filter_amount=1.0,
+                shuffle_buffer_size=FLAGS.shuffle_buffer_size,
+                random_rotation=True)
 
         hooks = [UpdateRatioSessionHook(FLAGS.model_dir),
                  EchoStepCounterHook(output_dir=FLAGS.model_dir)]
