@@ -464,7 +464,7 @@ def train(
     tf.logging.set_verbosity(tf.logging.INFO)
     estimator = get_estimator(FLAGS.model_dir)
 
-    if steps is -1:
+    if steps == -1:
         def count_examples(tf_record):
             opts = preprocessing.TF_RECORD_CONFIG
             return sum(1 for _ in tqdm(
@@ -472,9 +472,6 @@ def train(
                 desc=tf_record))
 
         total_examples = sum(map(count_examples, tf_records))
-        batch_size = FLAGS.train_batch_size
-        if FLAGS.use_tpu:
-            batch_size *= FLAGS.num_tpu_cores
         steps = total_examples // FLAGS.train_batch_size
 
     if FLAGS.use_tpu:
@@ -499,7 +496,7 @@ def train(
                  EchoStepCounterHook(output_dir=FLAGS.model_dir)]
 
     print("Training, steps = {}".format(steps))
-    estimator.train(input_fn, steps=int(steps), hooks=hooks)
+    estimator.train(input_fn, steps=steps, hooks=hooks)
 
 
 def validate(tf_records, validate_name=None):
