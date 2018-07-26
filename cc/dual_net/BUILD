@@ -14,6 +14,16 @@ load(
     "minigo_cc_test_9_only",
 )
 
+config_setting(
+    name = "enable_remote",
+    define_values = {"remote": "1"},
+)
+
+config_setting(
+    name = "enable_tf",
+    define_values = {"tf": "1"},
+)
+
 minigo_cc_library(
     name = "dual_net",
     srcs = ["dual_net.cc"],
@@ -23,6 +33,33 @@ minigo_cc_library(
         "//cc:position",
         "@com_google_absl//absl/types:span",
     ],
+)
+
+minigo_cc_library(
+    name = "factory",
+    srcs = ["factory.cc"],
+    hdrs = ["factory.h"],
+    copts = select({
+        ":enable_remote": ["-DMG_ENABLE_REMOTE_DUAL_NET"],
+        "//conditions:default": [],
+    }) + select({
+        ":enable_tf": ["-DMG_ENABLE_TF_DUAL_NET"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:check",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+    ] + select({
+        ":enable_remote": [":inference_server"],
+        "//conditions:default": [],
+    }) + select({
+        ":enable_tf": [":tf_dual_net"],
+        "//conditions:default": [],
+    }),
 )
 
 minigo_cc_library(
@@ -37,6 +74,7 @@ minigo_cc_library(
     ],
 )
 
+# TODO(tommadams): rename inference_server to remote_dual_net
 minigo_cc_library(
     name = "inference_server",
     srcs = ["inference_server.cc"],

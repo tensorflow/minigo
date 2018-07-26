@@ -25,8 +25,8 @@ std::ostream& operator<<(std::ostream& os, Color color) {
     case Color::kWhite:
       return os << "W";
     default:
-      MG_CHECK(false);
-      return os << "<" << static_cast<int>(color) << ">";
+      MG_FATAL() << "<" << static_cast<int>(color) << ">";
+      return os;
   }
 }
 
