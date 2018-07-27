@@ -265,16 +265,16 @@ def model_fn(features, labels, mode, params=None):
             'value_confidence': tf.metrics.mean(tf.abs(value_output)),
         }
 
+        if est_mode == tf.estimator.ModeKeys.EVAL:
+            return metric_ops
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
         summary_writer = summary.create_file_writer(FLAGS.model_dir)
         with summary_writer.as_default(), \
-                summary.record_summaries_every_n_global_steps(FLAGS.summary_steps):
+                summary.always_record_summaries():
             for metric_name, metric_op in metric_ops.items():
                 summary.scalar(metric_name, metric_op[1])
 
-        if est_mode == tf.estimator.ModeKeys.EVAL:
-            return metric_ops
         return summary.all_summary_ops()
 
     metric_args = [
