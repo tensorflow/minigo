@@ -98,6 +98,54 @@ fairly simple (there is no need for a LibertyTracker) and at the time of writing
 performance of the Position code was more than 450x that of its Python
 counterpart.
 
+## Inference engines
+
+C++ Minigo currently supports three separate engines for performing inference:
+
+ - tf: peforms inference using the TensorFlow libraries built by
+   `cc/configure_tensorflow.sh`.
+ - remote: launches a Python subprocess that performs inference using the
+   version of TensorFlow installed on the system. The remote inference
+   engine is required for running Minigo on Cloud TPU.
+ - lite: performs inference using TensorFlow Lite, which runs in software on
+   the CPU.
+
+The Compilation and linking of these engines into the `//cc:main` binary is
+controlled by the Bazel defines `--define=tf=<0,1>`, `--define=remote=<0,1>`
+and `--define=lite=<0,1>`.
+
+The choice of which engine to use is controlled by the command line argument
+`--engine=<tf,remote,lite>`.
+
+## TensorFlow Lite
+
+Minigo supports Tensorflow Lite as an inference engine.
+
+First, run a frozen graph through Toco, the TensorFlow optimizing compiler:
+
+```
+BATCH_SIZE=8
+./cc/tensorflow/toco \
+  --input_file=saved_models/000256-opossum.pb \
+  --input_format=TENSORFLOW_GRAPHDEF \
+  --output_format=TFLITE \
+  --output_file=saved_models/000256-opossum.tflite \
+  --inference_type=FLOAT \
+  --input_type=FLOAT \
+  --input_arrays=pos_tensor \
+  --output_arrays=policy_output,value_output \
+  --input_shapes=8,19,19,17
+```
+
+You will also need to build the `//cc:main` target with TensorFlow Lite
+support (optionally disabling the TensorFlow and remote inference engines
+as shown below):
+
+```
+bazel build -c opt --define=tf=0 --define=remote=0 --define=lite=1 cc:main
+```
+
+
 ## Style guide
 
 The C++ code follows

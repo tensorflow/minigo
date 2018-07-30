@@ -89,10 +89,8 @@ void TfDualNet::RunMany(absl::Span<const BoardFeatures> features,
   }
 
   // Copy the features into the input tensor.
-  for (int i = 0; i < batch_size; ++i) {
-    memcpy(feature_tensor.flat<float>().data(), features.data(),
-           features.size() * sizeof(BoardFeatures));
-  }
+  memcpy(feature_tensor.flat<float>().data(), features.data(),
+         features.size() * sizeof(BoardFeatures));
 
   // Run the model.
   TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));

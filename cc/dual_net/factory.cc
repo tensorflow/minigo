@@ -20,6 +20,13 @@
 #endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_TF_DUAL_NET
 
+#ifdef MG_ENABLE_LITE_DUAL_NET
+#include "cc/dual_net/lite_dual_net.h"
+#ifndef MG_DEFAULT_ENGINE
+#define MG_DEFAULT_ENGINE "lite"
+#endif  // MG_DEFAULT_ENGINE
+#endif  // MG_ENABLE_LITE_DUAL_NET
+
 DEFINE_string(engine, MG_DEFAULT_ENGINE,
               "The inference engine to use. Accepted values:"
 #ifdef MG_ENABLE_REMOTE_DUAL_NET
@@ -27,6 +34,9 @@ DEFINE_string(engine, MG_DEFAULT_ENGINE,
 #endif
 #ifdef MG_ENABLE_TF_DUAL_NET
               " \"tf\""
+#endif
+#ifdef MG_ENABLE_LITE_DUAL_NET
+              " \"lite\""
 #endif
 );
 
@@ -110,6 +120,18 @@ class TfDualNetFactory : public DualNetFactory {
 };
 #endif  // MG_ENABLE_TF_DUAL_NET
 
+#ifdef MG_ENABLE_LITE_DUAL_NET
+class LiteDualNetFactory : public DualNetFactory {
+ public:
+  LiteDualNetFactory(std::string model_path)
+      : DualNetFactory(std::move(model_path)) {}
+
+  std::unique_ptr<DualNet> New() override {
+    return absl::make_unique<LiteDualNet>(model());
+  }
+};
+#endif  // MG_ENABLE_LITE_DUAL_NET
+
 }  // namespace
 
 DualNetFactory::~DualNetFactory() = default;
@@ -129,6 +151,14 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(std::string model_path) {
 #else
     MG_FATAL() << "Binary wasn't compiled with tf inference support";
 #endif  // MG_ENABLE_TF_DUAL_NET
+  }
+
+  if (FLAGS_engine == "lite") {
+#ifdef MG_ENABLE_LITE_DUAL_NET
+    return absl::make_unique<LiteDualNetFactory>(std::move(model_path));
+#else
+    MG_FATAL() << "Binary wasn't compiled with lite inference support";
+#endif  // MG_ENABLE_LITE_DUAL_NET
   }
 
   MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";

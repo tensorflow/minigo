@@ -24,6 +24,11 @@ config_setting(
     define_values = {"tf": "1"},
 )
 
+config_setting(
+    name = "enable_lite",
+    define_values = {"lite": "1"},
+)
+
 minigo_cc_library(
     name = "dual_net",
     srcs = ["dual_net.cc"],
@@ -45,6 +50,9 @@ minigo_cc_library(
     }) + select({
         ":enable_tf": ["-DMG_ENABLE_TF_DUAL_NET"],
         "//conditions:default": [],
+    }) + select({
+        ":enable_lite": ["-DMG_ENABLE_LITE_DUAL_NET"],
+        "//conditions:default": [],
     }),
     deps = [
         ":dual_net",
@@ -58,6 +66,9 @@ minigo_cc_library(
         "//conditions:default": [],
     }) + select({
         ":enable_tf": [":tf_dual_net"],
+        "//conditions:default": [],
+    }) + select({
+        ":enable_lite": [":lite_dual_net"],
         "//conditions:default": [],
     }),
 )
@@ -98,9 +109,21 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:check",
-        "//cc:position",
-        "//cc:symmetries",
         "//cc:tensorflow",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+minigo_cc_library(
+    name = "lite_dual_net",
+    srcs = ["lite_dual_net.cc"],
+    hdrs = ["lite_dual_net.h"],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:check",
+        "//cc:tf_lite",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],

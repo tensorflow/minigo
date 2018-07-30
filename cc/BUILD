@@ -20,13 +20,28 @@ cc_library(
         "tensorflow/libtensorflow_framework.so",
     ],
     hdrs = glob(
-        ["tensorflow/**/*"],
-        exclude = ["tensorflow/*.so"],
+        ["tensorflow/include/**/*"],
+        exclude = ["tensorflow/contrib/lite/**"],
     ),
     includes = [
-        "tensorflow",
-        "tensorflow/external/nsync/public",
+        "tensorflow/include",
+        "tensorflow/include/external/nsync/public",
     ],
+)
+
+cc_library(
+    name = "tf_lite",
+    srcs = [
+        "tensorflow/libtensorflow_lite.a",
+    ],
+    hdrs = glob([
+        "tensorflow/include/tensorflow/contrib/lite/**/*",
+        "tensorflow/include/flatbuffers/*.h",
+    ]),
+    includes = [
+        "tensorflow/include",
+    ],
+    linkopts = ["-ldl"],
 )
 
 minigo_cc_library(
