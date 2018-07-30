@@ -15,7 +15,7 @@ rm -rf ${dst_dir}/*
 mkdir -p ${dst_dir}
 
 # TODO(tommadams): we should probably switch to Clang at some point.
-commit_tag="474b40bc7cb33d25f9bdc187d021e94a807bf1bd"
+commit_tag="v1.9.0"
 
 echo "Cloning tensorflow to ${tmp_dir}"
 git clone https://github.com/tensorflow/tensorflow "${tmp_dir}"

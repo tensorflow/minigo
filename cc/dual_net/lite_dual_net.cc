@@ -21,7 +21,6 @@
 #include "cc/check.h"
 #include "cc/constants.h"
 #include "tensorflow/contrib/lite/kernels/register.h"
-#include "tensorflow/contrib/lite/optional_debug_tools.h"
 
 using tflite::FlatBufferModel;
 using tflite::InterpreterBuilder;
