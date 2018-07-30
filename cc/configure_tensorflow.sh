@@ -83,4 +83,4 @@ cp -r tensorflow/contrib/lite/downloads/flatbuffers/include/flatbuffers $dst_dir
 
 popd
 echo "Deleting tmp dir ${tmp_dir}"
-# rm -rf "${tmp_dir}"
+rm -rf "${tmp_dir}"
