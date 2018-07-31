@@ -20,12 +20,17 @@ cc_library(
         "tensorflow/libtensorflow_framework.so",
     ],
     hdrs = glob(
-        ["tensorflow/include/**/*"],
-        exclude = ["tensorflow/contrib/lite/**"],
+        ["tensorflow/**/*"],
+        exclude = [
+            "**/*.a",
+            "**/*.so",
+            "tensorflow/flatbuffers/**",
+            "tensorflow/tensorflow/contrib/lite/**",
+        ],
     ),
     includes = [
-        "tensorflow/include",
-        "tensorflow/include/external/nsync/public",
+        "tensorflow",
+        "tensorflow/external/nsync/public",
     ],
 )
 
@@ -34,13 +39,14 @@ cc_library(
     srcs = [
         "tensorflow/libtensorflow_lite.a",
     ],
-    hdrs = glob([
-        "tensorflow/include/tensorflow/contrib/lite/**/*",
-        "tensorflow/include/flatbuffers/*.h",
-    ]),
-    includes = [
-        "tensorflow/include",
-    ],
+    hdrs = glob(
+        [
+            "tensorflow/flatbuffers/*.h",
+            "tensorflow/tensorflow/contrib/lite/**",
+        ],
+        exclude = ["**/*.so"],
+    ),
+    includes = ["tensorflow"],
     linkopts = ["-ldl"],
 )
 
