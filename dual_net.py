@@ -232,7 +232,7 @@ def model_fn(features, labels, mode, params=None):
 
     # Computations to be executed on CPU, outside of the main TPU queues.
     def eval_metrics_host_call_fn(policy_output, value_output, pi_tensor, policy_cost,
-                                  value_cost, l2_cost, combined_cost,
+                                  value_cost, l2_cost, combined_cost, step,
                                   est_mode=tf.estimator.ModeKeys.TRAIN):
         policy_entropy = -tf.reduce_mean(tf.reduce_sum(
             policy_output * tf.log(policy_output), axis=1))
@@ -241,6 +241,8 @@ def model_fn(features, labels, mode, params=None):
         policy_target_top_1 = tf.argmax(pi_tensor, axis=1)
         policy_output_top_1 = tf.argmax(policy_output, axis=1)
 
+        policy_output_in_top1 = tf.to_float(
+            tf.nn.in_top_k(policy_output, policy_target_top_1, k=1))
         policy_output_in_top3 = tf.to_float(
             tf.nn.in_top_k(policy_output, policy_target_top_1, k=3))
 
@@ -249,24 +251,26 @@ def model_fn(features, labels, mode, params=None):
             policy_output,
             tf.one_hot(policy_target_top_1, tf.shape(policy_output)[1]))
 
-        metric_ops = {
-            'policy_cost': tf.metrics.mean(policy_cost),
-            'value_cost': tf.metrics.mean(value_cost),
-            'l2_cost': tf.metrics.mean(l2_cost),
-            'policy_entropy': tf.metrics.mean(policy_entropy),
-            'combined_cost': tf.metrics.mean(combined_cost),
+        # TODO(sethtroisi): For V10 add tf.variable_scope for tf.metrics.mean's
+        with tf.variable_scope("metrics"):
+            metric_ops = {
+                'policy_cost': tf.metrics.mean(policy_cost),
+                'value_cost': tf.metrics.mean(value_cost),
+                'l2_cost': tf.metrics.mean(l2_cost),
+                'policy_entropy': tf.metrics.mean(policy_entropy),
+                'combined_cost': tf.metrics.mean(combined_cost),
 
-            'policy_accuracy_top_1': tf.metrics.accuracy(
-                labels=policy_target_top_1, predictions=policy_output_top_1),
-            'policy_accuracy_top_3': tf.metrics.mean(policy_output_in_top3),
-            'policy_top_1_confidence': tf.metrics.mean(policy_top_1_confidence),
-            'policy_target_top_1_confidence': tf.metrics.mean(
-                policy_target_top_1_confidence),
-            'value_confidence': tf.metrics.mean(tf.abs(value_output)),
-        }
+                'policy_accuracy_top_1': tf.metrics.mean(policy_output_in_top1),
+                'policy_accuracy_top_3': tf.metrics.mean(policy_output_in_top3),
+                'policy_top_1_confidence': tf.metrics.mean(policy_top_1_confidence),
+                'policy_target_top_1_confidence': tf.metrics.mean(
+                    policy_target_top_1_confidence),
+                'value_confidence': tf.metrics.mean(tf.abs(value_output)),
+            }
 
         if est_mode == tf.estimator.ModeKeys.EVAL:
             return metric_ops
+
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
         summary_writer = summary.create_file_writer(FLAGS.model_dir)
@@ -275,7 +279,14 @@ def model_fn(features, labels, mode, params=None):
             for metric_name, metric_op in metric_ops.items():
                 summary.scalar(metric_name, metric_op[1])
 
-        return summary.all_summary_ops()
+        # Reset metrics occasionally so that they are mean of recent batches.
+        reset_op = tf.variables_initializer(tf.local_variables("metrics"))
+        cond_reset_op = tf.cond(
+            tf.equal(tf.mod(tf.reduce_min(step), FLAGS.summary_steps), tf.to_int64(1)),
+            lambda: reset_op,
+            lambda: tf.no_op())
+
+        return summary.all_summary_ops() + [cond_reset_op]
 
     metric_args = [
         policy_output,
@@ -285,6 +296,7 @@ def model_fn(features, labels, mode, params=None):
         tf.reshape(value_cost, [1]),
         tf.reshape(l2_cost, [1]),
         tf.reshape(combined_cost, [1]),
+        tf.reshape(global_step, [1]),
     ]
 
     predictions = {
