@@ -105,8 +105,10 @@ C++ Minigo currently supports three separate engines for performing inference:
  - tf: peforms inference using the TensorFlow libraries built by
    `cc/configure_tensorflow.sh`.
  - remote: launches a Python subprocess that performs inference using the
-   version of TensorFlow installed on the system. The remote inference
-   engine is required for running Minigo on Cloud TPU.
+   version of TensorFlow installed on the system. The paths to TensorFlow and
+   the Python binary are resolved normally, so the ones from your virtual
+   environment will be used if you have one. The remote inference engine is
+   required for running Minigo on Cloud TPU.
  - lite: performs inference using TensorFlow Lite, which runs in software on
    the CPU.
 
