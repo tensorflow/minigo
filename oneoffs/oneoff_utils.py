@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 import dual_net
 import shipname
-from gtp_wrapper import MCTSPlayer
+from strategies import MCTSPlayer
 import sgf_wrapper
 from utils import parse_game_result, logged_timer
 

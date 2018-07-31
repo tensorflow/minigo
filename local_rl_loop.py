@@ -28,6 +28,7 @@ import preprocessing
 import dual_net
 import go
 import main
+import selfplay
 import example_buffer as eb
 from tensorflow import gfile
 import subprocess
@@ -70,22 +71,24 @@ def rl_loop():
         main.bootstrap(working_dir, model_save_path)
         print("Playing some games...")
         # Do two selfplay runs to test gather functionality
-        main.selfplay(
-            load_file=model_save_path,
-            output_dir=model_selfplay_dir,
-            output_sgf=sgf_dir,
-            holdout_pct=0)
-        main.selfplay(
-            load_file=model_save_path,
-            output_dir=model_selfplay_dir,
-            output_sgf=sgf_dir,
-            holdout_pct=0)
-        # Do one holdout run to test validation
-        main.selfplay(
+        selfplay.run_game(
             load_file=model_save_path,
             holdout_dir=holdout_dir,
-            output_dir=model_selfplay_dir,
-            output_sgf=sgf_dir,
+            selfplay_dir=model_selfplay_dir,
+            sgf_dir=sgf_dir,
+            holdout_pct=0)
+        selfplay.run_game(
+            load_file=model_save_path,
+            holdout_dir=holdout_dir,
+            selfplay_dir=model_selfplay_dir,
+            sgf_dir=sgf_dir,
+            holdout_pct=0)
+        # Do one holdout run to test validation
+        selfplay.run_game(
+            load_file=model_save_path,
+            holdout_dir=holdout_dir,
+            selfplay_dir=model_selfplay_dir,
+            sgf_dir=sgf_dir,
             holdout_pct=100)
 
         print("See sgf files here?")
@@ -107,11 +110,12 @@ def rl_loop():
         print("Trying validate on 'holdout' game...")
         main.validate(holdout_dir)
         print("Verifying that new checkpoint is playable...")
-        main.selfplay(
+        selfplay.run_game(
             load_file=next_model_save_file,
             holdout_dir=holdout_dir,
-            output_dir=model_selfplay_dir,
-            output_sgf=sgf_dir)
+            selfplay_dir=model_selfplay_dir,
+            sgf_dir=sgf_dir,
+            holdout_pct=0)
 
 if __name__ == '__main__':
     # horrible horrible hack to pass flag validation.

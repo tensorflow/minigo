@@ -193,7 +193,7 @@ and you can use any gtp-compliant program with it.
 ```
 # Latest model should look like: /path/to/models/000123-something
 LATEST_MODEL=$(ls -d $MINIGO_MODELS/* | tail -1 | cut -f 1 -d '.')
-BOARD_SIZE=19 python3 main.py gtp -l $LATEST_MODEL --num_readouts=$READOUTS -v 3
+BOARD_SIZE=19 python3 gtp.py --load_file=$LATEST_MODEL --num_readouts=$READOUTS --verbose=3
 ```
 
 (If no model is provided, it will initialize one with random values)
@@ -214,13 +214,13 @@ speaks GTP.) You can download the gogui set of tools at
 GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
 
 ```shell
-gogui-twogtp -black 'python3 main.py gtp -l gs://$BUCKET_NAME/models/000000-bootstrap' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
+gogui-twogtp -black 'python3 gtp.py --load_file=gs://$BUCKET_NAME/models/000000-bootstrap' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
 ```
 
 Another way to play via GTP is to watch it play against GnuGo, while spectating the games
 ```
 BLACK="gnugo --mode gtp"
-WHITE="python3 main.py gtp -l path/to/model"
+WHITE="python3 gtp.py --load_file=path/to/model"
 TWOGTP="gogui-twogtp -black \"$BLACK\" -white \"$WHITE\" -games 10 \
   -size 19 -alternate -sgffile gnugo"
 gogui -size 19 -program "$TWOGTP" -computer-both -auto
@@ -274,11 +274,13 @@ gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
 ```
 
 ```bash
-BOARD_SIZE=19 python3 main.py selfplay gs://$BUCKET_NAME/models/$MODEL_NAME \
+BOARD_SIZE=19 python3 selfplay.py \
+  --load_file=gs://$BUCKET_NAME/models/$MODEL_NAME \
   --num_readouts 10 \
-  -v 3 \
-  --output-dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
-  --output-sgf=gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker
+  --verbose 3 \
+  --selfplay_dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
+  --holdout_dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
+  --sgf_dir=gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker
 ```
 
 Training
