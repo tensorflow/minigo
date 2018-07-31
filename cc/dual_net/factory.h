@@ -22,7 +22,8 @@ class DualNetFactory {
   const std::string model_path_;
 };
 
-std::unique_ptr<DualNetFactory> NewDualNetFactory(std::string model_path);
+std::unique_ptr<DualNetFactory> NewDualNetFactory(std::string model_path,
+                                                  int parallel_games);
 
 }  // namespace minigo
 
