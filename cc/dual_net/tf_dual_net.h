@@ -23,7 +23,6 @@
 #include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
-#include "cc/position.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/public/session.h"
 
