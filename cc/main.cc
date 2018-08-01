@@ -295,7 +295,12 @@ class SelfPlayer {
 
       {
         absl::MutexLock lock(&mutex_);
+        auto old_model = FLAGS_model;
         MaybeReloadFlags();
+        MG_CHECK(old_model == FLAGS_model)
+            << "Manually changing the model during selfplay is not supported. "
+               "Use --checkpoint_dir and --engine=remote to perform inference "
+               "using the most recent checkpoint from training.";
         game_options.Init(thread_id);
         player = absl::make_unique<MctsPlayer>(dual_net_factory_->New(),
                                                game_options.player_options);
