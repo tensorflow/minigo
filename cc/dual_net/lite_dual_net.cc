@@ -34,7 +34,7 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
   MG_CHECK(model_ != nullptr);
 
   BuiltinOpResolver resolver;
-  InterpreterBuilder(*model_.get(), resolver)(&interpreter_);
+  InterpreterBuilder(*model_, resolver)(&interpreter_);
   MG_CHECK(interpreter_ != nullptr);
 
   // Let's just use all the processors we can.
