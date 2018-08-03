@@ -26,6 +26,7 @@ READ_OPTS = preprocessing.TF_RECORD_CONFIG
 LOCAL_DIR = "data/"
 
 MINIMUM_NEW_GAMES = 12000
+AVG_GAMES_PER_MODEL = 20000
 
 
 def pick_examples_from_tfrecord(filename, samples_per_game=4):
@@ -177,6 +178,14 @@ def _determine_chunk_to_make(write_dir):
 
     return chunk_to_make, False
 
+def get_window_size(chunk_num):
+    """ Adjust the window size by how far we are through a run.
+    At the start of the run, there's a benefit to 'expiring' the completely
+    random games a little sooner, and scaling up to the 500k game window
+    specified in the paper.
+    """
+    return min(500000, (chunk_num + 5) * (AVG_GAMES_PER_MODEL/2))
+
 def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
                   write_dir=None,
                   threads=32,
@@ -195,7 +204,7 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     files = (tf.gfile.Glob(os.path.join(LOCAL_DIR, d, "*.zz"))
                  for d in reversed(hours)
              if tf.gfile.Exists(os.path.join(LOCAL_DIR, d)))
-    files = itertools.islice(files, 500000) 
+    files = itertools.islice(files, get_window_size(chunk_to_make))
 
     models = fsdb.get_models()
     buf.parallel_fill(list(itertools.chain.from_iterable(files)), threads=threads)
