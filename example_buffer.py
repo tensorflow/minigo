@@ -184,7 +184,7 @@ def get_window_size(chunk_num):
     random games a little sooner, and scaling up to the 500k game window
     specified in the paper.
     """
-    return min(500000, (chunk_num + 5) * (AVG_GAMES_PER_MODEL/2))
+    return min(500000, (chunk_num + 5) * (AVG_GAMES_PER_MODEL // 2))
 
 def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
                   write_dir=None,
