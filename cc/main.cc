@@ -255,7 +255,7 @@ class SelfPlayer {
   }
 
  private:
-  // Struct that holds the options for a game. Each thread has it's own
+  // Struct that holds the options for a game. Each thread has its own
   // GameOptions instance, which are initialized with the SelfPlayer's mutex
   // held. This allows us to safely update the command line arguments from a
   // flag file without causing any race conditions.
