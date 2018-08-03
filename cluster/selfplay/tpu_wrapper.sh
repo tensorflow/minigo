@@ -31,8 +31,8 @@ bazel-bin/cc/main \
   --games_per_inference=16 \
   --parallel_games=32 \
   --num_readouts=800 \
-  --resign_threshold=-0.95 \
-  --disable_resign_pct=0.15 \
+  --resign_threshold=-0.999 \
+  --disable_resign_pct=0.10 \
   --output_dir=gs://${BUCKET_NAME}/data/selfplay \
   --holdout_dir=gs://${BUCKET_NAME}/data/holdout \
   --sgf_dir=gs://${BUCKET_NAME}/sgf \

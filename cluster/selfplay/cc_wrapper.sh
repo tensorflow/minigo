@@ -40,8 +40,8 @@ then
     --model=$NAME \
     --num_readouts=800 \
     --mode=selfplay \
-    --resign_threshold=0.91 \
-    --disable_resign_pct=0.2 \
+    --resign_threshold=0.999 \
+    --disable_resign_pct=0.1 \
     --holdout_dir="gs://$BUCKET_NAME/data/holdout/$BASENAME" \
     --output_dir="gs://$BUCKET_NAME/data/selfplay/$BASENAME" \
     --sgf_dir="gs://$BUCKET_NAME/sgf/$BASENAME"

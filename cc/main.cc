@@ -55,7 +55,7 @@ DEFINE_int32(
 DEFINE_bool(
     courtesy_pass, false,
     "If true and in GTP mode, we will always pass if the opponent passes.");
-DEFINE_double(resign_threshold, -0.95, "Resign threshold.");
+DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
 DEFINE_double(komi, minigo::kDefaultKomi, "Komi.");
 DEFINE_double(disable_resign_pct, 0.1,
               "Fraction of games to disable resignation for.");
@@ -115,7 +115,7 @@ DEFINE_string(output_dir, "",
 DEFINE_string(holdout_dir, "",
               "Holdout directory. If empty, no examples are written.");
 DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
-DEFINE_double(holdout_pct, 0.05,
+DEFINE_double(holdout_pct, 0.03,
               "Fraction of games to hold out for validation.");
 
 // Self play flags:

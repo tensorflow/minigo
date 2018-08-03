@@ -24,7 +24,7 @@ echo board_size: $BOARD_SIZE
 
 python3 rl_loop.py selfplay \
   --bucket_name=$BUCKET_NAME \
-  --resign-threshold=0.88 \
-  --num_readouts=900
+  --resign-threshold=0.999 \
+  --num_readouts=800
 
 echo Finished a set of games!

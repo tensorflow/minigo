@@ -27,8 +27,8 @@ import numpy as np
 import coords
 import go
 
-# 505 moves for 19x19, 113 for 9x9
-flags.DEFINE_integer('max_game_length', int(go.N ** 2 * 1.4),
+# 722 moves for 19x19, 162 for 9x9
+flags.DEFINE_integer('max_game_length', int(go.N ** 2 * 2),
                      'Move number at which game is forcibly terminated')
 
 flags.DEFINE_float('c_puct', 0.96,
