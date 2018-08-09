@@ -136,7 +136,7 @@ Coord MctsPlayer::SuggestMove() {
           TimeRecommendation(root_->position.n(), seconds_per_move,
                              options_.time_limit, options_.decay_factor);
     }
-    while (absl::ToDoubleSeconds(absl::Now() - start) < seconds_per_move) {
+    while (absl::Now() - start < absl::Seconds(seconds_per_move)) {
       TreeSearch(options_.batch_size);
     }
   } else {

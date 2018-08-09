@@ -1,0 +1,2 @@
+build --define=remote=1 --define=tf=1
+

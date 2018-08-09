@@ -30,15 +30,13 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "cc/check.h"
 #include "cc/constants.h"
-#ifndef MINIGO_DISABLE_INFERENCE_SERVER
-#include "cc/dual_net/inference_server.h"
-#endif
-#include "cc/dual_net/tf_dual_net.h"
+#include "cc/dual_net/factory.h"
 #include "cc/file/filesystem.h"
 #include "cc/file/path.h"
 #include "cc/gtp_player.h"
@@ -58,7 +56,7 @@ DEFINE_int32(
 DEFINE_bool(
     courtesy_pass, false,
     "If true and in GTP mode, we will always pass if the opponent passes.");
-DEFINE_double(resign_threshold, -0.95, "Resign threshold.");
+DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
 DEFINE_double(komi, minigo::kDefaultKomi, "Komi.");
 DEFINE_double(disable_resign_pct, 0.1,
               "Fraction of games to disable resignation for.");
@@ -82,6 +80,12 @@ DEFINE_bool(soft_pick, true,
 DEFINE_bool(random_symmetry, true,
             "If true, randomly flip & rotate the board features before running "
             "the model and apply the inverse transform to the results.");
+DEFINE_string(flags_path, "",
+              "Optional path to load flags from. Flags specified in this file "
+              "take priority over command line flags. When running selfplay "
+              "with run_forever=true, the flag file is reloaded periodically. "
+              "Note that flags_path is different from gflags flagfile, which "
+              "is only parsed once on startup.");
 
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
@@ -103,31 +107,14 @@ DEFINE_string(model, "",
               "Path to a minigo model. If remote_inference=false, the model "
               "should be a serialized GraphDef proto. If "
               "remote_inference=true, the model should be saved checkpoint.");
-DEFINE_string(checkpoint_dir, "",
-              "Path to a directory containing TensorFlow model checkpoints. "
-              "The inference worker will monitor this when a new checkpoint "
-              "is found, load the model and use it for futher inferences. "
-              "Only valid when remote inference is enabled.");
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
-DEFINE_bool(remote_inference, false,
-            "If true, run the model using the InferenceServer. This launches "
-            "a Python subprocess that performs the actual inference. Required "
-            "when running on Cloud TPU.");
-DEFINE_int32(port, 50051, "The port opened by the InferenceService server.");
-DEFINE_string(tpu_name, "", "Cloud TPU name, e.g. grpc://10.240.2.2:8470.");
 DEFINE_int32(parallel_games, 32,
              "Number of games to play in parallel. For performance reasons, "
              "parallel_games should equal games_per_inference * 2 because this "
              "allows the transfer of inference requests & responses to be "
              "overlapped with model evaluation.");
-DEFINE_int32(
-    games_per_inference, 16,
-    "Number of games to merge together into a single inference batch.");
-DEFINE_int32(parallel_tpus, 8,
-             "If model=remote, the number of TPU cores to run on in parallel.");
-DEFINE_int32(conv_width, 256, "Width of the model's convolution filters.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
@@ -135,7 +122,7 @@ DEFINE_string(output_dir, "",
 DEFINE_string(holdout_dir, "",
               "Holdout directory. If empty, no examples are written.");
 DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
-DEFINE_double(holdout_pct, 0.05,
+DEFINE_double(holdout_pct, 0.03,
               "Fraction of games to hold out for validation.");
 
 // Self play flags:
@@ -150,101 +137,6 @@ DEFINE_double(holdout_pct, 0.05,
 
 namespace minigo {
 namespace {
-
-class PlayerFactory {
- public:
-  PlayerFactory(const MctsPlayer::Options& options, float disable_resign_pct)
-      : options_(options), disable_resign_pct_(disable_resign_pct) {}
-
-  virtual ~PlayerFactory() = default;
-
-  virtual std::unique_ptr<MctsPlayer> New(
-      const MctsPlayer::Options& options) = 0;
-
-  // Thread safe random number generator, provided for convenience: when
-  // multiple players are running in parallel, they will need access to a thread
-  // safe random number generator for decisions like whether or not to holdout
-  // a game or disable resign.
-  float rnd() {
-    absl::MutexLock lock(&mutex_);
-    return rnd_();
-  }
-
-  MctsPlayer::Options default_options() {
-    auto options = options_;
-    if (rnd() < disable_resign_pct_) {
-      options.resign_threshold = -1;
-    }
-    return options;
-  }
-
- private:
-  absl::Mutex mutex_;
-  Random rnd_ GUARDED_BY(&mutex_);
-
-  const MctsPlayer::Options options_;
-  const float disable_resign_pct_;
-};
-
-class RemotePlayerFactory : public PlayerFactory {
- public:
-  RemotePlayerFactory(const MctsPlayer::Options& options,
-                      float disable_resign_pct, int virtual_losses,
-                      int games_per_inference, int port)
-      : PlayerFactory(options, disable_resign_pct) {
-    inference_worker_thread_ = std::thread([]() {
-      std::vector<std::string> cmd_parts = {
-          absl::StrCat("BOARD_SIZE=", kN),
-          "python",
-          "inference_worker.py",
-          absl::StrCat("--model=", FLAGS_model),
-          absl::StrCat("--checkpoint_dir=", FLAGS_checkpoint_dir),
-          "--use_tpu=true",
-          absl::StrCat("--tpu_name=", FLAGS_tpu_name),
-          absl::StrCat("--conv_width=", FLAGS_conv_width),
-          absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
-      };
-      auto cmd = absl::StrJoin(cmd_parts, " ");
-      FILE* f = popen(cmd.c_str(), "r");
-      for (;;) {
-        int c = fgetc(f);
-        if (c == EOF) {
-          break;
-        }
-        fputc(c, stderr);
-      }
-      fputc('\n', stderr);
-    });
-
-    server_ = absl::make_unique<InferenceServer>(virtual_losses,
-                                                 games_per_inference, port);
-  }
-
-  ~RemotePlayerFactory() override { inference_worker_thread_.join(); }
-
-  std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
-    return absl::make_unique<MctsPlayer>(server_->NewDualNet(), options);
-  }
-
-  std::thread inference_worker_thread_;
-  std::unique_ptr<InferenceServer> server_;
-};
-
-class LocalPlayerFactory : public PlayerFactory {
- public:
-  LocalPlayerFactory(const MctsPlayer::Options& options,
-                     float disable_resign_pct, std::string model_path)
-      : PlayerFactory(options, disable_resign_pct),
-        model_path_(std::move(model_path)) {}
-
-  std::unique_ptr<MctsPlayer> New(const MctsPlayer::Options& options) override {
-    return absl::make_unique<MctsPlayer>(
-        absl::make_unique<TfDualNet>(model_path_), options);
-  }
-
- private:
-  const std::string model_path_;
-};
 
 std::string GetOutputName(absl::Time now, size_t i) {
   auto timestamp = absl::ToUnixSeconds(now);
@@ -347,39 +239,79 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->decay_factor = FLAGS_decay_factor;
 }
 
-std::unique_ptr<PlayerFactory> GetPlayerFactory() {
-  MctsPlayer::Options default_options;
-  ParseMctsPlayerOptionsFromFlags(&default_options);
-  if (FLAGS_remote_inference) {
-    return absl::make_unique<RemotePlayerFactory>(
-        default_options, FLAGS_disable_resign_pct, FLAGS_virtual_losses,
-        FLAGS_games_per_inference, FLAGS_port);
-  } else {
-    return absl::make_unique<LocalPlayerFactory>(
-        default_options, FLAGS_disable_resign_pct, FLAGS_model);
+class SelfPlayer {
+ public:
+  void Run() {
+    {
+      absl::MutexLock lock(&mutex_);
+      dual_net_factory_ = NewDualNetFactory(FLAGS_model, FLAGS_parallel_games);
+    }
+    for (int i = 0; i < FLAGS_parallel_games; ++i) {
+      threads_.emplace_back(std::bind(&SelfPlayer::ThreadRun, this, i));
+    }
+    for (auto& t : threads_) {
+      t.join();
+    }
   }
-}
 
-std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory,
-                           bool run_forever) {
-  return std::thread([thread_id, player_factory, run_forever]() {
-    do {
-      // Create a new player.
-      auto options = player_factory->default_options();
-      options.verbose = thread_id == 0;
+ private:
+  // Struct that holds the options for a game. Each thread has its own
+  // GameOptions instance, which are initialized with the SelfPlayer's mutex
+  // held. This allows us to safely update the command line arguments from a
+  // flag file without causing any race conditions.
+  struct GameOptions {
+    void Init(int thread_id) {
+      ParseMctsPlayerOptionsFromFlags(&player_options);
+      player_options.verbose = thread_id == 0;
       // If an random seed was explicitly specified, make sure we use a
       // different seed for each thread.
-      if (options.random_seed != 0) {
-        options.random_seed += 1299283 * thread_id;
+      if (player_options.random_seed != 0) {
+        player_options.random_seed += 1299283 * thread_id;
       }
-      auto player = player_factory->New(options);
+
+      run_forever = FLAGS_run_forever;
+      holdout_pct = FLAGS_holdout_pct;
+      output_dir = FLAGS_output_dir;
+      holdout_dir = FLAGS_holdout_dir;
+      sgf_dir = FLAGS_sgf_dir;
+    }
+
+    MctsPlayer::Options player_options;
+    bool run_forever;
+    float holdout_pct;
+    std::string output_dir;
+    std::string holdout_dir;
+    std::string sgf_dir;
+  };
+
+  void ThreadRun(int thread_id) {
+    // Only print the board using ANSI colors if stderr is sent to the
+    // terminal.
+    const bool use_ansi_colors = isatty(fileno(stderr));
+
+    GameOptions game_options;
+    do {
+      std::unique_ptr<MctsPlayer> player;
+
+      {
+        absl::MutexLock lock(&mutex_);
+        auto old_model = FLAGS_model;
+        MaybeReloadFlags();
+        MG_CHECK(old_model == FLAGS_model)
+            << "Manually changing the model during selfplay is not supported. "
+               "Use --checkpoint_dir and --engine=remote to perform inference "
+               "using the most recent checkpoint from training.";
+        game_options.Init(thread_id);
+        player = absl::make_unique<MctsPlayer>(dual_net_factory_->New(),
+                                               game_options.player_options);
+      }
 
       // Play the game.
       auto start_time = absl::Now();
       while (!player->game_over()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
-          std::cerr << player->root()->position.ToPrettyString();
+          std::cerr << player->root()->position.ToPrettyString(use_ansi_colors);
           std::cerr << player->root()->Describe() << std::endl;
         }
         player->PlayMove(move);
@@ -392,32 +324,72 @@ std::thread SelfPlayThread(int thread_id, PlayerFactory* player_factory,
       auto now = absl::Now();
       auto output_name = GetOutputName(now, thread_id);
 
-      bool is_holdout = player_factory->rnd() < FLAGS_holdout_pct;
-      auto example_dir = is_holdout ? FLAGS_holdout_dir : FLAGS_output_dir;
+      bool is_holdout;
+      {
+        absl::MutexLock lock(&mutex_);
+        is_holdout = rnd_() < game_options.holdout_pct;
+      }
+      auto example_dir =
+          is_holdout ? game_options.holdout_dir : game_options.output_dir;
       if (!example_dir.empty()) {
         WriteExample(GetOutputDir(now, example_dir), output_name, *player);
       }
 
-      if (!FLAGS_sgf_dir.empty()) {
-        WriteSgf(GetOutputDir(now, file::JoinPath(FLAGS_sgf_dir, "clean")),
-                 output_name, *player, false);
-        WriteSgf(GetOutputDir(now, file::JoinPath(FLAGS_sgf_dir, "full")),
-                 output_name, *player, true);
+      if (!game_options.sgf_dir.empty()) {
+        WriteSgf(
+            GetOutputDir(now, file::JoinPath(game_options.sgf_dir, "clean")),
+            output_name, *player, false);
+        WriteSgf(
+            GetOutputDir(now, file::JoinPath(game_options.sgf_dir, "full")),
+            output_name, *player, true);
       }
-    } while (run_forever);
-  });
-}
+    } while (game_options.run_forever);
+
+    std::cerr << "Thread " << thread_id << " stopping" << std::endl;
+  }
+
+  void MaybeReloadFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
+    if (FLAGS_flags_path.empty()) {
+      return;
+    }
+    uint64_t new_flags_timestamp;
+    TF_CHECK_OK(tf_utils::GetModTime(FLAGS_flags_path, &new_flags_timestamp));
+    if (new_flags_timestamp == flags_timestamp_) {
+      return;
+    }
+
+    flags_timestamp_ = new_flags_timestamp;
+    std::string contents;
+    TF_CHECK_OK(tf_utils::ReadFile(FLAGS_flags_path, &contents));
+
+    for (auto line : absl::StrSplit(contents, '\n')) {
+      std::pair<absl::string_view, absl::string_view> line_comment =
+          absl::StrSplit(line, absl::MaxSplits('#', 1));
+      line = absl::StripAsciiWhitespace(line_comment.first);
+      if (line.empty()) {
+        continue;
+      }
+      MG_CHECK(line.length() > 2 && line[0] == '-' && line[1] == '-') << line;
+      std::pair<std::string, std::string> flag_value =
+          absl::StrSplit(line, absl::MaxSplits('=', 1));
+      flag_value.first = flag_value.first.substr(2);
+      std::cerr << "Setting command line flag: --" << flag_value.first << "="
+                << flag_value.second << std::endl;
+      gflags::SetCommandLineOption(flag_value.first.c_str(),
+                                   flag_value.second.c_str());
+    }
+  }
+
+  absl::Mutex mutex_;
+  std::unique_ptr<DualNetFactory> dual_net_factory_ GUARDED_BY(&mutex_);
+  Random rnd_ GUARDED_BY(&mutex_);
+  std::vector<std::thread> threads_;
+  uint64_t flags_timestamp_ = 0;
+};
 
 void SelfPlay() {
-  auto player_factory = GetPlayerFactory();
-  std::vector<std::thread> threads;
-  for (int i = 0; i < FLAGS_parallel_games; ++i) {
-    threads.push_back(
-        SelfPlayThread(i, player_factory.get(), FLAGS_run_forever));
-  }
-  for (auto& t : threads) {
-    t.join();
-  }
+  SelfPlayer player;
+  player.Run();
 }
 
 void Eval() {
@@ -426,48 +398,46 @@ void Eval() {
   options.inject_noise = false;
   options.soft_pick = false;
   options.random_symmetry = true;
-  auto black_name = std::string(file::Stem(FLAGS_model));
-  options.name = black_name;
-  auto player = absl::make_unique<MctsPlayer>(
-      absl::make_unique<TfDualNet>(FLAGS_model), options);
-  options.name = std::string(file::Stem(FLAGS_model_two));
-  auto other_player = absl::make_unique<MctsPlayer>(
-      absl::make_unique<TfDualNet>(FLAGS_model_two), options);
 
+  options.name = std::string(file::Stem(FLAGS_model));
+  auto black_factory = NewDualNetFactory(FLAGS_model, 1);
+  auto black = absl::make_unique<MctsPlayer>(black_factory->New(), options);
+
+  options.name = std::string(file::Stem(FLAGS_model_two));
+  auto white_factory = NewDualNetFactory(FLAGS_model_two, 1);
+  auto white = absl::make_unique<MctsPlayer>(white_factory->New(), options);
+
+  auto* player = black.get();
+  auto* other_player = white.get();
   while (!player->game_over()) {
     auto move = player->SuggestMove();
     std::cerr << player->root()->Describe() << "\n";
     player->PlayMove(move);
     other_player->PlayMove(move);
     std::cerr << player->root()->position.ToPrettyString();
-    player.swap(other_player);
+    std::swap(player, other_player);
   }
   std::cerr << player->result_string() << "\n";
+  std::cerr << "Black was: " << black->name() << "\n";
 
-  // Swap 'player' back to its original value if needed.
-  if (player->name() != black_name) {
-    player.swap(other_player);
-  }
-  std::cerr << "Black was: " << player->name() << "\n";
-
-  std::string output_name =
-      absl::StrCat(GetOutputName(absl::Now(), 0), "-", player->name(), "-",
-                   other_player->name());
+  std::string output_name = absl::StrCat(GetOutputName(absl::Now(), 0), "-",
+                                         black->name(), "-", white->name());
 
   // Write SGF.
   if (!FLAGS_sgf_dir.empty()) {
-    WriteSgf(FLAGS_sgf_dir, output_name, *player, *other_player, true);
+    WriteSgf(FLAGS_sgf_dir, output_name, *black, *white, true);
   }
 }
 
 void Gtp() {
   GtpPlayer::Options options;
   ParseMctsPlayerOptionsFromFlags(&options);
+
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   options.ponder_limit = FLAGS_ponder_limit;
   options.courtesy_pass = FLAGS_courtesy_pass;
-  auto player = absl::make_unique<GtpPlayer>(
-      absl::make_unique<TfDualNet>(FLAGS_model), options);
+  auto dual_net_factory = NewDualNetFactory(FLAGS_model, 1);
+  auto player = absl::make_unique<GtpPlayer>(dual_net_factory->New(), options);
   player->Run();
 }
 

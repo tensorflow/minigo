@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_DUAL_NET_TF_DUAL_NET_H_
-#define CC_DUAL_NET_TF_DUAL_NET_H_
+#ifndef CC_DUAL_NET_LITE_DUAL_NET_H_
+#define CC_DUAL_NET_LITE_DUAL_NET_H_
 
 #include <memory>
 #include <string>
@@ -21,29 +21,31 @@
 #include <vector>
 
 #include "absl/types/span.h"
-#include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
-#include "tensorflow/core/framework/tensor.h"
-#include "tensorflow/core/public/session.h"
+#include "tensorflow/contrib/lite/context.h"
+#include "tensorflow/contrib/lite/interpreter.h"
+#include "tensorflow/contrib/lite/model.h"
 
 namespace minigo {
 
-class TfDualNet : public DualNet {
+class LiteDualNet : public DualNet {
  public:
-  explicit TfDualNet(const std::string& graph_path);
-  ~TfDualNet() override;
+  explicit LiteDualNet(const std::string& graph_path);
+  ~LiteDualNet() override;
 
   void RunMany(absl::Span<const BoardFeatures> features,
                absl::Span<Output> outputs, std::string* model) override;
 
  private:
-  std::unique_ptr<tensorflow::Session> session_;
-  std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
-  std::vector<std::string> output_names_;
-  std::vector<tensorflow::Tensor> outputs_;
+  std::unique_ptr<tflite::FlatBufferModel> model_;
+  std::unique_ptr<tflite::Interpreter> interpreter_;
+
+  int policy_;
+  int value_;
+
   std::string graph_path_;
 };
 
 }  // namespace minigo
 
-#endif  // CC_DUAL_NET_TF_DUAL_NET_H_
+#endif  // CC_DUAL_NET_LITE_DUAL_NET_H_

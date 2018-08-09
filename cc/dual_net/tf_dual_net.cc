@@ -14,6 +14,7 @@
 
 #include "cc/dual_net/tf_dual_net.h"
 
+#include "absl/strings/str_cat.h"
 #include "cc/check.h"
 #include "cc/constants.h"
 #include "tensorflow/core/framework/graph.pb.h"
@@ -32,10 +33,21 @@ using tensorflow::TensorShape;
 
 namespace minigo {
 
-TfDualNet::TfDualNet(const std::string& graph_path)
-    : graph_path_(graph_path) {
+TfDualNet::TfDualNet(const std::string& graph_path) : graph_path_(graph_path) {
   GraphDef graph_def;
-  TF_CHECK_OK(ReadBinaryProto(Env::Default(), graph_path, &graph_def));
+
+  // If we can't find the specified graph, try adding a .pb extension.
+  auto* env = Env::Default();
+  if (!env->FileExists(graph_path_).ok()) {
+    auto alt_path = absl::StrCat(graph_path_, ".pb");
+    if (env->FileExists(alt_path).ok()) {
+      std::cerr << graph_path << " doesn't exist, using " << alt_path
+                << std::endl;
+      graph_path_ = alt_path;
+    }
+  }
+
+  TF_CHECK_OK(ReadBinaryProto(env, graph_path_, &graph_def));
 
   SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
@@ -77,10 +89,8 @@ void TfDualNet::RunMany(absl::Span<const BoardFeatures> features,
   }
 
   // Copy the features into the input tensor.
-  for (int i = 0; i < batch_size; ++i) {
-    memcpy(feature_tensor.flat<float>().data(), features.data(),
-           features.size() * sizeof(BoardFeatures));
-  }
+  memcpy(feature_tensor.flat<float>().data(), features.data(),
+         features.size() * sizeof(BoardFeatures));
 
   // Run the model.
   TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));

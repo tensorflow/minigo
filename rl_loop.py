@@ -29,6 +29,7 @@ import cloud_logging
 import dual_net
 import fsdb
 import main
+import selfplay as selfplay_lib
 import shipname
 
 # How many games before the selfplay workers will stop trying to play more.
@@ -58,18 +59,17 @@ def selfplay(verbose=2):
         sys.exit(1)
     print("Playing a game with model {}".format(model_name))
     model_save_path = os.path.join(fsdb.models_dir(), model_name)
-    game_output_dir = os.path.join(fsdb.selfplay_dir(), model_name)
+    selfplay_dir = os.path.join(fsdb.selfplay_dir(), model_name)
     game_holdout_dir = os.path.join(fsdb.holdout_dir(), model_name)
     sgf_dir = os.path.join(fsdb.sgf_dir(), model_name)
-    main.selfplay(
+    selfplay_lib.run_game(
         load_file=model_save_path,
-        output_dir=game_output_dir,
+        selfplay_dir=selfplay_dir,
         holdout_dir=game_holdout_dir,
-        output_sgf=sgf_dir,
+        sgf_dir=sgf_dir,
         holdout_pct=HOLDOUT_PCT,
         verbose=verbose,
     )
-
 
 def train(working_dir):
     model_num, model_name = fsdb.get_latest_model()
@@ -131,7 +131,7 @@ def validate_hourly(working_dir, validate_name=None):
                      for d in reversed(gfile.ListDirectory(fsdb.holdout_dir()))
                      for f in gfile.ListDirectory(os.path.join(fsdb.holdout_dir(),d))
                      if gfile.IsDirectory(os.path.join(fsdb.holdout_dir(),d)))
-    holdout_files = itertools.islice(holdout_files, 20000)
+    holdout_files = list(itertools.islice(holdout_files, 20000))
     random.shuffle(holdout_files)
     dual_net.validate(holdout_files)
 

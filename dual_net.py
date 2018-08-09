@@ -26,6 +26,7 @@ import os.path
 import sys
 
 import argh
+from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import summary
@@ -61,6 +62,10 @@ flags.DEFINE_multi_float('lr_rates', [0.01, 0.001, 0.0001],
 
 flags.DEFINE_float('l2_strength', 1e-4,
                    'The L2 regularization parameter applied to weights.')
+
+flags.DEFINE_float('value_cost_weight', 1.0,
+                   'Scalar for value_cost, AGZ paper suggests 1/100 for '
+                   'supervised learning')
 
 flags.DEFINE_float('sgd_momentum', 0.9,
                    'Momentum parameter for learning rate.')
@@ -201,23 +206,25 @@ def model_fn(features, labels, mode, params=None):
         features, mode == tf.estimator.ModeKeys.TRAIN)
 
     # train ops
-    global_step = tf.train.get_or_create_global_step()
     policy_cost = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
-    value_cost = tf.reduce_mean(
+
+    value_cost = FLAGS.value_cost_weight * tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
+
     reg_vars = [v for v in tf.trainable_variables()
                 if not 'bias' in v.name and not 'beta' in v.name]
-
     l2_cost = FLAGS.l2_strength * \
         tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
+
     combined_cost = policy_cost + value_cost + l2_cost
+
+    global_step = tf.train.get_or_create_global_step()
     learning_rate = tf.train.piecewise_constant(
         global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    optimizer = tf.train.MomentumOptimizer(
-        learning_rate, FLAGS.sgd_momentum)
+    optimizer = tf.train.MomentumOptimizer(learning_rate, FLAGS.sgd_momentum)
     if FLAGS.use_tpu:
         optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
     with tf.control_dependencies(update_ops):
@@ -225,15 +232,16 @@ def model_fn(features, labels, mode, params=None):
 
     # Computations to be executed on CPU, outside of the main TPU queues.
     def eval_metrics_host_call_fn(policy_output, value_output, pi_tensor, policy_cost,
-                                  value_cost, l2_cost, combined_cost,
+                                  value_cost, l2_cost, combined_cost, step,
                                   est_mode=tf.estimator.ModeKeys.TRAIN):
         policy_entropy = -tf.reduce_mean(tf.reduce_sum(
             policy_output * tf.log(policy_output), axis=1))
         # pi_tensor is one_hot when generated from sgfs (for supervised learning)
         # and soft-max when using self-play records. argmax normalizes the two.
         policy_target_top_1 = tf.argmax(pi_tensor, axis=1)
-        policy_output_top_1 = tf.argmax(policy_output, axis=1)
 
+        policy_output_in_top1 = tf.to_float(
+            tf.nn.in_top_k(policy_output, policy_target_top_1, k=1))
         policy_output_in_top3 = tf.to_float(
             tf.nn.in_top_k(policy_output, policy_target_top_1, k=3))
 
@@ -242,21 +250,22 @@ def model_fn(features, labels, mode, params=None):
             policy_output,
             tf.one_hot(policy_target_top_1, tf.shape(policy_output)[1]))
 
-        metric_ops = {
-            'policy_cost': tf.metrics.mean(policy_cost),
-            'value_cost': tf.metrics.mean(value_cost),
-            'l2_cost': tf.metrics.mean(l2_cost),
-            'policy_entropy': tf.metrics.mean(policy_entropy),
-            'combined_cost': tf.metrics.mean(combined_cost),
+        with tf.variable_scope("metrics"):
+            metric_ops = {
+                'policy_cost': tf.metrics.mean(policy_cost),
+                'value_cost': tf.metrics.mean(value_cost),
+                'l2_cost': tf.metrics.mean(l2_cost),
+                'policy_entropy': tf.metrics.mean(policy_entropy),
+                'combined_cost': tf.metrics.mean(combined_cost),
 
-            'policy_accuracy_top_1': tf.metrics.accuracy(
-                labels=policy_target_top_1, predictions=policy_output_top_1),
-            'policy_accuracy_top_3': tf.metrics.mean(policy_output_in_top3),
-            'policy_top_1_confidence': tf.metrics.mean(policy_top_1_confidence),
-            'policy_target_top_1_confidence': tf.metrics.mean(
-                policy_target_top_1_confidence),
-            'value_confidence': tf.metrics.mean(tf.abs(value_output)),
-        }
+                'policy_accuracy_top_1': tf.metrics.mean(policy_output_in_top1),
+                'policy_accuracy_top_3': tf.metrics.mean(policy_output_in_top3),
+                'policy_top_1_confidence': tf.metrics.mean(policy_top_1_confidence),
+                'policy_target_top_1_confidence': tf.metrics.mean(
+                    policy_target_top_1_confidence),
+                'value_confidence': tf.metrics.mean(tf.abs(value_output)),
+            }
+
         if est_mode == tf.estimator.ModeKeys.EVAL:
             return metric_ops
 
@@ -264,10 +273,18 @@ def model_fn(features, labels, mode, params=None):
         # That way, they get logged automatically during training
         summary_writer = summary.create_file_writer(FLAGS.model_dir)
         with summary_writer.as_default(), \
-                summary.record_summaries_every_n_global_steps(FLAGS.summary_steps):
+                summary.always_record_summaries():
             for metric_name, metric_op in metric_ops.items():
                 summary.scalar(metric_name, metric_op[1])
-        return summary.all_summary_ops()
+
+        # Reset metrics occasionally so that they are mean of recent batches.
+        reset_op = tf.variables_initializer(tf.local_variables("metrics"))
+        cond_reset_op = tf.cond(
+            tf.equal(tf.mod(tf.reduce_min(step), FLAGS.summary_steps), tf.to_int64(1)),
+            lambda: reset_op,
+            lambda: tf.no_op())
+
+        return summary.all_summary_ops() + [cond_reset_op]
 
     metric_args = [
         policy_output,
@@ -277,6 +294,7 @@ def model_fn(features, labels, mode, params=None):
         tf.reshape(value_cost, [1]),
         tf.reshape(l2_cost, [1]),
         tf.reshape(combined_cost, [1]),
+        tf.reshape(global_step, [1]),
     ]
 
     predictions = {
@@ -284,8 +302,10 @@ def model_fn(features, labels, mode, params=None):
         'value_output': value_output,
     }
 
-    eval_metrics_only_fn = functools.partial(eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.EVAL)
-    host_call_fn = functools.partial(eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.TRAIN)
+    eval_metrics_only_fn = functools.partial(
+        eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.EVAL)
+    host_call_fn = functools.partial(
+        eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.TRAIN)
 
     tpu_estimator_spec = tpu_estimator.TPUEstimatorSpec(
         mode=mode,
@@ -315,7 +335,7 @@ def model_inference_fn(features, training):
     my_batchn = functools.partial(
         tf.layers.batch_normalization,
         axis=-1,
-        momentum=.997,
+        momentum=.95,
         epsilon=1e-5,
         center=True,
         scale=True,
@@ -447,29 +467,47 @@ def export_model(working_dir, model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def train(*tf_records, steps=None):
+def train(
+        *tf_records: "Records to train on",
+        steps: "Number of steps to train. If not set iterates over "
+               "tf_records and sets steps to examples / batch_size"=-1):
     tf.logging.set_verbosity(tf.logging.INFO)
     estimator = get_estimator(FLAGS.model_dir)
-    if steps is None:
-        steps = EXAMPLES_PER_GENERATION // FLAGS.train_batch_size
+
+    if steps == -1:
+        def count_examples(tf_record):
+            opts = preprocessing.TF_RECORD_CONFIG
+            return sum(1 for _ in tqdm(
+                tf.python_io.tf_record_iterator(tf_record, opts),
+                desc=tf_record))
+
+        total_examples = sum(map(count_examples, tf_records))
+        steps = total_examples // FLAGS.train_batch_size
+        if FLAGS.use_tpu:
+            steps //= FLAGS.num_tpu_cores
+
     if FLAGS.use_tpu:
         def input_fn(params):
-            return preprocessing.get_tpu_input_tensors(params['batch_size'], tf_records)
-
+            return preprocessing.get_tpu_input_tensors(
+                params['batch_size'],
+                tf_records,
+                random_rotation=True)
         # TODO: get hooks working again with TPUestimator.
         hooks = []
-        steps //= FLAGS.num_tpu_cores
     else:
         def input_fn():
             return preprocessing.get_input_tensors(
-                FLAGS.train_batch_size, tf_records, filter_amount=1.0,
-                shuffle_buffer_size=FLAGS.shuffle_buffer_size)
+                FLAGS.train_batch_size,
+                tf_records,
+                filter_amount=1.0,
+                shuffle_buffer_size=FLAGS.shuffle_buffer_size,
+                random_rotation=True)
 
         hooks = [UpdateRatioSessionHook(FLAGS.model_dir),
                  EchoStepCounterHook(output_dir=FLAGS.model_dir)]
 
     print("Training, steps = {}".format(steps))
-    estimator.train(input_fn, steps=int(steps), hooks=hooks)
+    estimator.train(input_fn, steps=steps, hooks=hooks)
 
 
 def validate(tf_records, validate_name=None):
@@ -487,7 +525,7 @@ def validate(tf_records, validate_name=None):
                 shuffle_buffer_size=20000)
 
     estimator = get_estimator(FLAGS.model_dir)
-    estimator.evaluate(input_fn, steps=20, name=validate_name)
+    estimator.evaluate(input_fn, steps=50, name=validate_name)
 
 
 def compute_update_ratio(weight_tensors, before_weights, after_weights):
@@ -542,7 +580,7 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train, export_model])
+argh.add_commands(parser, [train, export_model, validate])
 
 if __name__ == '__main__':
     # Let absl.flags parse known flags from argv, then pass the remaining flags

@@ -19,6 +19,8 @@ fetched via RPC at the top of the loop, and inference output is written back
 at the bottom (again, via RPC).
 """
 
+import abc
+from contextlib import contextmanager
 import functools
 import sys
 import time
@@ -61,8 +63,8 @@ FLAGS = flags.FLAGS
 # The default maximum receive RPC size is only 4MB, which isn't large enough
 # for our messages.
 GRPC_OPTIONS = [
-    ("grpc.max_message_length", 50 *  1024 * 1024),
-    ("grpc.max_receive_message_length", 50 *  1024 * 1024),
+    ("grpc.max_message_length", 50 * 1024 * 1024),
+    ("grpc.max_receive_message_length", 50 * 1024 * 1024),
 ]
 
 NUM_WORKER_THREADS = 2
@@ -71,29 +73,46 @@ NUM_WORKER_THREADS = 2
 print = functools.partial(print, file=sys.stderr, flush=True)
 
 
-class RwLock(object):
+class RwMutex(object):
     """A simple read/write mutex.
 
     I'm surprised Python doesn't provide one of these by default.
     """
+
     def __init__(self):
         self._resource_lock = threading.Semaphore()
         self._read_lock = threading.Semaphore()
         self._read_count = 0
 
-    def acquire_write(self):
+    @contextmanager
+    def write_lock(self):
+        self._acquire_write()
+        try:
+            yield
+        finally:
+            self._release_write()
+
+    @contextmanager
+    def read_lock(self):
+        self._acquire_read()
+        try:
+            yield
+        finally:
+            self._release_read()
+
+    def _acquire_write(self):
         self._resource_lock.acquire()
 
-    def release_write(self):
+    def _release_write(self):
         self._resource_lock.release()
 
-    def acquire_read(self):
+    def _acquire_read(self):
         with self._read_lock:
             self._read_count += 1
             if self._read_count == 1:
                 self._resource_lock.acquire()
 
-    def release_read(self):
+    def _release_read(self):
         with self._read_lock:
             self._read_count -= 1
             if self._read_count == 0:
@@ -116,15 +135,206 @@ def const_model_inference_fn(features):
     with tf.variable_scope("", custom_getter=custom_getter):
         return dual_net.model_inference_fn(features, False)
 
-class Worker(object):
-    def __init__(self):
+
+class Session(abc.ABC):
+    def __init__(self, sess):
+        self._sess = sess
+
         # Event that gets set after a model is loaded.
         # The worker threads wait for this event before starting inference.
         self.model_available = threading.Event()
-        self.model_path = None
+        self._model_path = None
+        self._mutex = RwMutex()
+
+    def maybe_load_model(self, path):
+        """Loads the given model if it's different from the current one."""
+        with self._mutex.read_lock():
+            if path == self._model_path:
+                return
+
+        with self._mutex.write_lock():
+            print(time.time(), "loading %s" % path)
+            self._locked_load_model(path)
+            self._model_path = path
+            print(time.time(), "loaded %s" % path)
+        self.model_available.set()
+
+    def run(self, raw_features):
+        """Performs inference on the given raw features."""
+        features = self._prepare_features(raw_features)
+        with self._mutex.read_lock():
+            policy, value = self._locked_run(features)
+            local_model_path = self._model_path
+
+        return policy, value, local_model_path
+
+    def shutdown(self):
+        """Shuts down the session."""
+        with self._mutex.write_lock():
+            self._locked_shutdown()
+
+    @abc.abstractmethod
+    def _locked_load_model(self, path):
+        """Device-specific wrapper around a call to _load_graph.
+
+        Must be called with self._lock held for write.
+        """
+        pass
+
+    @abc.abstractmethod
+    def _locked_run(self, raw_features):
+        """Device-specific evaluation of the model with the given raw features.
+
+        Must be called with self._lock held for read.
+        """
+        pass
+
+    @abc.abstractmethod
+    def _locked_shutdown(self, raw_features):
+        """Device-specific shutdown.
+
+        Must be called with self._lock held for write.
+        """
+        pass
+
+    @abc.abstractmethod
+    def _prepare_features(self, raw_features):
+        """Device-specific preparation of raw features.
+
+        Does not require a lock to be held.
+        """
+        pass
+
+
+class BasicSession(Session):
+    def __init__(self):
+        Session.__init__(self, tf.Session(graph=tf.Graph()))
+
+        with self._sess.graph.as_default():
+            self._feature_placeholder = tf.placeholder(
+                tf.float32, [None, go.N, go.N,
+                             features_lib.NEW_FEATURES_PLANES],
+                name='pos_tensor')
+
+    def _locked_shutdown(self):
+        pass
+
+    def _locked_load_model(self, path):
+        tf.reset_default_graph()
+
+        if path[-3:] == ".pb":
+            graph_def = tf.GraphDef()
+            with tf.gfile.FastGFile(path, 'rb') as f:
+                graph_def.ParseFromString(f.read())
+            with self._sess.graph.as_default():
+                self._outputs = tf.import_graph_def(
+                    graph_def,
+                    input_map={'pos_tensor': self._feature_placeholder},
+                    return_elements=['policy_output:0', 'value_output:0'])
+        else:
+            with self._sess.graph.as_default():
+                self._outputs = dual_net.model_inference_fn(
+                    self._feature_placeholder, training=False)
+                tf.train.Saver().restore(self._sess, path)
+
+    def _locked_run(self, features):
+        outputs = self._sess.run(self._outputs,
+                                 {self._feature_placeholder: features})
+        return outputs[0], outputs[1]
+
+    def _prepare_features(self, raw_features):
+        features = np.frombuffer(raw_features, dtype=np.int8)
+        features = features.reshape([-1, go.N, go.N,
+                                     features_lib.NEW_FEATURES_PLANES])
+        return features
+
+
+class TpuSession(Session):
+    def __init__(self, tpu_name, parallel_tpus, batch_size):
+        tpu = [tpu_name] if tpu_name else None
+        tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver(
+            tpu=tpu).get_master()
+        sess = tf.Session(tpu_grpc_url)
+        Session.__init__(self, sess)
+
+        self._parallel_tpus = parallel_tpus
+        self._batch_size = batch_size
+
+        # Create init & shutdown ops up front. This is probably not really
+        # necessary but it's what the sample code does.
+        self._tpu_init = tf.contrib.tpu.initialize_system()
+        self._tpu_shutdown = tf.contrib.tpu.shutdown_system()
+
+        self._feature_placeholders = []
+        with self._sess.graph.as_default():
+            for i in range(parallel_tpus):
+                features = tf.placeholder(
+                    tf.float32, [None, go.N, go.N,
+                                 features_lib.NEW_FEATURES_PLANES],
+                    name='pos_tensor')
+                self._feature_placeholders.append((features,))
+
+            self._outputs = tf.contrib.tpu.replicate(
+                const_model_inference_fn, self._feature_placeholders)
+
+            # tpu.replicate requires a list, but sess.run requires a tuple...
+            self._feature_placeholders = tuple(self._feature_placeholders)
+
+    def _locked_shutdown(self):
+        self._sess.run(self._tpu_shutdown)
+
+    def _locked_load_model(self, path):
+        if self._model_path:
+            print("shutting down tpu")
+            self._sess.run(self._tpu_shutdown)
+
+        with self._sess.graph.as_default():
+            tf.train.Saver().restore(self._sess, path)
+
+        print("initializing tpu")
+        self._sess.run(self._tpu_init)
+
+    def _locked_run(self, features):
+        outputs = self._sess.run(self._outputs,
+                                 {self._feature_placeholders: features})
+        policy = []
+        value = []
+        for x in outputs:
+            policy.extend(x[0])
+            value.extend(x[1])
+        return policy, value
+
+    def _prepare_features(self, raw_features):
+        num_board_features = go.N * go.N * features_lib.NEW_FEATURES_PLANES
+        num_features = self._batch_size * num_board_features
+        assert len(raw_features) == num_features * self._parallel_tpus
+
+        features = []
+        for i in range(self._parallel_tpus):
+            begin = i * num_features
+            end = begin + num_features
+            x = np.frombuffer(
+                raw_features, dtype=np.int8, count=num_features, offset=begin)
+            x = x.reshape([self._batch_size, go.N, go.N,
+                           features_lib.NEW_FEATURES_PLANES])
+            features.append(x)
+        return features
+
+
+class Worker(object):
+    def __init__(self):
+        self.parallel_inferences = FLAGS.parallel_tpus if FLAGS.use_tpu else 1
 
         self._get_server_config()
-        self._init_sess()
+
+        if FLAGS.use_tpu:
+            self.sess = TpuSession(
+                FLAGS.tpu_name, self.parallel_inferences, self.batch_size)
+        else:
+            self.sess = BasicSession()
+
+        if FLAGS.model:
+            self.sess.maybe_load_model(FLAGS.model)
 
     def run(self):
         self._running = True
@@ -132,8 +342,8 @@ class Worker(object):
             self._run_threads()
         finally:
             self._running = False
-            print("shutting down TPU")
-            self.sess.run(self._tpu_shutdown)
+            print("shutting down session")
+            self.sess.shutdown()
             print("all done!")
 
     def _get_server_config(self):
@@ -155,45 +365,17 @@ class Worker(object):
 
         positions_per_inference = (config.games_per_inference *
                                    config.virtual_losses)
-        if positions_per_inference % FLAGS.parallel_tpus != 0:
+        if positions_per_inference % self.parallel_inferences != 0:
             raise RuntimeError(
                 "games_per_inference * virtual_losses must be divisible by "
                 "parallel_tpus")
-        self.batch_size = positions_per_inference // FLAGS.parallel_tpus
+        self.batch_size = positions_per_inference // self.parallel_inferences
 
-        print("parallel_tpus = %d" % FLAGS.parallel_tpus)
+        print("parallel_inferences = %d" % self.parallel_inferences)
         print("games_per_inference = %d" % config.games_per_inference)
         print("virtual_losses = %d" % config.virtual_losses)
         print("positions_per_inference = %d" % positions_per_inference)
         print("batch_size = %d" % self.batch_size)
-
-    def _init_sess(self):
-        self._tpu_init = tf.contrib.tpu.initialize_system()
-        self._tpu_shutdown = tf.contrib.tpu.shutdown_system()
-
-        if FLAGS.tpu_name:
-            tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver(
-                tpu=[FLAGS.tpu_name]).get_master()
-        else:
-            tpu_grpc_url = tf.contrib.cluster_resolver.TPUClusterResolver().get_master()
-        self.sess = tf.Session(tpu_grpc_url)
-
-        self.feature_placeholders = []
-        with self.sess.graph.as_default():
-            for i in range(FLAGS.parallel_tpus):
-                features = tf.placeholder(
-                    tf.float32, [None, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
-                    name='pos_tensor')
-                self.feature_placeholders.append((features,))
-
-            self.outputs = tf.contrib.tpu.replicate(
-                const_model_inference_fn, self.feature_placeholders)
-
-            # tpu.replicate requires a list, but sess.run requires a tuple...
-            self.feature_placeholders = tuple(self.feature_placeholders)
-
-        if FLAGS.model:
-            self._load_model(FLAGS.model)
 
     def _run_threads(self):
         """Run inference threads and optionally a thread that updates the model.
@@ -204,15 +386,14 @@ class Worker(object):
         they can both run inference concurrently. The model update thread enters
         the critical section using a write lock for exclusive access.
         """
-        self.lock = RwLock()
-
         threads = []
         # Start the worker threads before the checkpoint thread: if the parent
         # process dies, the worker thread RPCs will fail and the thread will
         # exit. This gives us a chance below to set self._running to False,
         # telling the checkpoint thread to exit.
         for i in range(NUM_WORKER_THREADS):
-            threads.append(threading.Thread(target=self._worker_thread))
+            threads.append(threading.Thread(
+                target=self._worker_thread, args=[i]))
         if FLAGS.checkpoint_dir:
             threads.append(threading.Thread(target=self._checkpoint_thread))
 
@@ -224,80 +405,36 @@ class Worker(object):
             # Once the first thread has joined, tell the remaining ones to stop.
             self._running = False
 
-    def _load_model(self, path):
-        if self.model_path:
-            print("shutting down tpu")
-            self.sess.run(self._tpu_shutdown)
-
-        print("loading %s" % path)
-        with self.sess.graph.as_default():
-            tf.train.Saver().restore(self.sess, path)
-        print("loaded %s" % path)
-        self.model_path = path
-
-        print("initializing tpu")
-        self.sess.run(self._tpu_init)
-        self.model_available.set()
-
     def _checkpoint_thread(self):
         print("starting model loader thread")
         while self._running:
             freshest = saver.latest_checkpoint(FLAGS.checkpoint_dir)
-            if freshest and freshest != self.model_path:
-                print("fresh model found %s" % freshest)
-                self.lock.acquire_write()
-                try:
-                    self._load_model(freshest)
-                finally:
-                    self.lock.release_write()
+            if freshest:
+                self.sess.maybe_load_model(freshest)
             # Wait a few seconds before checking again.
             time.sleep(5)
 
-    def _worker_thread(self):
-        num_board_features = go.N * go.N * features_lib.NEW_FEATURES_PLANES
-
+    def _worker_thread(self, thread_id):
         print("waiting for model")
-        while self._running and not self.model_available.wait(1):
+        while self._running and not self.sess.model_available.wait(1):
             pass
 
-        print("running worker")
+        print("running worker", thread_id)
         while self._running:
             features_response = self.stub.GetFeatures(
                 inference_service_pb2.GetFeaturesRequest())
-            all_features = features_response.features
 
-            features = []
-            num_features = self.batch_size * num_board_features
-            for i in range(FLAGS.parallel_tpus):
-                begin = i * num_features
-                end = begin + num_features
-                x = np.frombuffer(
-                    all_features, dtype=np.int8, count=num_features, offset=begin)
-                x = x.reshape([self.batch_size, go.N, go.N,
-                               features_lib.NEW_FEATURES_PLANES])
-                features.append(x)
-
-            try:
-                self.lock.acquire_read()
-                outputs = self.sess.run(self.outputs,
-                                        {self.feature_placeholders: features})
-                # Make a local copy of self.model_path while this worker has
-                # the read lock.
-                local_model_path = self.model_path
-            finally:
-                self.lock.release_read()
-
-            flat_policy = []
-            value = []
-            for x in outputs:
-                flat_policy.extend(x[0])
-                value.extend(x[1])
+            policy, value, model_path = self.sess.run(
+                features_response.features)
 
             put_outputs_request = inference_service_pb2.PutOutputsRequest(
-                 batch_id=features_response.batch_id,
-                 policy=np.concatenate(flat_policy), value=value,
-                 model_path=local_model_path)
+                batch_id=features_response.batch_id,
+                policy=np.concatenate(policy), value=value,
+                model_path=model_path)
+
             self.stub.PutOutputs(put_outputs_request)
+
+        print("stopping worker", thread_id)
 
 
 def main():

@@ -21,12 +21,33 @@ cc_library(
     ],
     hdrs = glob(
         ["tensorflow/**/*"],
-        exclude = ["tensorflow/*.so"],
+        exclude = [
+            "**/*.a",
+            "**/*.so",
+            "tensorflow/flatbuffers/**",
+            "tensorflow/tensorflow/contrib/lite/**",
+        ],
     ),
     includes = [
         "tensorflow",
         "tensorflow/external/nsync/public",
     ],
+)
+
+cc_library(
+    name = "tf_lite",
+    srcs = [
+        "tensorflow/libtensorflow_lite.a",
+    ],
+    hdrs = glob(
+        [
+            "tensorflow/flatbuffers/*.h",
+            "tensorflow/tensorflow/contrib/lite/**",
+        ],
+        exclude = ["**/*.so"],
+    ),
+    includes = ["tensorflow"],
+    linkopts = ["-ldl"],
 )
 
 minigo_cc_library(
@@ -323,8 +344,7 @@ minigo_cc_binary(
         ":random",
         ":sgf",
         ":tf_utils",
-        "//cc/dual_net:inference_server",
-        "//cc/dual_net:tf_dual_net",
+        "//cc/dual_net:factory",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/base:core_headers",

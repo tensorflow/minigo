@@ -69,7 +69,7 @@ inline Symmetry Inverse(Symmetry sym) {
     case kFlipRot270:
       return kFlipRot270;
     default:
-      MG_CHECK(false);
+      MG_FATAL() << static_cast<int>(sym);
       return kNumSymmetries;
   }
 }
@@ -220,7 +220,7 @@ inline void ApplySymmetry(Symmetry sym, const T* src, T* dst) {
       FlipRot270<T, N, num_channels>(src, dst);
       break;
     default:
-      MG_CHECK(false);
+      MG_FATAL() << static_cast<int>(sym);
       break;
   }
 }

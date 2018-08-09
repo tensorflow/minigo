@@ -170,7 +170,7 @@ class Position {
 
   std::string ToSimpleString() const;
   std::string ToGroupString() const;
-  std::string ToPrettyString() const;
+  std::string ToPrettyString(bool use_ansi_colors = true) const;
 
   Color to_play() const { return to_play_; }
   Coord previous_move() const { return previous_move_; }

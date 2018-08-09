@@ -17,8 +17,10 @@
 We run as subprocesses because it gives us some isolation.
 """
 
+import datetime as dt
 import os
 import subprocess
+import sys
 
 import argh
 from utils import timer
@@ -26,12 +28,14 @@ from utils import timer
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
 
-def loop(working_dir='estimator_working_dir'):
+def loop(working_dir='estimator_working_dir', tpu_name=None):
     """Run train and validate as subprocesses."""
     flags = [
         working_dir,
         '--bucket_name', BUCKET_NAME,
         '--model_dir', working_dir,
+        '--use_tpu',
+        '--tpu_name', tpu_name
     ]
     while True:
         print("==================================")
@@ -39,10 +43,15 @@ def loop(working_dir='estimator_working_dir'):
             train = subprocess.call(['python', 'rl_loop.py', 'train'] + flags)
             if train != 0:
                 print("Skipping validation")
+                print("=== Training failed at ", dt.datetime.utcnow())
+                sys.exit(1)
                 continue
 
         with timer("validate"):
             subprocess.call(['python', 'rl_loop.py', 'validate-hourly'] + flags)
+            subprocess.call(['python', 'main.py', 'validate',
+                             'gs://jacksona-sandbox/data/validate',
+                             '--validate-name=pro'] + flags[3:])
 
 
 if __name__ == '__main__':

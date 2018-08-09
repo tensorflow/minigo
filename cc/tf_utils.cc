@@ -85,8 +85,8 @@ void WriteTfExamples(const std::string& path,
   TF_CHECK_OK(file->Close());
 }
 
-__attribute__((warn_unused_result)) tensorflow::Status WriteFile(
-    const std::string& path, absl::string_view contents) {
+tensorflow::Status WriteFile(const std::string& path,
+                             absl::string_view contents) {
   tensorflow::Status status;
 
   std::unique_ptr<tensorflow::WritableFile> file;
@@ -104,6 +104,29 @@ __attribute__((warn_unused_result)) tensorflow::Status WriteFile(
   }
 
   return file->Close();
+}
+
+tensorflow::Status ReadFile(const std::string& path, std::string* contents) {
+  auto* env = tensorflow::Env::Default();
+  tensorflow::uint64 size;
+  TF_RETURN_IF_ERROR(env->GetFileSize(path, &size));
+
+  std::unique_ptr<tensorflow::RandomAccessFile> file;
+  TF_RETURN_IF_ERROR(env->NewRandomAccessFile(path, &file));
+
+  contents->resize(size);
+  tensorflow::StringPiece s;
+  TF_RETURN_IF_ERROR(file->Read(0u, size, &s, &(*contents)[0]));
+  contents->resize(s.size());
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status GetModTime(const std::string& path, uint64_t* mtime_usec) {
+  tensorflow::FileStatistics stat;
+  TF_RETURN_IF_ERROR(tensorflow::Env::Default()->Stat(path, &stat));
+  *mtime_usec = static_cast<uint64_t>(stat.mtime_nsec);
+  return tensorflow::Status::OK();
 }
 
 }  // namespace tf_utils

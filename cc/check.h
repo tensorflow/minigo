@@ -63,6 +63,8 @@ class CheckFailStream {
 #define MG_CHECK(cond) \
   (cond) ? 0 : true & internal::CheckFailStream(#cond, __FILE__, __LINE__)
 
+#define MG_FATAL() internal::CheckFailStream("FATAL", __FILE__, __LINE__)
+
 #ifndef NDEBUG
 #define MG_DCHECK MG_CHECK
 #else

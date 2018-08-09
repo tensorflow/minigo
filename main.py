@@ -24,8 +24,6 @@ import time
 import dual_net
 import evaluation
 import preprocessing
-import selfplay_mcts
-from gtp_wrapper import make_gtp_instance
 import utils
 
 import cloud_logging
@@ -40,20 +38,6 @@ EXAMPLES_PER_RECORD = 10000
 # How many positions to draw from for our training window.
 # AGZ used the most recent 500k games, which, assuming 250 moves/game = 125M
 WINDOW_SIZE = 125000000
-
-
-def gtp(load_file: 'The path to the network model files'=None,
-        cgos_mode: 'Whether to use CGOS time constraints'=False,
-        kgs_mode: 'Whether to use KGS courtesy-pass'=False,
-        verbose=1):
-    engine = make_gtp_instance(load_file,
-                               verbosity=verbose,
-                               cgos_mode=cgos_mode,
-                               kgs_mode=kgs_mode)
-    print("GTP engine ready\n", file=sys.stderr, flush=True)
-    for msg in sys.stdin:
-        if not engine.handle_msg(msg.strip()):
-            break
 
 
 def bootstrap(
@@ -123,42 +107,6 @@ def evaluate(
             black_net, white_net, games, output_dir, verbose)
 
 
-def selfplay(
-        load_file: "The path to the network model files",
-        output_dir: "Where to write the games"="data/selfplay",
-        holdout_dir: "Where to write the games"="data/holdout",
-        output_sgf: "Where to write the sgfs"="sgf/",
-        verbose: '>=2 will print debug info, >=3 will print boards' = 1,
-        holdout_pct: 'how many games to hold out for validation' = 0.05):
-    clean_sgf = os.path.join(output_sgf, 'clean')
-    full_sgf = os.path.join(output_sgf, 'full')
-    utils.ensure_dir_exists(clean_sgf)
-    utils.ensure_dir_exists(full_sgf)
-    utils.ensure_dir_exists(output_dir)
-    utils.ensure_dir_exists(holdout_dir)
-
-    with utils.logged_timer("Loading weights from %s ... " % load_file):
-        network = dual_net.DualNetwork(load_file)
-
-    with utils.logged_timer("Playing game"):
-        player = selfplay_mcts.play(network, verbose)
-
-    output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
-    game_data = player.extract_data()
-    with gfile.GFile(os.path.join(clean_sgf, '{}.sgf'.format(output_name)), 'w') as f:
-        f.write(player.to_sgf(use_comments=False))
-    with gfile.GFile(os.path.join(full_sgf, '{}.sgf'.format(output_name)), 'w') as f:
-        f.write(player.to_sgf())
-
-    tf_examples = preprocessing.make_dataset_from_selfplay(game_data)
-
-    # Hold out 5% of games for evaluation.
-    if random.random() < holdout_pct:
-        fname = os.path.join(holdout_dir, "{}.tfrecord.zz".format(output_name))
-    else:
-        fname = os.path.join(output_dir, "{}.tfrecord.zz".format(output_name))
-
-    preprocessing.write_tf_examples(fname, tf_examples)
 
 
 def convert(load_file, dest_file):
@@ -203,8 +151,8 @@ def freeze_graph(load_file):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [gtp, bootstrap, train, train_dir, freeze_graph,
-                           selfplay, evaluate, validate, convert])
+argh.add_commands(parser, [bootstrap, train, train_dir, freeze_graph,
+                           evaluate, validate, convert])
 
 if __name__ == '__main__':
     cloud_logging.configure()

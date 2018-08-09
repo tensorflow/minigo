@@ -206,7 +206,7 @@ def get_input_tensors(batch_size, tf_records, num_repeats=None,
 def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
                           shuffle_records=True, shuffle_examples=True,
                           shuffle_buffer_size=1024,
-                          filter_amount=1, random_rotation=False):
+                          filter_amount=1, random_rotation=True):
     dataset = read_tf_records(
         batch_size,
         tf_records,
