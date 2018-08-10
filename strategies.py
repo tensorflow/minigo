@@ -28,7 +28,7 @@ import sgf_wrapper
 from player_interface import MCTSPlayerInterface
 
 flags.DEFINE_integer('softpick_move_cutoff', (go.N * go.N // 12) // 2 * 2,
-                     'The move number (<=) up to which moves are softpicked from MCTS visits.')
+                     'The move number (<) up to which moves are softpicked from MCTS visits.')
 # Ensure that both white and black have an equal number of softpicked moves.
 flags.register_validator('softpick_move_cutoff', lambda x: x % 2 == 0)
 
@@ -173,17 +173,14 @@ class MCTSPlayer(MCTSPlayerInterface):
 
         Highest N is most robust indicator. In the early stage of the game, pick
         a move weighted by visit count; later on, pick the absolute max.'''
-        if (not self.two_player_mode and
-                self.root.position.n < self.temp_threshold):
+        if self.root.position.n >= self.temp_threshold:
+            fcoord = np.argmax(self.root.child_N)
+        else:
             cdf = self.root.children_as_pi(squash=True).cumsum()
             cdf /= cdf[-2]  # Prevents passing via softpick.
             selection = random.random()
             fcoord = cdf.searchsorted(selection)
             assert self.root.child_N[fcoord] != 0
-        else:
-            # break ties in N by looking at action_score
-            fcoord = np.argmax(self.root.child_N +
-                               self.root.child_action_score / 1000)
         return coords.from_flat(fcoord)
 
     def tree_search(self, parallel_readouts=None):

@@ -77,7 +77,8 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
       options_(options) {
   options_.resign_threshold = -std::abs(options_.resign_threshold);
   // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.
-  temperature_cutoff_ = kN * kN / 12;
+  // divide 2, multiply 2 guarentees that white and black do even number.
+  temperature_cutoff_ = !options_.soft_pick ? -1 : (((kN * kN / 12) / 2) * 2);
   root_ = &game_root_;
 
   if (options_.verbose) {
@@ -164,7 +165,7 @@ Coord MctsPlayer::SuggestMove() {
 }
 
 Coord MctsPlayer::PickMove() {
-  if (!options_.soft_pick || root_->position.n() >= temperature_cutoff_) {
+  if (root_->position.n() >= temperature_cutoff_) {
     // Choose the most visited node.
     Coord c = ArgMax(root_->edges, MctsNode::CmpN);
     if (options_.verbose) {
