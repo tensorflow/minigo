@@ -9,12 +9,10 @@ python position_pv.py
 import sys
 sys.path.insert(0, '.')
 
-import itertools
 import os
 
 from absl import app, flags
 import numpy as np
-import tensorflow as tf
 from tqdm import tqdm
 
 import go
@@ -49,7 +47,6 @@ def eval_pv(eval_positions):
             player.network,
             resign_threshold=-1)
 
-        eval_trees = []
         for name, position in eval_positions:
             mcts.initialize_game(position)
             mcts.suggest_move(position)

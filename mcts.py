@@ -94,9 +94,8 @@ class MCTSNode(object):
 
     @property
     def child_action_score(self):
-        return (self.child_Q * self.position.to_play
-            + self.child_U
-            - 1000 * self.illegal_moves)
+        return (self.child_Q * self.position.to_play +
+                self.child_U - 1000 * self.illegal_moves)
 
     @property
     def child_Q(self):
@@ -142,9 +141,9 @@ class MCTSNode(object):
                 break
             # HACK: if last move was a pass, always investigate double-pass first
             # to avoid situations where we auto-lose by passing too early.
-            if (current.position.recent
-                and current.position.recent[-1].move is None
-                    and current.child_N[pass_move] == 0):
+            if (current.position.recent and
+                current.position.recent[-1].move is None and
+                    current.child_N[pass_move] == 0):
                 current = current.maybe_add_child(pass_move)
                 continue
 

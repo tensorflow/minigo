@@ -127,7 +127,8 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
     if sloppy_interleave:
         dataset = record_list.apply(tf.contrib.data.parallel_interleave(
             functools.partial(tf.data.TFRecordDataset,
-                              buffer_size=8*1024*1024, compression_type='ZLIB'),
+                              buffer_size=8 * 1024 * 1024,
+                              compression_type='ZLIB'),
             cycle_length=64, sloppy=True))
     else:
         dataset = record_list.interleave(lambda x:

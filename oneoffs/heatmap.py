@@ -9,10 +9,8 @@ python heatmap.py
 import sys
 sys.path.insert(0, '.')
 
-import itertools
 import os
 
-import numpy as np
 import tensorflow as tf
 from absl import app, flags
 from tqdm import tqdm

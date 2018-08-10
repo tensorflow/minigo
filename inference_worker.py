@@ -25,10 +25,7 @@ import functools
 import sys
 import time
 import tensorflow as tf
-from tensorflow.python.framework import dtypes
 from tensorflow.python.training import saver
-from tensorflow.contrib.proto.python.ops import decode_proto_op
-from tensorflow.contrib.proto.python.ops import encode_proto_op
 import threading
 import numpy as np
 from absl import flags
@@ -131,7 +128,7 @@ def const_model_inference_fn(features):
     def custom_getter(getter, name, *args, **kwargs):
         with tf.control_dependencies(None):
             return tf.guarantee_const(
-                getter(name, *args, **kwargs), name=name+"/GuaranteeConst")
+                getter(name, *args, **kwargs), name=name + "/GuaranteeConst")
     with tf.variable_scope("", custom_getter=custom_getter):
         return dual_net.model_inference_fn(features, False)
 
@@ -312,7 +309,6 @@ class TpuSession(Session):
         features = []
         for i in range(self._parallel_tpus):
             begin = i * num_features
-            end = begin + num_features
             x = np.frombuffer(
                 raw_features, dtype=np.int8, count=num_features, offset=begin)
             x = x.reshape([self._batch_size, go.N, go.N,

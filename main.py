@@ -15,21 +15,16 @@
 import argh
 import argparse
 import os.path
-import random
-import socket
 import sys
 import tempfile
-import time
 
 import dual_net
 import evaluation
-import preprocessing
 import utils
 
 import cloud_logging
 import tensorflow as tf
 from absl import flags
-from tqdm import tqdm
 from tensorflow import gfile
 
 # How many positions we should aggregate per 'chunk'.
@@ -67,7 +62,7 @@ def train_dir(
 
 
 def train(tf_records: 'list of files of tf_records to train on',
-        model_save_path: 'Where to export the completed generation.'):
+          model_save_path: 'Where to export the completed generation.'):
     print("Training on:", tf_records[0], "to", tf_records[-1])
     with utils.logged_timer("Training"):
         dual_net.train(*tf_records)
@@ -105,8 +100,6 @@ def evaluate(
     with utils.logged_timer("Playing game"):
         evaluation.play_match(
             black_net, white_net, games, output_dir, verbose)
-
-
 
 
 def convert(load_file, dest_file):

@@ -13,12 +13,10 @@
 # limitations under the License.
 
 import copy
-import unittest
 import numpy as np
 
 import coords
 import go
-from go import Position
 import mcts
 from tests import test_utils
 
@@ -97,7 +95,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # Root was visited twice: first at the root, then at this child.
         self.assertEqual(root.N, 2)
         # Root has 0 as a prior and two visits with value 0, -1
-        self.assertAlmostEqual(root.Q, -1/3)  # average of 0, 0, -1
+        self.assertAlmostEqual(root.Q, -1 / 3)  # average of 0, 0, -1
         # Leaf should have one visit
         self.assertEqual(root.child_N[leaf.fmove], 1)
         self.assertEqual(leaf.N, 1)

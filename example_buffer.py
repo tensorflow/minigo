@@ -6,7 +6,6 @@ import itertools
 import multiprocessing as mp
 import os
 import random
-import re
 import subprocess
 import time
 from collections import deque
@@ -94,7 +93,7 @@ class ExampleBuffer():
                 self.total_updates += num_new_games
             self.examples.extend(self.func(game))
         if first_new_game is None:
-            print ("No new games", file_timestamp(new_games[-1]), self.examples[-1][0])
+            print("No new games", file_timestamp(new_games[-1]), self.examples[-1][0])
 
     def flush(self, path):
         # random.shuffle on deque is O(n^2) convert to list for O(n)
@@ -122,6 +121,7 @@ class ExampleBuffer():
 def files_for_model(model):
     return tf.gfile.Glob(os.path.join(LOCAL_DIR, model[1], '*.zz'))
 
+
 def smart_rsync(
         from_model_num=0,
         source_dir=None,
@@ -132,6 +132,7 @@ def smart_rsync(
     for _, model in models:
         _rsync_dir(os.path.join(
             source_dir, model), os.path.join(dest_dir, model))
+
 
 def time_rsync(from_date,
                source_dir=None,
@@ -178,6 +179,7 @@ def _determine_chunk_to_make(write_dir):
 
     return chunk_to_make, False
 
+
 def get_window_size(chunk_num):
     """ Adjust the window size by how far we are through a run.
     At the start of the run, there's a benefit to 'expiring' the completely
@@ -186,10 +188,11 @@ def get_window_size(chunk_num):
     """
     return min(500000, (chunk_num + 5) * (AVG_GAMES_PER_MODEL // 2))
 
+
 def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
-                  write_dir=None,
-                  threads=32,
-                  start_from=None):
+                       write_dir=None,
+                       threads=32,
+                       start_from=None):
     start_from = start_from or dt.datetime.utcnow()
     write_dir = write_dir or fsdb.golden_chunk_dir()
     buf = ExampleBuffer(bufsize)
@@ -202,8 +205,7 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
 
     hours = fsdb.get_hour_dirs()
     files = (tf.gfile.Glob(os.path.join(LOCAL_DIR, d, "*.zz"))
-                 for d in reversed(hours)
-             if tf.gfile.Exists(os.path.join(LOCAL_DIR, d)))
+             for d in reversed(hours) if tf.gfile.Exists(os.path.join(LOCAL_DIR, d)))
     files = itertools.islice(files, get_window_size(chunk_to_make))
 
     models = fsdb.get_models()
@@ -216,24 +218,25 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
         start_from = dt.datetime.utcnow()
         hours = sorted(fsdb.get_hour_dirs(LOCAL_DIR))
         new_files = list(map(lambda d: tf.gfile.Glob(
-                os.path.join(LOCAL_DIR, d, '*.zz')), hours[-2:]))
+            os.path.join(LOCAL_DIR, d, '*.zz')), hours[-2:]))
         buf.update(list(itertools.chain.from_iterable(new_files)))
         if fast_write:
             break
         time.sleep(30)
         if fsdb.get_latest_model() != models[-1]:
-            print ("New model!  Waiting for games. Got", buf.total_updates, "new games so far")
+            print("New model!  Waiting for games. Got", buf.total_updates, "new games so far")
 
     latest = fsdb.get_latest_model()
     print("New model!", latest[1], "!=", models[-1][1])
     print(buf)
     buf.flush(chunk_to_make)
 
+
 def fill_and_wait_models(bufsize=dual_net.EXAMPLES_PER_GENERATION,
-                  write_dir=None,
-                  threads=8,
-                  model_window=100,
-                  skip_first_rsync=False):
+                         write_dir=None,
+                         threads=8,
+                         model_window=100,
+                         skip_first_rsync=False):
     """ Fills a ringbuffer with positions from the most recent games, then
     continually rsync's and updates the buffer until a new model is promoted.
     Once it detects a new model, iit then dumps its contents for training to
@@ -241,7 +244,6 @@ def fill_and_wait_models(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     """
     write_dir = write_dir or fsdb.golden_chunk_dir()
     buf = ExampleBuffer(bufsize)
-    chunk_to_make = _determine_chunk_to_make(write_dir)
     models = fsdb.get_models()[-model_window:]
     if not skip_first_rsync:
         with timer("Rsync"):

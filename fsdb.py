@@ -41,11 +41,13 @@ flags.register_multi_flags_validator(
 
 FLAGS = flags.FLAGS
 
+
 def _with_base(*args):
     def inner():
         base_dir = FLAGS.base_dir or 'gs://{}'.format(FLAGS.bucket_name)
         return os.path.join(base_dir, *args)
     return inner
+
 
 # Functions to compute various important directories, based on FLAGS input.
 models_dir = _with_base('models')
@@ -84,6 +86,7 @@ def get_model(model_num):
     model_names_by_num = dict(get_models())
     return model_names_by_num[model_num]
 
+
 def get_hour_dirs(root=None):
     """Gets the directories under selfplay_dir that match YYYY-MM-DD-HH."""
     root = root or selfplay_dir()
@@ -96,4 +99,3 @@ def game_counts(n_back=20):
     for _, model_name in get_models[-n_back:]:
         games = gfile.Glob(os.path.join(selfplay_dir(), model_name, '*.zz'))
         print(model_name, len(games))
-

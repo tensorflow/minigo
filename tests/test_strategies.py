@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
 import unittest.mock as mock
 import numpy as np
 
@@ -20,7 +19,6 @@ from absl import flags
 
 import coords
 import go
-from go import Position
 from tests import test_utils
 from strategies import MCTSPlayer, time_recommendation
 
@@ -127,7 +125,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
 
         # With dirichelet noise, majority of density should be in one node.
         max_p = np.max(player.root.child_prior)
-        self.assertGreater(max_p, 3/(go.N ** 2 + 1))
+        self.assertGreater(max_p, 4 / (go.N ** 2 + 1))
 
     def test_pick_moves(self):
         player = initialize_basic_player()

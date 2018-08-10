@@ -21,7 +21,6 @@ move prediction and score estimation.
 from absl import flags
 import argparse
 import functools
-import math
 import os.path
 import sys
 
@@ -214,7 +213,7 @@ def model_fn(features, labels, mode, params=None):
         tf.square(value_output - labels['value_tensor']))
 
     reg_vars = [v for v in tf.trainable_variables()
-                if not 'bias' in v.name and not 'beta' in v.name]
+                if 'bias' not in v.name and 'beta' not in v.name]
     l2_cost = FLAGS.l2_strength * \
         tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
 

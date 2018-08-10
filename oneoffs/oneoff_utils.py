@@ -1,6 +1,5 @@
 import os
 
-import sgf
 from tensorflow import gfile
 from tqdm import tqdm
 
@@ -8,7 +7,7 @@ import dual_net
 import shipname
 from strategies import MCTSPlayer
 import sgf_wrapper
-from utils import parse_game_result, logged_timer
+from utils import logged_timer
 
 
 def parse_sgf(sgf_path):
@@ -27,8 +26,8 @@ def check_year(props, year):
 
     try:
         # Most sgf files in this database have dates of the form
-        #"2005-01-15", but there are some rare exceptions like
-        #"Broadcasted on 2005-01-15.
+        # "2005-01-15", but there are some rare exceptions like
+        # "Broadcasted on 2005-01-15.
         year_sgf = int(props.get('DT')[0][:4])
     except:
         return False

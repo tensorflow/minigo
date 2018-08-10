@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
 import random
 import tempfile
 
@@ -90,9 +89,6 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
 
     def find_symmetry(self, x, pi, x2, pi2):
         for sym in symmetries.SYMMETRIES:
-            #print (sym, type(x), type(symmetries.apply_symmetry_feat(sym, x2)))
-            #print (x.shape, symmetries.apply_symmetry_feat(sym, x2).shape)
-            #print (pi.shape, symmetries.apply_symmetry_pi(sym, pi2).shape)
             x_equal = (x == symmetries.apply_symmetry_feat(sym, x2)).all()
             pi_equal = (pi == symmetries.apply_symmetry_pi(sym, pi2)).all()
             if x_equal and pi_equal:

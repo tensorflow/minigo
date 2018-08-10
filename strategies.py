@@ -48,7 +48,7 @@ flags.DEFINE_integer('parallel_readouts', 8,
 FLAGS = flags.FLAGS
 
 
-def time_recommendation(move_num, seconds_per_move=5, time_limit=15*60,
+def time_recommendation(move_num, seconds_per_move=5, time_limit=15 * 60,
                         decay_factor=0.98):
     '''Given the current move number and the 'desired' seconds per move, return
     how much time should actually be used. This is intended specifically for
@@ -216,8 +216,10 @@ class MCTSPlayer(MCTSPlayerInterface):
         if len(pos.recent) == 0:
             return
 
-        def fmt(move): return "{}-{}".format('b' if move.color == 1 else 'w',
-                                             coords.to_kgs(move.move))
+        def fmt(move):
+            return "{}-{}".format('b' if move.color == go.BLACK else 'w',
+                                  coords.to_kgs(move.move))
+
         path = " ".join(fmt(move) for move in pos.recent[-diff:])
         if node.position.n >= FLAGS.max_game_length:
             path += " (depth cutoff reached) %0.1f" % node.position.score()

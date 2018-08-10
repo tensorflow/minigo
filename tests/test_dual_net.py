@@ -14,7 +14,6 @@
 
 import os
 import tempfile
-import unittest
 
 import dual_net
 import go

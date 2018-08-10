@@ -107,7 +107,7 @@ def rotate_train(x, pi):
         # flipDiagonal
         tensor = tf.where(
             tf.bitwise.bitwise_and(sym, 4) > 0,
-            tf.transpose(tensor, perm=[1,0,2]),
+            tf.transpose(tensor, perm=[1, 0, 2]),
             tensor)
         return tensor
 

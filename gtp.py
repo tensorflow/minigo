@@ -39,6 +39,7 @@ flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
 
 FLAGS = flags.FLAGS
 
+
 def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False, verbosity=1,
                       num_readouts=None):
     '''Takes a path to model files and set up a GTP engine instance.'''
@@ -65,6 +66,7 @@ def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False, verbosity=1,
 
     return engine
 
+
 def main(argv):
     '''Run Minigo in GTP mode.'''
     del argv
@@ -76,6 +78,7 @@ def main(argv):
     for msg in sys.stdin:
         if not engine.handle_msg(msg.strip()):
             break
+
 
 if __name__ == '__main__':
     app.run(main)

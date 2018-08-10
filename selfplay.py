@@ -44,6 +44,7 @@ flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
 
 FLAGS = flags.FLAGS
 
+
 def play(network, verbosity=0):
     ''' Plays out a self-play match, returning a MCTSPlayer object containing:
         - the final position
@@ -107,6 +108,7 @@ def play(network, verbosity=0):
 
     return player
 
+
 def run_game(load_file, selfplay_dir, holdout_dir,
              sgf_dir, holdout_pct=0.05, verbose=1):
     '''Takes a played game and record results and game data.'''
@@ -125,11 +127,9 @@ def run_game(load_file, selfplay_dir, holdout_dir,
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
     game_data = player.extract_data()
-    with gfile.GFile(
-        os.path.join(minimal_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
+    with gfile.GFile(os.path.join(minimal_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
         f.write(player.to_sgf(use_comments=False))
-    with gfile.GFile(
-        os.path.join(full_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
+    with gfile.GFile(os.path.join(full_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
         f.write(player.to_sgf())
 
     tf_examples = preprocessing.make_dataset_from_selfplay(game_data)
@@ -158,6 +158,7 @@ def main(argv):
         holdout_pct=FLAGS.holdout_pct,
         sgf_dir=FLAGS.sgf_dir,
         verbose=FLAGS.verbose)
+
 
 if __name__ == '__main__':
     app.run(main)

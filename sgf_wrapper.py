@@ -21,7 +21,6 @@ Most of the complexity here is dealing with two features of SGF:
 - Plays don't necessarily alternate colors; they can be repeated B or W moves
   This feature is used to handle free handicap placement.
 '''
-from collections import namedtuple
 import numpy as np
 import itertools
 
@@ -158,7 +157,7 @@ def replay_sgf(sgf_contents):
     assert int(sgf_prop(props.get('GM', ['1']))) == 1, "Not a Go SGF!"
 
     komi = 0
-    if props.get('KM') != None:
+    if props.get('KM') is not None:
         komi = float(sgf_prop(props.get('KM')))
     result = utils.parse_game_result(sgf_prop(props.get('RE', '')))
 

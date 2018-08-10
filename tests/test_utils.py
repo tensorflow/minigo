@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import numpy as np
-import random
 import re
 import time
 import unittest

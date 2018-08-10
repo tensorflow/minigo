@@ -96,7 +96,7 @@ def find_reached(board, c):
         current = frontier.pop()
         chain.add(current)
         for n in NEIGHBORS[current]:
-            if board[n] == color and not n in chain:
+            if board[n] == color and n not in chain:
                 frontier.append(n)
             elif board[n] != color:
                 reached.add(n)
@@ -108,7 +108,7 @@ def is_koish(board, c):
     if board[c] != EMPTY:
         return None
     neighbors = {board[n] for n in NEIGHBORS[c]}
-    if len(neighbors) == 1 and not EMPTY in neighbors:
+    if len(neighbors) == 1 and EMPTY not in neighbors:
         return list(neighbors)[0]
     else:
         return None
@@ -303,7 +303,8 @@ class Position():
         '''
         assert type(recent) is tuple
         self.board = board if board is not None else np.copy(EMPTY_BOARD)
-        self.n = n  # With a full history, self.n == len(self.recent) == num moves played
+        # With a full history, self.n == len(self.recent) == num moves played
+        self.n = n
         self.komi = komi
         self.caps = caps
         self.lib_tracker = lib_tracker or LibertyTracker.from_board(self.board)
@@ -401,7 +402,7 @@ class Position():
         legal_moves[self.board != EMPTY] = 0
         # calculate which spots have 4 stones next to them
         # padding is because the edge always counts as a lost liberty.
-        adjacent = np.ones([N+2, N+2], dtype=np.int8)
+        adjacent = np.ones([N + 2, N + 2], dtype=np.int8)
         adjacent[1:-1, 1:-1] = np.abs(self.board)
         num_adjacent_stones = (adjacent[:-2, 1:-1] + adjacent[1:-1, :-2] +
                                adjacent[2:, 1:-1] + adjacent[1:-1, 2:])

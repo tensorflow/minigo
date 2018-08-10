@@ -76,7 +76,7 @@ def dual_net_list(model):
     print("Dual Net will calculate L2 cost over these variables")
     with dual.sess.graph.as_default():
         var_names = [v.name for v in tf.trainable_variables()]
-        _ = reduce_and_print_vars(var_names)
+        reduce_and_print_vars(var_names)
     print()
 
 

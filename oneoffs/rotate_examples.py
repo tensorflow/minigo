@@ -21,13 +21,11 @@ import os.path
 import multiprocessing as mp
 
 from absl import app, flags
-import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
 import dual_net
 import preprocessing
-import symmetries
 
 # This file produces a lot of logging, supress most of it
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -68,14 +66,13 @@ def convert(paths):
     if tf.gfile.Exists(out_path):
         # Make sure out_path is about the size of in_path
         size = get_size(out_path)
-        error = (size - good_size) / (in_size + 1)
+        error = (size - in_size) / (in_size + 1)
         # 5% smaller to 20% larger
         if -0.05 < error < 0.20:
             return out_path + " already existed"
         return "ERROR on file size ({:.1f}% diff) {}".format(
             100 * error, out_path)
 
-    #assert abs(in_size/2**20 - 670) <= 80, in_size
     num_batches = dual_net.EXAMPLES_PER_GENERATION // FLAGS.batch_size + 1
 
     with tf.python_io.TFRecordWriter(out_path, OPTS) as writer:
@@ -138,20 +135,20 @@ def main(remaining_argv):
     total = len(paths)
     pairs = []
     for i, path in enumerate(paths):
-      ext = '.tfrecord.zz'
-      out_path = path.replace(ext, '_rot' + ext)
-      pairs.append((
-          -total + i,
-          os.path.join(FLAGS.in_dir, path),
-          os.path.join(FLAGS.out_dir, out_path)))
+        ext = '.tfrecord.zz'
+        out_path = path.replace(ext, '_rot' + ext)
+        pairs.append((
+            -total + i,
+            os.path.join(FLAGS.in_dir, path),
+            os.path.join(FLAGS.out_dir, out_path)))
 
     with mp.Pool(FLAGS.threads) as p:
         # NOTE: this keeps tqdm progress bars visible.
-        print ("\n" * (total+1))
+        print("\n" * (total + 1))
         list(tqdm(p.imap(convert, pairs), desc="converting", total=total))
 
         if FLAGS.compare:
-            print ("\n" * (total+1))
+            print("\n" * (total + 1))
             list(tqdm(p.imap(compare, pairs), desc="comparing", total=total))
 
 

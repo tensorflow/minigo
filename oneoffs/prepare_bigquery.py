@@ -112,7 +112,6 @@ def extract_game_data(gcs_path, root_node):
     root_node.next.properties['C'][0] = '\n'.join(first_comment_node_lines[1:])
     resign_threshold = float(first_comment_node_lines[0].split()[-1])
 
-
     return {
         'worker_id': worker_id,
         'completed_time': completion_millis,

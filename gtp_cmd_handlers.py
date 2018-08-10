@@ -49,8 +49,8 @@ class BasicCmdHandler(object):
 
     def cmd_clear_board(self):
         position = self._player.get_position()
-        if (self._player.get_result_string()
-                and position and len(position.recent) > 1):
+        if (self._player.get_result_string() and
+                position and len(position.recent) > 1):
             try:
                 sgf = self._player.to_sgf()
                 with open(datetime.now().strftime("%Y-%m-%d-%H:%M.sgf"), 'w') as f:

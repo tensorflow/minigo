@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import numpy as np
-import unittest
 
 import coords
-from go import Position, PlayerMove, LibertyTracker, WHITE, BLACK, EMPTY
+from go import Position, PlayerMove, LibertyTracker, WHITE, BLACK
 import go
 import sgf_wrapper
 from tests import test_utils

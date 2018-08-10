@@ -12,7 +12,6 @@ import functools
 import json
 import logging
 import subprocess
-from threading import Lock
 
 parser = argparse.ArgumentParser()
 
@@ -150,4 +149,4 @@ def index():
 
 
 if __name__ == "__main__":
-  socketio.run(app, port=args.port, host=args.host)
+    socketio.run(app, port=args.port, host=args.host)

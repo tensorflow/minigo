@@ -20,17 +20,13 @@ overfit to a near-zero loss.
 """
 
 import os
-import sys
 import tempfile
 
 from absl import flags
-import preprocessing
 import dual_net
-import go
 import main
 import selfplay
 import example_buffer as eb
-from tensorflow import gfile
 import subprocess
 
 
@@ -116,6 +112,7 @@ def rl_loop():
             selfplay_dir=model_selfplay_dir,
             sgf_dir=sgf_dir,
             holdout_pct=0)
+
 
 if __name__ == '__main__':
     # horrible horrible hack to pass flag validation.
