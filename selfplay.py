@@ -19,7 +19,6 @@ This worker is used to set up many parallel selfplay instances.'''
 import random
 import os
 import socket
-import sys
 import time
 
 from absl import app, flags
@@ -102,9 +101,8 @@ def play(network, verbosity=0):
                   coords.to_kgs(coords.from_flat(player.root.fmove)))
 
     if verbosity >= 2:
-        print("%s: %.3f" % (player.result_string, player.root.Q), file=sys.stderr)
-        print(player.root.position,
-              player.root.position.score(), file=sys.stderr)
+        utils.dbg("%s: %.3f" % (player.result_string, player.root.Q))
+        utils.dbg(player.root.position, player.root.position.score())
 
     return player
 

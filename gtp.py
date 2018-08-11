@@ -24,6 +24,7 @@ from gtp_cmd_handlers import (
     KgsCmdHandler, GoGuiCmdHandler, MiniguiCmdHandler, RegressionsCmdHandler)
 import gtp_engine
 from strategies import MCTSPlayer, CGOSPlayer
+from utils import dbg
 
 
 flags.DEFINE_bool('cgos_mode', False, 'Whether to use CGOS settings.')
@@ -74,7 +75,7 @@ def main(argv):
                                cgos_mode=FLAGS.cgos_mode,
                                kgs_mode=FLAGS.kgs_mode,
                                verbosity=FLAGS.verbose)
-    print("GTP engine ready\n", file=sys.stderr, flush=True)
+    dbg("GTP engine ready\n")
     for msg in sys.stdin:
         if not engine.handle_msg(msg.strip()):
             break

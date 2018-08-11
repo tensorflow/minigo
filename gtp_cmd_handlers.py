@@ -13,17 +13,13 @@
 # limitations under the License.
 
 from datetime import datetime
-import sys
 import itertools
 import json
 import time
 import sgf_wrapper
 import go
 import coords
-
-
-def dbg(fmt, *args):
-    print(fmt % args, file=sys.stderr, flush=True)
+from utils import dbg
 
 
 def translate_gtp_color(gtp_color):
@@ -58,7 +54,7 @@ class BasicCmdHandler(object):
             except NotImplementedError:
                 pass
             except:
-                print("Error saving sgf", file=sys.stderr, flush=True)
+                dbg("Error saving sgf")
         self._player.initialize_game(go.Position(komi=self._komi))
 
     def cmd_komi(self, komi: float):
@@ -101,7 +97,7 @@ class BasicCmdHandler(object):
         raise NotImplementedError()
 
     def cmd_showboard(self):
-        print('\n\n' + str(self._player.get_position()) + '\n\n', file=sys.stderr)
+        dbg('\n\n' + str(self._player.get_position()) + '\n\n')
         return True
 
     def cmd_final_score(self):
@@ -163,7 +159,7 @@ class RegressionsCmdHandler(object):
         # want to advance the engine along with us rather than try to
         # push in some finished Position object.
         for idx, p in enumerate(sgf_wrapper.replay_sgf(contents)):
-            print("playing #", idx, p.next_move, file=sys.stderr)
+            dbg("playing #", idx, p.next_move)
             self._player.play_move(p.next_move)
             if movenum and idx == movenum:
                 break
@@ -201,9 +197,8 @@ class GoGuiCmdHandler(object):
             colors = "bw" if root.position.to_play is go.BLACK else "wb"
             moves_cols = " ".join(['{} {}'.format(*z)
                                    for z in zip(itertools.cycle(colors), moves)])
-            print("gogui-gfx: TEXT", "{:.3f} after {}".format(
-                root.Q, root.N), file=sys.stderr, flush=True)
-            print("gogui-gfx: VAR", moves_cols, file=sys.stderr, flush=True)
+            dbg("gogui-gfx: TEXT", "{:.3f} after {}".format(root.Q, root.N))
+            dbg("gogui-gfx: VAR", moves_cols)
         return self.cmd_nextplay()
 
     def _heatmap(self, sort_order, node, prop):

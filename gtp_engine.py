@@ -170,7 +170,7 @@ class Engine(object):
             if cmd in _CANONICAL_ERRORS:
                 _print_error(msg_id, _CANONICAL_ERRORS[cmd])
             else:
-                _print_error(msg_id, " ".join([str(a) for a in e.args]))
+                _print_error(msg_id, " ".join(map(str, e.args)))
 
         return True
 

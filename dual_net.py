@@ -473,6 +473,10 @@ def train(
     tf.logging.set_verbosity(tf.logging.INFO)
     estimator = get_estimator(FLAGS.model_dir)
 
+    effective_batch_size = FLAGS.train_batch_size
+    if FLAGS.use_tpu:
+        effective_batch_size *= FLAGS.num_tpu_cores
+
     if steps == -1:
         def count_examples(tf_record):
             opts = preprocessing.TF_RECORD_CONFIG
@@ -481,9 +485,7 @@ def train(
                 desc=tf_record))
 
         total_examples = sum(map(count_examples, tf_records))
-        steps = total_examples // FLAGS.train_batch_size
-        if FLAGS.use_tpu:
-            steps //= FLAGS.num_tpu_cores
+        steps = total_examples // effective_batch_size
 
     if FLAGS.use_tpu:
         def input_fn(params):
@@ -505,7 +507,8 @@ def train(
         hooks = [UpdateRatioSessionHook(FLAGS.model_dir),
                  EchoStepCounterHook(output_dir=FLAGS.model_dir)]
 
-    print("Training, steps = {}".format(steps))
+    print("Training, steps = {} x{} = {} examples".format(
+        steps, effective_batch_size, steps * effective_batch_size))
     estimator.train(input_fn, steps=steps, hooks=hooks)
 
 

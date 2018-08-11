@@ -14,7 +14,6 @@
 
 import os
 import random
-import sys
 import time
 
 from absl import flags
@@ -24,8 +23,9 @@ import coords
 import go
 import mcts
 import sgf_wrapper
-
+from utils import dbg
 from player_interface import MCTSPlayerInterface
+
 
 flags.DEFINE_integer('softpick_move_cutoff', (go.N * go.N // 12) // 2 * 2,
                      'The move number (<) up to which moves are softpicked from MCTS visits.')
@@ -132,15 +132,15 @@ class MCTSPlayer(MCTSPlayerInterface):
             while self.root.N < current_readouts + self.num_readouts:
                 self.tree_search()
             if self.verbosity > 0:
-                print("%d: Searched %d times in %s seconds\n\n" % (
-                    position.n, self.num_readouts, time.time() - start), file=sys.stderr)
+                dbg("%d: Searched %d times in %.2f seconds\n\n" % (
+                    position.n, self.num_readouts, time.time() - start))
 
-        # print some stats on anything with probability > 1%
+        # print some stats on moves considered.
         if self.verbosity > 2:
-            print(self.root.describe(), file=sys.stderr)
-            print('\n\n', file=sys.stderr)
+            dbg(self.root.describe())
+            dbg('\n\n')
         if self.verbosity > 3:
-            print(self.root.position, file=sys.stderr)
+            dbg(self.root.position)
 
         return self.pick_move()
 

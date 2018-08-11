@@ -21,20 +21,23 @@ at the bottom (again, via RPC).
 
 import abc
 from contextlib import contextmanager
-import functools
 import sys
 import time
-import tensorflow as tf
-from tensorflow.python.training import saver
 import threading
-import numpy as np
+
 from absl import flags
 import grpc
+import numpy as np
 from proto import inference_service_pb2
 from proto import inference_service_pb2_grpc
+import tensorflow as tf
+from tensorflow.python.training import saver
+
 import dual_net
 import features as features_lib
 import go
+from utils import dbg
+
 
 flags.DEFINE_string("model", "", "Path to the TensorFlow model.")
 
@@ -65,9 +68,6 @@ GRPC_OPTIONS = [
 ]
 
 NUM_WORKER_THREADS = 2
-
-# Print to stderr and flush by default.
-print = functools.partial(print, file=sys.stderr, flush=True)
 
 
 class RwMutex(object):
@@ -150,10 +150,10 @@ class Session(abc.ABC):
                 return
 
         with self._mutex.write_lock():
-            print(time.time(), "loading %s" % path)
+            dbg(time.time(), "loading %s" % path)
             self._locked_load_model(path)
             self._model_path = path
-            print(time.time(), "loaded %s" % path)
+            dbg(time.time(), "loaded %s" % path)
         self.model_available.set()
 
     def run(self, raw_features):
@@ -282,13 +282,13 @@ class TpuSession(Session):
 
     def _locked_load_model(self, path):
         if self._model_path:
-            print("shutting down tpu")
+            dbg("shutting down tpu")
             self._sess.run(self._tpu_shutdown)
 
         with self._sess.graph.as_default():
             tf.train.Saver().restore(self._sess, path)
 
-        print("initializing tpu")
+        dbg("initializing tpu")
         self._sess.run(self._tpu_init)
 
     def _locked_run(self, features):
@@ -338,9 +338,9 @@ class Worker(object):
             self._run_threads()
         finally:
             self._running = False
-            print("shutting down session")
+            dbg("shutting down session")
             self.sess.shutdown()
-            print("all done!")
+            dbg("all done!")
 
     def _get_server_config(self):
         while True:
@@ -352,7 +352,7 @@ class Worker(object):
                     inference_service_pb2.GetConfigRequest())
                 break
             except grpc.RpcError:
-                print("Waiting for server")
+                dbg("Waiting for server")
                 time.sleep(1)
 
         if config.board_size != go.N:
@@ -367,11 +367,11 @@ class Worker(object):
                 "parallel_tpus")
         self.batch_size = positions_per_inference // self.parallel_inferences
 
-        print("parallel_inferences = %d" % self.parallel_inferences)
-        print("games_per_inference = %d" % config.games_per_inference)
-        print("virtual_losses = %d" % config.virtual_losses)
-        print("positions_per_inference = %d" % positions_per_inference)
-        print("batch_size = %d" % self.batch_size)
+        dbg("parallel_inferences = %d" % self.parallel_inferences)
+        dbg("games_per_inference = %d" % config.games_per_inference)
+        dbg("virtual_losses = %d" % config.virtual_losses)
+        dbg("positions_per_inference = %d" % positions_per_inference)
+        dbg("batch_size = %d" % self.batch_size)
 
     def _run_threads(self):
         """Run inference threads and optionally a thread that updates the model.
@@ -397,12 +397,12 @@ class Worker(object):
             t.start()
         for i, t in enumerate(threads):
             t.join()
-            print("joined thread %d" % i)
+            dbg("joined thread %d" % i)
             # Once the first thread has joined, tell the remaining ones to stop.
             self._running = False
 
     def _checkpoint_thread(self):
-        print("starting model loader thread")
+        dbg("starting model loader thread")
         while self._running:
             freshest = saver.latest_checkpoint(FLAGS.checkpoint_dir)
             if freshest:
@@ -411,11 +411,11 @@ class Worker(object):
             time.sleep(5)
 
     def _worker_thread(self, thread_id):
-        print("waiting for model")
+        dbg("waiting for model")
         while self._running and not self.sess.model_available.wait(1):
             pass
 
-        print("running worker", thread_id)
+        dbg("running worker", thread_id)
         while self._running:
             features_response = self.stub.GetFeatures(
                 inference_service_pb2.GetFeaturesRequest())
@@ -430,7 +430,7 @@ class Worker(object):
 
             self.stub.PutOutputs(put_outputs_request)
 
-        print("stopping worker", thread_id)
+        dbg("stopping worker", thread_id)
 
 
 def main():

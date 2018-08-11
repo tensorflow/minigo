@@ -98,4 +98,4 @@ def game_counts(n_back=20):
     """Prints statistics for the most recent n_back models"""
     for _, model_name in get_models[-n_back:]:
         games = gfile.Glob(os.path.join(selfplay_dir(), model_name, '*.zz'))
-        print(model_name, len(games))
+        print("Model: {}, Games: {}".format(model_name, len(games)))

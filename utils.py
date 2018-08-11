@@ -24,12 +24,17 @@ import sys
 import time
 
 
+def dbg(fmt, *args):
+    "Helper function to print to stderr and flush"
+    print(fmt % args, file=sys.stderr, flush=True)
+
+
 def ensure_dir_exists(directory):
     "Creates local directories if they don't exist."
     if directory.startswith('gs://'):
         return
     if not os.path.exists(directory):
-        print("Making dir {}".format(directory), file=sys.stderr)
+        dbg("Making dir {}".format(directory))
     os.makedirs(directory, exist_ok=True)
 
 

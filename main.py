@@ -63,7 +63,9 @@ def train_dir(
 
 def train(tf_records: 'list of files of tf_records to train on',
           model_save_path: 'Where to export the completed generation.'):
-    print("Training on:", tf_records[0], "to", tf_records[-1])
+    if tf_records:
+        print("Training on {} records: {} to {}".format(
+            len(tf_records), tf_records[0], tf_records[-1]))
     with utils.logged_timer("Training"):
         dual_net.train(*tf_records)
     print("== Training done.  Exporting model to ", model_save_path)

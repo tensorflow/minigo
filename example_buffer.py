@@ -75,7 +75,7 @@ class ExampleBuffer():
         with mp.Pool(threads) as pool:
             res = tqdm(pool.imap(self.func, games), total=len(games))
             self.examples.extend(itertools.chain.from_iterable(res))
-        print("Got", len(self.examples))
+        print("Got", len(self.examples), "examples")
 
     def update(self, new_games):
         """ new_games is a list of .tfrecord.zz new game records. """
@@ -170,7 +170,8 @@ def _determine_chunk_to_make(write_dir):
     chunk_to_make = os.path.join(write_dir, str(
         models[-1][0] + 2) + '.tfrecord.zz')
     while tf.gfile.Exists(chunk_to_make):
-        print("Chunk for next model ({}) already exists.  Sleeping.".format(chunk_to_make))
+        print("Chunk for next model ({}) already exists. Sleeping.".format(
+            chunk_to_make))
         time.sleep(5 * 60)
         models = fsdb.get_models()
         chunk_to_make = os.path.join(write_dir, str(
