@@ -208,7 +208,7 @@ class GoGuiCmdHandler(object):
             for key in sort_order if node.child_N[key] > 0][: 20])
 
 
-class MiniguiCmdHandler(BasicCmdHandler):
+class MiniguiBasicCmdHandler(BasicCmdHandler):
     def __init__(self, player, courtesy_pass=False):
         super().__init__(player, courtesy_pass)
 

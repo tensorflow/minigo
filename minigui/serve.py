@@ -73,6 +73,7 @@ if args.engine == "py":
     GTP_COMMAND = [python_binary,  "-u",  # turn off buffering
                    "gtp.py",
                    "--load-file", args.model,
+                   "--minigui_mode=true",
                    "--num_readouts", "1000",
                    "--conv_width", "128",
                    "--verbose", "2"]

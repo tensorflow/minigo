@@ -21,7 +21,7 @@ from absl import app, flags
 
 from dual_net import DualNetwork
 from gtp_cmd_handlers import (
-    KgsCmdHandler, GoGuiCmdHandler, MiniguiCmdHandler, RegressionsCmdHandler)
+    BasicCmdHandler, KgsCmdHandler, GoGuiCmdHandler, MiniguiBasicCmdHandler, RegressionsCmdHandler)
 import gtp_engine
 from strategies import MCTSPlayer, CGOSPlayer
 from utils import dbg
@@ -30,6 +30,8 @@ from utils import dbg
 flags.DEFINE_bool('cgos_mode', False, 'Whether to use CGOS settings.')
 
 flags.DEFINE_bool('kgs_mode', False, 'Whether to use KGS courtesy-pass.')
+
+flags.DEFINE_bool('minigui_mode', False, 'Whether to add minigui logging.')
 
 flags.DEFINE_string('load_file', None, 'Path to model save files.')
 
@@ -41,16 +43,15 @@ flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
 FLAGS = flags.FLAGS
 
 
-def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False, verbosity=1,
-                      num_readouts=None):
+def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False,
+                      minigui_mode=False, verbosity=1):
     '''Takes a path to model files and set up a GTP engine instance.'''
     n = DualNetwork(load_file)
     if cgos_mode:
         player = CGOSPlayer(network=n, seconds_per_move=5, timed_match=True,
                             verbosity=verbosity, two_player_mode=True)
     else:
-        player = MCTSPlayer(network=n, num_readouts=num_readouts,
-                            verbosity=verbosity, two_player_mode=True)
+        player = MCTSPlayer(network=n, verbosity=verbosity, two_player_mode=True)
 
     name = "Minigo-" + os.path.basename(load_file)
     version = "0.2"
@@ -63,7 +64,10 @@ def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False, verbosity=1,
         engine.add_cmd_handler(KgsCmdHandler(player))
     engine.add_cmd_handler(RegressionsCmdHandler(player))
     engine.add_cmd_handler(GoGuiCmdHandler(player))
-    engine.add_cmd_handler(MiniguiCmdHandler(player, courtesy_pass=kgs_mode))
+    if minigui_mode:
+        engine.add_cmd_handler(MiniguiBasicCmdHandler(player, courtesy_pass=kgs_mode))
+    else:
+        engine.add_cmd_handler(BasicCmdHandler(player, courtesy_pass=kgs_mode))
 
     return engine
 
@@ -74,6 +78,7 @@ def main(argv):
     engine = make_gtp_instance(FLAGS.load_file,
                                cgos_mode=FLAGS.cgos_mode,
                                kgs_mode=FLAGS.kgs_mode,
+                               minigui_mode=FLAGS.minigui_mode,
                                verbosity=FLAGS.verbose)
     dbg("GTP engine ready\n")
     for msg in sys.stdin:
