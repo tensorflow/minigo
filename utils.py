@@ -23,10 +23,9 @@ import re
 import sys
 import time
 
-
-def dbg(fmt, *args):
+def dbg(*objects, file=sys.stderr, flush=True, **kwargs):
     "Helper function to print to stderr and flush"
-    print(fmt % args, file=sys.stderr, flush=True)
+    print(*objects, file=file, flush=flush, **kwargs)
 
 
 def ensure_dir_exists(directory):
