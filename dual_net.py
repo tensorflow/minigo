@@ -78,6 +78,12 @@ flags.DEFINE_integer('shuffle_buffer_size', 2000,
 
 flags.DEFINE_bool('use_tpu', False, 'Whether to use TPU for training.')
 
+flags.DEFINE_bool('quantize', False, 'Whether to quantize the model.')
+
+flags.DEFINE_integer('quant_delay', 700 * 1024,
+                     'Number of training steps after which weights and '
+                     'activations are quantized.')
+
 flags.DEFINE_string(
     'tpu_name', None,
     'The Cloud TPU to use for training. This should be either the name used'
@@ -223,6 +229,15 @@ def model_fn(features, labels, mode, params=None):
     learning_rate = tf.train.piecewise_constant(
         global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
+    # Insert quantization ops if requested
+    if FLAGS.quantize:
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            tf.contrib.quantize.create_training_graph(
+                quant_delay=FLAGS.quant_delay)
+        elif mode == tf.estimator.ModeKeys.EVAL:
+            tf.contrib.quantize.create_eval_graph()
+
     optimizer = tf.train.MomentumOptimizer(learning_rate, FLAGS.sgd_momentum)
     if FLAGS.use_tpu:
         optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
@@ -279,7 +294,8 @@ def model_fn(features, labels, mode, params=None):
         # Reset metrics occasionally so that they are mean of recent batches.
         reset_op = tf.variables_initializer(tf.local_variables("metrics"))
         cond_reset_op = tf.cond(
-            tf.equal(tf.mod(tf.reduce_min(step), FLAGS.summary_steps), tf.to_int64(1)),
+            tf.equal(tf.mod(tf.reduce_min(step),
+                            FLAGS.summary_steps), tf.to_int64(1)),
             lambda: reset_op,
             lambda: tf.no_op())
 
