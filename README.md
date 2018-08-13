@@ -86,11 +86,11 @@ pip3 install -r requirements.txt
 
 Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
-- GPU: `pip3 install "tensorflow-gpu>=1.8,<1.9"`.
+- GPU: `pip3 install "tensorflow-gpu>=1.9,<1.10"`.
   - *Note*: You must install [CUDA
-    9.0].(https://developer.nvidia.com/cuda-90-download-archive) for Tensorflow
+    9.0](https://developer.nvidia.com/cuda-90-download-archive). for Tensorflow
     1.5+.
-- CPU: `pip3 install "tensorflow>=1.8,<1.9"`.
+- CPU: `pip3 install "tensorflow>=1.9,<1.10"`.
 
 Setting up the Environment
 --------------------------
@@ -145,30 +145,34 @@ Otherwise, all commands fetching files from GCS will hang.
 For instance, this would set a bucket, authenticate, and then look for the most
 recent model.
 ```bash
-export BUCKET_NAME=your_bucket;
+# When you first start we reccomend using our minigo-pub bucket.
+# Later you can setup your own bucket and store data there.
+export BUCKET_NAME=minigo-pub/v9-19x19
 gcloud auth application-default login
-gsutil ls gs://$BUCKET_NAME/models | tail -3
+gsutil ls gs://$BUCKET_NAME/models | tail -4
 ```
 
 Which might look like:
 
 ```
-gs://$BUCKET_NAME/models/000193-trusty.data-00000-of-00001
-gs://$BUCKET_NAME/models/000193-trusty.index
-gs://$BUCKET_NAME/models/000193-trusty.meta
+gs://$BUCKET_NAME/models/000737-fury.data-00000-of-00001
+gs://$BUCKET_NAME/models/000737-fury.index
+gs://$BUCKET_NAME/models/000737-fury.meta
+gs://$BUCKET_NAME/models/000737-fury.pb
 ```
 
-These three files comprise the model, and commands that take a model as an
+These four files comprise the model. Commands that take a model as an
 argument usually need the path to the model basename, e.g.
-`gs://$BUCKET_NAME/models/000123-foobar`
+`gs://$BUCKET_NAME/models/000737-fury`
 
 You'll need to copy them to your local disk.  This fragment copies the files
 associated with $MODEL_NAME to the directory specified by `MINIGO_MODELS`
 
 ```shell
+MODEL_NAME=000532-ace
 MINIGO_MODELS=$HOME/minigo-models
 mkdir -p $MINIGO_MODELS
-gsutil ls gs://$BUCKET_NAME/models | grep $MODEL_NAME | xargs -I{} gsutil cp "{}" $MINIGO_MODELS
+gsutil ls gs://$BUCKET_NAME/models | grep $MODEL_NAME | gsutil cp -I $MINIGO_MODELS
 ```
 
 Selfplay
@@ -177,6 +181,7 @@ To watch Minigo play a game, you need to specify a model. Here's an example
 to play using the latest model in your bucket
 
 ```shell
+READOUTS=400
 python rl_loop.py selfplay --num_readouts=$READOUTS -v 2
 ```
 where `READOUTS` is how many searches to make per move.  Timing information and
@@ -196,8 +201,6 @@ LATEST_MODEL=$(ls -d $MINIGO_MODELS/* | tail -1 | cut -f 1 -d '.')
 BOARD_SIZE=19 python3 gtp.py --load_file=$LATEST_MODEL --num_readouts=$READOUTS --verbose=3
 ```
 
-(If no model is provided, it will initialize one with random values)
-
 After some loading messages, it will display `GTP engine ready`, at which point
 it can receive commands.  GTP cheatsheet:
 
@@ -214,13 +217,13 @@ speaks GTP.) You can download the gogui set of tools at
 GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
 
 ```shell
-gogui-twogtp -black 'python3 gtp.py --load_file=gs://$BUCKET_NAME/models/000000-bootstrap' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
+gogui-twogtp -black 'python3 gtp.py --load_file=$LATEST_MODEL' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
 ```
 
 Another way to play via GTP is to watch it play against GnuGo, while spectating the games
 ```
 BLACK="gnugo --mode gtp"
-WHITE="python3 gtp.py --load_file=path/to/model"
+WHITE="python3 gtp.py --load_file=$LATEST_MODEL"
 TWOGTP="gogui-twogtp -black \"$BLACK\" -white \"$WHITE\" -games 10 \
   -size 19 -alternate -sgffile gnugo"
 gogui -size 19 -program "$TWOGTP" -computer-both -auto
@@ -258,7 +261,7 @@ If these directories don't exist, bootstrap will create them for you.
 ```bash
 export MODEL_NAME=000000-bootstrap
 python3 main.py bootstrap \
-  --working-dir=estimator_working_dir
+  --working-dir=estimator_working_dir \
   --model-save-path="gs://$BUCKET_NAME/models/$MODEL_NAME"
 ```
 
@@ -269,8 +272,8 @@ This command starts self-playing, outputting its raw game data in a
 tensorflow-compatible format as well as in SGF form in the directories
 
 ```
-gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker/*.tfrecord.zz
-gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
+gsutil ls gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker/*.tfrecord.zz
+gsutil ls gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
 ```
 
 ```bash
@@ -317,7 +320,7 @@ command.
 
 By default, Minigo will hold out 5% of selfplay games for validation, and write
 them to `gs://$BUCKET_NAME/data/holdout/<model_name>`.  This can be changed by
-adjusting the `holdout-pct` flag on the `selfplay` command.
+adjusting the `holdout_pct` flag on the `selfplay` command.
 
 With this setup, `python rl_loop.py validate --logdir=estimator_working_dir --` will figure out
 the most recent model, grab the holdout data from the fifty models prior to that
@@ -347,7 +350,7 @@ Once you've collected all the files in a directory, producing validation is as
 easy as
 
 ```
-BOARD_SIZE=19 python main.py validate path/to/validation/files/ --load-file=/path/to/model
+BOARD_SIZE=19 python main.py validate path/to/validation/files/ --load_file=$LATEST_MODEL
 --logdir=path/to/tb/logs --num-steps=<number of positions to run validation on>
 ```
 
