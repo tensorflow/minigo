@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "cc/algorithm.h"
+#include "cc/check.h"
 
 namespace minigo {
 
@@ -101,9 +102,7 @@ std::vector<Coord> MctsNode::MostVisitedPath() const {
         [](const EdgeStats& a, const EdgeStats& b) { return a.N < b.N; });
     path.push_back(next_kid);
     auto it = node->children.find(next_kid);
-    if (it == node->children.end()) {
-      break;
-    }
+    MG_CHECK(it != node->children.end());
     node = it->second.get();
   }
   return path;
@@ -114,10 +113,8 @@ std::string MctsNode::MostVisitedPathString() const {
   const auto* node = this;
   for (Coord c : MostVisitedPath()) {
     auto it = node->children.find(c);
-    if (it == node->children.end()) {
-      oss << "GAME END";
-      break;
-    }
+    MG_CHECK(it != node->children.end());
+
     oss << node->move.ToKgs() << " (" << static_cast<int>(node->N())
         << ") ==> ";
     node = it->second.get();

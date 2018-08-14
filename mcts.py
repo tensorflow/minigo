@@ -271,35 +271,27 @@ class MCTSNode(object):
         while node.children:
             next_kid = np.argmax(node.child_N)
             node = node.children.get(next_kid)
-            if node is None:
-                break
+            assert node is not None
             output.append(node)
         return output
 
     def most_visited_path(self):
-        node = self
         output = []
-        while node.children:
-            next_kid = np.argmax(node.child_N)
-            node = node.children.get(next_kid)
-            if node is None:
-                output.append("GAME END")
-                break
-            output.append("%s (%d) ==> " % (coords.to_kgs(
-                                            coords.from_flat(node.fmove)),
-                                            node.N))
+        node = self
+        for node in self.most_visited_path_nodes():
+            output.append("%s (%d) ==> " % (
+                coords.to_kgs(coords.from_flat(node.fmove)), node.N))
+
         output.append("Q: {:.5f}\n".format(node.Q))
         return ''.join(output)
 
     def mvp_gg(self):
         """ Returns most visited path in go-gui VAR format e.g. 'b r3 w c17..."""
-        node = self
         output = []
-        while node.children and max(node.child_N) > 1:
-            next_kid = np.argmax(node.child_N)
-            node = node.children[next_kid]
-            output.append("%s" % coords.to_kgs(
-                coords.from_flat(node.fmove)))
+        for node in self.most_visited_path_nodes():
+            if max(node.child_N) <= 1:
+                break
+            output.append(coords.to_kgs(coords.from_flat(node.fmove)))
         return ' '.join(output)
 
     def describe(self):
