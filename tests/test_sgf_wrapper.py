@@ -14,7 +14,6 @@
 
 import go
 from sgf_wrapper import replay_sgf, translate_sgf_move, make_sgf
-import unittest
 
 import coords
 from tests import test_utils

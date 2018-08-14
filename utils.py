@@ -41,7 +41,7 @@ def parse_game_result(result):
     "Parse an SGF result string into value target."
     if re.match(r'[bB]\+', result):
         return 1
-    elif re.match(r'[wW]\+', result):
+    if re.match(r'[wW]\+', result):
         return -1
     return 0
 

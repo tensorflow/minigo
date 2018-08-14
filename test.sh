@@ -25,7 +25,7 @@
 cd "$(dirname "$0")"
 
 lint_fail=0
-ls *.py | xargs pylint || {
+pylint *.py || {
   lint_fail=1
 }
 

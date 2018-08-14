@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest.mock as mock
+from unittest import mock
 import numpy as np
 
 from absl import flags
@@ -159,7 +159,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # check -- white is losing.
         self.assertEqual(player.root.position.score(), -0.5)
 
-        for i in range(20):
+        for _ in range(20):
             player.tree_search()
         # uncomment to debug this test
         # print(player.root.describe())
@@ -186,7 +186,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player.tree_search(parallel_readouts=1)
         # virtual losses should enable multiple searches to happen simultaneously
         # without throwing an error...
-        for i in range(5):
+        for _ in range(5):
             player.tree_search(parallel_readouts=4)
         # uncomment to debug this test
         # print(player.root.describe())
@@ -207,7 +207,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player = initialize_almost_done_player()
         # Test that an almost complete game
         # will tree search with # parallelism > # legal moves.
-        for i in range(10):
+        for _ in range(10):
             player.tree_search(parallel_readouts=50)
         self.assertNoPendingVirtualLosses(player.root)
 
@@ -226,7 +226,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
 
         # Test that MCTS can deduce that B wins because of TT-scoring
         # triggered by move limit.
-        for i in range(10):
+        for _ in range(10):
             player.tree_search(parallel_readouts=8)
         self.assertNoPendingVirtualLosses(player.root)
         self.assertGreater(player.root.Q, 0)
@@ -292,7 +292,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
 
         data = list(player.extract_data())
         self.assertEqual(len(data), 2)
-        position, pi, result = data[0]
+        position, _, result = data[0]
         # White wins by komi
         self.assertEqual(result, go.WHITE)
         self.assertEqual(player.result_string,
@@ -312,7 +312,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player.set_result(go.WHITE, was_resign=True)
 
         data = list(player.extract_data())
-        position, pi, result = data[0]
+        position, _, result = data[0]
         # Result should say White is the winner
         self.assertEqual(result, go.WHITE)
         self.assertEqual(player.result_string, "W+R")

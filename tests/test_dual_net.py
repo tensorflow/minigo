@@ -15,11 +15,12 @@
 import os
 import tempfile
 
+from absl import flags
+
 import dual_net
 import go
 import preprocessing
 from tests import test_utils
-from absl import flags
 
 
 class TestDualNet(test_utils.MiniGoUnitTest):

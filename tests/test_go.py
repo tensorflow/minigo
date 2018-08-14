@@ -349,11 +349,11 @@ class TestPosition(test_utils.MiniGoUnitTest):
         nonsuicidal_moves = coords_from_kgs_set('B5 J1 A9')
         for move in suicidal_moves:
             # sanity check my coordinate input
-            assert(position.board[move] == go.EMPTY)
+            self.assertEqual(position.board[move], go.EMPTY)
             self.assertTrue(position.is_move_suicidal(move), str(move))
         for move in nonsuicidal_moves:
             # sanity check my coordinate input
-            assert(position.board[move] == go.EMPTY)
+            self.assertEqual(position.board[move], go.EMPTY)
             self.assertFalse(position.is_move_suicidal(move), str(move))
 
     def test_legal_moves(self):
