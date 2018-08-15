@@ -237,7 +237,7 @@ TEST(MctsNodeTest, DontPickUnexpandedChild) {
   leaf1->AddVirtualLoss(&root);
 
   auto* leaf2 = root.SelectLeaf();
-  EXPECT_EQ(leaf2, leaf2);
+  EXPECT_EQ(leaf1, leaf2);
 }
 
 // Verifies that even when one move is hugely more likely than all the others,
