@@ -61,8 +61,8 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
     def test_sgf_props(self):
         sgf_replayer = replay_sgf(CHINESE_HANDICAP_SGF)
         initial = next(sgf_replayer)
-        self.assertEqual(initial.result, go.BLACK)
-        self.assertEqual(initial.position.komi, 5.5)
+        self.assertEqual(go.BLACK, initial.result)
+        self.assertEqual(5.5, initial.position.komi)
 
     def test_japanese_handicap_handling(self):
         intermediate_board = test_utils.load_board('''

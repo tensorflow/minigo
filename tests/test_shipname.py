@@ -25,9 +25,9 @@ class TestShipname(unittest.TestCase):
     def test_detect_name(self):
         string = '000017-model.index'
         detected_name = shipname.detect_model_name(string)
-        self.assertEqual(detected_name, '000017-model')
+        self.assertEqual('000017-model', detected_name)
 
     def test_detect_num(self):
         string = '000017-model.index'
         detected_name = shipname.detect_model_num(string)
-        self.assertEqual(detected_name, 17)
+        self.assertEqual(17, detected_name)

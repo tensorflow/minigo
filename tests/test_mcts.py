@@ -95,14 +95,14 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # Root was visited twice: first at the root, then at this child.
         self.assertEqual(root.N, 2)
         # Root has 0 as a prior and two visits with value 0, -1
-        self.assertAlmostEqual(root.Q, -1 / 3)  # average of 0, 0, -1
+        self.assertAlmostEqual(-1 / 3, root.Q)  # average of 0, 0, -1
         # Leaf should have one visit
-        self.assertEqual(root.child_N[leaf.fmove], 1)
-        self.assertEqual(leaf.N, 1)
+        self.assertEqual(1, root.child_N[leaf.fmove])
+        self.assertEqual(1, leaf.N)
         # And that leaf's value had its parent's Q (0) as a prior, so the Q
         # should now be the average of 0, -1
-        self.assertAlmostEqual(root.child_Q[leaf.fmove], -0.5)
-        self.assertAlmostEqual(leaf.Q, -0.5)
+        self.assertAlmostEqual(-0.5, root.child_Q[leaf.fmove])
+        self.assertAlmostEqual(-0.5, leaf.Q)
 
         # We're assuming that select_leaf() returns a leaf like:
         #   root
@@ -111,21 +111,21 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         #       \
         #       leaf2
         # which happens in this test because root is W to play and leaf was a W win.
-        self.assertEqual(root.position.to_play, go.WHITE)
+        self.assertEqual(go.WHITE, root.position.to_play)
         leaf2 = root.select_leaf()
         leaf2.incorporate_results(probs, -0.2, root)  # another white semi-win
-        self.assertEqual(root.N, 3)
+        self.assertEqual(3, root.N)
         # average of 0, 0, -1, -0.2
-        self.assertAlmostEqual(root.Q, -0.3)
+        self.assertAlmostEqual(-0.3, root.Q)
 
-        self.assertEqual(leaf.N, 2)
-        self.assertEqual(leaf2.N, 1)
+        self.assertEqual(2, leaf.N)
+        self.assertEqual(1, leaf2.N)
         # average of 0, -1, -0.2
-        self.assertAlmostEqual(leaf.Q, root.child_Q[leaf.fmove])
-        self.assertAlmostEqual(leaf.Q, -0.4)
+        self.assertAlmostEqual(root.child_Q[leaf.fmove], leaf.Q)
+        self.assertAlmostEqual(-0.4, leaf.Q)
         # average of -1, -0.2
-        self.assertAlmostEqual(leaf.child_Q[leaf2.fmove], -0.6)
-        self.assertAlmostEqual(leaf2.Q, -0.6)
+        self.assertAlmostEqual(-0.6, leaf.child_Q[leaf2.fmove])
+        self.assertAlmostEqual(-0.6, leaf2.Q)
 
     def test_do_not_explore_past_finish(self):
         probs = np.array([0.02] * (go.N * go.N + 1), dtype=np.float32)
@@ -138,14 +138,14 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
             second_pass.incorporate_results(probs, 0, root)
         node_to_explore = second_pass.select_leaf()
         # should just stop exploring at the end position.
-        self.assertEqual(node_to_explore, second_pass)
+        self.assertEqual(second_pass, node_to_explore)
 
     def test_add_child(self):
         root = mcts.MCTSNode(go.Position())
         child = root.maybe_add_child(17)
         self.assertIn(17, root.children)
-        self.assertEqual(child.parent, root)
-        self.assertEqual(child.fmove, 17)
+        self.assertEqual(root, child.parent)
+        self.assertEqual(17, child.fmove)
 
     def test_add_child_idempotency(self):
         root = mcts.MCTSNode(go.Position())
@@ -168,13 +168,13 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # this should not throw an error...
         leaf = root.select_leaf()
         # the returned leaf should not be the illegal move
-        self.assertNotEqual(leaf.fmove, 1)
+        self.assertNotEqual(1, leaf.fmove)
 
         # and even after injecting noise, we should still not select an illegal move
         for i in range(10):
             root.inject_noise()
             leaf = root.select_leaf()
-            self.assertNotEqual(leaf.fmove, 1)
+            self.assertNotEqual(1, leaf.fmove)
 
     def test_dont_pick_unexpanded_child(self):
         probs = np.array([0.001] * (go.N * go.N + 1))
@@ -184,7 +184,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         root = mcts.MCTSNode(go.Position())
         root.incorporate_results(probs, 0, root)
         leaf1 = root.select_leaf()
-        self.assertEqual(leaf1.fmove, 17)
+        self.assertEqual(17, leaf1.fmove)
         leaf1.add_virtual_loss(up_to=root)
         # the second select_leaf pick should return the same thing, since the child
         # hasn't yet been sent to neural net for eval + result incorporation
@@ -200,9 +200,9 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         root.N = 0
 
         # Policy sums to 1.0, only legal moves have non-zero values.
-        self.assertAlmostEqual(sum(root.child_prior), 1.0)
-        self.assertEqual(np.count_nonzero(root.child_prior), 6)
-        self.assertEqual(sum(root.child_prior * root.illegal_moves), 0)
+        self.assertAlmostEqual(1.0, sum(root.child_prior))
+        self.assertEqual(6, np.count_nonzero(root.child_prior))
+        self.assertEqual(0, sum(root.child_prior * root.illegal_moves))
 
     def test_inject_noise_only_legal_moves(self):
         probs = np.array([0.02] * (go.N * go.N + 1))
@@ -222,5 +222,5 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         self.assertTrue(
             (0.75 * expected_policy + 0.25 >= root.child_prior).all())
         # Policy sums to 1.0, only legal moves have non-zero values.
-        self.assertAlmostEqual(sum(root.child_prior), 1.0)
-        self.assertEqual(sum(root.child_prior * root.illegal_moves), 0)
+        self.assertAlmostEqual(1.0, sum(root.child_prior))
+        self.assertEqual(0, sum(root.child_prior * root.illegal_moves))

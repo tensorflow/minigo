@@ -66,8 +66,8 @@ for coord in ((0, 0), (0, 1), (0, 2), (0, 3), (1, 1)):
 class TestFeatureExtraction(test_utils.MiniGoUnitTest):
     def test_stone_features(self):
         f = features.stone_features(TEST_POSITION3)
-        self.assertEqual(TEST_POSITION3.to_play, go.WHITE)
-        self.assertEqual(f.shape, (9, 9, 16))
+        self.assertEqual(go.WHITE, TEST_POSITION3.to_play)
+        self.assertEqual((9, 9, 16), f.shape)
         self.assertEqualNPArray(f[:, :, 0], test_utils.load_board('''
             ...X.....
             .........''' + EMPTY_ROW * 7))
@@ -92,60 +92,61 @@ class TestFeatureExtraction(test_utils.MiniGoUnitTest):
             X.X......
             .........''' + EMPTY_ROW * 7))
 
+        all_zeros = np.zeros([go.N, go.N])
         for i in range(10, 16):
-            self.assertEqualNPArray(f[:, :, i], np.zeros([go.N, go.N]))
+            self.assertEqualNPArray(all_zeros, f[:, :, i])
 
     def test_stone_color_feature(self):
         f = features.stone_color_feature(TEST_POSITION)
-        self.assertEqual(f.shape, (9, 9, 3))
+        self.assertEqual((9, 9, 3), f.shape)
         # plane 0 is B
-        self.assertEqual(f[0, 1, 0], 1)
-        self.assertEqual(f[0, 1, 1], 0)
+        self.assertEqual(1, f[0, 1, 0])
+        self.assertEqual(0, f[0, 1, 1])
         # plane 1 is W
-        self.assertEqual(f[0, 8, 1], 1)
-        self.assertEqual(f[0, 8, 0], 0)
+        self.assertEqual(0, f[0, 8, 0])
+        self.assertEqual(1, f[0, 8, 1])
         # plane 2 is empty
-        self.assertEqual(f[0, 5, 2], 1)
-        self.assertEqual(f[0, 5, 1], 0)
+        self.assertEqual(1, f[0, 5, 2])
+        self.assertEqual(0, f[0, 5, 1])
 
     def test_liberty_feature(self):
         f = features.liberty_feature(TEST_POSITION)
         self.assertEqual(f.shape, (9, 9, features.liberty_feature.planes))
 
-        self.assertEqual(f[0, 0, 0], 0)
+        self.assertEqual(0, f[0, 0, 0])
         # the stone at 0, 1 has 3 liberties.
-        self.assertEqual(f[0, 1, 2], 1)
-        self.assertEqual(f[0, 1, 4], 0)
+        self.assertEqual(1, f[0, 1, 2])
+        self.assertEqual(0, f[0, 1, 4])
         # the group at 0, 7 has 3 liberties
-        self.assertEqual(f[0, 7, 2], 1)
-        self.assertEqual(f[0, 8, 2], 1)
+        self.assertEqual(1, f[0, 7, 2])
+        self.assertEqual(1, f[0, 8, 2])
         # the group at 1, 0 has 18 liberties
-        self.assertEqual(f[1, 0, 7], 1)
+        self.assertEqual(1, f[1, 0, 7])
 
     def test_recent_moves_feature(self):
         f = features.recent_move_feature(TEST_POSITION)
         self.assertEqual(f.shape, (9, 9, features.recent_move_feature.planes))
         # most recent move at (1, 0)
-        self.assertEqual(f[1, 0, 0], 1)
-        self.assertEqual(f[1, 0, 3], 0)
+        self.assertEqual(1, f[1, 0, 0])
+        self.assertEqual(0, f[1, 0, 3])
         # second most recent move at (0, 8)
-        self.assertEqual(f[0, 8, 1], 1)
-        self.assertEqual(f[0, 8, 0], 0)
+        self.assertEqual(1, f[0, 8, 1])
+        self.assertEqual(0, f[0, 8, 0])
         # third most recent move at (0, 1)
-        self.assertEqual(f[0, 1, 2], 1)
+        self.assertEqual(1, f[0, 1, 2])
         # no more older moves
-        self.assertEqualNPArray(f[:, :, 3], np.zeros([9, 9]))
+        self.assertEqualNPArray(np.zeros([9, 9]), f[:, :, 3])
         self.assertEqualNPArray(
-            f[:, :, features.recent_move_feature.planes - 1], np.zeros([9, 9]))
+            np.zeros([9, 9]), f[:, :, features.recent_move_feature.planes - 1])
 
     def test_would_capture_feature(self):
         f = features.would_capture_feature(TEST_POSITION2)
         self.assertEqual(
-            f.shape, (9, 9, features.would_capture_feature.planes))
+            (9, 9, features.would_capture_feature.planes), f.shape)
         # move at (1, 2) would capture 2 stones
-        self.assertEqual(f[1, 2, 1], 1)
+        self.assertEqual(1, f[1, 2, 1])
         # move at (0, 0) should not capture stones because it's B's move.
-        self.assertEqual(f[0, 0, 0], 0)
+        self.assertEqual(0, f[0, 0, 0])
         # move at (0, 7) would capture 3 stones
-        self.assertEqual(f[0, 7, 2], 1)
-        self.assertEqual(f[0, 7, 1], 0)
+        self.assertEqual(1, f[0, 7, 2])
+        self.assertEqual(0, f[0, 7, 1])

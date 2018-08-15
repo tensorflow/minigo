@@ -44,9 +44,9 @@ def load_board(string):
 
 class TestUtils(unittest.TestCase):
     def test_parse_game_result(self):
-        self.assertEqual(utils.parse_game_result('B+3.5'), go.BLACK)
-        self.assertEqual(utils.parse_game_result('W+T'), go.WHITE)
-        self.assertEqual(utils.parse_game_result('Void'), 0)
+        self.assertEqual(go.BLACK, utils.parse_game_result('B+3.5'))
+        self.assertEqual(go.WHITE, utils.parse_game_result('W+T'))
+        self.assertEqual(0, utils.parse_game_result('Void'))
 
 
 class MiniGoUnitTest(unittest.TestCase):
@@ -117,5 +117,5 @@ class MiniGoUnitTest(unittest.TestCase):
         queue = [root]
         while queue:
             current = queue.pop()
-            self.assertEqual(current.losses_applied, 0)
+            self.assertEqual(0, current.losses_applied)
             queue.extend(current.children.values())

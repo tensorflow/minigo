@@ -115,7 +115,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player = initialize_basic_player()
         sum_priors = np.sum(player.root.child_prior)
         # dummyNet should return normalized priors.
-        self.assertAlmostEqual(sum_priors, 1)
+        self.assertAlmostEqual(1, sum_priors)
         self.assertTrue(np.all(player.root.child_U == player.root.child_U[0]))
 
         player.root.inject_noise()
@@ -139,7 +139,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # Assert we're picking deterministically
         self.assertTrue(root.position.n > player.temp_threshold)
         move = player.pick_move()
-        self.assertEqual(move, (2, 0))
+        self.assertEqual((2, 0), move)
 
         # But if we're in the early part of the game, pick randomly
         root.position.n = 3
@@ -147,7 +147,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
 
         with mock.patch('random.random', lambda: .5):
             move = player.pick_move()
-            self.assertEqual(move, (2, 0))
+            self.assertEqual((2, 0), move)
 
         with mock.patch('random.random', lambda: .99):
             move = player.pick_move()
@@ -157,7 +157,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player = initialize_almost_done_player()
 
         # check -- white is losing.
-        self.assertEqual(player.root.position.score(), -0.5)
+        self.assertEqual(-0.5, player.root.position.score())
 
         for _ in range(20):
             player.tree_search()
@@ -167,7 +167,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # Search should converge on D9 as only winning move.
         flattened = coords.to_flat(coords.from_kgs('D9'))
         best_move = np.argmax(player.root.child_N)
-        self.assertEqual(best_move, flattened)
+        self.assertEqual(flattened, best_move)
         # D9 should have a positive value
         self.assertGreater(player.root.children[flattened].Q, 0)
         self.assertGreaterEqual(player.root.N, 20)
@@ -181,7 +181,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
     def test_parallel_tree_search(self):
         player = initialize_almost_done_player()
         # check -- white is losing.
-        self.assertEqual(player.root.position.score(), -0.5)
+        self.assertEqual(-0.5, player.root.position.score())
         # initialize the tree so that the root node has populated children.
         player.tree_search(parallel_readouts=1)
         # virtual losses should enable multiple searches to happen simultaneously
@@ -194,7 +194,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # Search should converge on D9 as only winning move.
         flattened = coords.to_flat(coords.from_kgs('D9'))
         best_move = np.argmax(player.root.child_N)
-        self.assertEqual(best_move, flattened)
+        self.assertEqual(flattened, best_move)
         # D9 should have a positive value
         self.assertGreater(player.root.children[flattened].Q, 0)
         self.assertGreaterEqual(player.root.N, 20)
@@ -235,15 +235,15 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # Test that parallel tree search doesn't trip on an empty tree
         player = MCTSPlayer(DummyNet(fake_value=0.17))
         player.initialize_game()
-        self.assertEqual(player.root.N, 0)
+        self.assertEqual(0, player.root.N)
         self.assertFalse(player.root.is_expanded)
         player.tree_search(parallel_readouts=4)
         self.assertNoPendingVirtualLosses(player.root)
         # Even though the root gets selected 4 times by tree search, its
         # final visit count should just be 1.
-        self.assertEqual(player.root.N, 1)
+        self.assertEqual(1, player.root.N)
         # 0.085 = average(0, 0.17), since 0 is the prior on the root.
-        self.assertAlmostEqual(player.root.Q, 0.085)
+        self.assertAlmostEqual(0.085, player.root.Q)
 
     def test_tree_search_failsafe(self):
         # Test that the failsafe works correctly. It can trigger if the MCTS
@@ -274,8 +274,8 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # explore a child - should be a pass move.
         player.tree_search()
         pass_move = go.N * go.N
-        self.assertEqual(player.root.children[pass_move].N, 1)
-        self.assertEqual(player.root.child_N[pass_move], 1)
+        self.assertEqual(1, player.root.children[pass_move].N)
+        self.assertEqual(1, player.root.child_N[pass_move])
         player.tree_search()
         # check that we didn't visit the pass node any more times.
         self.assertEqual(player.root.child_N[pass_move], 1)
@@ -291,12 +291,12 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player.set_result(player.root.position.result(), was_resign=False)
 
         data = list(player.extract_data())
-        self.assertEqual(len(data), 2)
+        self.assertEqual(2, len(data))
         position, _, result = data[0]
         # White wins by komi
-        self.assertEqual(result, go.WHITE)
-        self.assertEqual(player.result_string,
-                         "W+{}".format(player.root.position.komi))
+        self.assertEqual(go.WHITE, result)
+        self.assertEqual("W+{}".format(player.root.position.komi),
+                         player.result_string)
 
     def test_extract_data_resign_end(self):
         player = MCTSPlayer(DummyNet())
@@ -307,12 +307,12 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player.play_move(None)
         player.tree_search()
         # Black is winning on the board
-        self.assertEqual(player.root.position.result(), go.BLACK)
+        self.assertEqual(go.BLACK, player.root.position.result())
         # But if Black resigns
         player.set_result(go.WHITE, was_resign=True)
 
         data = list(player.extract_data())
         position, _, result = data[0]
         # Result should say White is the winner
-        self.assertEqual(result, go.WHITE)
-        self.assertEqual(player.result_string, "W+R")
+        self.assertEqual(go.WHITE, result)
+        self.assertEqual("W+R", player.result_string)

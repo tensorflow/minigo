@@ -94,14 +94,33 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             if x_equal and pi_equal:
                 return sym
 
-        assert False, "No rotation makes {} equal {}".format(
-            pi, pi2)
+        self.assertTrue(False, "No rotation makes {} equal {}".format(pi, pi2))
 
     def x_and_pi_same(self, run_a, run_b):
         x_a, pi_a, values_a = zip(*run_a)
         x_b, pi_b, values_b = zip(*run_b)
         self.assertEqual(values_a, values_b, "Values are not same")
         return np.array_equal(x_a, x_b) and np.array_equal(pi_a, pi_b)
+
+    def assert_rotate_data(self, run_one, run_two, run_three):
+        """Verify run_one is rotated and run_two is identical to run_three"""
+        self.assertTrue(
+            self.x_and_pi_same(run_two, run_three),
+            "Not deterministic")
+        self.assertFalse(
+            self.x_and_pi_same(run_one, run_two),
+            "Not randomly rotated")
+
+        syms = []
+        for (x, pi, v), (x2, pi2, v2) in zip(run_one, run_two):
+            self.assertEqual(v, v2, "values not the same")
+            # For each record find the symmetry that makes them equal
+            syms.extend(
+                map(lambda r: self.find_symmetry(*r), zip(x, pi, x2, pi2)))
+
+        difference = set(symmetries.SYMMETRIES) - set(syms)
+        self.assertEqual(len(run_one), len(syms), "Not same number of records")
+        self.assertEqual(set(), difference, "Didn't find these rotations")
 
     def test_serialize_round_trip(self):
         np.random.seed(1)
@@ -166,23 +185,7 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             self.reset_random()
             run_three = self.extract_data(f.name, random_rotation=True)
 
-        self.assertTrue(
-            self.x_and_pi_same(run_two, run_three),
-            "Not deterministic")
-        self.assertFalse(
-            self.x_and_pi_same(run_one, run_two),
-            "Not randomly rotated")
-
-        syms = []
-        for (x, pi, v), (x2, pi2, v2) in zip(run_one, run_two):
-            self.assertEqual(v, v2, "values not the same")
-            # For each record find the symmetry that makes them equal
-            syms.extend(
-                map(lambda r: self.find_symmetry(*r), zip(x, pi, x2, pi2)))
-
-        difference = set(symmetries.SYMMETRIES) - set(syms)
-        self.assertEqual(len(syms), num_records, "Not same number of records")
-        self.assertEqual(difference, set(), "Didn't find these rotations")
+        self.assert_rotate_data(run_one, run_two, run_three)
 
     def test_tpu_rotate(self):
         num_records = 100
@@ -201,20 +204,4 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
             self.reset_random()
             run_three = self.extract_tpu_data(f.name, random_rotation=True)
 
-        self.assertTrue(
-            self.x_and_pi_same(run_two, run_three),
-            "Not deterministic")
-        self.assertFalse(
-            self.x_and_pi_same(run_one, run_two),
-            "Not randomly rotated")
-
-        syms = []
-        for (x, pi, v), (x2, pi2, v2) in zip(run_one, run_two):
-            assert v == v2, "Values not the same"
-            # For each record find the symmetry that makes them equal
-            syms.extend(
-                map(lambda r: self.find_symmetry(*r), zip(x, pi, x2, pi2)))
-
-        difference = set(symmetries.SYMMETRIES) - set(syms)
-        self.assertEqual(len(syms), num_records, "Not same number of records")
-        self.assertEqual(difference, set(), "Didn't find these rotations")
+        self.assert_rotate_data(run_one, run_two, run_three)
