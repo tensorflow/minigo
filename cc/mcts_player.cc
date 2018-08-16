@@ -36,6 +36,7 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
      << " soft_pick:" << options.soft_pick
      << " random_symmetry:" << options.random_symmetry
      << " resign_threshold:" << options.resign_threshold
+     << " resign_enabled:" << options.resign_enabled
      << " batch_size:" << options.batch_size << " komi:" << options.komi
      << " num_readouts:" << options.num_readouts
      << " seconds_per_move:" << options.seconds_per_move
@@ -228,7 +229,8 @@ absl::Span<MctsNode* const> MctsPlayer::TreeSearch(int batch_size) {
 }
 
 bool MctsPlayer::ShouldResign() const {
-  return root_->Q_perspective() < options_.resign_threshold;
+  return options_.resign_enabled &&
+         root_->Q_perspective() < options_.resign_threshold;
 }
 
 void MctsPlayer::PlayMove(Coord c) {

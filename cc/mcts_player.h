@@ -46,6 +46,13 @@ class MctsPlayer {
     bool soft_pick = true;
     bool random_symmetry = true;
     float resign_threshold = -0.95;
+
+    // We use a separate resign_enabled flag instead of setting the
+    // resign_threshold to -1 for games where resignation is diabled. This
+    // enables us to report games where the eventual winner would have
+    // incorrectly resigned early, had resignations been enabled.
+    bool resign_enabled = true;
+
     // TODO(tommadams): rename batch_size to virtual_losses.
     int batch_size = 8;
     float komi = kDefaultKomi;

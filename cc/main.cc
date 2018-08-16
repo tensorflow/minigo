@@ -260,7 +260,7 @@ class SelfPlayer {
   // held. This allows us to safely update the command line arguments from a
   // flag file without causing any race conditions.
   struct GameOptions {
-    void Init(int thread_id) {
+    void Init(int thread_id, Random* rnd) {
       ParseMctsPlayerOptionsFromFlags(&player_options);
       player_options.verbose = thread_id == 0;
       // If an random seed was explicitly specified, make sure we use a
@@ -268,6 +268,7 @@ class SelfPlayer {
       if (player_options.random_seed != 0) {
         player_options.random_seed += 1299283 * thread_id;
       }
+      player_options.resign_enabled = (*rnd)() >= FLAGS_disable_resign_pct;
 
       run_forever = FLAGS_run_forever;
       holdout_pct = FLAGS_holdout_pct;
@@ -283,6 +284,52 @@ class SelfPlayer {
     std::string holdout_dir;
     std::string sgf_dir;
   };
+
+  void LogEndGameInfo(MctsPlayer* player, absl::Duration game_time) {
+    std::cerr << player->result_string() << std::endl;
+    std::cout << "Playing game: " << absl::ToDoubleSeconds(game_time)
+              << std::endl;
+
+    const auto& history = player->history();
+    if (history.empty()) {
+      return;
+    }
+
+    // Find the move at which the game looked the bleakest from the perspective
+    // of the winner.
+    float result = player->result();
+    float bleakest_eval = history[0].node->Q() * result;
+    float bleakest_move = 0;
+    for (size_t i = 1; i < history.size(); ++i) {
+      float eval = history[i].node->Q() * result;
+      if (eval < bleakest_eval) {
+        bleakest_eval = eval;
+        bleakest_move = i;
+      }
+    }
+    std::cout << "Bleakest eval: move=" << bleakest_move
+              << " Q=" << history[bleakest_move].node->Q() << std::endl;
+
+    // If resignation is disabled, check to see if the first time Q_perspective
+    // crossed the resign_threshold the eventual winner of the game would have
+    // resigned. Note that we only check for the first resignation: if the
+    // winner would have incorrectly resigned AFTER the loser would have
+    // resigned on an earlier move, this is not counted as a bad resignation for
+    // the winner (since the game would have ended after the loser's initial
+    // resignation).
+    if (!player->options().resign_enabled) {
+      for (size_t i = 0; i < history.size(); ++i) {
+        if (history[i].node->Q_perspective() <
+            player->options().resign_threshold) {
+          if ((history[i].node->Q() < 0) != (result < 0)) {
+            std::cout << "Bad resign: move=" << i
+                      << " Q=" << history[i].node->Q() << std::endl;
+          }
+          break;
+        }
+      }
+    }
+  }
 
   void ThreadRun(int thread_id) {
     // Only print the board using ANSI colors if stderr is sent to the
@@ -301,7 +348,7 @@ class SelfPlayer {
             << "Manually changing the model during selfplay is not supported. "
                "Use --checkpoint_dir and --engine=remote to perform inference "
                "using the most recent checkpoint from training.";
-        game_options.Init(thread_id);
+        game_options.Init(thread_id, &rnd_);
         player = absl::make_unique<MctsPlayer>(dual_net_factory_->New(),
                                                game_options.player_options);
       }
@@ -311,14 +358,16 @@ class SelfPlayer {
       while (!player->game_over()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
+          const auto& position = player->root()->position;
           std::cerr << player->root()->position.ToPrettyString(use_ansi_colors);
+          std::cerr << "Move: " << position.n()
+                    << " Captures X: " << position.num_captures()[0]
+                    << " O: " << position.num_captures()[1] << std::endl;
           std::cerr << player->root()->Describe() << std::endl;
         }
         player->PlayMove(move);
       }
-      std::cerr << player->result_string() << std::endl;
-      std::cout << "Playing game: "
-                << absl::ToDoubleSeconds(absl::Now() - start_time) << std::endl;
+      LogEndGameInfo(player.get(), absl::Now() - start_time);
 
       // Write the outputs.
       auto now = absl::Now();
