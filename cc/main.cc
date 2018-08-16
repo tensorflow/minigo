@@ -286,7 +286,7 @@ class SelfPlayer {
   };
 
   void LogEndGameInfo(MctsPlayer* player, absl::Duration game_time) {
-    std::cerr << player->result_string() << std::endl;
+    std::cout << player->result_string() << std::endl;
     std::cout << "Playing game: " << absl::ToDoubleSeconds(game_time)
               << std::endl;
 
@@ -367,7 +367,13 @@ class SelfPlayer {
         }
         player->PlayMove(move);
       }
-      LogEndGameInfo(player.get(), absl::Now() - start_time);
+
+      {
+        // Log the end game info with the mutex held multiple lines being
+        // interleaved.
+        absl::MutexLock lock(&mutex_);
+        LogEndGameInfo(player.get(), absl::Now() - start_time);
+      }
 
       // Write the outputs.
       auto now = absl::Now();
