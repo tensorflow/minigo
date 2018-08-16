@@ -263,6 +263,9 @@ class MCTSNode(object):
         probs = self.child_N
         if squash:
             probs = probs ** .98
+        sum_probs = np.sum(probs)
+        if sum_probs == 0:
+            return probs
         return probs / np.sum(probs)
 
     def most_visited_path_nodes(self):
