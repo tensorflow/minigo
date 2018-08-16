@@ -289,6 +289,7 @@ class SelfPlayer {
     std::cout << player->result_string() << std::endl;
     std::cout << "Playing game: " << absl::ToDoubleSeconds(game_time)
               << std::endl;
+    std::cout << "Played moves: " << player->root()->position.n() << std::endl;
 
     const auto& history = player->history();
     if (history.empty()) {
