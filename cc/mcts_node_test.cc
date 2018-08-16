@@ -75,9 +75,9 @@ TEST(MctsNodeTest, SelectLeaf) {
 
   root.SelectLeaf()->IncorporateResults(probs, 0, &root);
 
-  EXPECT_EQ(root.position.to_play(), Color::kWhite);
+  EXPECT_EQ(Color::kWhite, root.position.to_play());
   auto* leaf = root.SelectLeaf();
-  EXPECT_EQ(leaf, root.children[c].get());
+  EXPECT_EQ(root.children[c].get(), leaf);
 }
 
 // Verifies IncorporateResults and BackupValue.
@@ -96,16 +96,16 @@ TEST(MctsNodeTest, BackupIncorporateResults) {
   leaf->IncorporateResults(probs, -1, &root);  // white wins!
 
   // Root was visited twice: first at the root, then at this child.
-  EXPECT_EQ(root.N(), 2);
+  EXPECT_EQ(2, root.N());
   // Root has 0 as a prior and two visits with value 0, -1.
-  EXPECT_FLOAT_EQ(root.Q(), -1.0 / 3);  // average of 0, 0, -1
+  EXPECT_FLOAT_EQ(-1.0 / 3, root.Q());  // average of 0, 0, -1
   // Leaf should have one visit
-  EXPECT_EQ(root.child_N(leaf->move), 1);
-  EXPECT_EQ(leaf->N(), 1);
+  EXPECT_EQ(1, root.child_N(leaf->move));
+  EXPECT_EQ(1, leaf->N());
   // And that leaf's value had its parent's Q (0) as a prior, so the Q
   // should now be the average of 0, -1
-  EXPECT_FLOAT_EQ(root.child_Q(leaf->move), -0.5);
-  EXPECT_FLOAT_EQ(leaf->Q(), -0.5);
+  EXPECT_FLOAT_EQ(-0.5, root.child_Q(leaf->move));
+  EXPECT_FLOAT_EQ(-0.5, leaf->Q());
 
   // We're assuming that SelectLeaf() returns a leaf like:
   //   root
@@ -114,21 +114,23 @@ TEST(MctsNodeTest, BackupIncorporateResults) {
   //       |
   //       leaf2
   // which happens in this test because root is W to play and leaf was a W win.
-  EXPECT_EQ(root.position.to_play(), Color::kWhite);
+  EXPECT_EQ(Color::kWhite, root.position.to_play());
   auto* leaf2 = root.SelectLeaf();
-  leaf2->IncorporateResults(probs, -0.2, &root);  // another white semi-win
-  EXPECT_EQ(root.N(), 3);
-  // average of 0, 0, -1, -0.2
-  EXPECT_FLOAT_EQ(root.Q(), -0.3);
+  ASSERT_EQ(leaf, leaf2->parent);
 
-  EXPECT_EQ(leaf->N(), 2);
-  EXPECT_EQ(leaf2->N(), 1);
+  leaf2->IncorporateResults(probs, -0.2, &root);  // another white semi-win
+  EXPECT_EQ(3, root.N());
+  // average of 0, 0, -1, -0.2
+  EXPECT_FLOAT_EQ(-0.3, root.Q());
+
+  EXPECT_EQ(2, leaf->N());
+  EXPECT_EQ(1, leaf2->N());
   // average of 0, -1, -0.2
-  EXPECT_FLOAT_EQ(leaf->Q(), root.child_Q(leaf->move));
-  EXPECT_FLOAT_EQ(leaf->Q(), -0.4);
+  EXPECT_FLOAT_EQ(root.child_Q(leaf->move), leaf->Q());
+  EXPECT_FLOAT_EQ(-0.4, leaf->Q());
   // average of -1, -0.2
-  EXPECT_FLOAT_EQ(leaf->child_Q(leaf2->move), -0.6);
-  EXPECT_FLOAT_EQ(leaf2->Q(), -0.6);
+  EXPECT_FLOAT_EQ(-0.6, leaf->child_Q(leaf2->move));
+  EXPECT_FLOAT_EQ(-0.6, leaf2->Q());
 }
 
 TEST(MctsNodeTest, DoNotExplorePastFinish) {
@@ -151,7 +153,7 @@ TEST(MctsNodeTest, DoNotExplorePastFinish) {
   second_pass->IncorporateEndGameResult(value, &root);
   auto* node_to_explore = second_pass->SelectLeaf();
   // should just stop exploring at the end position.
-  EXPECT_EQ(node_to_explore, second_pass);
+  EXPECT_EQ(second_pass, node_to_explore);
 }
 
 TEST(MctsNodeTest, AddChild) {
@@ -162,7 +164,7 @@ TEST(MctsNodeTest, AddChild) {
   Coord c = Coord::FromKgs("B9");
   auto* child = root.MaybeAddChild(c);
   EXPECT_EQ(1, root.children.count(c));
-  EXPECT_EQ(child->parent, &root);
+  EXPECT_EQ(&root, child->parent);
   EXPECT_EQ(child->move, c);
 }
 
@@ -205,7 +207,7 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   // this should not throw an error...
   auto* leaf = root.SelectLeaf();
   // the returned leaf should not be the illegal move
-  EXPECT_NE(leaf->move, 1);
+  EXPECT_NE(1, leaf->move);
 
   // and even after injecting noise, we should still not select an illegal move
   Random rnd(1);
@@ -214,7 +216,7 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
     rnd.Uniform(0, 1, &noise);
     root.InjectNoise(noise);
     leaf = root.SelectLeaf();
-    EXPECT_NE(leaf->move, 1);
+    EXPECT_NE(1, leaf->move);
   }
 }
 

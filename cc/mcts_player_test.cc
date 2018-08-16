@@ -221,7 +221,7 @@ TEST(MctsPlayerTest, DontPassIfLosing) {
 
   // Search should converge on D9 as only winning move.
   auto best_move = ArgMax(root->edges, MctsNode::CmpN);
-  ASSERT_EQ(best_move, Coord::FromKgs("D9"));
+  ASSERT_EQ(Coord::FromKgs("D9"), best_move);
   // D9 should have a positive value.
   EXPECT_LT(0, root->child_Q(best_move));
   EXPECT_LE(20, root->N());

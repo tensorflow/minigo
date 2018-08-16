@@ -43,7 +43,7 @@ TEST(RandomTest, TestUniformArray) {
     avg[i] = sum[i] / 10000;
   }
   for (const auto& a : avg) {
-    EXPECT_NEAR(a, 7.5, 0.05);
+    EXPECT_NEAR(7.5, a, 0.05);
   }
 }
 
@@ -54,7 +54,7 @@ TEST(RandomTest, TestOperator) {
     sum += rnd();
   }
   float avg = sum / 10000;
-  EXPECT_NEAR(avg, 0.5, 0.01);
+  EXPECT_NEAR(0.5, avg, 0.01);
 }
 
 TEST(RandomTest, Dirichlet) {
