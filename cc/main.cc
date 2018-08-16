@@ -369,8 +369,8 @@ class SelfPlayer {
       }
 
       {
-        // Log the end game info with the mutex held multiple lines being
-        // interleaved.
+        // Log the end game info with the shared mutex held to prevent the
+        // outputs from multiple threads being interleaved.
         absl::MutexLock lock(&mutex_);
         LogEndGameInfo(player.get(), absl::Now() - start_time);
       }
