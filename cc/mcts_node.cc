@@ -49,6 +49,45 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
   }
 }
 
+Coord MctsNode::GetMostVisitedMove() const {
+  // Find the set of moves with the largest N.
+  inline_vector<Coord, kNumMoves> moves;
+  moves.push_back(0);
+  int best_N = child_N(0);
+  for (int i = 1; i < kNumMoves; ++i) {
+    int cn = child_N(i);
+    if (cn > best_N) {
+      moves.clear();
+      moves.push_back(i);
+      best_N = cn;
+    } else if (cn == best_N) {
+      moves.push_back(i);
+    }
+  }
+
+  // If there's only one move with the largest N, we're done.
+  if (moves.size() == 1) {
+    return moves[0];
+  }
+
+  // Otherwise, break score using the child action score.
+  float to_play = position.to_play() == Color::kBlack ? 1 : -1;
+  float U_scale = kPuct * std::sqrt(1.0f + N());
+
+  Coord c = moves[0];
+  float best_cas =
+      CalculateSingleMoveChildActionScore(to_play, U_scale, moves[0]);
+  for (int i = 0; i < moves.size(); ++i) {
+    float cas = CalculateSingleMoveChildActionScore(to_play, U_scale, moves[i]);
+    if (cas > best_cas) {
+      best_cas = cas;
+      c = moves[i];
+    }
+  }
+
+  return c;
+}
+
 std::string MctsNode::Describe() const {
   using std::setprecision;
   using std::setw;
@@ -97,9 +136,7 @@ std::vector<Coord> MctsNode::MostVisitedPath() const {
   std::vector<Coord> path;
   const auto* node = this;
   while (!node->children.empty()) {
-    int next_kid = ArgMax(
-        node->edges,
-        [](const EdgeStats& a, const EdgeStats& b) { return a.N < b.N; });
+    Coord next_kid = node->GetMostVisitedMove();
     path.push_back(next_kid);
     auto it = node->children.find(next_kid);
     MG_CHECK(it != node->children.end());
@@ -114,10 +151,9 @@ std::string MctsNode::MostVisitedPathString() const {
   for (Coord c : MostVisitedPath()) {
     auto it = node->children.find(c);
     MG_CHECK(it != node->children.end());
-
+    node = it->second.get();
     oss << node->move.ToKgs() << " (" << static_cast<int>(node->N())
         << ") ==> ";
-    node = it->second.get();
   }
   oss << std::fixed << std::setprecision(5) << "Q: " << node->Q();
   return oss.str();
@@ -286,9 +322,7 @@ std::array<float, kNumMoves> MctsNode::CalculateChildActionScore() const {
 
   std::array<float, kNumMoves> result;
   for (int i = 0; i < kNumMoves; ++i) {
-    float Q = child_Q(i);
-    float U = U_scale * child_P(i) / (1 + child_N(i));
-    result[i] = Q * to_play + U - 1000.0f * illegal_moves[i];
+    result[i] = CalculateSingleMoveChildActionScore(to_play, U_scale, i);
   }
   return result;
 }

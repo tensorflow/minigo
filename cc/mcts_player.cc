@@ -115,16 +115,17 @@ void MctsPlayer::NewGame() {
 Coord MctsPlayer::SuggestMove() {
   auto start = absl::Now();
 
-  std::array<float, kNumMoves> noise;
-  if (options_.inject_noise) {
-    // In order to be able to inject noise into the root node, we need to first
-    // expand it. The root will always be expanded unless this is the first time
-    // SuggestMove has been called for a game.
-    if (!root_->is_expanded) {
-      auto* first_node = root_->SelectLeaf();
-      ProcessLeaves({&first_node, 1});
-    }
+  // In order to correctly count the number of reads performed, the root node
+  // must be expanded. The root will always be expanded unless this is the first
+  // time SuggestMove has been called for a game, or PlayMove was called without
+  // a prior call to SuggestMove.
+  if (!root_->is_expanded) {
+    auto* first_node = root_->SelectLeaf();
+    ProcessLeaves({&first_node, 1});
+  }
 
+  if (options_.inject_noise) {
+    std::array<float, kNumMoves> noise;
     rnd_.Dirichlet(kDirichletAlpha, &noise);
     root_->InjectNoise(noise);
   }
@@ -167,10 +168,9 @@ Coord MctsPlayer::SuggestMove() {
 
 Coord MctsPlayer::PickMove() {
   if (root_->position.n() >= temperature_cutoff_) {
-    // Choose the most visited node.
-    Coord c = ArgMax(root_->edges, MctsNode::CmpN);
+    Coord c = root_->GetMostVisitedMove();
     if (options_.verbose) {
-      std::cerr << "Picked arg_max " << c << "\n";
+      std::cerr << "Picked arg_max " << c << std::endl;
     }
     return c;
   }
@@ -179,18 +179,19 @@ Coord MctsPlayer::PickMove() {
   // randomly choosing to pass early on in the game.
   std::array<float, kN * kN> cdf;
 
-  cdf[0] = root_->child_N(0);
-  for (size_t i = 1; i < cdf.size(); ++i) {
-    cdf[i] = cdf[i - 1] + root_->child_N(i);
-  }
-  float norm = 1 / cdf[cdf.size() - 1];
+  // For moves before the temperature cutoff, exponentiate the probabilities by
+  // a temperature slightly larger than unity to encourage diversity in early
+  // play and hopefully to move away from 3-3s.
   for (size_t i = 0; i < cdf.size(); ++i) {
-    cdf[i] *= norm;
+    cdf[i] = std::pow(root_->child_N(i), kVisitCountSquash);
+  }
+  for (size_t i = 1; i < cdf.size(); ++i) {
+    cdf[i] += cdf[i - 1];
   }
   float e = rnd_();
-  Coord c = SearchSorted(cdf, e);
+  Coord c = SearchSorted(cdf, e * cdf.back());
   if (options_.verbose) {
-    std::cerr << "Picked rnd(" << e << ") " << c << "\n";
+    std::cerr << "Picked rnd(" << e << ") " << c << std::endl;
   }
   MG_DCHECK(root_->child_N(c) != 0);
   return c;
@@ -312,13 +313,10 @@ void MctsPlayer::PushHistory(Coord c) {
   }
 
   // Convert child visit counts to a probability distribution, pi.
-  // For moves before the temperature cutoff, exponentiate the probabilities by
-  // a temperature slightly larger than unity to encourage diversity in early
-  // play and hopefully to move away from 3-3s.
   if (root_->position.n() < temperature_cutoff_) {
-    // Squash counts before normalizing.
+    // Squash counts before normalizing to match softpick behavior in PickMove.
     for (int i = 0; i < kNumMoves; ++i) {
-      history.search_pi[i] = std::pow(root_->child_N(i), 0.98);
+      history.search_pi[i] = std::pow(root_->child_N(i), kVisitCountSquash);
     }
   } else {
     for (int i = 0; i < kNumMoves; ++i) {

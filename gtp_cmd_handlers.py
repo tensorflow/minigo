@@ -277,7 +277,6 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
 
         root = self._player.get_root()
         dbg("")
-        dbg(root.describe())
         if result != "resign":
             dbg("")
             dbg(root.position.__str__(colors=False))

@@ -42,6 +42,11 @@ def play_match(black_net, white_net, games, sgf_dir, verbosity):
     black_name = os.path.basename(black_net.save_file)
     white_name = os.path.basename(white_net.save_file)
 
+    for player in [black, white]:
+        first_node = player.root.select_leaf()
+        prob, val = network.run(first_node.position)
+        first_node.incorporate_results(prob, val, first_node)
+
     for i in range(games):
         num_move = 0  # The move number of the current game
 

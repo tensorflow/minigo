@@ -73,7 +73,7 @@ void Position::PlayMove(Coord c, Color color) {
   } else {
     to_play_ = color;
   }
-  MG_CHECK(IsMoveLegal(c));
+  MG_CHECK(IsMoveLegal(c)) << c;
 
   AddStoneToBoard(c, color);
 

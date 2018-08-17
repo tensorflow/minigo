@@ -67,6 +67,10 @@ class MctsNode {
     return kPuct * std::sqrt(1.0f + N()) * child_P(i) / (1 + child_N(i));
   }
 
+  // Finds the best move by visit count, N. Ties are broken using the child
+  // action score.
+  Coord GetMostVisitedMove() const;
+
   std::string Describe() const;
   std::string MostVisitedPathString() const;
   std::vector<Coord> MostVisitedPath() const;
@@ -111,6 +115,13 @@ class MctsNode {
   // TODO(tommadams): Validate returning by value has the same performance as
   // passing a pointer to the output array.
   std::array<float, kNumMoves> CalculateChildActionScore() const;
+
+  float CalculateSingleMoveChildActionScore(float to_play, float U_scale,
+                                            int i) const {
+    float Q = child_Q(i);
+    float U = U_scale * child_P(i) / (1 + child_N(i));
+    return Q * to_play + U - 1000.0f * illegal_moves[i];
+  }
 
   MctsNode* MaybeAddChild(Coord c);
 

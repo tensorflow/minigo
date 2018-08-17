@@ -110,11 +110,7 @@ DEFINE_string(model, "",
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
-DEFINE_int32(parallel_games, 32,
-             "Number of games to play in parallel. For performance reasons, "
-             "parallel_games should equal games_per_inference * 2 because this "
-             "allows the transfer of inference requests & responses to be "
-             "overlapped with model evaluation.");
+DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
