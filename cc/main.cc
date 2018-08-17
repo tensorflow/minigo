@@ -410,7 +410,11 @@ class SelfPlayer {
     }
     uint64_t new_flags_timestamp;
     TF_CHECK_OK(tf_utils::GetModTime(FLAGS_flags_path, &new_flags_timestamp));
+    std::cerr << "flagfile:" << FLAGS_flags_path
+              << " old_ts:" << absl::FromUnixMicros(flags_timestamp_)
+              << " new_ts:" << absl::FromUnixMicros(new_flags_timestamp);
     if (new_flags_timestamp == flags_timestamp_) {
+      std::cerr << " skipping" << std::endl;
       return;
     }
 
@@ -418,7 +422,11 @@ class SelfPlayer {
     std::string contents;
     TF_CHECK_OK(tf_utils::ReadFile(FLAGS_flags_path, &contents));
 
-    for (auto line : absl::StrSplit(contents, '\n')) {
+    std::vector<std::string> lines =
+        absl::StrSplit(contents, '\n', absl::SkipEmpty());
+    std::cerr << " loaded flags:" << absl::StrJoin(lines, " ") << std::endl;
+
+    for (absl::string_view line : lines) {
       std::pair<absl::string_view, absl::string_view> line_comment =
           absl::StrSplit(line, absl::MaxSplits('#', 1));
       line = absl::StripAsciiWhitespace(line_comment.first);

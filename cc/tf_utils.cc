@@ -125,7 +125,7 @@ tensorflow::Status ReadFile(const std::string& path, std::string* contents) {
 tensorflow::Status GetModTime(const std::string& path, uint64_t* mtime_usec) {
   tensorflow::FileStatistics stat;
   TF_RETURN_IF_ERROR(tensorflow::Env::Default()->Stat(path, &stat));
-  *mtime_usec = static_cast<uint64_t>(stat.mtime_nsec);
+  *mtime_usec = static_cast<uint64_t>(stat.mtime_nsec / 1000);
   return tensorflow::Status::OK();
 }
 
