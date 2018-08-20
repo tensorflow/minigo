@@ -242,6 +242,40 @@ TEST(MctsNodeTest, DontPickUnexpandedChild) {
   EXPECT_EQ(leaf1, leaf2);
 }
 
+// Verifies that action score is used as a tie-breaker to choose between moves
+// with the same visit count when selecting the best one.
+// This test uses raw indices here instead of KGS coords to make it clear that
+// without using action score as a tie-breaker, the move with the lower index
+// would be selected by GetMostVisitedMove.
+TEST(MctsNodeTest, GetMostVisitedPath) {
+  // Give two moves a higher probability.
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.001;
+  }
+  probs[15] = 0.5;
+  probs[16] = 0.6;
+
+  MctsNode::EdgeStats root_stats;
+  auto board = TestablePosition("", Color::kBlack);
+  MctsNode root(&root_stats, board);
+  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+
+  // We should select the highest probabilty first.
+  auto* leaf1 = root.SelectLeaf();
+  EXPECT_EQ(Coord(16), leaf1->move);
+  leaf1->AddVirtualLoss(&root);
+
+  // Then the second highest probability.
+  auto* leaf2 = root.SelectLeaf();
+  EXPECT_EQ(Coord(15), leaf2->move);
+  leaf1->RevertVirtualLoss(&root);
+
+  // Both Coord(15) and Coord(16) have visit counts of 1.
+  // Coord(16) should be selected because of it's higher action score.
+  EXPECT_EQ(Coord(16), root.GetMostVisitedMove());
+}
+
 // Verifies that even when one move is hugely more likely than all the others,
 // SelectLeaf will eventually start exploring other moves given enough
 // iterations.
