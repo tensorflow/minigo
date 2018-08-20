@@ -268,7 +268,7 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
             msg["q"] = root.parent.Q
         else:
             msg["q"] = 0
-        dbg("mg-gamestate:%s", json.dumps(msg, sort_keys=True))
+        dbg("mg-gamestate:%s" % json.dumps(msg, sort_keys=True))
 
     def cmd_genmove(self, color=None):
         start = time.time()
@@ -276,14 +276,12 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
         duration = time.time() - start
 
         root = self._player.get_root()
-        dbg("")
         if result != "resign":
             dbg("")
             dbg(root.position.__str__(colors=False))
-            dbg("%d readouts, %.3f s/100. (%.2f sec)",
+            dbg("%d readouts, %.3f s/100. (%.2f sec)" % (
                 self._player.get_num_readouts(),
-                duration / self._player.get_num_readouts() * 100.0,
-                duration)
+                duration / self._player.get_num_readouts() * 100.0, duration))
             dbg("")
             if root.is_done():
                 self._player.set_result(
@@ -319,15 +317,15 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
                 path.append(leaf.fmove)
                 leaf = leaf.parent
             path = [coords.to_kgs(coords.from_flat(m)) for m in reversed(path)]
-            dbg("mg-search:%s", " ".join(path))
+            dbg("mg-search:%s" % " ".join(path))
 
         q = root.child_Q - root.Q
         q = ['%.3f' % x for x in q]
-        dbg("mg-q:%s", " ".join(q))
+        dbg("mg-q:%s" % " ".join(q))
 
         n = ['%d' % x for x in root.child_N]
-        dbg("mg-n:%s", " ".join(n))
+        dbg("mg-n:%s" % " ".join(n))
 
         nodes = root.most_visited_path_nodes()
         path = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
-        dbg("mg-pv:%s", " ".join(path))
+        dbg("mg-pv:%s" % " ".join(path))
