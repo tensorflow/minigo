@@ -94,6 +94,7 @@ minigo_cc_library(
     name = "inference_server",
     srcs = ["inference_server.cc"],
     hdrs = ["inference_server.h"],
+    tags = ["manual"],
     deps = [
         ":dual_net",
         "//cc:thread_safe_queue",
@@ -109,6 +110,7 @@ minigo_cc_library(
     name = "tf_dual_net",
     srcs = ["tf_dual_net.cc"],
     hdrs = ["tf_dual_net.h"],
+    tags = ["manual"],
     deps = [
         ":dual_net",
         "//cc:base",
@@ -123,6 +125,7 @@ minigo_cc_library(
     name = "lite_dual_net",
     srcs = ["lite_dual_net.cc"],
     hdrs = ["lite_dual_net.h"],
+    tags = ["manual"],
     deps = [
         ":dual_net",
         "//cc:base",
