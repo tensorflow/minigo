@@ -50,6 +50,8 @@ DEFINE_bool(use_tpu, true,
             "remote_inference=false.");
 DEFINE_string(tpu_name, "", "Cloud TPU name, e.g. grpc://10.240.2.2:8470.");
 DEFINE_int32(conv_width, 256, "Width of the model's convolution filters.");
+DEFINE_int32(fc_width, 256,
+             "Width of the model's fully connected layer in value head.");
 DEFINE_int32(parallel_tpus, 8,
              "If model=remote, the number of TPU cores to run on in parallel.");
 DEFINE_int32(port, 50051, "The port opened by the InferenceService server.");
@@ -74,6 +76,7 @@ class RemoteDualNetFactory : public DualNetFactory {
           absl::StrCat("--use_tpu=", FLAGS_use_tpu),
           absl::StrCat("--tpu_name=", FLAGS_tpu_name),
           absl::StrCat("--conv_width=", FLAGS_conv_width),
+          absl::StrCat("--fc_width=", FLAGS_fc_width),
           absl::StrCat("--parallel_tpus=", FLAGS_parallel_tpus),
       };
       auto cmd = absl::StrJoin(cmd_parts, " ");
