@@ -136,6 +136,36 @@ def convert(load_file, dest_file):
     tf.reset_default_graph()
 
 
+def add_quant_ops(load_file, dest_file):
+    flags.FLAGS.quantize = False
+
+    sess = tf.Session()
+    with sess.graph.as_default():
+        # Load a checkpoint whose model doesn't contain quantization ops.
+        features, labels = dual_net.get_inference_input()
+        dual_net.model_fn(features, labels, tf.estimator.ModeKeys.TRAIN)
+        tf.train.Saver().restore(sess, load_file)
+
+        # Add quantization ops.
+        before_quant = set([n.name for n in sess.graph.as_graph_def().node])
+        tf.contrib.quantize.create_training_graph(
+            quant_delay=flags.FLAGS.quant_delay)
+        after_quant = set([n.name for n in sess.graph.as_graph_def().node])
+
+        # Initialize the new variables that were added to the graph.
+        quant_var_names = set([v for v in after_quant
+                               if v not in before_quant])
+        quant_vars = [v for v in tf.global_variables()
+                      if v.op.name in quant_var_names]
+        sess.run(tf.variables_initializer(quant_vars))
+
+        # Save.
+        tf.train.Saver().save(sess, dest_file)
+
+    sess.close()
+    tf.reset_default_graph()
+
+
 def freeze_graph(load_file):
     """ Loads a network and serializes just the inference parts for use by e.g. the C++ binary """
     n = dual_net.DualNetwork(load_file)
@@ -147,7 +177,7 @@ def freeze_graph(load_file):
 
 parser = argparse.ArgumentParser()
 argh.add_commands(parser, [bootstrap, train, train_dir, freeze_graph,
-                           evaluate, validate, convert])
+                           evaluate, validate, convert, add_quant_ops])
 
 if __name__ == '__main__':
     cloud_logging.configure()

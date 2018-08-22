@@ -235,7 +235,7 @@ def model_fn(features, labels, mode, params=None):
         if mode == tf.estimator.ModeKeys.TRAIN:
             tf.contrib.quantize.create_training_graph(
                 quant_delay=FLAGS.quant_delay)
-        elif mode == tf.estimator.ModeKeys.EVAL:
+        else:
             tf.contrib.quantize.create_eval_graph()
 
     optimizer = tf.train.MomentumOptimizer(learning_rate, FLAGS.sgd_momentum)
