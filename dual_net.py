@@ -365,14 +365,16 @@ def model_inference_fn(features, training):
         data_format="channels_last",
         use_bias=False)
 
+    my_relu = tf.nn.relu6 if FLAGS.quantize else tf.nn.relu
+
     def my_res_layer(inputs):
         int_layer1 = my_batchn(my_conv2d(inputs))
-        initial_output = tf.nn.relu(int_layer1)
+        initial_output = my_relu(int_layer1)
         int_layer2 = my_batchn(my_conv2d(initial_output))
-        output = tf.nn.relu(inputs + int_layer2)
+        output = my_relu(inputs + int_layer2)
         return output
 
-    initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
+    initial_output = my_relu(my_batchn(my_conv2d(features)))
 
     # the shared stack
     shared_output = initial_output
@@ -381,7 +383,7 @@ def model_inference_fn(features, training):
 
     # policy head
     policy_conv = my_conv2d(shared_output, filters=2, kernel_size=1)
-    policy_conv = tf.nn.relu(my_batchn(policy_conv, center=False, scale=False))
+    policy_conv = my_relu(my_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
         tf.reshape(policy_conv, [-1, 2 * go.N * go.N]),
         go.N * go.N + 1)
@@ -390,9 +392,9 @@ def model_inference_fn(features, training):
 
     # value head
     value_conv = my_conv2d(shared_output, filters=1, kernel_size=1)
-    value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
+    value_conv = my_relu(my_batchn(value_conv, center=False, scale=False))
 
-    value_fc_hidden = tf.nn.relu(tf.layers.dense(
+    value_fc_hidden = my_relu(tf.layers.dense(
         tf.reshape(value_conv, [-1, go.N * go.N]),
         FLAGS.fc_width))
     value_output = tf.nn.tanh(
