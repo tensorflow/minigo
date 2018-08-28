@@ -111,6 +111,9 @@ flags.DEFINE_integer(
     'summary_steps', default=256,
     help='Number of steps between logging summary scalars.')
 
+flags.DEFINE_integer(
+    'keep_checkpoint_max', default=5, help='Number of checkpoints to keep.')
+
 flags.register_multi_flags_validator(
     ['use_tpu', 'iterations_per_loop', 'summary_steps'],
     lambda flags: (not flags['use_tpu'] or
@@ -408,7 +411,9 @@ def get_estimator(working_dir):
     if FLAGS.use_tpu:
         return get_tpu_estimator(working_dir)
 
-    run_config = tf.estimator.RunConfig(save_summary_steps=FLAGS.summary_steps)
+    run_config = tf.estimator.RunConfig(
+        save_summary_steps=FLAGS.summary_steps,
+        keep_checkpoint_max=FLAGS.keep_checkpoint_max)
     return tf.estimator.Estimator(
         model_fn,
         model_dir=working_dir,
@@ -426,6 +431,7 @@ def get_tpu_estimator(working_dir):
         model_dir=working_dir,
         save_checkpoints_steps=max(1000, FLAGS.iterations_per_loop),
         save_summary_steps=FLAGS.summary_steps,
+        keep_checkpoint_max=FLAGS.keep_checkpoint_max,
         session_config=tf.ConfigProto(
             allow_soft_placement=True, log_device_placement=True),
         tpu_config=tpu_config.TPUConfig(
