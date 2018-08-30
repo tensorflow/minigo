@@ -28,11 +28,11 @@ MINIMUM_NEW_GAMES = 12000
 AVG_GAMES_PER_MODEL = 20000
 
 
-def pick_examples_from_tfrecord(filename, samples_per_game=4):
+def pick_examples_from_tfrecord(filename):
     protos = list(tf.python_io.tf_record_iterator(filename, READ_OPTS))
-    if len(protos) < 50:  # Filter games with less than 20 moves
-        return []
-    choices = random.sample(protos, min(len(protos), samples_per_game))
+
+    number_samples = np.random.poisson(len(protos) / 50.0)
+    choices = random.sample(protos, min(len(protos), number_samples))
 
     def make_example(protostring):
         e = tf.train.Example()
@@ -41,8 +41,8 @@ def pick_examples_from_tfrecord(filename, samples_per_game=4):
     return list(map(make_example, choices))
 
 
-def choose(game, samples_per_game=4):
-    examples = pick_examples_from_tfrecord(game, samples_per_game)
+def choose(game):
+    examples = pick_examples_from_tfrecord(game)
     timestamp = file_timestamp(game)
     return [(timestamp, ex) for ex in examples]
 
@@ -56,12 +56,10 @@ def _ts_to_str(timestamp):
 
 
 class ExampleBuffer():
-    def __init__(self, max_size=2**21, samples_per_game=4):
+    def __init__(self, max_size=2**21):
         self.examples = deque(maxlen=max_size)
         self.max_size = max_size
         self.samples_per_game = samples_per_game
-        self.func = functools.partial(
-            choose, samples_per_game=self.samples_per_game)
         self.total_updates = 0
 
     def parallel_fill(self, games, threads=8):
@@ -73,7 +71,7 @@ class ExampleBuffer():
             games = games[-max_games:]
 
         with mp.Pool(threads) as pool:
-            res = tqdm(pool.imap(self.func, games), total=len(games))
+            res = tqdm(pool.imap(choose, games), total=len(games))
             self.examples.extend(itertools.chain.from_iterable(res))
         print("Got", len(self.examples), "examples")
 
@@ -91,7 +89,7 @@ class ExampleBuffer():
                 print("Found {}/{} new games".format(
                     num_new_games, len(new_games)))
                 self.total_updates += num_new_games
-            self.examples.extend(self.func(game))
+            self.examples.extend(choose(game))
         if first_new_game is None:
             print("No new games", file_timestamp(new_games[-1]), self.examples[-1][0])
 
