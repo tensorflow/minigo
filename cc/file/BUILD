@@ -7,12 +7,12 @@ licenses(["notice"])  # Apache License 2.0
 cc_library(
     name = "file",
     srcs = [
-        "filesystem.cc",
         "path.cc",
+        "util.cc",
     ],
     hdrs = [
-        "filesystem.h",
         "path.h",
+        "util.h",
     ],
     deps = [
         "@com_google_absl//absl/strings",

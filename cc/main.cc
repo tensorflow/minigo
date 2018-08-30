@@ -37,14 +37,13 @@
 #include "cc/check.h"
 #include "cc/constants.h"
 #include "cc/dual_net/factory.h"
-#include "cc/file/filesystem.h"
 #include "cc/file/path.h"
+#include "cc/file/util.h"
 #include "cc/gtp_player.h"
 #include "cc/init.h"
 #include "cc/mcts_player.h"
 #include "cc/random.h"
 #include "cc/sgf.h"
-#include "cc/tf_utils.h"
 #include "gflags/gflags.h"
 
 // Game options flags.
@@ -213,7 +212,7 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
   auto sgf_str = sgf::CreateSgfString(moves, options);
 
   auto output_path = file::JoinPath(output_dir, output_name + ".sgf");
-  TF_CHECK_OK(tf_utils::WriteFile(output_path, sgf_str));
+  MG_CHECK(file::WriteFile(output_path, sgf_str));
 }
 
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
@@ -405,7 +404,7 @@ class SelfPlayer {
       return;
     }
     uint64_t new_flags_timestamp;
-    TF_CHECK_OK(tf_utils::GetModTime(FLAGS_flags_path, &new_flags_timestamp));
+    MG_CHECK(file::GetModTime(FLAGS_flags_path, &new_flags_timestamp));
     std::cerr << "flagfile:" << FLAGS_flags_path
               << " old_ts:" << absl::FromUnixMicros(flags_timestamp_)
               << " new_ts:" << absl::FromUnixMicros(new_flags_timestamp);
@@ -416,7 +415,7 @@ class SelfPlayer {
 
     flags_timestamp_ = new_flags_timestamp;
     std::string contents;
-    TF_CHECK_OK(tf_utils::ReadFile(FLAGS_flags_path, &contents));
+    MG_CHECK(file::ReadFile(FLAGS_flags_path, &contents));
 
     std::vector<std::string> lines =
         absl::StrSplit(contents, '\n', absl::SkipEmpty());

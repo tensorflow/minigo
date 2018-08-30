@@ -38,21 +38,6 @@ tensorflow::Example MakeTfExample(const DualNet::BoardFeatures& features,
 void WriteTfExamples(const std::string& path,
                      absl::Span<const tensorflow::Example> examples);
 
-// Uses Tensorflow to write a file in one shot. This allows writing to GCS, etc
-// when Tensorflow is compiled with that support.
-__attribute__((warn_unused_result)) tensorflow::Status WriteFile(
-    const std::string& path, absl::string_view contents);
-
-// Uses Tensorflow to read a file in one shot. This allows reading from GCS, etc
-// when Tensorflow is compiled with that support.
-__attribute__((warn_unused_result)) tensorflow::Status ReadFile(
-    const std::string& path, std::string* contents);
-
-// Uses Tensorflow to read the modification time for a file. This allows reading
-// from GCS, etc when Tensorflow is compiled with that support.
-__attribute__((warn_unused_result)) tensorflow::Status GetModTime(
-    const std::string& path, uint64_t* mtime_usec);
-
 }  // namespace tf_utils
 }  // namespace minigo
 

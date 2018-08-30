@@ -85,49 +85,5 @@ void WriteTfExamples(const std::string& path,
   TF_CHECK_OK(file->Close());
 }
 
-tensorflow::Status WriteFile(const std::string& path,
-                             absl::string_view contents) {
-  tensorflow::Status status;
-
-  std::unique_ptr<tensorflow::WritableFile> file;
-  status = tensorflow::Env::Default()->NewWritableFile(path, &file);
-  if (!status.ok()) {
-    return status;
-  }
-
-  // *sigh* absl::string_view doesn't automatically convert to
-  // tensorflow::StringPiece even though I'm pretty sure they're exactly the
-  // same.
-  status = file->Append({contents.data(), contents.size()});
-  if (!status.ok()) {
-    return status;
-  }
-
-  return file->Close();
-}
-
-tensorflow::Status ReadFile(const std::string& path, std::string* contents) {
-  auto* env = tensorflow::Env::Default();
-  tensorflow::uint64 size;
-  TF_RETURN_IF_ERROR(env->GetFileSize(path, &size));
-
-  std::unique_ptr<tensorflow::RandomAccessFile> file;
-  TF_RETURN_IF_ERROR(env->NewRandomAccessFile(path, &file));
-
-  contents->resize(size);
-  tensorflow::StringPiece s;
-  TF_RETURN_IF_ERROR(file->Read(0u, size, &s, &(*contents)[0]));
-  contents->resize(s.size());
-
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status GetModTime(const std::string& path, uint64_t* mtime_usec) {
-  tensorflow::FileStatistics stat;
-  TF_RETURN_IF_ERROR(tensorflow::Env::Default()->Stat(path, &stat));
-  *mtime_usec = static_cast<uint64_t>(stat.mtime_nsec / 1000);
-  return tensorflow::Status::OK();
-}
-
 }  // namespace tf_utils
 }  // namespace minigo

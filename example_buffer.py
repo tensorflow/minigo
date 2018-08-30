@@ -30,7 +30,7 @@ AVG_GAMES_PER_MODEL = 20000
 
 def pick_examples_from_tfrecord(filename, samples_per_game=4):
     protos = list(tf.python_io.tf_record_iterator(filename, READ_OPTS))
-    if len(protos) < 50:  # Filter games with less than 20 moves
+    if len(protos) < 50:  # Filter games with fewer than 50 moves
         return []
     choices = random.sample(protos, min(len(protos), samples_per_game))
 
@@ -93,7 +93,8 @@ class ExampleBuffer():
                 self.total_updates += num_new_games
             self.examples.extend(self.func(game))
         if first_new_game is None:
-            print("No new games", file_timestamp(new_games[-1]), self.examples[-1][0])
+            print("No new games", file_timestamp(
+                new_games[-1]), self.examples[-1][0])
 
     def flush(self, path):
         # random.shuffle on deque is O(n^2) convert to list for O(n)
@@ -141,7 +142,8 @@ def time_rsync(from_date,
     while from_date < dt.datetime.utcnow():
         src = os.path.join(source_dir, from_date.strftime("%Y-%m-%d-%H"))
         if tf.gfile.Exists(src):
-            _rsync_dir(src, os.path.join(dest_dir, from_date.strftime("%Y-%m-%d-%H")))
+            _rsync_dir(src, os.path.join(
+                dest_dir, from_date.strftime("%Y-%m-%d-%H")))
         from_date = from_date + dt.timedelta(hours=1)
 
 
@@ -201,7 +203,8 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
 
     hours = fsdb.get_hour_dirs()
     with timer("Rsync"):
-        time_rsync(min(dt.datetime.strptime(hours[-1], "%Y-%m-%d-%H/"), start_from))
+        time_rsync(min(dt.datetime.strptime(
+            hours[-1], "%Y-%m-%d-%H/"), start_from))
         start_from = dt.datetime.utcnow()
 
     hours = fsdb.get_hour_dirs()
@@ -210,7 +213,8 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     files = itertools.islice(files, get_window_size(chunk_to_make))
 
     models = fsdb.get_models()
-    buf.parallel_fill(list(itertools.chain.from_iterable(files)), threads=threads)
+    buf.parallel_fill(
+        list(itertools.chain.from_iterable(files)), threads=threads)
     print("Filled buffer, watching for new games")
 
     while (fsdb.get_latest_model() == models[-1] or buf.total_updates < MINIMUM_NEW_GAMES):
@@ -225,7 +229,8 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
             break
         time.sleep(30)
         if fsdb.get_latest_model() != models[-1]:
-            print("New model!  Waiting for games. Got", buf.total_updates, "new games so far")
+            print("New model!  Waiting for games. Got",
+                  buf.total_updates, "new games so far")
 
     latest = fsdb.get_latest_model()
     print("New model!", latest[1], "!=", models[-1][1])
