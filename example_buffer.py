@@ -33,12 +33,7 @@ def pick_examples_from_tfrecord(filename):
 
     number_samples = np.random.poisson(len(protos) / 50.0)
     choices = random.sample(protos, min(len(protos), number_samples))
-
-    def make_example(protostring):
-        e = tf.train.Example()
-        e.ParseFromString(protostring)
-        return e
-    return list(map(make_example, choices))
+    return choices
 
 
 def choose(game):
@@ -99,7 +94,7 @@ class ExampleBuffer():
         random.shuffle(self.examples)
         with timer("Writing examples to " + path):
             preprocessing.write_tf_examples(
-                path, [ex[1] for ex in self.examples])
+                path, [ex[1] for ex in self.examples], serialize=False)
         self.examples.clear()
         self.examples = deque(maxlen=self.max_size)
 
