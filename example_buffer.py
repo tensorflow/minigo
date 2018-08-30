@@ -13,6 +13,7 @@ from collections import deque
 from absl import flags
 import tensorflow as tf
 from tqdm import tqdm
+import numpy as np
 
 import preprocessing
 import dual_net
@@ -28,16 +29,16 @@ MINIMUM_NEW_GAMES = 12000
 AVG_GAMES_PER_MODEL = 20000
 
 
-def pick_examples_from_tfrecord(filename):
+def pick_examples_from_tfrecord(filename, sampling_frac=0.02):
     protos = list(tf.python_io.tf_record_iterator(filename, READ_OPTS))
 
-    number_samples = np.random.poisson(len(protos) / 50.0)
+    number_samples = np.random.poisson(len(protos) * sampling_frac)
     choices = random.sample(protos, min(len(protos), number_samples))
     return choices
 
 
-def choose(game):
-    examples = pick_examples_from_tfrecord(game)
+def choose(game, sampling_frac=0.02):
+    examples = pick_examples_from_tfrecord(game, sampling_frac)
     timestamp = file_timestamp(game)
     return [(timestamp, ex) for ex in examples]
 
@@ -51,22 +52,23 @@ def _ts_to_str(timestamp):
 
 
 class ExampleBuffer():
-    def __init__(self, max_size=2**21):
+    def __init__(self, max_size=2**21, sampling_frac=0.02):
         self.examples = deque(maxlen=max_size)
         self.max_size = max_size
-        self.samples_per_game = samples_per_game
+        self.sampling_frac = sampling_frac
+        self.func = functools.partial(choose, sampling_frac=sampling_frac)
         self.total_updates = 0
 
     def parallel_fill(self, games, threads=8):
         """ games is a list of .tfrecord.zz game records. """
         games.sort(key=os.path.basename)
         # A couple extra in case parsing fails
-        max_games = (self.max_size // self.samples_per_game) + 480
+        max_games = (self.max_size / self.sampling_frac / 12.5) + 480
         if len(games) > max_games:
             games = games[-max_games:]
 
         with mp.Pool(threads) as pool:
-            res = tqdm(pool.imap(choose, games), total=len(games))
+            res = tqdm(pool.imap(self.func, games), total=len(games))
             self.examples.extend(itertools.chain.from_iterable(res))
         print("Got", len(self.examples), "examples")
 
@@ -84,7 +86,7 @@ class ExampleBuffer():
                 print("Found {}/{} new games".format(
                     num_new_games, len(new_games)))
                 self.total_updates += num_new_games
-            self.examples.extend(choose(game))
+            self.examples.extend(self.func(game))
         if first_new_game is None:
             print("No new games", file_timestamp(new_games[-1]), self.examples[-1][0])
 
@@ -265,7 +267,7 @@ def make_chunk_for(output_dir=LOCAL_DIR,
                    model_num=1,
                    positions=dual_net.EXAMPLES_PER_GENERATION,
                    threads=8,
-                   samples_per_game=4):
+                   sampling_frac=0.02):
     """
     Explicitly make a golden chunk for a given model `model_num`
     (not necessarily the most recent one).
@@ -276,7 +278,7 @@ def make_chunk_for(output_dir=LOCAL_DIR,
     game_dir = game_dir or fsdb.selfplay_dir()
     ensure_dir_exists(output_dir)
     models = [model for model in fsdb.get_models() if model[0] < model_num]
-    buf = ExampleBuffer(positions, samples_per_game=samples_per_game)
+    buf = ExampleBuffer(positions, sampling_frac=sampling_frac)
     files = []
     for _, model in sorted(models, reverse=True):
         local_model_dir = os.path.join(local_dir, model)
@@ -285,7 +287,7 @@ def make_chunk_for(output_dir=LOCAL_DIR,
             _rsync_dir(os.path.join(game_dir, model), local_model_dir)
         files.extend(tf.gfile.Glob(os.path.join(local_model_dir, '*.zz')))
         print("{}: {} games".format(model, len(files)))
-        if len(files) * samples_per_game > positions:
+        if len(files) * 200 * sampling_frac > positions:
             break
 
     print("Filling from {} files".format(len(files)))
