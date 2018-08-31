@@ -78,7 +78,9 @@ flags.DEFINE_integer('shuffle_buffer_size', 2000,
 
 flags.DEFINE_bool('use_tpu', False, 'Whether to use TPU for training.')
 
-flags.DEFINE_bool('quantize', False, 'Whether to quantize the model.')
+flags.DEFINE_bool('quantize', False,
+                  'Whether create a quantized model. When loading a model for '
+                  'inference, this must match how the model was trained.')
 
 flags.DEFINE_integer('quant_delay', 700 * 1024,
                      'Number of training steps after which weights and '
