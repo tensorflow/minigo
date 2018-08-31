@@ -76,9 +76,9 @@ class DummyNet():
         return [self.fake_priors] * len(positions), [self.fake_value] * len(positions)
 
 
-def initialize_basic_player():
+def initialize_basic_player(position=None):
     player = MCTSPlayer(DummyNet())
-    player.initialize_game()
+    player.initialize_game(position)
     first_node = player.root.select_leaf()
     first_node.incorporate_results(
         *player.network.run(player.root.position), up_to=player.root)
@@ -237,7 +237,10 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player.initialize_game()
         self.assertEqual(0, player.root.N)
         self.assertFalse(player.root.is_expanded)
-        player.tree_search(parallel_readouts=4)
+        leaves = player.tree_search(parallel_readouts=4)
+        self.assertEqual(4, len(leaves))
+        self.assertEqual(player.root, leaves[0])
+
         self.assertNoPendingVirtualLosses(player.root)
         # Even though the root gets selected 4 times by tree search, its
         # final visit count should just be 1.
@@ -253,7 +256,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         player = MCTSPlayer(DummyNet(fake_priors=probs))
         pass_position = go.Position().pass_move()
         player.initialize_game(pass_position)
-        player.tree_search(parallel_readouts=1)
+        player.tree_search(parallel_readouts=8)
         self.assertNoPendingVirtualLosses(player.root)
 
     def test_only_check_game_end_once(self):
@@ -261,16 +264,13 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # and we have to decide whether to pass, it should be the first thing
         # we check, but not more than that.
 
-        white_passed_pos = go.Position(
-        ).play_move((3, 3)  # b plays
-                    ).play_move((3, 4)  # w plays
-                                ).play_move((4, 3)  # b plays
-                                            ).pass_move()  # w passes - if B passes too, B would lose by komi.
+        white_passed_pos = (go.Position()
+            .play_move((3, 3))  # b plays
+            .play_move((3, 4))  # w plays
+            .play_move((4, 3))  # b plays
+            .pass_move())  # w passes - if B passes too, B would lose by komi.
 
-        player = MCTSPlayer(DummyNet())
-        player.initialize_game(white_passed_pos)
-        # initialize the root
-        player.tree_search()
+        player = initialize_basic_player(white_passed_pos)
         # explore a child - should be a pass move.
         player.tree_search()
         pass_move = go.N * go.N
@@ -281,8 +281,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         self.assertEqual(player.root.child_N[pass_move], 1)
 
     def test_extract_data_normal_end(self):
-        player = MCTSPlayer(DummyNet())
-        player.initialize_game()
+        player = initialize_basic_player()
         player.tree_search()
         player.play_move(None)
         player.tree_search()
@@ -299,8 +298,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
                          player.result_string)
 
     def test_extract_data_resign_end(self):
-        player = MCTSPlayer(DummyNet())
-        player.initialize_game()
+        player = initialize_basic_player()
         player.tree_search()
         player.play_move((0, 0))
         player.tree_search()
