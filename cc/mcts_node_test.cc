@@ -36,6 +36,51 @@ static constexpr char kAlmostDoneBoard[] = R"(
     XXXXXOOOO
     XXXXOOOOO)";
 
+// Test puct and child action score calculation
+TEST(MctsNodeTest, UpperConfidenceBound) {
+  float epsilon = 1e-7;
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.02;
+  }
+
+  MctsNode::EdgeStats root_stats;
+  MctsNode root(&root_stats, TestablePosition("", Color::kBlack));
+  auto* leaf = root.SelectLeaf();
+  EXPECT_EQ(&root, leaf);
+  leaf->IncorporateResults(probs, 0.5, &root);
+
+  // 0.02 are normalized to 1/82
+  EXPECT_NEAR(1.0 / 82, root.child_P(0), epsilon);
+  EXPECT_NEAR(1.0 / 82, root.child_P(1), epsilon);
+  double puct_policy = kPuct * 1.0 / 82;
+  ASSERT_EQ(1, root.N());
+  EXPECT_NEAR(puct_policy * std::sqrt(1) / (1 + 0), root.child_U(0), epsilon);
+
+  leaf = root.SelectLeaf();
+  leaf->IncorporateResults(probs, 0.5, &root);
+  EXPECT_NE(&root, leaf);
+  EXPECT_EQ(&root, leaf->parent);
+  EXPECT_EQ(Coord(0), leaf->move);
+
+  // With the first child expanded.
+  ASSERT_EQ(2, root.N());
+  EXPECT_NEAR(puct_policy * std::sqrt(1) / (1 + 1), root.child_U(0), epsilon);
+  EXPECT_NEAR(puct_policy * std::sqrt(1) / (1 + 0), root.child_U(1), epsilon);
+
+  auto* leaf2 = root.SelectLeaf();
+  EXPECT_NE(&root, leaf2);
+  EXPECT_EQ(&root, leaf2->parent);
+  EXPECT_EQ(Coord(1), leaf2->move);
+  leaf2->IncorporateResults(probs, 0.5, &root);
+
+  // With the 2nd child expanded.
+  ASSERT_EQ(3, root.N());
+  EXPECT_NEAR(puct_policy * std::sqrt(2) / (1 + 1), root.child_U(0), epsilon);
+  EXPECT_NEAR(puct_policy * std::sqrt(2) / (1 + 1), root.child_U(1), epsilon);
+  EXPECT_NEAR(puct_policy * std::sqrt(2) / (1 + 0), root.child_U(2), epsilon);
+}
+
 // Verifies that no matter who is to play, when we know nothing else, the priors
 // should be respected, and the same move should be picked.
 TEST(MctsNodeTest, ActionFlipping) {
@@ -220,7 +265,7 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   }
 }
 
-TEST(MctsNodeTest, DontPickUnexpandedChild) {
+TEST(MctsNodeTest, DontTraverseUnexpandedChild) {
   std::array<float, kNumMoves> probs;
   for (float& prob : probs) {
     prob = 0.001;
@@ -232,6 +277,7 @@ TEST(MctsNodeTest, DontPickUnexpandedChild) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
+  root_stats.N = 5;
   root.SelectLeaf()->IncorporateResults(probs, 0, &root);
 
   auto* leaf1 = root.SelectLeaf();
@@ -239,7 +285,7 @@ TEST(MctsNodeTest, DontPickUnexpandedChild) {
   leaf1->AddVirtualLoss(&root);
 
   auto* leaf2 = root.SelectLeaf();
-  EXPECT_EQ(leaf1, leaf2);
+  EXPECT_EQ(leaf1, leaf2);  // assert we didn't go below the first leaf.
 }
 
 // Verifies that action score is used as a tie-breaker to choose between moves

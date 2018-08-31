@@ -13,12 +13,17 @@
 # limitations under the License.
 
 import copy
+import math
 import numpy as np
 
 import coords
 import go
 import mcts
 from tests import test_utils
+
+from absl import flags
+
+FLAGS = flags.FLAGS
 
 
 ALMOST_DONE_BOARD = test_utils.load_board('''
@@ -58,6 +63,49 @@ SEND_TWO_RETURN_ONE = go.Position(
 
 
 class TestMctsNodes(test_utils.MiniGoUnitTest):
+    def test_upper_bound_confidence(self):
+        probs = np.array([.02] * (go.N * go.N + 1))
+        root = mcts.MCTSNode(go.Position())
+        leaf = root.select_leaf()
+        self.assertEqual(root, leaf)
+        leaf.incorporate_results(probs, 0.5, root)
+
+        # 0.02 are normalized to 1/82
+        self.assertAlmostEqual(root.child_prior[0], 1/82)
+        self.assertAlmostEqual(root.child_prior[1], 1/82)
+        puct_policy = FLAGS.c_puct * 1/82
+        self.assertEqual(root.N, 1)
+        self.assertAlmostEqual(
+            root.child_U[0], puct_policy * math.sqrt(1) / (1 + 0))
+
+        leaf = root.select_leaf()
+        self.assertNotEqual(root, leaf)
+
+        # With the first child expanded.
+        self.assertEqual(root.N, 1)
+        self.assertAlmostEqual(
+            root.child_U[0], puct_policy * math.sqrt(1) / (1 + 0))
+        self.assertAlmostEqual(
+            root.child_U[1], puct_policy * math.sqrt(1) / (1 + 0))
+
+        leaf.add_virtual_loss(up_to=root)
+        leaf2 = root.select_leaf()
+
+        self.assertNotIn(leaf2, (root, leaf))
+
+        leaf.revert_virtual_loss(up_to=root)
+        leaf.incorporate_results(probs, 0.3, root)
+        leaf2.incorporate_results(probs, 0.3, root)
+
+        # With the 2nd child expanded.
+        self.assertEqual(root.N, 3)
+        self.assertAlmostEqual(
+            root.child_U[0], puct_policy * math.sqrt(2) / (1 + 1))
+        self.assertAlmostEqual(
+            root.child_U[1], puct_policy * math.sqrt(2) / (1 + 1))
+        self.assertAlmostEqual(
+            root.child_U[2], puct_policy * math.sqrt(2) / (1 + 0))
+
     def test_action_flipping(self):
         np.random.seed(1)
         probs = np.array([.02] * (go.N * go.N + 1))
@@ -183,6 +231,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         probs[17] = 0.999
         root = mcts.MCTSNode(go.Position())
         root.incorporate_results(probs, 0, root)
+        root.N = 5
         leaf1 = root.select_leaf()
         self.assertEqual(17, leaf1.fmove)
         leaf1.add_virtual_loss(up_to=root)

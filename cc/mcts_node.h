@@ -64,7 +64,8 @@ class MctsNode {
   float child_original_P(int i) const { return edges[i].original_P; }
   float child_Q(int i) const { return child_W(i) / (1 + child_N(i)); }
   float child_U(int i) const {
-    return kPuct * std::sqrt(1.0f + N()) * child_P(i) / (1 + child_N(i));
+    return kPuct * std::sqrt(std::max<float>(1, N() - 1)) * child_P(i) /
+           (1 + child_N(i));
   }
 
   // Finds the best move by visit count, N. Ties are broken using the child
@@ -94,14 +95,6 @@ class MctsNode {
                           float value, MctsNode* up_to);
 
   void IncorporateEndGameResult(float value, MctsNode* up_to);
-
-  // Sometimes, repeated calls to select_leaf return the same node.  This is
-  // rare and we're okay with the wasted computation to evaluate the position
-  // multiple times by the dual_net. But select_leaf has the side effect of
-  // incrementing visit counts. Since we want the value to only count once for
-  // the repeatedly selected node, we also have to revert the incremented visit
-  // counts.
-  void RevertVisits(MctsNode* up_to);
 
   void BackupValue(float value, MctsNode* up_to);
 
