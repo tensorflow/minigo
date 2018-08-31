@@ -14,8 +14,16 @@
 
 #include "cc/tf_utils.h"
 
+#include <array>
 #include <memory>
-#include "absl/types/span.h"
+
+#include "cc/constants.h"
+#include "cc/dual_net/dual_net.h"
+#include "cc/file/path.h"
+#include "cc/file/utils.h"
+#include "cc/mcts_player.h"
+#include "tensorflow/core/example/example.pb.h"
+#include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/io/record_writer.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
@@ -46,8 +54,8 @@ tensorflow::Feature MakeBytesFeature(const T& data) {
   return feature;
 }
 
-}  // namespace
-
+// Converts board features, and the pi & value outputs of MTCS to a tensorflow
+// example proto.
 tensorflow::Example MakeTfExample(const DualNet::BoardFeatures& features,
                                   const std::array<float, kNumMoves>& pi,
                                   float outcome) {
@@ -66,8 +74,10 @@ tensorflow::Example MakeTfExample(const DualNet::BoardFeatures& features,
   return example;
 }
 
+// Writes a list of tensorflow Example protos to a zlib compressed TFRecord
+// file.
 void WriteTfExamples(const std::string& path,
-                     absl::Span<const tensorflow::Example> examples) {
+                     const std::vector<tensorflow::Example>& examples) {
   std::unique_ptr<tensorflow::WritableFile> file;
   TF_CHECK_OK(tensorflow::Env::Default()->NewWritableFile(path, &file));
 
@@ -83,6 +93,29 @@ void WriteTfExamples(const std::string& path,
 
   TF_CHECK_OK(writer.Close());
   TF_CHECK_OK(file->Close());
+}
+
+}  // namespace
+
+void WriteGameExamples(const std::string& output_dir,
+                       const std::string& output_name,
+                       const MctsPlayer& player) {
+  MG_CHECK(file::RecursivelyCreateDir(output_dir));
+
+  // Write the TensorFlow examples.
+  std::vector<tensorflow::Example> examples;
+  examples.reserve(player.history().size());
+  DualNet::BoardFeatures features;
+  std::vector<const Position::Stones*> recent_positions;
+  for (const auto& h : player.history()) {
+    h.node->GetMoveHistory(DualNet::kMoveHistory, &recent_positions);
+    DualNet::SetFeatures(recent_positions, h.node->position.to_play(),
+                         &features);
+    examples.push_back(MakeTfExample(features, h.search_pi, player.result()));
+  }
+
+  auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");
+  WriteTfExamples(output_path, examples);
 }
 
 }  // namespace tf_utils

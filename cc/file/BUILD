@@ -8,13 +8,19 @@ cc_library(
     name = "file",
     srcs = [
         "path.cc",
-        "util.cc",
-    ],
+        "utils_shared.cc",
+    ] + select({
+        "//cc/config:enable_tf": ["utils_tf.cc"],
+        "//conditions:default": ["utils_stdio.cc"],
+    }),
     hdrs = [
         "path.h",
-        "util.h",
+        "utils.h",
     ],
     deps = [
         "@com_google_absl//absl/strings",
-    ],
+    ] + select({
+        "//cc/config:enable_tf": ["//cc:tensorflow"],
+        "//conditions:default": [],
+    }),
 )

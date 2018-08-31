@@ -12,28 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_TF_UTILS_H_
-#define CC_TF_UTILS_H_
+#include "cc/tf_utils.h"
 
-#include <string>
-
-#include "cc/mcts_player.h"
+#include "cc/check.h"
 
 namespace minigo {
 namespace tf_utils {
 
-// Writes a list of tensorflow Example protos to a zlib compressed TFRecord
-// file, one for each position in the player's move history.
-// Each example contains:
-//   x: the input BoardFeatures as bytes.
-//   pi: the search pi as a float array, serialized as bytes.
-//   outcome: a single float containing the game result +/-1.
-// CHECK fails if the binary was not compiled with --define=tf=1.
 void WriteGameExamples(const std::string& output_dir,
                        const std::string& output_name,
-                       const MctsPlayer& player);
+                       const MctsPlayer& player) {
+  MG_FATAL()
+      << "Can't write TensorFlow examples without TensorFlow support enabled. "
+         "Please recompile, passing --define=tf=1 to bazel build.";
+}
 
 }  // namespace tf_utils
 }  // namespace minigo
-
-#endif  // CC_TF_UTILS_H_

@@ -13,3 +13,23 @@ config_setting(
     name = "minigo9",
     define_values = {"board_size": "9"},
 )
+
+# Build condition labels that configure which inference engines are enabled.
+# Additionally, enable_tf is also required in order for the following
+# functionality, which is provided by TensorFlow:
+#  - Google Cloud Storage access.
+#  - Writing TensorFlow examples at the end of self play.
+config_setting(
+    name = "enable_remote",
+    define_values = {"remote": "1"},
+)
+
+config_setting(
+    name = "enable_tf",
+    define_values = {"tf": "1"},
+)
+
+config_setting(
+    name = "enable_lite",
+    define_values = {"lite": "1"},
+)

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_FILE_UTIL_H_
-#define CC_FILE_UTIL_H_
+#ifndef CC_FILE_UTILS_H_
+#define CC_FILE_UTILS_H_
 
 #include <cstdint>
 #include <string>
@@ -46,4 +46,4 @@ __attribute__((warn_unused_result)) bool GetModTime(const std::string& path,
 }  // namespace file
 }  // namespace minigo
 
-#endif  //  CC_FILE_UTIL_H_
+#endif  //  CC_FILE_UTILS_H_

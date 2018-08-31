@@ -38,12 +38,13 @@
 #include "cc/constants.h"
 #include "cc/dual_net/factory.h"
 #include "cc/file/path.h"
-#include "cc/file/util.h"
+#include "cc/file/utils.h"
 #include "cc/gtp_player.h"
 #include "cc/init.h"
 #include "cc/mcts_player.h"
 #include "cc/random.h"
 #include "cc/sgf.h"
+#include "cc/tf_utils.h"
 #include "gflags/gflags.h"
 
 // Game options flags.
@@ -146,27 +147,6 @@ std::string GetOutputName(absl::Time now, size_t i) {
 std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
   auto sub_dirs = absl::FormatTime("%Y-%m-%d-%H", now, absl::UTCTimeZone());
   return file::JoinPath(root_dir, sub_dirs);
-}
-
-void WriteExample(const std::string& output_dir, const std::string& output_name,
-                  const MctsPlayer& player) {
-  MG_CHECK(file::RecursivelyCreateDir(output_dir));
-
-  // Write the TensorFlow examples.
-  std::vector<tensorflow::Example> examples;
-  examples.reserve(player.history().size());
-  DualNet::BoardFeatures features;
-  std::vector<const Position::Stones*> recent_positions;
-  for (const auto& h : player.history()) {
-    h.node->GetMoveHistory(DualNet::kMoveHistory, &recent_positions);
-    DualNet::SetFeatures(recent_positions, h.node->position.to_play(),
-                         &features);
-    examples.push_back(
-        tf_utils::MakeTfExample(features, h.search_pi, player.result()));
-  }
-
-  auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");
-  tf_utils::WriteTfExamples(output_path, examples);
 }
 
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
@@ -383,7 +363,8 @@ class SelfPlayer {
       auto example_dir =
           is_holdout ? game_options.holdout_dir : game_options.output_dir;
       if (!example_dir.empty()) {
-        WriteExample(GetOutputDir(now, example_dir), output_name, *player);
+        tf_utils::WriteGameExamples(GetOutputDir(now, example_dir), output_name,
+                                    *player);
       }
 
       if (!game_options.sgf_dir.empty()) {
