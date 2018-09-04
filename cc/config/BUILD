@@ -19,6 +19,7 @@ config_setting(
 # functionality, which is provided by TensorFlow:
 #  - Google Cloud Storage access.
 #  - Writing TensorFlow examples at the end of self play.
+# enable_tf is not required to play Minigo over GTP.
 config_setting(
     name = "enable_remote",
     define_values = {"remote": "1"},
