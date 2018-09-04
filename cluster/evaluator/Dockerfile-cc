@@ -1,5 +1,8 @@
-FROM gcr.io/$PROJECT/cc-base:0.17
+FROM gcr.io/tensor-go/cc-base:0.17
 
 COPY evaluator_cc_wrapper.sh /app
+
+ADD staging/ /app
+RUN bazel build -c opt --define=board_size=19 --define=tf=1 remote=0 cc/main
 
 CMD ["/bin/sh", "evaluator_cc_wrapper.sh"]

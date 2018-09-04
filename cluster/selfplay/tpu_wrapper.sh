@@ -22,13 +22,12 @@ set -e
 : ${WORK_DIR?"Working directory must be set!"}
 
 bazel-bin/cc/main \
-  --remote_inference=true \
+  --engine=remote \
   --checkpoint-dir=${WORK_DIR}\
   --inject_noise=true \
   --soft_pick=true \
   --random_symmetry=true \
   --virtual_losses=8 \
-  --games_per_inference=16 \
   --parallel_games=32 \
   --num_readouts=800 \
   --resign_threshold=-0.999 \
@@ -37,4 +36,5 @@ bazel-bin/cc/main \
   --holdout_dir=gs://${BUCKET_NAME}/data/holdout \
   --sgf_dir=gs://${BUCKET_NAME}/sgf \
   --mode=selfplay \
+  --flags_path=gs://${BUCKET_NAME}/flags.txt
   --run_forever=true
