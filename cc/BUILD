@@ -210,6 +210,7 @@ minigo_cc_library(
     hdrs = ["tf_utils.h"],
     deps = [
         ":base",
+        ":check",
         ":mcts",
         "//cc/file",
         "//cc/dual_net",
