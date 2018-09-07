@@ -102,7 +102,7 @@ def rl_loop():
                           model_num=1,
                           positions=dual_net.EXAMPLES_PER_GENERATION,
                           threads=8,
-                          samples_per_game=200)
+                          sampling_frac=1)
 
         print("Training on gathered game data...")
         main.train_dir(gather_dir,
