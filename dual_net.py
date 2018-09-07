@@ -47,6 +47,12 @@ flags.DEFINE_integer('train_batch_size', 256,
 flags.DEFINE_integer('conv_width', 256 if go.N == 19 else 32,
                      'The width of each conv layer in the shared trunk.')
 
+flags.DEFINE_integer('policy_conv_width', 2,
+                     'The width of the policy conv layer.')
+
+flags.DEFINE_integer('value_conv_width', 1,
+                     'The width of the value conv layer.')
+
 flags.DEFINE_integer('fc_width', 256 if go.N == 19 else 64,
                      'The width of the fully connected layer in value head.')
 
@@ -388,20 +394,22 @@ def model_inference_fn(features, training):
         shared_output = my_res_layer(shared_output)
 
     # policy head
-    policy_conv = my_conv2d(shared_output, filters=2, kernel_size=1)
+    policy_conv = my_conv2d(
+        shared_output, filters=FLAGS.policy_conv_width, kernel_size=1)
     policy_conv = tf.nn.relu(my_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
-        tf.reshape(policy_conv, [-1, 2 * go.N * go.N]),
+        tf.reshape(policy_conv, [-1, FLAGS.policy_conv_width * go.N * go.N]),
         go.N * go.N + 1)
 
     policy_output = tf.nn.softmax(logits, name='policy_output')
 
     # value head
-    value_conv = my_conv2d(shared_output, filters=1, kernel_size=1)
+    value_conv = my_conv2d(
+        shared_output, filters=FLAGS.value_conv_width, kernel_size=1)
     value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
 
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
-        tf.reshape(value_conv, [-1, go.N * go.N]),
+        tf.reshape(value_conv, [-1, FLAGS.value_conv_width * go.N * go.N]),
         FLAGS.fc_width))
     value_output = tf.nn.tanh(
         tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
