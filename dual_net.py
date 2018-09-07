@@ -409,8 +409,12 @@ def model_inference_fn(features, training):
 
 def get_estimator(working_dir):
     if FLAGS.use_tpu:
-        return get_tpu_estimator(working_dir)
+        return _get_tpu_estimator(working_dir)
+    else:
+        return _get_nontpu_estimator(working_dir)
 
+
+def _get_nontpu_estimator(working_dir):
     run_config = tf.estimator.RunConfig(
         save_summary_steps=FLAGS.summary_steps,
         keep_checkpoint_max=FLAGS.keep_checkpoint_max)
@@ -420,7 +424,7 @@ def get_estimator(working_dir):
         config=run_config)
 
 
-def get_tpu_estimator(working_dir):
+def _get_tpu_estimator(working_dir):
     tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu_name, zone=None, project=None)
     tpu_grpc_url = tpu_cluster_resolver.get_master()
