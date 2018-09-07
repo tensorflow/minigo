@@ -78,6 +78,14 @@ flags.DEFINE_integer('shuffle_buffer_size', 2000,
 
 flags.DEFINE_bool('use_tpu', False, 'Whether to use TPU for training.')
 
+flags.DEFINE_bool('quantize', False,
+                  'Whether create a quantized model. When loading a model for '
+                  'inference, this must match how the model was trained.')
+
+flags.DEFINE_integer('quant_delay', 700 * 1024,
+                     'Number of training steps after which weights and '
+                     'activations are quantized.')
+
 flags.DEFINE_string(
     'tpu_name', None,
     'The Cloud TPU to use for training. This should be either the name used'
@@ -104,6 +112,9 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'summary_steps', default=256,
     help='Number of steps between logging summary scalars.')
+
+flags.DEFINE_integer(
+    'keep_checkpoint_max', default=5, help='Number of checkpoints to keep.')
 
 flags.register_multi_flags_validator(
     ['use_tpu', 'iterations_per_loop', 'summary_steps'],
@@ -223,6 +234,15 @@ def model_fn(features, labels, mode, params=None):
     learning_rate = tf.train.piecewise_constant(
         global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
+    # Insert quantization ops if requested
+    if FLAGS.quantize:
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            tf.contrib.quantize.create_training_graph(
+                quant_delay=FLAGS.quant_delay)
+        else:
+            tf.contrib.quantize.create_eval_graph()
+
     optimizer = tf.train.MomentumOptimizer(learning_rate, FLAGS.sgd_momentum)
     if FLAGS.use_tpu:
         optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
@@ -279,7 +299,8 @@ def model_fn(features, labels, mode, params=None):
         # Reset metrics occasionally so that they are mean of recent batches.
         reset_op = tf.variables_initializer(tf.local_variables("metrics"))
         cond_reset_op = tf.cond(
-            tf.equal(tf.mod(tf.reduce_min(step), FLAGS.summary_steps), tf.to_int64(1)),
+            tf.equal(tf.mod(tf.reduce_min(step),
+                            FLAGS.summary_steps), tf.to_int64(1)),
             lambda: reset_op,
             lambda: tf.no_op())
 
@@ -390,7 +411,9 @@ def get_estimator(working_dir):
     if FLAGS.use_tpu:
         return get_tpu_estimator(working_dir)
 
-    run_config = tf.estimator.RunConfig(save_summary_steps=FLAGS.summary_steps)
+    run_config = tf.estimator.RunConfig(
+        save_summary_steps=FLAGS.summary_steps,
+        keep_checkpoint_max=FLAGS.keep_checkpoint_max)
     return tf.estimator.Estimator(
         model_fn,
         model_dir=working_dir,
@@ -408,6 +431,7 @@ def get_tpu_estimator(working_dir):
         model_dir=working_dir,
         save_checkpoints_steps=max(1000, FLAGS.iterations_per_loop),
         save_summary_steps=FLAGS.summary_steps,
+        keep_checkpoint_max=FLAGS.keep_checkpoint_max,
         session_config=tf.ConfigProto(
             allow_soft_placement=True, log_device_placement=True),
         tpu_config=tpu_config.TPUConfig(

@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_FILE_FILESYSTEM_H_
-#define CC_FILE_FILESYSTEM_H_
+#include "cc/tf_utils.h"
 
-#include "absl/strings/string_view.h"
+#include "cc/check.h"
 
 namespace minigo {
-namespace file {
+namespace tf_utils {
 
-__attribute__((warn_unused_result)) bool RecursivelyCreateDir(
-    absl::string_view path);
+void WriteGameExamples(const std::string& output_dir,
+                       const std::string& output_name,
+                       const MctsPlayer& player) {
+  MG_FATAL()
+      << "Can't write TensorFlow examples without TensorFlow support enabled. "
+         "Please recompile, passing --define=tf=1 to bazel build.";
+}
 
-}  // namespace file
+}  // namespace tf_utils
 }  // namespace minigo
-
-#endif  //  CC_FILE_FILESYSTEM_H_

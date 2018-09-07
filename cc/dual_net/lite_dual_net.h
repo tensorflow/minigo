@@ -17,8 +17,6 @@
 
 #include <memory>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "absl/types/span.h"
 #include "cc/dual_net/dual_net.h"
@@ -40,8 +38,9 @@ class LiteDualNet : public DualNet {
   std::unique_ptr<tflite::FlatBufferModel> model_;
   std::unique_ptr<tflite::Interpreter> interpreter_;
 
-  int policy_;
-  int value_;
+  TfLiteTensor* input_ = nullptr;
+  TfLiteTensor* policy_ = nullptr;
+  TfLiteTensor* value_ = nullptr;
 
   std::string graph_path_;
 };

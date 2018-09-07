@@ -14,21 +14,6 @@ load(
     "minigo_cc_test_9_only",
 )
 
-config_setting(
-    name = "enable_remote",
-    define_values = {"remote": "1"},
-)
-
-config_setting(
-    name = "enable_tf",
-    define_values = {"tf": "1"},
-)
-
-config_setting(
-    name = "enable_lite",
-    define_values = {"lite": "1"},
-)
-
 minigo_cc_library(
     name = "dual_net",
     srcs = ["dual_net.cc"],
@@ -41,24 +26,24 @@ minigo_cc_library(
 )
 
 factory_engine_copts = select({
-    ":enable_remote": ["-DMG_ENABLE_REMOTE_DUAL_NET"],
+    "//cc/config:enable_remote": ["-DMG_ENABLE_REMOTE_DUAL_NET"],
     "//conditions:default": [],
 }) + select({
-    ":enable_tf": ["-DMG_ENABLE_TF_DUAL_NET"],
+    "//cc/config:enable_tf": ["-DMG_ENABLE_TF_DUAL_NET"],
     "//conditions:default": [],
 }) + select({
-    ":enable_lite": ["-DMG_ENABLE_LITE_DUAL_NET"],
+    "//cc/config:enable_lite": ["-DMG_ENABLE_LITE_DUAL_NET"],
     "//conditions:default": [],
 })
 
 factory_engine_deps = select({
-    ":enable_remote": [":inference_server"],
+    "//cc/config:enable_remote": [":inference_server"],
     "//conditions:default": [],
 }) + select({
-    ":enable_tf": [":tf_dual_net"],
+    "//cc/config:enable_tf": [":tf_dual_net"],
     "//conditions:default": [],
 }) + select({
-    ":enable_lite": [":lite_dual_net"],
+    "//cc/config:enable_lite": [":lite_dual_net"],
     "//conditions:default": [],
 })
 

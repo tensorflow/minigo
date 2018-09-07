@@ -19,9 +19,6 @@ i.e. the number 135 corresponds to the string 000135-some-name and so on.
 
 import random
 import re
-import petname
-
-import go
 
 MODEL_NUM_REGEX = r"^\d{6}"
 MODEL_NAME_REGEX = r"^\d{6}(-\w+)+"
@@ -31,10 +28,8 @@ def generate(model_num):
     """Generates a new model name, given the model number."""
     if model_num == 0:
         new_name = 'bootstrap'
-    elif go.N == 19:
-        new_name = random.choice(NAMES)
     else:
-        new_name = petname.generate()
+        new_name = random.choice(NAMES)
     full_name = "%06d-%s" % (model_num, new_name)
     return full_name
 

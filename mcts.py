@@ -103,7 +103,7 @@ class MCTSNode(object):
 
     @property
     def child_U(self):
-        return (FLAGS.c_puct * math.sqrt(1 + self.N) *
+        return (FLAGS.c_puct * math.sqrt(max(1, self.N-1)) *
                 self.child_prior / (1 + self.child_N))
 
     @property
@@ -135,7 +135,6 @@ class MCTSNode(object):
         current = self
         pass_move = go.N * go.N
         while True:
-            current.N += 1
             # if a node has never been evaluated, we have no basis to select a child.
             if not current.is_expanded:
                 break
@@ -184,28 +183,15 @@ class MCTSNode(object):
             return
         self.parent.revert_virtual_loss(up_to)
 
-    def revert_visits(self, up_to):
-        """Revert visit increments.
-
-        Sometimes, repeated calls to select_leaf return the same node.
-        This is rare and we're okay with the wasted computation to evaluate
-        the position multiple times by the dual_net. But select_leaf has the
-        side effect of incrementing visit counts. Since we want the value to
-        only count once for the repeatedly selected node, we also have to
-        revert the incremented visit counts.
-        """
-        self.N -= 1
-        if self.parent is None or self is up_to:
-            return
-        self.parent.revert_visits(up_to)
-
     def incorporate_results(self, move_probabilities, value, up_to):
         assert move_probabilities.shape == (go.N * go.N + 1,)
         # A finished game should not be going through this code path - should
         # directly call backup_value() on the result of the game.
         assert not self.position.is_game_over()
+
+        # If a node was picked multiple times (despite vlosses), we shouldn't
+        # expand it more than once.
         if self.is_expanded:
-            self.revert_visits(up_to=up_to)
             return
         self.is_expanded = True
 
@@ -235,6 +221,7 @@ class MCTSNode(object):
             value: the value to be propagated (1 = black wins, -1 = white wins)
             up_to: the node to propagate until.
         """
+        self.N += 1
         self.W += value
         if self.parent is None or self is up_to:
             return

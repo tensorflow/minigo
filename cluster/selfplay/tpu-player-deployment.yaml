@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: tpu-player-deployment
 spec:
-  replicas: 8
+  replicas: 128
   selector:
     matchLabels:
       app: tpu-player
@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: minigo-tpu-player-container
-        image: gcr.io/tensor-go/minigo-tpu-player:0.2
+        image: gcr.io/tensor-go/minigo-tpu-player:0.21
         imagePullPolicy: Always
         resources:
           limits:
@@ -25,6 +25,8 @@ spec:
         - name: service-credentials
           mountPath: /etc/credentials
         env:
+        - name: GCS_READ_CACHE_MAX_SIZE_MB
+          value: "0"
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /etc/credentials/service-account.json
         - name: BUCKET_NAME

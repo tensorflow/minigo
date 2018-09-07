@@ -46,12 +46,13 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
   absl::string_view input_name = interpreter_->GetInputName(0);
   MG_CHECK(input_name == "pos_tensor");
 
-  auto* input_tensor = interpreter_->tensor(inputs[0]);
-  MG_CHECK(input_tensor != nullptr);
-  MG_CHECK(input_tensor->dims->size == 4);
-  MG_CHECK(input_tensor->dims->data[1] == kN);
-  MG_CHECK(input_tensor->dims->data[2] == kN);
-  MG_CHECK(input_tensor->dims->data[3] == DualNet::kNumStoneFeatures);
+  input_ = interpreter_->tensor(inputs[0]);
+  MG_CHECK(input_ != nullptr);
+  MG_CHECK(input_->type == kTfLiteUInt8);
+  MG_CHECK(input_->dims->size == 4);
+  MG_CHECK(input_->dims->data[1] == kN);
+  MG_CHECK(input_->dims->data[2] == kN);
+  MG_CHECK(input_->dims->data[3] == DualNet::kNumStoneFeatures);
 
   // Initialize outputs.
   const auto& outputs = interpreter_->outputs();
@@ -60,22 +61,22 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
   absl::string_view output_1_name = interpreter_->GetOutputName(1);
   if (output_0_name == "policy_output") {
     MG_CHECK(output_1_name == "value_output") << output_1_name;
-    policy_ = 0;
-    value_ = 1;
+    policy_ = interpreter_->tensor(outputs[0]);
+    value_ = interpreter_->tensor(outputs[1]);
   } else {
     MG_CHECK(output_1_name == "policy_output") << output_1_name;
     MG_CHECK(output_0_name == "value_output") << output_0_name;
-    policy_ = 1;
-    value_ = 0;
+    policy_ = interpreter_->tensor(outputs[1]);
+    value_ = interpreter_->tensor(outputs[0]);
   }
 
-  auto* policy_tensor = interpreter_->tensor(outputs[policy_]);
-  MG_CHECK(policy_tensor != nullptr);
-  MG_CHECK(policy_tensor->dims->size == 2) << policy_tensor->dims->size;
+  MG_CHECK(policy_ != nullptr);
+  MG_CHECK(policy_->type == kTfLiteUInt8);
+  MG_CHECK(policy_->dims->size == 2);
 
-  auto* value_tensor = interpreter_->tensor(outputs[value_]);
-  MG_CHECK(value_tensor != nullptr);
-  MG_CHECK(value_tensor->dims->size == 1);
+  MG_CHECK(value_ != nullptr);
+  MG_CHECK(value_->type == kTfLiteUInt8);
+  MG_CHECK(value_->dims->size == 1);
 
   MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
 }
@@ -85,20 +86,35 @@ LiteDualNet::~LiteDualNet() {}
 void LiteDualNet::RunMany(absl::Span<const BoardFeatures> features,
                           absl::Span<Output> outputs, std::string* model) {
   int batch_size = static_cast<int>(features.size());
-  auto* input_tensor = interpreter_->tensor(interpreter_->inputs()[0]);
-  MG_CHECK(input_tensor->dims->data[0] == batch_size);
 
-  auto* data = interpreter_->typed_input_tensor<float>(0);
-  memcpy(data, features.data(), features.size() * sizeof(BoardFeatures));
+  // Allow a smaller batch size than we run inference on because the first
+  // inference made when starting the game has batch size 1 (instead of the
+  // normal 8) to initialized the tree search.
+  MG_CHECK(batch_size <= input_->dims->data[0]);
+
+  // TODO(tommadams): Make BoardFeatures a uint8_t array and memcpy here.
+  auto* data = input_->data.uint8;
+  for (size_t j = 0; j < features.size(); ++j) {
+    const auto& board = features[j];
+    for (size_t i = 0; i < board.size(); ++i) {
+      data[j * kNumStoneFeatures + i] = static_cast<uint8_t>(board[i]);
+    }
+  }
 
   MG_CHECK(interpreter_->Invoke() == kTfLiteOk);
 
-  auto* policy_data = interpreter_->typed_output_tensor<float>(policy_);
-  auto* value_data = interpreter_->typed_output_tensor<float>(value_);
-  for (int i = 0; i < batch_size; ++i) {
-    memcpy(outputs[i].policy.data(), policy_data + i * kNumMoves,
-           sizeof(outputs[i].policy));
-    outputs[i].value = value_data[i];
+  auto* policy_data = policy_->data.uint8;
+  auto* value_data = value_->data.uint8;
+  const auto& policy_params = policy_->params;
+  const auto& value_params = value_->params;
+  for (int j = 0; j < batch_size; ++j) {
+    for (int i = 0; i < kNumMoves; ++i) {
+      outputs[j].policy[i] =
+          policy_params.scale *
+          (policy_data[j * batch_size + i] - policy_params.zero_point);
+    }
+    outputs[j].value =
+        value_params.scale * (value_data[j] - value_params.zero_point);
   }
 
   if (model != nullptr) {

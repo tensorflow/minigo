@@ -34,5 +34,5 @@ RUN pip3 install "tensorflow==1.9.0rc2"
 ADD staging/ /app
 WORKDIR /app
 
-RUN bazel build -c opt cc:main
+RUN bazel build -c opt --define=board_size=19 --define=remote=1 cc/main
 CMD ["/bin/sh", "tpu_wrapper.sh"]

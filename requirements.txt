@@ -4,7 +4,6 @@ autopep8>=1.3
 google.cloud.logging
 grpcio-tools
 numpy>=1.14.0
-petname
 protobuf
 pylint
 sgf==0.5

@@ -26,7 +26,7 @@ import fsdb
 import time
 
 
-def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=20):
+def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=2):
     """Launches an evaluator job.
     m1_path, m2_path: full gs:// paths to the .pb files to match up
     job_name: string, appended to the container, used to differentiate the job names

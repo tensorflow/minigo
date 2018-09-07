@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/file/filesystem.h"
+#include "cc/file/utils.h"
 
 #include <sys/stat.h>
-#include <cerrno>
-#include <string>
 
 #include "absl/strings/match.h"
 #include "cc/file/path.h"

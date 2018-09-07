@@ -203,15 +203,21 @@ cc_library(
 
 minigo_cc_library(
     name = "tf_utils",
-    srcs = ["tf_utils.cc"],
+    srcs = select({
+        "//cc/config:enable_tf": ["tf_utils.cc"],
+        "//conditions:default": ["tf_utils_dummy.cc"],
+    }),
     hdrs = ["tf_utils.h"],
     deps = [
         ":base",
-        ":tensorflow",
+        ":check",
+        ":mcts",
+        "//cc/file",
         "//cc/dual_net",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
+    ] + select({
+        "//cc/config:enable_tf": ["//cc:tensorflow"],
+        "//conditions:default": [],
+    }),
 )
 
 minigo_cc_library(

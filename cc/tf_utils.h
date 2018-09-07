@@ -15,43 +15,23 @@
 #ifndef CC_TF_UTILS_H_
 #define CC_TF_UTILS_H_
 
-#include <array>
 #include <string>
 
-#include "cc/constants.h"
-#include "cc/dual_net/dual_net.h"
-
-#include "tensorflow/core/example/example.pb.h"
-#include "tensorflow/core/lib/core/status.h"
+#include "cc/mcts_player.h"
 
 namespace minigo {
 namespace tf_utils {
 
-// Converts board features, and the pi & value outputs of MTCS to a tensorflow
-// example proto.
-tensorflow::Example MakeTfExample(const DualNet::BoardFeatures& features,
-                                  const std::array<float, kNumMoves>& pi,
-                                  float outcome);
-
 // Writes a list of tensorflow Example protos to a zlib compressed TFRecord
-// file.
-void WriteTfExamples(const std::string& path,
-                     absl::Span<const tensorflow::Example> examples);
-
-// Uses Tensorflow to write a file in one shot. This allows writing to GCS, etc
-// when Tensorflow is compiled with that support.
-__attribute__((warn_unused_result)) tensorflow::Status WriteFile(
-    const std::string& path, absl::string_view contents);
-
-// Uses Tensorflow to read a file in one shot. This allows reading from GCS, etc
-// when Tensorflow is compiled with that support.
-__attribute__((warn_unused_result)) tensorflow::Status ReadFile(
-    const std::string& path, std::string* contents);
-
-// Uses Tensorflow to read the modification time for a file. This allows reading
-// from GCS, etc when Tensorflow is compiled with that support.
-__attribute__((warn_unused_result)) tensorflow::Status GetModTime(
-    const std::string& path, uint64_t* mtime_usec);
+// file, one for each position in the player's move history.
+// Each example contains:
+//   x: the input BoardFeatures as bytes.
+//   pi: the search pi as a float array, serialized as bytes.
+//   outcome: a single float containing the game result +/-1.
+// CHECK fails if the binary was not compiled with --define=tf=1.
+void WriteGameExamples(const std::string& output_dir,
+                       const std::string& output_name,
+                       const MctsPlayer& player);
 
 }  // namespace tf_utils
 }  // namespace minigo
