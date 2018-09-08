@@ -19,7 +19,6 @@ import sys
 import tempfile
 
 import dual_net
-import evaluation
 import utils
 
 import cloud_logging
@@ -42,21 +41,6 @@ def bootstrap(
     dual_net.export_model(model_save_path)
 
 
-def evaluate(
-        black_model: 'The path to the model to play black',
-        white_model: 'The path to the model to play white',
-        output_dir: 'Where to write the evaluation results'='sgf/evaluate',
-        games: 'the number of games to play'=16,
-        verbose: 'How verbose the players should be (see selfplay)' = 1):
-    utils.ensure_dir_exists(output_dir)
-
-    with utils.logged_timer("Loading weights"):
-        black_net = dual_net.DualNetwork(black_model)
-        white_net = dual_net.DualNetwork(white_model)
-
-    with utils.logged_timer("Playing game"):
-        evaluation.play_match(
-            black_net, white_net, games, output_dir, verbose)
 
 
 def convert(load_file, dest_file):
@@ -94,7 +78,7 @@ def convert(load_file, dest_file):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [bootstrap, evaluate, convert])
+argh.add_commands(parser, [bootstrap, convert])
 
 if __name__ == '__main__':
     cloud_logging.configure()

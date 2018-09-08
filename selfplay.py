@@ -38,13 +38,15 @@ flags.DEFINE_float('holdout_pct', 0.05, 'What percent of games to hold out.')
 flags.DEFINE_float('resign_disable_pct', 0.05,
                    'What percent of games to disable resign for.')
 
-# this should be called "verbosity" but flag name conflicts with absl.logging.
-flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
+# From strategies.py
+flags.declare_key_flag('verbose')
+flags.declare_key_flag('num_readouts')
+
 
 FLAGS = flags.FLAGS
 
 
-def play(network, verbosity=0):
+def play(network):
     ''' Plays out a self-play match, returning a MCTSPlayer object containing:
         - the final position
         - the n x 362 tensor of floats representing the mcts search probabilities
@@ -57,9 +59,7 @@ def play(network, verbosity=0):
     else:
         resign_threshold = None
 
-    player = MCTSPlayer(network,
-                        verbosity=verbosity,
-                        resign_threshold=resign_threshold)
+    player = MCTSPlayer(network, resign_threshold=resign_threshold)
 
     player.initialize_game()
 
@@ -76,7 +76,7 @@ def play(network, verbosity=0):
         while player.root.N < current_readouts + readouts:
             player.tree_search()
 
-        if verbosity >= 3:
+        if FLAGS.verbose >= 3:
             print(player.root.position)
             print(player.root.describe())
 
@@ -90,16 +90,16 @@ def play(network, verbosity=0):
             player.set_result(player.root.position.result(), was_resign=False)
             break
 
-        if (verbosity >= 2) or (verbosity >= 1 and player.root.position.n % 10 == 9):
+        if (FLAGS.verbose >= 2) or (FLAGS.verbose >= 1 and player.root.position.n % 10 == 9):
             print("Q: {:.5f}".format(player.root.Q))
             dur = time.time() - start
             print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (
                 player.root.position.n, readouts, dur / readouts * 100.0, dur), flush=True)
-        if verbosity >= 3:
+        if FLAGS.verbose >= 3:
             print("Played >>",
                   coords.to_kgs(coords.from_flat(player.root.fmove)))
 
-    if verbosity >= 2:
+    if FLAGS.verbose >= 2:
         utils.dbg("%s: %.3f" % (player.result_string, player.root.Q))
         utils.dbg(player.root.position, player.root.position.score())
 
@@ -107,7 +107,7 @@ def play(network, verbosity=0):
 
 
 def run_game(load_file, selfplay_dir, holdout_dir,
-             sgf_dir, holdout_pct=0.05, verbose=1):
+             sgf_dir, holdout_pct=0.05):
     '''Takes a played game and record results and game data.'''
     minimal_sgf_dir = os.path.join(sgf_dir, 'clean')
     full_sgf_dir = os.path.join(sgf_dir, 'full')
@@ -120,7 +120,7 @@ def run_game(load_file, selfplay_dir, holdout_dir,
         network = dual_net.DualNetwork(load_file)
 
     with utils.logged_timer("Playing game"):
-        player = play(network, verbose)
+        player = play(network)
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
     game_data = player.extract_data()
@@ -131,7 +131,7 @@ def run_game(load_file, selfplay_dir, holdout_dir,
 
     tf_examples = preprocessing.make_dataset_from_selfplay(game_data)
 
-    # Hold out 5% of games for evaluation.
+    # Hold out 5% of games for validation.
     if random.random() < holdout_pct:
         fname = os.path.join(holdout_dir,
                              "{}.tfrecord.zz".format(output_name))
@@ -153,8 +153,7 @@ def main(argv):
         selfplay_dir=FLAGS.selfplay_dir,
         holdout_dir=FLAGS.holdout_dir,
         holdout_pct=FLAGS.holdout_pct,
-        sgf_dir=FLAGS.sgf_dir,
-        verbose=FLAGS.verbose)
+        sgf_dir=FLAGS.sgf_dir)
 
 
 if __name__ == '__main__':

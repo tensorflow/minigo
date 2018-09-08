@@ -26,11 +26,11 @@ echo white:  $MODEL_WHITE
 
 DATE=`date +%Y-%m-%d` 
 
-python3 main.py evaluate \
+python3 evaluate.py \
   $MODEL_BLACK $MODEL_WHITE \
-  --output-dir "gs://$BUCKET_NAME/sgf/eval/$DATE" \
+  --eval_sgf_dir "gs://$BUCKET_NAME/sgf/eval/$DATE" \
   --num_readouts=1000 \
-  --games=1 \
+  --num_evaluation_games=1 \
   --verbose=2
 
 echo Finished a set of evaluation games!

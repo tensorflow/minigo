@@ -27,6 +27,7 @@ from absl import flags
 from tensorflow import gfile
 
 import dual_net
+import evaluate
 import main
 import selfplay
 import train
@@ -47,6 +48,8 @@ def rl_loop():
     flags.FLAGS.trunk_layers = 1
     flags.FLAGS.train_batch_size = 16
     flags.FLAGS.shuffle_buffer_size = 1000
+    flags.FLAGS.num_evaluation_games = 1
+    flags.FLAGS.verbose = 0
     dual_net.EXAMPLES_PER_GENERATION = 64
 
     flags.FLAGS.num_readouts = 10
@@ -68,8 +71,10 @@ def rl_loop():
         holdout_dir = os.path.join(
             base_dir, 'data', 'holdout', bootstrap_model)
         sgf_dir = os.path.join(base_dir, 'sgf', bootstrap_model)
+        eval_sgf_dir = os.path.join(base_dir, 'eval_sgf')
         os.makedirs(os.path.join(base_dir, 'data'), exist_ok=True)
         os.makedirs(os.path.join(base_dir, bootstrap_model), exist_ok=True)
+        os.makedirs(eval_sgf_dir, exist_ok=True)
 
         print("Creating random initial weights...")
         main.bootstrap(model_save_path)
@@ -122,6 +127,9 @@ def rl_loop():
             selfplay_dir=model_selfplay_dir,
             sgf_dir=sgf_dir,
             holdout_pct=0)
+        evaluate.play_match(next_model_save_file, model_save_path,
+            games=1,
+            sgf_dir=eval_sgf_dir)
 
 
 if __name__ == '__main__':

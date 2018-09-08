@@ -50,7 +50,7 @@ def bootstrap():
     main.bootstrap(bootstrap_model_path)
 
 
-def selfplay(verbose=2):
+def selfplay():
     _, model_name = fsdb.get_latest_model()
     games = gfile.Glob(os.path.join(fsdb.selfplay_dir(), model_name, '*.zz'))
     if len(games) > MAX_GAMES_PER_GENERATION:
@@ -67,8 +67,7 @@ def selfplay(verbose=2):
         selfplay_dir=selfplay_dir,
         holdout_dir=game_holdout_dir,
         sgf_dir=sgf_dir,
-        holdout_pct=HOLDOUT_PCT,
-        verbose=verbose,
+        holdout_pct=HOLDOUT_PCT
     )
 
 
