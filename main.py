@@ -41,19 +41,6 @@ def bootstrap(
     dual_net.bootstrap()
     dual_net.export_model(model_save_path)
 
-def validate(
-        *tf_record_dirs: 'Directories where holdout data are',
-        validate_name: 'Name for validation set (i.e., selfplay or human)'=None):
-    tf_records = []
-    with utils.logged_timer("Building lists of holdout files"):
-        for record_dir in tf_record_dirs:
-            tf_records.extend(gfile.Glob(os.path.join(record_dir, '*.zz')))
-
-    first_record = os.path.basename(tf_records[0])
-    last_record = os.path.basename(tf_records[-1])
-    with utils.logged_timer("Validating from {} to {}".format(first_record, last_record)):
-        dual_net.validate(tf_records, validate_name=validate_name)
-
 
 def evaluate(
         black_model: 'The path to the model to play black',
@@ -107,7 +94,7 @@ def convert(load_file, dest_file):
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [bootstrap, evaluate, validate, convert])
+argh.add_commands(parser, [bootstrap, evaluate, convert])
 
 if __name__ == '__main__':
     cloud_logging.configure()

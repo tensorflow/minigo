@@ -20,6 +20,7 @@ overfit to a near-zero loss.
 """
 
 import os
+import subprocess
 import tempfile
 
 from absl import flags
@@ -29,8 +30,8 @@ import dual_net
 import main
 import selfplay
 import train
+import validate
 import example_buffer as eb
-import subprocess
 
 
 def rl_loop():
@@ -113,7 +114,7 @@ def rl_loop():
         print("Training on gathered game data...")
         train.main(tf_records)
         print("Trying validate on 'holdout' game...")
-        main.validate(holdout_dir)
+        validate.main(holdout_dir)
         print("Verifying that new checkpoint is playable...")
         selfplay.run_game(
             load_file=next_model_save_file,

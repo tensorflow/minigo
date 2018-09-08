@@ -490,28 +490,12 @@ def export_model(model_path):
 
 
 
-def validate(tf_records, validate_name=None):
-    validate_name = validate_name or "selfplay"
-
-    if FLAGS.use_tpu:
-        def input_fn(params):
-            return preprocessing.get_tpu_input_tensors(
-                params['batch_size'],
-                tf_records, filter_amount=0.05)
-    else:
-        def input_fn():
-            return preprocessing.get_input_tensors(
-                FLAGS.train_batch_size, tf_records, filter_amount=0.05,
-                shuffle_buffer_size=20000)
-
-    estimator = get_estimator()
-    estimator.evaluate(input_fn, steps=50, name=validate_name)
 
 
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [export_model, validate])
+argh.add_commands(parser, [export_model])
 
 if __name__ == '__main__':
     # Let absl.flags parse known flags from argv, then pass the remaining flags

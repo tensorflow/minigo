@@ -126,9 +126,9 @@ def train(*tf_records: "Records to train on"):
     estimator.train(_input_fn, steps=steps, hooks=hooks)
 
 
-def main(unused_argv):
+def main(argv):
     """Train on examples and export the updated model weights."""
-    tf_records = unused_argv
+    tf_records = argv
     logging.info("Training on %s records: %s to %s",
                  len(tf_records), tf_records[0], tf_records[-1])
     with utils.logged_timer("Training"):

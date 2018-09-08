@@ -100,29 +100,6 @@ def train():
         sys.exit(1)
 
 
-def validate(model_num=None, validate_name=None):
-    """ Runs validate on the directories up to the most recent model, or up to
-    (but not including) the model specified by `model_num`
-    """
-    if model_num is None:
-        model_num, _ = fsdb.get_latest_model()
-    else:
-        model_num = int(model_num)
-
-    # Model N was trained on games up through model N-2, so the validation set
-    # should only be for models through N-2 as well, thus the (model_num - 1)
-    # term.
-    models = list(
-        filter(lambda num_name: num_name[0] < (model_num - 1), fsdb.get_models()))
-    # Run on the most recent 30 generations,
-    # TODO(brianklee): make this hyperparameter dependency explicit/not hardcoded
-    holdout_dirs = [os.path.join(fsdb.holdout_dir(), pair[1])
-                    for pair in models[-30:]]
-
-    main.validate(*holdout_dirs,
-                  validate_name=validate_name)
-
-
 def validate_hourly(validate_name=None):
     """ compiles a list of games based on the new hourly directory format. Then
     calls validate on it """
@@ -133,7 +110,7 @@ def validate_hourly(validate_name=None):
                      if gfile.IsDirectory(os.path.join(fsdb.holdout_dir(), d)))
     holdout_files = list(itertools.islice(holdout_files, 20000))
     random.shuffle(holdout_files)
-    dual_net.validate(holdout_files)
+    validate.validate(holdout_files)
 
 
 def backfill():
@@ -161,7 +138,7 @@ def backfill():
 parser = argparse.ArgumentParser()
 
 argh.add_commands(parser, [train, selfplay, backfill,
-                           bootstrap, fsdb.game_counts, validate,
+                           bootstrap, fsdb.game_counts,
                            validate_hourly])
 
 if __name__ == '__main__':

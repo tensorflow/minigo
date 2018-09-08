@@ -50,8 +50,9 @@ def loop(working_dir='estimator_working_dir', tpu_name=None):
 
         with timer("validate"):
             subprocess.call(['python', 'rl_loop.py', 'validate-hourly'] + flags)
-            subprocess.call(['python', 'main.py', 'validate',
-                             '--validate-name=pro'] + flags[3:])
+            subprocess.call(['python', 'validate.py',
+                             'gs://jacksona-sandbox/data/validate',
+                             '--validate-name=pro'] + flags[1:])
 
 
 if __name__ == '__main__':
