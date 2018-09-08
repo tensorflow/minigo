@@ -36,42 +36,10 @@ WINDOW_SIZE = 125000000
 
 
 def bootstrap(
-        working_dir: 'tf.estimator working directory. If not set, defaults to a random tmp dir'=None,
         model_save_path: 'Where to export the first bootstrapped generation'=None):
-    if working_dir is None:
-        with tempfile.TemporaryDirectory() as working_dir:
-            utils.ensure_dir_exists(working_dir)
-            utils.ensure_dir_exists(os.path.dirname(model_save_path))
-            dual_net.bootstrap(working_dir)
-            dual_net.export_model(working_dir, model_save_path)
-    else:
-        utils.ensure_dir_exists(working_dir)
-        utils.ensure_dir_exists(os.path.dirname(model_save_path))
-        dual_net.bootstrap(working_dir)
-        dual_net.export_model(working_dir, model_save_path)
-        freeze_graph(model_save_path)
-
-
-def train_dir(
-        chunk_dir: 'Directory where training chunks are.',
-        model_save_path: 'Where to export the completed generation.'):
-    tf_records = sorted(gfile.Glob(os.path.join(chunk_dir, '*.tfrecord.zz')))
-    tf_records = tf_records[-1 * (WINDOW_SIZE // EXAMPLES_PER_RECORD):]
-
-    train(tf_records, model_save_path)
-
-
-def train(tf_records: 'list of files of tf_records to train on',
-          model_save_path: 'Where to export the completed generation.'):
-    if tf_records:
-        print("Training on {} records: {} to {}".format(
-            len(tf_records), tf_records[0], tf_records[-1]))
-    with utils.logged_timer("Training"):
-        dual_net.train(*tf_records)
-    print("== Training done.  Exporting model to ", model_save_path)
-    dual_net.export_model(flags.FLAGS.model_dir, model_save_path)
-    freeze_graph(model_save_path)
-
+    utils.ensure_dir_exists(os.path.dirname(model_save_path))
+    dual_net.bootstrap()
+    dual_net.export_model(model_save_path)
 
 def validate(
         *tf_record_dirs: 'Directories where holdout data are',
@@ -136,18 +104,10 @@ def convert(load_file, dest_file):
     tf.reset_default_graph()
 
 
-def freeze_graph(load_file):
-    """ Loads a network and serializes just the inference parts for use by e.g. the C++ binary """
-    n = dual_net.DualNetwork(load_file)
-    out_graph = tf.graph_util.convert_variables_to_constants(
-        n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
-    with gfile.GFile(os.path.join(load_file + '.pb'), 'wb') as f:
-        f.write(out_graph.SerializeToString())
 
 
 parser = argparse.ArgumentParser()
-argh.add_commands(parser, [bootstrap, train, train_dir, freeze_graph,
-                           evaluate, validate, convert])
+argh.add_commands(parser, [bootstrap, evaluate, validate, convert])
 
 if __name__ == '__main__':
     cloud_logging.configure()

@@ -177,7 +177,7 @@ def _random_rotation_pure_tf(x_tensor, outcome_tensor):
     return x_rot_tensor, outcome_tensor
 
 
-def get_input_tensors(batch_size, tf_records, num_repeats=None,
+def get_input_tensors(batch_size, tf_records, num_repeats=1,
                       shuffle_records=True, shuffle_examples=True,
                       shuffle_buffer_size=None,
                       filter_amount=0.05, random_rotation=False):

@@ -23,9 +23,12 @@ import os
 import tempfile
 
 from absl import flags
+from tensorflow import gfile
+
 import dual_net
 import main
 import selfplay
+import train
 import example_buffer as eb
 import subprocess
 
@@ -51,12 +54,13 @@ def rl_loop():
         bootstrap_model = '000000-bootstrap'
 
         flags.FLAGS.base_dir = base_dir
-        working_dir = os.path.join(base_dir, 'models_in_training')
-        flags.FLAGS.model_dir = working_dir
+        model_dir = os.path.join(base_dir, 'models_in_training')
+        flags.FLAGS.model_dir = model_dir
         model_save_path = os.path.join(base_dir, 'models', bootstrap_model)
         local_eb_dir = os.path.join(base_dir, 'scratch')
         next_model_save_file = os.path.join(
             base_dir, 'models', '000001-nextmodel')
+        flags.FLAGS.export_path = next_model_save_file
         selfplay_dir = os.path.join(base_dir, 'data', 'selfplay')
         model_selfplay_dir = os.path.join(selfplay_dir, bootstrap_model)
         gather_dir = os.path.join(base_dir, 'data', 'training_chunks')
@@ -67,7 +71,7 @@ def rl_loop():
         os.makedirs(os.path.join(base_dir, bootstrap_model), exist_ok=True)
 
         print("Creating random initial weights...")
-        main.bootstrap(working_dir, model_save_path)
+        main.bootstrap(model_save_path)
         print("Playing some games...")
         # Do two selfplay runs to test gather functionality
         selfplay.run_game(
@@ -104,9 +108,10 @@ def rl_loop():
                           threads=8,
                           sampling_frac=1)
 
+        tf_records = sorted(gfile.Glob(os.path.join(gather_dir, '*.tfrecord.zz')))
+
         print("Training on gathered game data...")
-        main.train_dir(gather_dir,
-                       next_model_save_file)
+        train.main(tf_records)
         print("Trying validate on 'holdout' game...")
         main.validate(holdout_dir)
         print("Verifying that new checkpoint is playable...")

@@ -20,6 +20,7 @@ from absl import flags
 import dual_net
 import go
 import preprocessing
+import train
 from tests import test_utils
 
 
@@ -30,15 +31,15 @@ class TestDualNet(test_utils.MiniGoUnitTest):
             flags.FLAGS.model_dir = working_dir
             preprocessing.make_dataset_from_sgf(
                 'tests/example_game.sgf', tf_record.name)
-            dual_net.train([tf_record.name], steps=1)
+            train.train([tf_record.name])
 
     def test_inference(self):
         with tempfile.TemporaryDirectory() as working_dir, \
                 tempfile.TemporaryDirectory() as export_dir:
             flags.FLAGS.model_dir = working_dir
-            dual_net.bootstrap(working_dir)
+            dual_net.bootstrap()
             exported_model = os.path.join(export_dir, 'bootstrap-model')
-            dual_net.export_model(working_dir, exported_model)
+            dual_net.export_model(exported_model)
 
             n1 = dual_net.DualNetwork(exported_model)
             n1.run(go.Position())

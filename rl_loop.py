@@ -42,12 +42,12 @@ MIN_GAMES_PER_GENERATION = 10000
 HOLDOUT_PCT = 0.05
 
 
-def bootstrap(working_dir):
+def bootstrap():
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
     print("Bootstrapping with working dir {}\n Model 0 exported to {}".format(
-        working_dir, bootstrap_model_path))
-    main.bootstrap(working_dir, bootstrap_model_path)
+        flags.FLAGS.model_dir, bootstrap_model_path))
+    main.bootstrap(bootstrap_model_path)
 
 
 def selfplay(verbose=2):
@@ -72,7 +72,7 @@ def selfplay(verbose=2):
     )
 
 
-def train(working_dir):
+def train():
     model_num, model_name = fsdb.get_latest_model()
 
     print("Training on gathered game data, initializing from {}".format(model_name))
@@ -91,7 +91,7 @@ def train(working_dir):
         print("Training model")
         dual_net.train(training_file)
         print("Exporting model to ", save_file)
-        dual_net.export_model(working_dir, save_file)
+        dual_net.export_model(save_file)
     except Exception as e:
         import traceback
         logging.error(traceback.format_exc())
@@ -100,7 +100,7 @@ def train(working_dir):
         sys.exit(1)
 
 
-def validate(working_dir, model_num=None, validate_name=None):
+def validate(model_num=None, validate_name=None):
     """ Runs validate on the directories up to the most recent model, or up to
     (but not including) the model specified by `model_num`
     """
@@ -119,11 +119,11 @@ def validate(working_dir, model_num=None, validate_name=None):
     holdout_dirs = [os.path.join(fsdb.holdout_dir(), pair[1])
                     for pair in models[-30:]]
 
-    main.validate(working_dir, *holdout_dirs,
+    main.validate(*holdout_dirs,
                   validate_name=validate_name)
 
 
-def validate_hourly(working_dir, validate_name=None):
+def validate_hourly(validate_name=None):
     """ compiles a list of games based on the new hourly directory format. Then
     calls validate on it """
 
