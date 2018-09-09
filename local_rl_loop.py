@@ -26,9 +26,9 @@ import tempfile
 from absl import flags
 from tensorflow import gfile
 
+import bootstrap
 import dual_net
 import evaluate
-import main
 import selfplay
 import train
 import validate
@@ -73,11 +73,11 @@ def rl_loop():
         sgf_dir = os.path.join(base_dir, 'sgf', bootstrap_model)
         eval_sgf_dir = os.path.join(base_dir, 'eval_sgf')
         os.makedirs(os.path.join(base_dir, 'data'), exist_ok=True)
-        os.makedirs(os.path.join(base_dir, bootstrap_model), exist_ok=True)
+        os.makedirs(os.path.join(base_dir, 'models', bootstrap_model), exist_ok=True)
         os.makedirs(eval_sgf_dir, exist_ok=True)
 
         print("Creating random initial weights...")
-        main.bootstrap(model_save_path)
+        bootstrap.bootstrap(model_save_path)
         print("Playing some games...")
         # Do two selfplay runs to test gather functionality
         selfplay.run_game(

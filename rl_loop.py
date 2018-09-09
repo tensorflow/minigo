@@ -25,10 +25,10 @@ from tensorflow import gfile
 import itertools
 import random
 
+import bootstrap
 import cloud_logging
 import dual_net
 import fsdb
-import main
 import selfplay as selfplay_lib
 import shipname
 
@@ -47,7 +47,7 @@ def bootstrap():
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
     print("Bootstrapping with working dir {}\n Model 0 exported to {}".format(
         flags.FLAGS.model_dir, bootstrap_model_path))
-    main.bootstrap(bootstrap_model_path)
+    bootstrap.bootstrap(bootstrap_model_path)
 
 
 def selfplay():
