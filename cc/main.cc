@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
