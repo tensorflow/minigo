@@ -45,7 +45,8 @@ parser.add_argument(
     default="py",
     type=str,
     help="Which Minigo engine to use: \"py\" for the Python engine, or "
-         "\"tf\", \"lite\", \"remote\" for one of the C++ engines.")
+         "one of the C++ engines (run \"cc/main --helpon=factory\" for the "
+         "C++ engine list.")
 
 parser.add_argument(
     "--virtual_losses",
