@@ -16,7 +16,7 @@ import numpy as np
 from tqdm import tqdm
 
 import go
-import fsdb
+from rl_loop import fsdb
 import oneoff_utils
 import strategies
 

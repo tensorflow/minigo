@@ -17,7 +17,7 @@ import numpy as np
 
 import preprocessing
 from utils import timer, ensure_dir_exists
-import fsdb
+from rl_loop import fsdb
 
 
 READ_OPTS = preprocessing.TF_RECORD_CONFIG

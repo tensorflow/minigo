@@ -23,7 +23,7 @@ from absl import flags
 from tensorflow.python.framework import meta_graph
 
 import dual_net
-import fsdb
+from rl_loop import fsdb
 from utils import ensure_dir_exists
 
 flags.DEFINE_string("data_dir", "data/swa/", "Where to save swa models")

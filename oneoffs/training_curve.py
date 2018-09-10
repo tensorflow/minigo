@@ -27,7 +27,7 @@ from absl import app, flags
 from tqdm import tqdm
 
 import coords
-import fsdb
+from rl_loop import fsdb
 from strategies import MCTSPlayer
 import oneoff_utils
 

@@ -22,8 +22,8 @@ import yaml
 import json
 import os
 import argh
-import fsdb
 import time
+from rl_loop import fsdb
 
 
 def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=2):

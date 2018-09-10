@@ -17,6 +17,8 @@
 This module works equivalently with local filesystems and GCS.
 """
 import os
+import sys
+sys.path.insert(0, '.')
 
 from absl import flags
 from tensorflow import gfile

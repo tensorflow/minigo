@@ -18,7 +18,7 @@ from collections import defaultdict
 from tqdm import tqdm
 
 import dual_net
-import fsdb
+from rl_loop import fsdb
 import oneoff_utils
 
 flags.DEFINE_string("plot_dir", "data/l2_cost", "Where to save the plots.")
