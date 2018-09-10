@@ -5,10 +5,13 @@ import functools
 import itertools
 import multiprocessing as mp
 import os
+import sys
 import random
 import subprocess
 import time
 from collections import deque
+
+sys.path.insert(0, '.')
 
 from absl import flags
 import tensorflow as tf
@@ -17,7 +20,7 @@ import numpy as np
 
 import preprocessing
 from utils import timer, ensure_dir_exists
-from rl_loop import fsdb
+import fsdb
 
 
 READ_OPTS = preprocessing.TF_RECORD_CONFIG
