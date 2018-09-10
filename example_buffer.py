@@ -16,7 +16,6 @@ from tqdm import tqdm
 import numpy as np
 
 import preprocessing
-import dual_net
 from utils import timer, ensure_dir_exists
 import fsdb
 
@@ -24,6 +23,10 @@ import fsdb
 READ_OPTS = preprocessing.TF_RECORD_CONFIG
 
 LOCAL_DIR = "data/"
+
+# How many positions to look at per generation.
+# Per AGZ, 2048 minibatch * 1k = 2M positions/generation
+EXAMPLES_PER_GENERATION = 2 ** 21
 
 MINIMUM_NEW_GAMES = 12000
 AVG_GAMES_PER_MODEL = 20000
@@ -186,7 +189,7 @@ def get_window_size(chunk_num):
     return min(500000, (chunk_num + 5) * (AVG_GAMES_PER_MODEL // 2))
 
 
-def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
+def fill_and_wait_time(bufsize=EXAMPLES_PER_GENERATION,
                        write_dir=None,
                        threads=32,
                        start_from=None):
@@ -232,7 +235,7 @@ def fill_and_wait_time(bufsize=dual_net.EXAMPLES_PER_GENERATION,
     buf.flush(chunk_to_make)
 
 
-def fill_and_wait_models(bufsize=dual_net.EXAMPLES_PER_GENERATION,
+def fill_and_wait_models(bufsize=EXAMPLES_PER_GENERATION,
                          write_dir=None,
                          threads=8,
                          model_window=100,
@@ -269,7 +272,7 @@ def make_chunk_for(output_dir=LOCAL_DIR,
                    local_dir=LOCAL_DIR,
                    game_dir=None,
                    model_num=1,
-                   positions=dual_net.EXAMPLES_PER_GENERATION,
+                   positions=EXAMPLES_PER_GENERATION,
                    threads=8,
                    sampling_frac=0.02):
     """

@@ -120,11 +120,6 @@ flags.register_multi_flags_validator(
 FLAGS = flags.FLAGS
 
 
-# How many positions to look at per generation.
-# Per AGZ, 2048 minibatch * 1k = 2M positions/generation
-EXAMPLES_PER_GENERATION = 2 ** 21
-
-
 class DualNetwork():
     def __init__(self, save_file):
         self.save_file = save_file
