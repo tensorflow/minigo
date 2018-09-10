@@ -103,6 +103,7 @@ struct CreateSgfOptions {
   std::string ruleset = "Chinese";
   float komi = 7.5;
   std::string result;
+  std::string game_comment;
 };
 
 // Returns a valid SGF file for the given move sequence.

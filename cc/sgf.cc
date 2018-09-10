@@ -245,6 +245,9 @@ std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                          options.ruleset, "]\n", "SZ[", kN, "]KM[",
                          options.komi, "]PW[", options.white_name, "]PB[",
                          options.black_name, "]RE[", options.result, "]\n"));
+  if (!options.game_comment.empty()) {
+    absl::StrAppend(&str, absl::StrCat("C[", options.game_comment, "]\n"));
+  }
 
   for (const auto& move_with_comment : moves) {
     Move move = move_with_comment.move;

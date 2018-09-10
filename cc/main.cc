@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <cstring>
-#include <iostream>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <thread>
@@ -150,6 +150,16 @@ std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
   return file::JoinPath(root_dir, sub_dirs);
 }
 
+std::string FormatInferenceInfo(
+    const std::vector<MctsPlayer::InferenceInfo>& inferences) {
+  std::vector<std::string> parts;
+  for (const auto& info : inferences) {
+    parts.push_back(absl::StrCat(info.model, "(", info.first_move, ",",
+                                 info.last_move, ")"));
+  }
+  return absl::StrJoin(parts, ", ");
+}
+
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
               const MctsPlayer& player_b, const MctsPlayer& player_w,
               bool write_comments) {
@@ -190,6 +200,10 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
   options.result = player_b.result_string();
   options.black_name = player_b.name();
   options.white_name = player_w.name();
+  options.game_comment = absl::StrCat(
+      "B inferences: ", FormatInferenceInfo(player_b.inferences()), "\n",
+      "W inferences: ", FormatInferenceInfo(player_w.inferences()));
+
   auto sgf_str = sgf::CreateSgfString(moves, options);
 
   auto output_path = file::JoinPath(output_dir, output_name + ".sgf");
