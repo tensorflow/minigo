@@ -159,7 +159,7 @@ class MCTSPlayer(MCTSPlayerInterface):
         try:
             self.root = self.root.maybe_add_child(coords.to_flat(c))
         except go.IllegalMove:
-            print("Illegal move")
+            dbg("Illegal move")
             if not self.two_player_mode:
                 self.searches_pi.pop()
             self.comments.pop()
@@ -192,7 +192,7 @@ class MCTSPlayer(MCTSPlayerInterface):
             failsafe += 1
             leaf = self.root.select_leaf()
             if self.verbosity >= 4:
-                print(self.show_path_to_root(leaf))
+                dbg(self.show_path_to_root(leaf))
             # if game is over, override the value estimate with the true score
             if leaf.is_done():
                 value = 1 if leaf.position.score() > 0 else -1
