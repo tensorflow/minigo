@@ -68,3 +68,8 @@ def prepare_subprocess_cmd(subprocess_cmd):
     filtered_flags = list(filter(valid_argv, parsed_flags))
     return [subprocess_cmd[0]] + filtered_flags
 
+def run(cmd):
+    '''Prepare and run a subprocess cmd, returning a CompletedProcess.'''
+    cmd = prepare_subprocess_cmd(cmd)
+    print("Running the following cmd", cmd)
+    return subprocess.run(cmd, capture_output=True)

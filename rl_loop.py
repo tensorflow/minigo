@@ -32,22 +32,11 @@ import fsdb
 import selfplay as selfplay_lib
 import shipname
 
-# How many games before the selfplay workers will stop trying to play more.
-MAX_GAMES_PER_GENERATION = 20000
 
-# How many games minimum, until the trainer will train
-MIN_GAMES_PER_GENERATION = 10000
 
 # What percent of games to holdout from training per generation
 HOLDOUT_PCT = 0.05
 
-
-def bootstrap():
-    bootstrap_name = shipname.generate(0)
-    bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
-    print("Bootstrapping with working dir {}\n Model 0 exported to {}".format(
-        flags.FLAGS.model_dir, bootstrap_model_path))
-    bootstrap.bootstrap(bootstrap_model_path)
 
 
 def selfplay():
@@ -69,48 +58,6 @@ def selfplay():
         sgf_dir=sgf_dir,
         holdout_pct=HOLDOUT_PCT
     )
-
-
-def train():
-    model_num, model_name = fsdb.get_latest_model()
-
-    print("Training on gathered game data, initializing from {}".format(model_name))
-    new_model_num = model_num + 1
-    new_model_name = shipname.generate(new_model_num)
-    print("New model will be {}".format(new_model_name))
-    training_file = os.path.join(
-        fsdb.golden_chunk_dir(), str(new_model_num) + '.tfrecord.zz')
-    while not gfile.Exists(training_file):
-        print("Waiting for", training_file)
-        time.sleep(1 * 60)
-    print("Using Golden File:", training_file)
-
-    try:
-        save_file = os.path.join(fsdb.models_dir(), new_model_name)
-        print("Training model")
-        dual_net.train(training_file)
-        print("Exporting model to ", save_file)
-        dual_net.export_model(save_file)
-    except Exception as e:
-        import traceback
-        logging.error(traceback.format_exc())
-        print(traceback.format_exc())
-        logging.exception("Train error")
-        sys.exit(1)
-
-
-def validate_hourly(validate_name=None):
-    """ compiles a list of games based on the new hourly directory format. Then
-    calls validate on it """
-
-    holdout_files = (os.path.join(fsdb.holdout_dir(), d, f)
-                     for d in reversed(gfile.ListDirectory(fsdb.holdout_dir()))
-                     for f in gfile.ListDirectory(os.path.join(fsdb.holdout_dir(), d))
-                     if gfile.IsDirectory(os.path.join(fsdb.holdout_dir(), d)))
-    holdout_files = list(itertools.islice(holdout_files, 20000))
-    random.shuffle(holdout_files)
-    validate.validate(holdout_files)
-
 
 def backfill():
     models = [m[1] for m in fsdb.get_models()]
@@ -136,9 +83,7 @@ def backfill():
 
 parser = argparse.ArgumentParser()
 
-argh.add_commands(parser, [train, selfplay, backfill,
-                           bootstrap, fsdb.game_counts,
-                           validate_hourly])
+argh.add_commands(parser, [selfplay, backfill])
 
 if __name__ == '__main__':
     cloud_logging.configure()

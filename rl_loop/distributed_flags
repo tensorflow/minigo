@@ -1,0 +1,4 @@
+# One line per flag
+--model_dir=estimator_working_dir
+--use_tpu
+--tpu_name=$TPU_NAME

@@ -60,7 +60,7 @@ def main(*validation_paths):
         tf_records = []
         with utils.logged_timer("Building lists of holdout files"):
             for record_dir in validation_paths:
-                tf_records.extend(gfile.Glob(os.path.join(record_dir, '*.zz')))
+                tf_records.extend(gfile.Glob(os.path.join(record_dir, '**', '*.zz')))
     else:
         tf_records = validation_paths
 
