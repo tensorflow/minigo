@@ -246,7 +246,7 @@ std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                          options.komi, "]PW[", options.white_name, "]PB[",
                          options.black_name, "]RE[", options.result, "]\n"));
   if (!options.game_comment.empty()) {
-    absl::StrAppend(&str, absl::StrCat("C[", options.game_comment, "]\n"));
+    absl::StrAppend(&str, "C[", options.game_comment, "]\n");
   }
 
   for (const auto& move_with_comment : moves) {
@@ -255,7 +255,7 @@ std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
     const char* color = move.color == Color::kBlack ? "B" : "W";
     absl::StrAppend(&str, absl::StrCat(";", color, "[", move.c.ToSgf(), "]"));
     if (!move_with_comment.comment.empty()) {
-      absl::StrAppend(&str, absl::StrCat("C[", move_with_comment.comment, "]"));
+      absl::StrAppend(&str, "C[", move_with_comment.comment, "]");
     }
   }
 

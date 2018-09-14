@@ -153,6 +153,7 @@ std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
 std::string FormatInferenceInfo(
     const std::vector<MctsPlayer::InferenceInfo>& inferences) {
   std::vector<std::string> parts;
+  parts.reserve(inferences.size());
   for (const auto& info : inferences) {
     parts.push_back(absl::StrCat(info.model, "(", info.first_move, ",",
                                  info.last_move, ")"));
