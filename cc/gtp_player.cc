@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -28,6 +29,7 @@
 #include "absl/time/clock.h"
 #include "cc/constants.h"
 #include "cc/sgf.h"
+#include "nlohmann/json.hpp"
 
 namespace minigo {
 
@@ -98,7 +100,7 @@ bool GtpPlayer::MaybePonder() {
   }
 
   if (ponder_count_ == 0) {
-    std::cerr << "pondering...\n";
+    std::cerr << "pondering..." << std::endl;
   }
 
   TreeSearch(options().batch_size);
@@ -106,7 +108,7 @@ bool GtpPlayer::MaybePonder() {
   ponder_count_ += options().batch_size;
   if (ponder_count_ >= ponder_limit_) {
     std::cerr << root()->Describe() << "\n";
-    std::cerr << "finished pondering\n";
+    std::cerr << "finished pondering" << std::endl;
   }
 
   return true;
@@ -168,8 +170,8 @@ GtpPlayer::Response GtpPlayer::CheckArgsRange(absl::string_view cmd,
   if (args.size() < expected_min_args || args.size() > expected_max_args) {
     return Response::Error("expected between ", expected_min_args, " and ",
                            expected_max_args, " args for GTP command ", cmd,
-                           ", got ", args.size(), " args: ",
-                           absl::StrJoin(args, " "));
+                           ", got ", args.size(),
+                           " args: ", absl::StrJoin(args, " "));
   }
   return Response::Ok();
 }
@@ -275,9 +277,9 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
     return response;
   }
 
+  nlohmann::json j;
   const auto& position = root()->position;
 
-  // board field.
   std::ostringstream oss;
   for (const auto& stone : position.stones()) {
     char ch;
@@ -290,34 +292,16 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
     }
     oss << ch;
   }
-  std::string board = oss.str();
-
-  // toPlay field.
-  std::string to_play = position.to_play() == Color::kBlack ? "Black" : "White";
-
-  // lastMove field.
-  std::string last_move;
+  j["board"] = oss.str();
+  j["toPlay"] = position.to_play() == Color::kBlack ? "Black" : "White";
   if (!history().empty()) {
-    last_move = absl::StrCat("\"", history().back().c.ToKgs(), "\"");
-  } else {
-    last_move = "null";
+    j["lastMove"] = history().back().c.ToKgs();
   }
+  j["n"] = position.n();
+  j["q"] = root()->parent != nullptr ? root()->parent->Q() : 0;
 
-  // n field.
-  auto n = position.n();
+  std::cerr << "mg-gamestate: " << j.dump() << std::endl;
 
-  // q field.
-  auto q = root()->parent != nullptr ? root()->parent->Q() : 0;
-
-  // clang-format off
-  std::cerr << "mg-gamestate: {"
-            << "\"board\":\"" << board << "\", "
-            << "\"toPlay\":\"" << to_play << "\", "
-            << "\"lastMove\":" << last_move << ", "
-            << "\"n\":" << n << ", "
-            << "\"q\":" << q
-            << "}" << std::endl;
-  // clang-format on
   return Response::Ok();
 }
 
@@ -403,7 +387,7 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
   std::ifstream f;
   f.open(std::string(args[0]));
   if (!f.is_open()) {
-    std::cerr << "Couldn't read \"" << args[0] << "\"\n";
+    std::cerr << "Couldn't read \"" << args[0] << "\"" << std::endl;
     return Response::Error("cannot load file");
   }
   std::stringstream buffer;
@@ -411,7 +395,7 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
 
   sgf::Ast ast;
   if (!ast.Parse(buffer.str())) {
-    std::cerr << "Couldn't parse \"" << args[0] << "\"\n";
+    std::cerr << "Couldn't parse \"" << args[0] << std::endl;
     return Response::Error("cannot load file");
   }
 
@@ -521,36 +505,44 @@ GtpPlayer::Response GtpPlayer::HandleReportSearchInterval(absl::string_view cmd,
 }
 
 void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
-  std::cerr << "mg-search:";
+  const auto& pos = root()->position;
+
+  nlohmann::json j = {
+      {"move", pos.n()},
+      {"toPlay", pos.to_play()},
+  };
+
+  auto& search = j["search"];
   std::vector<const MctsNode*> path;
   for (const auto* node = last_read; node != root(); node = node->parent) {
     path.push_back(node);
   }
   for (auto it = path.rbegin(); it != path.rend(); ++it) {
-    std::cerr << " " << (*it)->move.ToKgs();
+    search.push_back((*it)->move.ToKgs());
   }
-  std::cerr << "\n";
 
-  std::cerr << "mg-q:";
+  auto& qs = j["dq"];
   for (int i = 0; i < kNumMoves; ++i) {
-    std::cerr << " " << std::fixed << std::setprecision(3)
-              << (root()->child_Q(i) - root()->Q());
+    float dq = root()->child_Q(i) - root()->Q();
+    qs.push_back(static_cast<int>(std::round(dq * 100)));
   }
-  std::cerr << "\n";
 
-  std::cerr << "mg-n:";
+  auto& ns = j["n"];
   for (const auto& edge : root()->edges) {
-    std::cerr << std::setprecision(0) << " " << edge.N;
+    ns.push_back(static_cast<int>(edge.N));
   }
-  std::cerr << "\n";
 
-  std::cerr << "mg-pv:";
-  for (Coord c : root()->MostVisitedPath()) {
-    std::cerr << " " << c.ToKgs();
+  // Only report the principal variation when it changes.
+  auto principal_variation = root()->MostVisitedPath();
+  if (principal_variation != last_principal_variation_sent_) {
+    auto& pv = j["pv"];
+    for (Coord c : principal_variation) {
+      pv.push_back(c.ToKgs());
+    }
+    last_principal_variation_sent_ = std::move(principal_variation);
   }
-  std::cerr << "\n";
 
-  std::cerr << std::flush;
+  std::cerr << "mg-search:" << j.dump() << std::endl;
 }
 
 }  // namespace minigo

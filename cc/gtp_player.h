@@ -119,6 +119,8 @@ class GtpPlayer : public MctsPlayer {
   absl::Time last_report_time_;
 
   std::map<std::string, CmdHandler> cmd_handlers_;
+
+  std::vector<Coord> last_principal_variation_sent_;
 };
 
 }  // namespace minigo

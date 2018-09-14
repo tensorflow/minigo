@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Color, otherColor, Point, BoardSize} from './board'
+import {BoardSize, Color, otherColor, Move} from './base'
 
 function getElement(id: string) {
   return document.getElementById(id) as HTMLElement;
@@ -22,7 +22,12 @@ function querySelector(selector: string) {
   return document.querySelector(selector) as HTMLElement;
 }
 
-function parseGtpPoint(gtpCoord: string, N: BoardSize): Point | 'pass' | 'resign' {
+function parseGtpColor(color: string) {
+  let c = color[0].toLowerCase();
+  return c == 'b' ? Color.Black : Color.White;
+}
+
+function parseGtpMove(gtpCoord: string, size: BoardSize): Move {
   if (gtpCoord == 'pass' || gtpCoord == 'resign') {
     return gtpCoord;
   }
@@ -30,30 +35,34 @@ function parseGtpPoint(gtpCoord: string, N: BoardSize): Point | 'pass' | 'resign
   if (col >= 8) {
     --col;
   }
-  let row = N - parseInt(gtpCoord.slice(1), 10);
+  let row = size - parseInt(gtpCoord.slice(1), 10);
   return {row: row, col: col};
 }
 
-function parseVariation(str: string, N: BoardSize, toPlay: Color) {
-  if (str.trim() == '') {
-    return [];
-  }
-  let moves = str.split(' ');
-  let variation = [];
-  let color = toPlay;
+function parseMoves(moves: string[], size: BoardSize): Move[] {
+  let variation: Move[] = [];
   for (let move of moves) {
-    let p = parseGtpPoint(move, N)
-    if (p != 'pass' && p != 'resign') {
-      variation.push({p: p, color: color});
-    }
-    color = otherColor(color);
+    variation.push(parseGtpMove(move, size));
   }
   return variation;
 }
 
+function pixelRatio() {
+  return window.devicePixelRatio || 1;
+}
+
+function emptyBoard(size: number): Color[] {
+  let result: Color[] = [];
+  result.fill(Color.Empty, size * size);
+  return result;
+}
+
 export {
+  emptyBoard,
   getElement,
-  parseGtpPoint,
-  parseVariation,
+  parseGtpColor,
+  parseGtpMove,
+  parseMoves,
+  pixelRatio,
   querySelector,
 }

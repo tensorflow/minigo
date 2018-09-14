@@ -16,8 +16,8 @@
 declare var io: any;
 
 type DebugHandler = (msg: string) => void;
-type CmdHandler = (cmd: string, result: string, ok: boolean) => void;
-type StderrHandler = (line: string) => void;
+type CmdHandler = (result: string, ok: boolean) => void;
+type StderrHandler = (obj: any) => void;
 type ConnectCallback = () => void;
 
 // The GtpSocket serializes all calls to send so that only one call is ever
@@ -69,8 +69,8 @@ class Socket {
     this.connectCallback = callback;
   }
 
-  addStderrHandler(prefix: string, handler: StderrHandler) {
-    this.stderrHandlers.push({prefix: prefix, handler: handler});
+  onData(prefix: string, handler: StderrHandler) {
+    this.stderrHandlers.push({prefix: prefix + ':', handler: handler});
   }
 
   send(cmd: string, callback?: CmdHandler) {
@@ -113,16 +113,27 @@ class Socket {
     if (callback) {
       let ok = line[0] == '=';
       let result = line.substr(1).trim();
-      callback(cmd, result, ok);
+      callback(result, ok);
     }
   }
 
   private stderrHandler(line: string) {
+    let handled = false;
     for (let {prefix, handler} of this.stderrHandlers) {
       if (line.substr(0, prefix.length) == prefix) {
-        handler(line.substr(prefix.length));
-        break;
+        let stripped = line.substr(prefix.length);
+        let obj;
+        try {
+          obj = JSON.parse(stripped);
+        } catch (e) {
+          obj = stripped;
+        }
+        handler(obj);
+        handled = true;
       }
+    }
+    if (!handled && this.debugHandler) {
+      this.debugHandler(line);
     }
   }
 

@@ -17,6 +17,13 @@ new_http_archive(
     urls = ["https://github.com/google/benchmark/archive/v1.3.0.zip"],
 )
 
+new_http_archive(
+    name = "com_github_nlohmann_json",
+    build_file = "cc/json.BUILD",
+    strip_prefix = "json-3.2.0",
+    urls = ["https://github.com/nlohmann/json/archive/v3.2.0.zip"],
+)
+
 http_archive(
     name = "com_google_googletest",
     strip_prefix = "googletest-master",

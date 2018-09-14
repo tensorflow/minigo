@@ -28,7 +28,7 @@ body {
 }
 
 #search-board,
-#q-board,
+#dq-board,
 #n-board {
   width: 280px;
   height: 280px;

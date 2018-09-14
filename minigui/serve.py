@@ -94,14 +94,14 @@ if args.engine == "py":
                    "gtp.py",
                    "--load_file", args.model,
                    "--minigui_mode=true",
-                   "--num_readouts", "1000",
+                   "--num_readouts", "100",
                    "--conv_width", "128",
                    "--verbose", "2"]
 else:
     GTP_COMMAND = [
         "bazel-bin/cc/main",
         "--model=%s" % args.model,
-        "--num_readouts=1000",
+        "--num_readouts=400",
         "--soft_pick=false",
         "--inject_noise=false",
         "--disable_resign_pct=0",

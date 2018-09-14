@@ -97,6 +97,7 @@ minigo_cc_library(
         ":mcts",
         ":sgf",
         "//cc/dual_net",
+        "@com_github_nlohmann_json//:json",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
