@@ -295,10 +295,13 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
   j["board"] = oss.str();
   j["toPlay"] = position.to_play() == Color::kBlack ? "Black" : "White";
   if (!history().empty()) {
+    std::cerr << "### " << history().size() << " " << history().back().c
+              << std::endl;
     j["lastMove"] = history().back().c.ToKgs();
   }
-  j["n"] = position.n();
+  j["moveNum"] = position.n();
   j["q"] = root()->parent != nullptr ? root()->parent->Q() : 0;
+  j["gameOver"] = game_over();
 
   std::cerr << "mg-gamestate: " << j.dump() << std::endl;
 

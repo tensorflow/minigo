@@ -36,12 +36,17 @@ abstract class Layer {
     this.boardToCanvas = board.boardToCanvas.bind(board);
   }
 
-  abstract update(dataObj: DataObj): void;
+  // Returns true if dataObj contained updated data for the layer and it should
+  // be redrawn.
+  abstract update(dataObj: DataObj): boolean;
+
   abstract draw(): void;
 }
 
 abstract class StaticLayer extends Layer {
-  update(dataObj: DataObj) {}
+  update(dataObj: DataObj) {
+    return false;
+  }
 }
 
 abstract class DataLayer extends Layer {
@@ -162,9 +167,11 @@ class HeatMap extends DataLayer {
 
   update(dataObj: DataObj) {
     let data = this.getData<number[] | null>(dataObj);
-    if (data !== undefined) {
-      this.colors = data != null ? this.colorizeFn(data) : null;
+    if (data === undefined) {
+      return false;
     }
+    this.colors = data != null ? this.colorizeFn(data) : null;
+    return true;
   }
 
   draw() {
@@ -214,13 +221,13 @@ class BoardStones extends StoneBaseLayer {
 
   update(dataObj: DataObj) {
     let stones = this.getData<Color[]>(dataObj);
-    if (stones !== undefined) {
-      this.blackStones = [];
-      this.whiteStones = [];
-      if (stones == null) {
-        return;
-      }
+    if (stones === undefined) {
+      return false;
+    }
 
+    this.blackStones = [];
+    this.whiteStones = [];
+    if (stones != null) {
       let size = this.board.size;
       let i = 0;
       for (let row = 0; row < size; ++row) {
@@ -234,6 +241,7 @@ class BoardStones extends StoneBaseLayer {
         }
       }
     }
+    return true;
   }
 }
 
@@ -251,20 +259,25 @@ class Variation extends StoneBaseLayer {
   }
 
   update(dataObj: DataObj) {
-    let toPlay = this.board.toPlay;
-    let size = this.board.size;
     let variation = this.getData<Move[]>(dataObj);
     if (variation === undefined) {
-      return;
+      return false;
     }
 
+    let toPlay = this.board.toPlay;
+    let size = this.board.size;
     this.blackStones = [];
     this.whiteStones = [];
     this.blackLabels = [];
     this.whiteLabels = [];
 
     if (variation == null) {
-      return;
+      // We assume here that every update contains a new variation.
+      // The search variation will by definition be different every time and
+      // the engine only sends a principle variation when it changes, so this is
+      // currently a safe assumption.
+      // TODO(tommadams): return false if the varation was previously empty.
+      return true;
     }
 
     // The playedCount array keeps track of the number of times each point on
@@ -302,6 +315,8 @@ class Variation extends StoneBaseLayer {
         firstPlayed[idx].s += '*';
       }
     }
+
+    return true;
   }
 
   draw() {
@@ -339,9 +354,10 @@ class Annotations extends DataLayer {
   update(dataObj: DataObj) {
     let annotations = this.getData<Annotation[]>(dataObj);
     if (annotations === undefined) {
-      return;
+      return false;
     }
     this.annotations = annotations != null ? annotations : [];
+    return true;
   }
 
   draw() {

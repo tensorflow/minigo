@@ -110,6 +110,7 @@ void MctsPlayer::NewGame() {
   game_root_ = MctsNode(&dummy_stats_, {&bv_, &gv_, Color::kBlack});
   root_ = &game_root_;
   game_over_ = false;
+  history_.clear();
 }
 
 Coord MctsPlayer::SuggestMove() {

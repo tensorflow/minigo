@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {getElement, pixelRatio} from './util'
+import {View} from './view'
 import {DataObj, Grid, Layer} from './layer'
 import {BoardSize, Color, Coord, Move, Point} from './base'
 
@@ -31,19 +32,13 @@ interface Annotation {
   color: string;
 }
 
-interface StateObj {
-  toPlay?: Color;
-  stones?: Color[];
-  [key: string]: any;
-}
-
 interface BoardOptions {
   // Margin in pixels to add to the board.
   // Default is 0;
   margin?: number;
 }
 
-class Board {
+class Board extends View {
   toPlay = Color.Black;
   stones: Color[] = [];
   ctx: CanvasRenderingContext2D;
@@ -53,14 +48,18 @@ class Board {
   pointW: number;
   pointH: number;
   stoneRadius: number;
+  elem: HTMLElement;
 
   protected layers: Layer[];
 
   constructor(parent: HTMLElement | string, public size: BoardSize,
               layerDescs: any[], options: BoardOptions = {}) {
+    super();
+
     if (typeof(parent) == 'string') {
       parent = getElement(parent);
     }
+    this.elem = parent;
 
     this.backgroundColor = '#db6';
     this.margin = options.margin || 0;
@@ -103,19 +102,23 @@ class Board {
     }
   }
 
-  update(state: StateObj) {
+  update(state: any) {
     if (state.toPlay !== undefined) {
-      this.toPlay = state.toPlay;
+      this.toPlay = state.toPlay as Color;
     }
     if (state.stones !== undefined) {
-      this.stones = state.stones;
+      this.stones = state.stones as Color[];
     }
+    let anything_changed = false;
     for (let layer of this.layers) {
-      layer.update(state);
+      if (layer.update(state)) {
+        anything_changed = true;
+      }
     }
+    return anything_changed;
   }
 
-  draw() {
+  drawImpl() {
     let ctx = this.ctx;
     ctx.fillStyle = this.backgroundColor;
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -270,8 +273,8 @@ class ClickableBoard extends Board {
     this.listeners.push(cb);
   }
 
-  draw() {
-    super.draw();
+  drawImpl() {
+    super.drawImpl();
     let p = this.enabled ? this.p : null;
     this.ctx.canvas.style.cursor = p ? 'pointer' : null;
     if (p) {

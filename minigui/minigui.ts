@@ -18,17 +18,21 @@ import * as util from './util'
 import * as lyr from './layer'
 import {heatMapN, heatMapDq} from './heat_map'
 import {Log} from './log'
-import * as gtpsock from './gtp_socket'
-import {Graph} from './graph'
+import {Socket} from './gtp_socket'
+import {WinrateGraph} from './winrate_graph'
 
-class BoardState {
+const HUMAN = 'Human';
+const MINIGO = 'Minigo';
+
+class Position {
   search: Move[] = [];
   pv: Move[] = [];
   n: Nullable<number[]> = null;
   dq: Nullable<number[]> = null;
   annotations: Annotation[] = [];
 
-  constructor(public stones: Color[],
+  constructor(public moveNum: number,
+              public stones: Color[],
               public lastMove: Nullable<Move>,
               public toPlay: Color) {
     if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
@@ -44,40 +48,51 @@ class BoardState {
 export interface SearchMsg {
   move: number;
   toPlay: string;
-  search: string[];
+  search: string[] | Move[];
   n: number[];
   dq: number[];
-  pv?: string[];
+  pv?: string[] | Move[];
 }
 
 export interface GameStateMsg {
-  board: string | Color[];
+  board: string;
   toPlay: string;
   lastMove?: string;
-  n: number;
+  moveNum: number;
   q: number;
+  gameOver: boolean;
 }
 
 class App {
-  private drawPending = false;
-
+  private size: number;
   private mainBoard: ClickableBoard;
   private searchBoard: Board;
   private nBoard: Board;
   private dqBoard: Board;
   private boards: Board[] = [];
-  private history: BoardState[];
-  private activeMove = 0;
+  private positionHistory: Position[];
+  private activePosition: Position;
   private numConsecutivePasses = 0;
   private gameOver = false;
   private minigoBusy = false;
   private playerElems: HTMLElement[] = [];
   private toPlay = Color.Black;
+  private winrateGraph = new WinrateGraph('winrate-graph');
 
-  constructor(private size: number) {
-    this.history = [
-      new BoardState(util.emptyBoard(this.size), null, Color.Black)
-    ];
+  private log = new Log('log', 'console');
+  private gtp: Socket;
+
+  constructor(uri: string) {
+    this.gtp = new Socket();
+    this.gtp.connect(uri).then((size: number) => { this.init(size); });
+  }
+
+  init(size: number) {
+    this.size = size;
+
+    this.activePosition = new Position(
+      0, util.emptyBoard(this.size), null, Color.Black)
+    this.positionHistory = [this.activePosition];
 
     this.mainBoard = new ClickableBoard(
       'main-board', this.size,
@@ -104,8 +119,8 @@ class App {
       this.playMove(this.toPlay, p);
     });
 
-    gtp.onData('mg-search', this.onSearch.bind(this));
-    gtp.onData('mg-gamestate', this.onGameState.bind(this));
+    this.gtp.onData('mg-search', this.onSearch.bind(this));
+    this.gtp.onData('mg-gamestate', this.onGameState.bind(this));
 
     util.getElement('pass').addEventListener('click', () => {
       if (this.mainBoard.enabled) {
@@ -114,54 +129,92 @@ class App {
     });
 
     util.getElement('reset').addEventListener('click', () => {
-      log.clear();
-      qGraph.clear();
-      gtp.newSession();
-      gtp.send('clear_board', () => { this.gameOver = false; });
-      gtp.send('gamestate');
-      gtp.send('report_search_interval 50');
-      gtp.send('info');
+      this.log.clear();
+      this.winrateGraph.clear();
+      this.gtp.newSession();
+      this.gtp.send('clear_board');
+      this.gtp.send('gamestate');
+      this.gtp.send('report_search_interval 50');
+      this.gtp.send('info');
     });
 
     let initPlayerButton = (color: Color, elemId: string) => {
       let elem = util.getElement(elemId);
       this.playerElems[color] = elem;
       elem.addEventListener('click', () => {
-        if (elem.innerText == 'Human') {
-          elem.innerText = 'Minigo';
-          if (this.toPlay == color && !this.minigoBusy) {
-            this.genMove();
-          }
+        if (elem.innerText == HUMAN) {
+          elem.innerText = MINIGO;
         } else {
-          elem.innerText = 'Human';
+          elem.innerText = HUMAN;
         }
+        this.onPlayerChanged();
       });
     };
     initPlayerButton(Color.Black, 'black-player');
     initPlayerButton(Color.White, 'white-player');
-  }
 
-  private genMove() {
-    this.minigoBusy = true;
-    gtp.send('genmove', (result: string) => {
-      this.minigoBusy = false;
-      this.onMovePlayed(util.parseGtpMove(result, this.mainBoard.size));
+    this.winrateGraph.onMoveChanged((moveNum: Nullable<number>) => {
+      let position: Position;
+      if (moveNum == null || moveNum < 0 ||
+          moveNum >= this.positionHistory.length) {
+        position = this.positionHistory[this.positionHistory.length - 1];
+      } else {
+        position = this.positionHistory[moveNum];
+      }
+      if (position == this.activePosition) {
+        return;
+      }
+      this.activePosition = position;
+      this.updateBoards(position);
     });
+
+    // Initialize log.
+    this.log = new Log('log', 'console');
+    this.log.onConsoleCmd((cmd: string) => {
+      this.gtp.send(cmd).then(() => { this.log.scroll(); });
+    });
+
+    this.gtp.onText((line: string) => { this.log.log(line, 'log-cmd'); });
+    this.gtp.send('clear_board');
+    this.gtp.send('gamestate');
+    this.gtp.send('report_search_interval 250');
+    this.gtp.send('info');
+    this.gtp.send('ponder_limit 0');
   }
 
-  onSearch(msg: SearchMsg) {
-    this.history[msg.move].n = msg.n;
-    this.history[msg.move].dq = msg.dq;
-    this.history[msg.move].search = util.parseMoves(msg.search, this.size);
-    if (msg.pv) {
-      this.history[msg.move].pv = util.parseMoves(msg.search, this.size);
+  private onPlayerChanged() {
+    if (this.minigoBusy || this.gameOver) {
+      return;
     }
-    // TODO(tommadams): This will redraw the main board, even if nothing has
-    // changed.
-    this.refresh();
+
+    if (this.playerElems[this.toPlay].innerText == MINIGO) {
+      this.mainBoard.enabled = false;
+      this.minigoBusy = true;
+      this.gtp.send('genmove').then((move: string) => {
+        this.minigoBusy = false;
+        this.onMovePlayed(util.parseGtpMove(move, this.mainBoard.size));
+      });
+    } else {
+      this.mainBoard.enabled = true;
+    }
   }
 
-  onGameState(msg: GameStateMsg) {
+  private onSearch(msg: SearchMsg) {
+    // Parse move variations.
+    msg.search = util.parseMoves(msg.search as string[], this.size);
+    if (msg.pv) {
+      msg.pv = util.parseMoves(msg.pv as string[], this.size);
+    }
+
+    // Update the board state with contents of the search.
+    const props = ['n', 'dq', 'pv', 'search'];
+    util.partialUpdate(msg, this.positionHistory[msg.move], props);
+
+    // Update the boards.
+    this.updateBoards(msg);
+  }
+
+  private onGameState(msg: GameStateMsg) {
     // Update stones on the board.
     let stoneMap: {[index: string]: Color} = {
       '.': Color.Empty,
@@ -174,20 +227,20 @@ class App {
     }
 
     this.toPlay = util.parseGtpColor(msg.toPlay);
+    this.gameOver = msg.gameOver;
+
     let lastMove = msg.lastMove ? util.parseGtpMove(msg.lastMove, this.size) : null;
-    this.history[msg.n] = new BoardState(stones, lastMove, this.toPlay);
-    if (msg.n == this.activeMove + 1) {
-      this.activeMove = msg.n;
+    let position = new Position(msg.moveNum, stones, lastMove, this.toPlay);
+    this.positionHistory[msg.moveNum] = position;
+    if (msg.moveNum == this.activePosition.moveNum + 1) {
+      this.activePosition = position;
+      this.updateBoards(this.activePosition);
     }
 
-    qGraph.setMoveScore(msg.n, msg.q);
-    qGraph.draw();
+    this.winrateGraph.setMoveScore(msg.moveNum, msg.q);
+    this.winrateGraph.draw();
 
-    if (!this.gameOver && this.playerElems[this.toPlay].innerText == 'Minigo') {
-      this.genMove();
-    }
-
-    this.refresh();
+    this.onPlayerChanged();
   }
 
   private playMove(color: Color, move: Move) {
@@ -203,34 +256,17 @@ class App {
       let col = COL_LABELS[move.col];
       moveStr = `${col}${row}`;
     }
-    gtp.send(`play ${colorStr} ${moveStr}`, (result: string, ok: boolean) => {
-      if (ok) {
-        this.onMovePlayed(move);
-      }
+    this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
+      this.onMovePlayed(move);
     });
   }
 
-  // TODO(tommadams): Make private
   // Callback invoked when either a human or Minigo plays a valid move.
-  onMovePlayed(move: Move) {
-    if (move == 'pass') {
-      if (++this.numConsecutivePasses == 2) {
-        this.gameOver = true;
-      }
-    } else {
-      this.numConsecutivePasses = 0;
-      if (move == 'resign') {
-        this.gameOver = true;
-      }
-    }
-
-    log.scroll();
-    gtp.send('gamestate');
+  private onMovePlayed(move: Move) {
+    this.log.scroll();
+    this.gtp.send('gamestate');
     if (this.gameOver) {
-      gtp.send('final_score', (result: string, ok: boolean) => {
-        if (!ok) {
-          return;
-        }
+      this.gtp.send('final_score').then((result: string) => {
         let prettyResult: string;
         if (result[0] == 'W') {
           prettyResult = 'White wins by ';
@@ -242,103 +278,20 @@ class App {
         } else {
           prettyResult += result.substr(2) + ' points';
         }
-        log.log(prettyResult);
-        log.scroll();
+        this.log.log(prettyResult);
+        this.log.scroll();
       });
     }
   }
 
-  private refresh() {
-    if (!this.drawPending) {
-      this.drawPending = true;
-      window.requestAnimationFrame(() => {
-        this.drawPending = false;
-        for (let board of this.boards) {
-          board.update(this.history[this.activeMove]);
-          board.draw();
-        }
-      });
+  private updateBoards(state: any) {
+    for (let board of this.boards) {
+      if (board.update(state)) {
+        board.draw();
+      }
     }
   }
 }
 
-let app: App;
+new App(`http://${document.domain}:${location.port}/minigui`);
 
-// Initialize log.
-let log = new Log('log', 'console');
-let consoleElem = util.getElement('console')
-consoleElem.addEventListener('keypress', (e) => {
-  if (e.keyCode == 13) {
-    let cmd = consoleElem.innerText.trim();
-    if (cmd != '') {
-      gtp.send(cmd, () => { log.scroll(); });
-    }
-    consoleElem.innerHTML = '';
-    e.preventDefault();
-    return false;
-  }
-});
-
-// Initialize socket connection to the backend.
-let gtp = new gtpsock.Socket(
-  `http://${document.domain}:${location.port}/minigui`,
-  (line: string) => { log.log(line, 'log-cmd'); });
-
-function init(boardSize: number) {
-  app = new App(boardSize);
-
-  gtp.send('clear_board');
-  gtp.send('gamestate');
-  gtp.send('report_search_interval 250');
-  gtp.send('info');
-  gtp.send('ponder_limit 0');
-  util.getElement('ui-container').classList.remove('hidden');
-}
-
-function tryBoardSize(sizes: BoardSize[]) {
-  if (sizes.length == 0) {
-    throw new Error('Couldn\'t find an acceptable board size');
-  }
-  gtp.send(`boardsize ${sizes[0]}`, (result, ok) => {
-    if (ok) {
-      init(sizes[0]);
-    } else {
-      tryBoardSize(sizes.slice(1));
-    }
-  });
-}
-
-gtp.onConnect(() => {
-  if (!app) {
-    tryBoardSize([BoardSize.Nine, BoardSize.Nineteen]);
-  }
-});
-
-let qGraph = new Graph('q-graph');
-// TODO(tommadams): do this
-/*
-qGraph.onMoveChanged((move: number | null) => {
-  gameState.hoveredMove = move;
-  for (let board of boards) {
-    board.clearAnnotations();
-  }
-
-  if (move == null) {
-    move = gameState.history.length - 1;
-  }
-  let h = gameState.history[move];
-  if (h.lastMove != null && h.lastMove != 'pass' && h.lastMove != 'resign') {
-    mainBoard.setMark(h.lastMove, '#ef6c02');
-  }
-  mainBoard.setStones(h.stones);
-  dqBoard.setStones(h.stones);
-  nBoard.setStones(h.stones);
-  mainBoard.setVariation(h.pv);
-  dqBoard.setHeatMap(h.q);
-  nBoard.setHeatMap(h.n);
-
-  for (let board of boards) {
-    redraw.requestDraw(board);
-  }
-});
-*/

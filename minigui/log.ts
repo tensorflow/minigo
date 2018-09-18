@@ -12,15 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Nullable} from './base';
 import {getElement, querySelector} from './util';
+
+type CmdHandler = (cmd: string) => void;
 
 class Log {
   private logElem: HTMLElement;
   private consoleElem: HTMLElement;
+  private cmdHandler: Nullable<CmdHandler> = null;
 
   constructor(logElemId: string, consoleElemId: string) {
     this.logElem = getElement(logElemId);
     this.consoleElem = getElement(consoleElemId);
+    this.consoleElem.addEventListener('keypress', (e) => {
+      if (e.keyCode == 13) {
+        let cmd = this.consoleElem.innerText.trim();
+        if (cmd != '' && this.cmdHandler) {
+          this.cmdHandler(cmd);
+        }
+        this.consoleElem.innerHTML = '';
+        e.preventDefault();
+        return false;
+      }
+    });
   }
 
   log(msg: string | HTMLElement, className='') {
@@ -49,6 +64,10 @@ class Log {
     if (this.logElem.lastElementChild) {
       this.logElem.lastElementChild.scrollIntoView();
     }
+  }
+
+  onConsoleCmd(cmdHandler: CmdHandler) {
+    this.cmdHandler = cmdHandler;
   }
 }
 

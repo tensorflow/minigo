@@ -16,7 +16,7 @@ import {getElement} from './util'
 
 type MoveChangedCallback = (move: number | null) => void;
 
-class Graph {
+class WinrateGraph {
   protected ctx: CanvasRenderingContext2D;
   protected points = new Array<[number, number]>();
   protected pixelRatio = window.devicePixelRatio || 1;
@@ -197,4 +197,4 @@ class Graph {
   }
 }
 
-export {Graph}
+export {WinrateGraph}

@@ -57,12 +57,22 @@ function emptyBoard(size: number): Color[] {
   return result;
 }
 
+function partialUpdate(src: any, dst: any, propNames: string[]) {
+  for (let name of propNames) {
+    if (name in src) {
+      dst[name] = src[name];
+    }
+  }
+  return dst;
+}
+
 export {
   emptyBoard,
   getElement,
   parseGtpColor,
   parseGtpMove,
   parseMoves,
+  partialUpdate,
   pixelRatio,
   querySelector,
 }

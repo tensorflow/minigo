@@ -88,7 +88,7 @@ body {
   margin: auto;
 }
 
-#q-graph {
+#winrate-graph {
   width: 480px;
   height: 210px;
   cursor: crosshair;
@@ -116,22 +116,6 @@ body {
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
 }
 .button:hover { opacity: 0.8; }
-
-#mode {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  color: #fee;
-  cursor: pointer;
-  user-select: none;
-  font-family: sans-serif;
-  text-align: center;
-  width: 50px;
-  margin-right: 8px;
-  margin-bottom: 8px;
-  opacity: 0.05;
-}
-#mode:hover { opacity: 0.5; }
 
 .log-cmd { font-style: italic; padding-left: 12px; }
 

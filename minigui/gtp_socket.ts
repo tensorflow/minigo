@@ -15,9 +15,11 @@
 // Let's not worry about Socket.io type safety for now.
 declare var io: any;
 
-type DebugHandler = (msg: string) => void;
+import {Nullable} from './base';
+
+type TextHandler = (msg: string) => void;
 type CmdHandler = (result: string, ok: boolean) => void;
-type StderrHandler = (obj: any) => void;
+type DataHandler = (obj: any) => void;
 type ConnectCallback = () => void;
 
 // The GtpSocket serializes all calls to send so that only one call is ever
@@ -25,25 +27,21 @@ type ConnectCallback = () => void;
 // the debug logs easier because we don't end up with request and result logs
 // all jumbled up.
 class Socket {
-  private sock: any;
-  private cmdQueue = new Array<{cmd: string, callback: CmdHandler | null}>();
+  private sock: any = null;
+  private cmdQueue: {cmd: string, resolve: any, reject: any}[] = [];
   private gameToken: string;
   private handshakeComplete = false;
-  private connectCallback: ConnectCallback | null = null;
-  private lines = new Array<string>();
+  private connectCallback: Nullable<ConnectCallback> = null;
+  private lines: string[] = [];
 
-  private stderrHandlers = new Array<{prefix: string, handler: StderrHandler}>();
+  private dataHandlers: {prefix: string, handler: DataHandler}[] = [];
+  private textHandlers: TextHandler[] = [];
 
-  constructor(uri: string, private debugHandler: DebugHandler) {
+  // Connects to the Minigui server at the given URI.
+  // Returns a promise that gets resolved of the board size when the connection
+  // is established.
+  connect(uri: string) {
     this.sock = io.connect(uri)
-    this.debugHandler = debugHandler;
-
-    this.sock.on('connect', () => {
-      this.newSession();
-      if (this.connectCallback) {
-        this.connectCallback();
-      }
-     });
 
     this.sock.on('json', (msg: string) => {
       let obj = JSON.parse(msg);
@@ -63,21 +61,49 @@ class Socket {
         this.stderrHandler(obj.stderr);
       }
     });
+
+    return new Promise((resolve) => {
+      // Connect to the server.
+      this.sock.on('connect', () => {
+        this.newSession();
+
+        // Probe for the supported board size.
+        // Minigo only supports a single board size and will reject GTP
+        // "boardsize" commands for any other size.
+        this.send('boardsize 9')
+          .then(() => { resolve(9); })
+          .catch(() => {
+            this.send('boardsize 19').then(() => { resolve(19); });
+          });
+      });
+    });
   }
 
-  onConnect(callback: ConnectCallback) {
-    this.connectCallback = callback;
+  // Add a handler that will be invoked whenever the Minigo engine writes
+  // anything to stdout, or writes something to stderr that isn't handled by
+  // one of the data handlers registered via onData.
+  onText(handler: TextHandler) {
+    this.textHandlers.push(handler);
   }
 
-  onData(prefix: string, handler: StderrHandler) {
-    this.stderrHandlers.push({prefix: prefix + ':', handler: handler});
+  // Add a handler that accepts lines that begin with the given prefix plus ':'.
+  // The matching handlers are invoked in the order they were registered.
+  // Before the handlers are invoked, the contents of the line that follows the
+  // matching prefix are parsed as a JSON object if possible and passed as the
+  // handler argument. The raw line suffix is passed if it can't be parsed.
+  onData(prefix: string, handler: DataHandler) {
+    this.dataHandlers.push({prefix: prefix + ':', handler: handler});
   }
 
-  send(cmd: string, callback?: CmdHandler) {
-    this.cmdQueue.push({cmd: cmd, callback: callback || null});
-    if (this.cmdQueue.length == 1) {
-      this.sendNext();
-    }
+  // Sends a GTP command, invoking the optional handler when the command is
+  // complete.
+  send(cmd: string) {
+    return new Promise((resolve, reject) => {
+      this.cmdQueue.push({cmd: cmd, resolve: resolve, reject: reject});
+      if (this.cmdQueue.length == 1) {
+        this.sendNext();
+      }
+    });
   }
 
   newSession() {
@@ -95,11 +121,9 @@ class Socket {
   }
 
   private cmdHandler(line: string) {
-    let {cmd, callback} = this.cmdQueue[0];
+    let {cmd, resolve, reject} = this.cmdQueue[0];
 
-    if (this.debugHandler) {
-      this.debugHandler(`${cmd} ${line}`);
-    }
+    this.textHandler(`${cmd} ${line}`);
 
     if (line[0] == '=' || line[0] == '?') {
       // This line contains the response from a GTP command; pop the command off
@@ -110,16 +134,18 @@ class Socket {
       }
     }
 
-    if (callback) {
-      let ok = line[0] == '=';
-      let result = line.substr(1).trim();
-      callback(result, ok);
+    let ok = line[0] == '=';
+    let result = line.substr(1).trim();
+    if (ok) {
+      resolve(result);
+    } else {
+      reject(result);
     }
   }
 
   private stderrHandler(line: string) {
     let handled = false;
-    for (let {prefix, handler} of this.stderrHandlers) {
+    for (let {prefix, handler} of this.dataHandlers) {
       if (line.substr(0, prefix.length) == prefix) {
         let stripped = line.substr(prefix.length);
         let obj;
@@ -132,23 +158,26 @@ class Socket {
         handled = true;
       }
     }
-    if (!handled && this.debugHandler) {
-      this.debugHandler(line);
+    if (!handled) {
+      this.textHandler(line);
+    }
+  }
+
+  private textHandler(str: string) {
+    for (let handler of this.textHandlers) {
+      handler(str);
     }
   }
 
   private sendNext() {
-    let {cmd, callback} = this.cmdQueue[0];
-    if (this.debugHandler) {
-      this.debugHandler(`${cmd}`);
+    let {cmd} = this.cmdQueue[0];
+    if (this.textHandler) {
+      this.textHandler(`${cmd}`);
     }
     this.sock.emit('gtpcmd', {data: cmd});
   }
 }
 
 export {
-  CmdHandler,
-  DebugHandler,
   Socket,
-  StderrHandler,
 };
