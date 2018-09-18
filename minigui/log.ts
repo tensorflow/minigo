@@ -22,20 +22,22 @@ class Log {
   private consoleElem: HTMLElement;
   private cmdHandler: Nullable<CmdHandler> = null;
 
-  constructor(logElemId: string, consoleElemId: string) {
+  constructor(logElemId: string, consoleElemId: Nullable<string> = null) {
     this.logElem = getElement(logElemId);
-    this.consoleElem = getElement(consoleElemId);
-    this.consoleElem.addEventListener('keypress', (e) => {
-      if (e.keyCode == 13) {
-        let cmd = this.consoleElem.innerText.trim();
-        if (cmd != '' && this.cmdHandler) {
-          this.cmdHandler(cmd);
+    if (consoleElemId) {
+      this.consoleElem = getElement(consoleElemId);
+      this.consoleElem.addEventListener('keypress', (e) => {
+        if (e.keyCode == 13) {
+          let cmd = this.consoleElem.innerText.trim();
+          if (cmd != '' && this.cmdHandler) {
+            this.cmdHandler(cmd);
+          }
+          this.consoleElem.innerHTML = '';
+          e.preventDefault();
+          return false;
         }
-        this.consoleElem.innerHTML = '';
-        e.preventDefault();
-        return false;
-      }
-    });
+      });
+    }
   }
 
   log(msg: string | HTMLElement, className='') {

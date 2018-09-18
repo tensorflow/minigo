@@ -63,16 +63,17 @@ class WinrateGraph {
     this.draw();
   }
 
-  // Sets the graph value for the given move number.
-  setMoveScore(move: number, value: number) {
-    this.points[move] = [move, value];
+  // Sets the predicted winrate for the given move.
+  setWinrate(move: number, winrate: number) {
+    this.points[move] = [move, winrate];
+    this.draw();
   }
 
   onMoveChanged(callback: MoveChangedCallback) {
     this.moveChangedCallback = callback;
   }
 
-  draw() {
+  private draw() {
     let ctx = this.ctx;
     let w = this.w;
     let h = this.h;

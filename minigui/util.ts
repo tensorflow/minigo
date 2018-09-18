@@ -52,8 +52,8 @@ function pixelRatio() {
 }
 
 function emptyBoard(size: number): Color[] {
-  let result: Color[] = [];
-  result.fill(Color.Empty, size * size);
+  let result = new Array<Color>(size * size);
+  result.fill(Color.Empty);
   return result;
 }
 
