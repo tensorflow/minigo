@@ -19,12 +19,11 @@ move prediction and score estimation.
 """
 
 from absl import flags
-import argparse
 import functools
 import os.path
 import sys
 
-import argh
+import fire
 from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
@@ -616,11 +615,12 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
             self.before_weights = None
 
 
-parser = argparse.ArgumentParser()
-argh.add_commands(parser, [train, export_model, validate])
-
 if __name__ == '__main__':
     # Let absl.flags parse known flags from argv, then pass the remaining flags
-    # into argh for dispatching.
+    # into 'fire' for dispatching.
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    argh.dispatch(parser, argv=remaining_argv[1:])
+    fire.Fire({
+        'train': train,
+        'export_model': export_model,
+        'validate': validate,
+    }, remaining_argv[1:])

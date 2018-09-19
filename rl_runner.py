@@ -18,11 +18,11 @@ We run as subprocesses because it gives us some isolation.
 """
 
 import datetime as dt
+import fire
 import os
 import subprocess
 import sys
 
-import argh
 from utils import timer
 
 BUCKET_NAME = os.environ['BUCKET_NAME']
@@ -57,4 +57,4 @@ def loop(working_dir='estimator_working_dir', tpu_name=None):
 
 
 if __name__ == '__main__':
-    argh.dispatch_command(loop)
+    fire.Fire(loop)
