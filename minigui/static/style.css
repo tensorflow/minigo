@@ -1,7 +1,14 @@
 * { box-sizing: border-box; }
 
+html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
 body {
   margin: 0;
+  padding: 0;
   background-color: #543;
 }
 
@@ -11,20 +18,13 @@ body {
 /* Spacers */
 .sp-20 { width: 20px; height: 20px; display: inline-block; }
 .sp-30 { width: 30px; height: 30px; display: inline-block; }
+.sp-1vh { width: 1vh; height: 1vh; display: inline-block; }
+.sp-2vh { width: 2vh; height: 2vh; display: inline-block; }
+.sp-3vh { width: 3vh; height: 3vh; display: inline-block; }
 
 /* Squares of different sizes (mostly used for boards) */
 .sq-280 { width: 280px; height: 280px; }
 .sq-900 { width: 900px; height: 900px; }
-
-#ui-container {
-  display: flex;
-  flex-wrap: wrap;
-  flex-direction: row;
-  width: 1720px;
-  height: 900px;
-  margin: auto;
-  margin-top: 90px;
-}
 
 .board {
   background-color: #db6;
@@ -34,47 +34,36 @@ body {
 .log-container {
   background-color: #2c241e;
   color: rgba(255, 255, 255, 0.7);
-  width: 480px;
-  height: 590px;
   font-family: monospace;
   font-size: 0;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
-#log {
+.log {
   padding: 3px;
   white-space: pre-wrap;
-  width: 480px;
-  height: 566px;
-  font-size: 10px;
-  overflow: scroll;
+  overflow-x: hidden;
+  overflow-y: scroll;
 }
 
 .console-wrapper {
   display: flex;
   border-top: 1px dashed #96928f;
-  height: 24px;
 }
 .console-prompt {
-  font-size: 10px;
-  width: 16px;
   height: 100%;
   padding: 3px;
   display: inline-flex;
   justify-content: center;
 }
-#console {
-  font-size: 10px;
+.console {
   height: 100%;
-  width: 464px;
   padding: 3px;
   display: inline-flex;
   outline: none;
 }
 
-#winrate-graph {
-  width: 480px;
-  height: 210px;
+.winrate-graph {
   cursor: crosshair;
   background-color: #2c241e;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
@@ -87,13 +76,8 @@ body {
 
 .button {
   font-family: sans-serif;
-  font-size: 14px;
-
-  border-radius: 6px;
   cursor: pointer;
   user-select: none;
-  width: 105px;
-  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

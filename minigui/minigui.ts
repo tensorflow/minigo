@@ -36,22 +36,32 @@ class DemoApp extends App {
     this.connect().then(() => {
       this.mainBoard = new ClickableBoard(
         'main-board', this.size,
-        [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations],
-        {margin: 30});
+        [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
 
-      let searchBoard = new Board(
-        'search-board', this.size,
-        [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]);
+      let boards: Board[] = [this.mainBoard];
 
-      let nBoard = new Board(
-        'n-board', this.size,
-        [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heatMapN], lyr.BoardStones]);
+      let searchElem = getElement('search-board');
+      if (searchElem) {
+        boards.push(new Board(
+            searchElem, this.size,
+            [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]));
+      }
 
-      let dqBoard = new Board(
-        'dq-board', this.size,
-        [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heatMapDq], lyr.BoardStones]);
+      let nElem = getElement('n-board');
+      if (nElem) {
+        boards.push(new Board(
+          nElem, this.size,
+          [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heatMapN], lyr.BoardStones]));
+      }
 
-      this.init([this.mainBoard, searchBoard, nBoard, dqBoard]);
+      let dqElem = getElement('dq-board');
+      if (dqElem) {
+        boards.push(new Board(
+          'dq-board', this.size,
+          [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heatMapDq], lyr.BoardStones]));
+      }
+
+      this.init(boards);
 
       this.mainBoard.onClick((p) => {
         this.playMove(this.toPlay, p);

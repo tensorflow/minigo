@@ -29,8 +29,7 @@ class KioskApp extends App {
     this.connect().then(() => {
       let mainBoard = new Board(
         'main-board', this.size,
-        [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations],
-        {margin: 30});
+        [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
 
       let searchBoard = new Board(
         'search-board', this.size,

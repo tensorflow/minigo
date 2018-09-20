@@ -39,7 +39,7 @@ class Position {
 }
 
 interface SearchMsg {
-  move: number;
+  moveNum: number;
   toPlay: string;
   search: string[] | Move[];
   n: number[];
@@ -118,10 +118,12 @@ abstract class App {
 
     // Update the board state with contents of the search.
     const props = ['n', 'dq', 'pv', 'search'];
-    util.partialUpdate(msg, this.positionHistory[msg.move], props);
+    util.partialUpdate(msg, this.positionHistory[msg.moveNum], props);
 
     // Update the boards.
-    this.updateBoards(msg);
+    if (msg.moveNum == this.activePosition.moveNum) {
+      this.updateBoards(msg);
+    }
   }
 
   protected onGameState(msg: GameStateMsg) {

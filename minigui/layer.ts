@@ -82,10 +82,10 @@ class Grid extends StaticLayer {
       let right = this.boardToCanvas(i, size - 1);
       let top = this.boardToCanvas(0, i);
       let bottom = this.boardToCanvas(size - 1, i);
-      ctx.moveTo(0.5 + left.x, 0.5 + left.y);
-      ctx.lineTo(0.5 + right.x, 0.5 + right.y);
-      ctx.moveTo(0.5 + top.x, 0.5 + top.y);
-      ctx.lineTo(0.5 + bottom.x, 0.5 + bottom.y);
+      ctx.moveTo(0.5 + Math.round(left.x), 0.5 + Math.round(left.y));
+      ctx.lineTo(0.5 + Math.round(right.x), 0.5 + Math.round(right.y));
+      ctx.moveTo(0.5 + Math.round(top.x), 0.5 + Math.round(top.y));
+      ctx.lineTo(0.5 + Math.round(bottom.x), 0.5 + Math.round(bottom.y));
     }
     ctx.stroke();
 

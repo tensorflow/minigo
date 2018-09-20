@@ -32,19 +32,12 @@ interface Annotation {
   color: string;
 }
 
-interface BoardOptions {
-  // Margin in pixels to add to the board.
-  // Default is 0;
-  margin?: number;
-}
-
 class Board extends View {
   toPlay = Color.Black;
   stones: Color[] = [];
   ctx: CanvasRenderingContext2D;
 
   backgroundColor: string;
-  margin: number;
   pointW: number;
   pointH: number;
   stoneRadius: number;
@@ -53,7 +46,7 @@ class Board extends View {
   protected layers: Layer[];
 
   constructor(parent: HTMLElement | string, public size: BoardSize,
-              layerDescs: any[], options: BoardOptions = {}) {
+              layerDescs: any[]) {
     super();
 
     if (typeof(parent) == 'string') {
@@ -62,29 +55,36 @@ class Board extends View {
     this.elem = parent;
 
     this.backgroundColor = '#db6';
-    this.margin = options.margin || 0;
 
     for (let i = 0; i < this.size * this.size; ++i) {
       this.stones.push(Color.Empty);
     }
 
-    let pr = pixelRatio();
     let canvas = document.createElement('canvas');
-    canvas.style.margin = `${this.margin}px`;
-    canvas.width = pr * (parent.offsetWidth - 2 * this.margin);
-    canvas.height = pr * (parent.offsetHeight - 2 * this.margin);
-    canvas.style.width = `${parent.offsetWidth - 2 * this.margin}px`;
-    canvas.style.height = `${parent.offsetHeight - 2 * this.margin}px`;
     this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 
-    this.pointW = this.ctx.canvas.width / (this.size + 1);
-    this.pointH = this.ctx.canvas.height / (this.size + 1);
-    this.stoneRadius = Math.min(this.pointW, this.pointH);
+    parent.appendChild(canvas);
+    window.addEventListener('resize', () => {
+      this.resizeCanvas();
+      this.draw();
+    });
+    this.resizeCanvas();
 
     this.layers = [new Grid(this)];
     this.addLayers(layerDescs);
+  }
 
-    parent.appendChild(canvas);
+  private resizeCanvas() {
+    let pr = pixelRatio();
+    let canvas = this.ctx.canvas;
+    let parent = canvas.parentElement as HTMLElement;
+    canvas.width = pr * (parent.offsetWidth);
+    canvas.height = pr * (parent.offsetHeight);
+    canvas.style.width = `${parent.offsetWidth}px`;
+    canvas.style.height = `${parent.offsetHeight}px`;
+    this.pointW = this.ctx.canvas.width / (this.size + 1);
+    this.pointH = this.ctx.canvas.height / (this.size + 1);
+    this.stoneRadius = Math.min(this.pointW, this.pointH);
   }
 
   addLayers(descs: any[]) {
@@ -228,8 +228,8 @@ class ClickableBoard extends Board {
   public enabled = false;
 
   constructor(parent: HTMLElement | string, public size: BoardSize,
-              layerDescs: any[], options: BoardOptions = {}) {
-    super(parent, size, layerDescs, options);
+              layerDescs: any[]) {
+    super(parent, size, layerDescs);
 
     this.ctx.canvas.addEventListener('mousemove', (e) => {
       // Find the point on the board being hovered over.
@@ -286,7 +286,6 @@ class ClickableBoard extends Board {
 export {
   Annotation,
   Board,
-  BoardOptions,
   ClickableBoard,
   COL_LABELS,
 };

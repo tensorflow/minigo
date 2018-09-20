@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {getElement} from './util'
+import {getElement, pixelRatio} from './util'
 
 type MoveChangedCallback = (move: number | null) => void;
 
 class WinrateGraph {
   protected ctx: CanvasRenderingContext2D;
   protected points = new Array<[number, number]>();
-  protected pixelRatio = window.devicePixelRatio || 1;
-  protected marginTop = 20 * this.pixelRatio;
-  protected marginBottom = 20 * this.pixelRatio;
-  protected marginLeft = 30 * this.pixelRatio;
-  protected marginRight = 60 * this.pixelRatio;
+  protected marginTop: number;
+  protected marginBottom: number;
+  protected marginLeft: number;
+  protected marginRight: number;
+  protected textHeight: number;
   protected minPoints = 10;
 
   protected w: number;
@@ -37,16 +37,14 @@ class WinrateGraph {
     }
 
     let canvas = document.createElement('canvas');
-    canvas.width = this.pixelRatio * parent.offsetWidth;
-    canvas.height = this.pixelRatio * parent.offsetHeight;
-    canvas.style.width = `${parent.offsetWidth}px`;
-    canvas.style.height = `${parent.offsetHeight}px`;
     this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-
-    this.w = canvas.width - this.marginLeft - this.marginRight;
-    this.h = canvas.height - this.marginTop - this.marginBottom;
-
     parent.appendChild(canvas);
+    this.resizeCanvas();
+
+    window.addEventListener('resize', () => {
+      this.resizeCanvas();
+      this.draw();
+    });
 
     canvas.addEventListener('mousemove', (e) => {
       this.onMouseMove(e.offsetX, e.offsetY);
@@ -56,6 +54,25 @@ class WinrateGraph {
     });
 
     this.draw();
+  }
+
+
+  private resizeCanvas() {
+    let pr = pixelRatio();
+    let canvas = this.ctx.canvas;
+    let parent = canvas.parentElement as HTMLElement;
+    canvas.width = pr * parent.offsetWidth;
+    canvas.height = pr * parent.offsetHeight;
+    canvas.style.width = `${parent.offsetWidth}px`;
+    canvas.style.height = `${parent.offsetHeight}px`;
+
+    this.marginTop = Math.floor(0.05 * canvas.width);
+    this.marginBottom = Math.floor(0.05 * canvas.width);
+    this.marginLeft = Math.floor(0.075 * canvas.width);
+    this.marginRight = Math.floor(0.125 * canvas.width);
+    this.w = canvas.width - this.marginLeft - this.marginRight;
+    this.h = canvas.height - this.marginTop - this.marginBottom;
+    this.textHeight = 0.06 * this.h;
   }
 
   clear() {
@@ -74,6 +91,7 @@ class WinrateGraph {
   }
 
   private draw() {
+    let pr = pixelRatio();
     let ctx = this.ctx;
     let w = this.w;
     let h = this.h;
@@ -92,7 +110,7 @@ class WinrateGraph {
     ctx.lineJoin = 'round';
 
     // Draw the resign threshold lines.
-    ctx.lineWidth = 1 * this.pixelRatio;
+    ctx.lineWidth = 1 * pr;
     ctx.strokeStyle = '#56504b';
     ctx.beginPath();
     ctx.moveTo(0, Math.round(0.95 * h));
@@ -102,7 +120,7 @@ class WinrateGraph {
     ctx.stroke();
 
     // Draw the horizontal & vertical axis.
-    let lineWidth = 3 * this.pixelRatio;
+    let lineWidth = 3 * pr;
     ctx.lineWidth = lineWidth;
 
     ctx.strokeStyle = '#96928f';
@@ -114,13 +132,12 @@ class WinrateGraph {
     ctx.stroke();
 
     // Draw the Y axis labels.
-    let textHeight = 14 * this.pixelRatio;
-    ctx.font = `${textHeight}px sans-serif`;
+    ctx.font = `${this.textHeight}px sans-serif`;
     ctx.fillStyle = '#96928f';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('B', -0.5 * textHeight, Math.round(0.05 * h));
-    ctx.fillText('W', -0.5 * textHeight, Math.round(0.95 * h));
+    ctx.fillText('B', -0.5 * this.textHeight, Math.round(0.05 * h));
+    ctx.fillText('W', -0.5 * this.textHeight, Math.round(0.95 * h));
 
     // Offset the start of the X axis by the widh of the vertical axis.
     // It looks nicer that way.
@@ -177,8 +194,9 @@ class WinrateGraph {
     if (this.points.length < 2) {
       return;
     }
+    let pr = pixelRatio();
     let n = Math.max(this.minPoints, this.points.length - 1);
-    let newMove = Math.round(n * (this.pixelRatio * x - this.marginLeft) / this.w);
+    let newMove = Math.round(n * (pr * x - this.marginLeft) / this.w);
     newMove = Math.max(0, Math.min(newMove, this.points.length - 1));
     if (newMove != this.selectedMove) {
       this.selectedMove = newMove;

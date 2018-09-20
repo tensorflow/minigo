@@ -509,7 +509,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   const auto& pos = root()->position;
 
   nlohmann::json j = {
-      {"move", pos.n()},
+      {"moveNum", pos.n()},
       {"toPlay", pos.to_play()},
   };
 
