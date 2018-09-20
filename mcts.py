@@ -255,11 +255,15 @@ class MCTSNode(object):
             return probs
         return probs / np.sum(probs)
 
+    def _top_child(self):
+        # Sort by child_N tie break with action score.
+        return np.argmax(self.child_N + self.child_action_score / 10000)
+
     def most_visited_path_nodes(self):
         node = self
         output = []
         while node.children:
-            next_kid = np.argmax(node.child_N)
+            next_kid = node._top_child()
             node = node.children.get(next_kid)
             assert node is not None
             output.append(node)
