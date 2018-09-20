@@ -105,9 +105,9 @@ DEFINE_bool(run_forever, false,
 
 // Inference flags.
 DEFINE_string(model, "",
-              "Path to a minigo model. If remote_inference=false, the model "
+              "Path to a minigo model. If engine!=remote, the model "
               "should be a serialized GraphDef proto. If "
-              "remote_inference=true, the model should be saved checkpoint.");
+              "engine=remote, the model should be saved checkpoint.");
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
