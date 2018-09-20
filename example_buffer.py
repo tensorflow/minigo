@@ -1,6 +1,5 @@
-import argh
-import argparse
 import datetime as dt
+import fire
 import functools
 import itertools
 import multiprocessing as mp
@@ -303,11 +302,12 @@ def make_chunk_for(output_dir=LOCAL_DIR,
     buf.flush(output)
 
 
-parser = argparse.ArgumentParser()
-argh.add_commands(parser, [fill_and_wait_models, fill_and_wait_time,
-                           smart_rsync, make_chunk_for])
-
 if __name__ == "__main__":
     import sys
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    argh.dispatch(parser, argv=remaining_argv[1:])
+    fire.Fire({
+        'fill_and_wait_models': fill_and_wait_models,
+        'fill_and_wait_time': fill_and_wait_time,
+        'smart_rsync': smart_rsync,
+        'make_chunk_for': make_chunk_for,
+    }, remaining_argv[1:])

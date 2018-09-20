@@ -15,13 +15,12 @@
 import sys
 sys.path.insert(0, '.')
 
+import fire
 from absl import flags
 import kubernetes
-import argparse
 import yaml
 import json
 import os
-import argh
 import fsdb
 import time
 
@@ -196,9 +195,11 @@ def make_pairs_for_model(model_num=0):
     return pairs
 
 
-parser = argparse.ArgumentParser()
-argh.add_commands(parser, [zoo_loop, same_run_eval, cleanup, launch_eval_job])
-
 if __name__ == '__main__':
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    argh.dispatch(parser, argv=remaining_argv[1:])
+    fire.Fire({
+        'zoo_loop': zoo_loop,
+        'same_run_eval': same_run_eval,
+        'cleanup': cleanup,
+        'launch_eval_job': launch_eval_job,
+    }, remaining_argv[1:])

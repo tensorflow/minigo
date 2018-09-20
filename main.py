@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argh
-import argparse
+import fire
 import os.path
 import sys
 import tempfile
@@ -145,13 +144,17 @@ def freeze_graph(load_file):
         f.write(out_graph.SerializeToString())
 
 
-parser = argparse.ArgumentParser()
-argh.add_commands(parser, [bootstrap, train, train_dir, freeze_graph,
-                           evaluate, validate, convert])
-
 if __name__ == '__main__':
     cloud_logging.configure()
     # Let absl.flags parse known flags from argv, then pass the remaining flags
-    # into argh for dispatching.
+    # into 'fire' for dispatching.
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    argh.dispatch(parser, argv=remaining_argv[1:])
+    fire.Fire({
+        'bootstrap': bootstrap,
+        'train': train,
+        'train_dir': train_dir,
+        'freeze_graph': freeze_graph,
+        'evaluate': evaluate,
+        'validate': validate,
+        'convert': convert,
+    }, remaining_argv[1:])

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argh
+import fire
 import os
 import itertools
 import re
@@ -86,4 +86,4 @@ def crawl(sgf_directory='sgf', print_summary=True):
         print (bad_resign_files)
 
 if __name__ == '__main__':
-    argh.dispatch_command(crawl)
+    fire.Fire(crawl)

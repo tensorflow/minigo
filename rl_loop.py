@@ -13,14 +13,13 @@
 # limitations under the License.
 
 """Bookkeeping around other entry points to automate the rl pipeline."""
-import argparse
 import logging
 import os
 import sys
 import time
 
+import fire
 from absl import flags
-import argh
 from tensorflow import gfile
 import itertools
 import random
@@ -158,13 +157,15 @@ def backfill():
             continue
 
 
-parser = argparse.ArgumentParser()
-
-argh.add_commands(parser, [train, selfplay, backfill,
-                           bootstrap, fsdb.game_counts, validate,
-                           validate_hourly])
-
 if __name__ == '__main__':
     cloud_logging.configure()
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    argh.dispatch(parser, argv=remaining_argv[1:])
+    fire.Fire({
+        'train': train,
+        'selfplay': selfplay,
+        'backfill': backfill,
+        'bootstrap': bootstrap,
+        'game_counts': fsdb.game_counts,
+        'validate': validate,
+        'validate_hourly': validate_hourly,
+    }, remaining_argv[1:])
