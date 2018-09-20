@@ -16,6 +16,12 @@ Make sure you have the following command line tools:
   - gsutil (via `gcloud components install gsutil`)
   - kubectl (via `gcloud components install kubectl`)
   - docker
+  
+And the Python [kubernetes-client](https://github.com/kubernetes-client/python)
+
+```
+pip install kubernetes
+```
 
 Next, make sure you have a Google Cloud Project with GKE Enabled
 
