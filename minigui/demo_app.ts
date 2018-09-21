@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App, Position, GameStateMsg} from './app'
-import {Color, Move, Nullable} from './base'
-import {Board, ClickableBoard, COL_LABELS} from './board'
-import {getElement} from './util'
+import {App, GameStateMsg, Position} from './app'
+import {COL_LABELS, Color, Move, Nullable} from './base'
+import {Board, ClickableBoard} from './board'
+import {heatMapDq, heatMapN} from './heat_map'
 import * as lyr from './layer'
-import {heatMapN, heatMapDq} from './heat_map'
 import {Log} from './log'
 import {WinrateGraph} from './winrate_graph'
+import {getElement, toPrettyResult} from './util'
 
 const HUMAN = 'Human';
 const MINIGO = 'Minigo';
 
+// Demo app implementation that's shared between full and lightweight demo UIs.
 class DemoApp extends App {
   private mainBoard: ClickableBoard;
   private playerElems: HTMLElement[] = [];
@@ -34,6 +35,9 @@ class DemoApp extends App {
     super();
 
     this.connect().then(() => {
+      // Create boards for each of the elements in the UI.
+      // The extra board views aren't available in the lightweight UI, so we
+      // must check if the HTML elements exist.
       this.mainBoard = new ClickableBoard(
         'main-board', this.size,
         [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
@@ -71,8 +75,7 @@ class DemoApp extends App {
 
       this.winrateGraph.onMoveChanged((moveNum: Nullable<number>) => {
         let position: Position;
-        if (moveNum == null || moveNum < 0 ||
-            moveNum >= this.positionHistory.length) {
+        if (moveNum == null) {
           position = this.positionHistory[this.positionHistory.length - 1];
         } else {
           position = this.positionHistory[moveNum];
@@ -172,18 +175,7 @@ class DemoApp extends App {
 
   protected onGameOver() {
     this.gtp.send('final_score').then((result: string) => {
-      let prettyResult: string;
-      if (result[0] == 'W') {
-        prettyResult = 'White wins by ';
-      } else {
-        prettyResult = 'Black wins by ';
-      }
-      if (result[2] == 'R') {
-        prettyResult += 'resignation';
-      } else {
-        prettyResult += result.substr(2) + ' points';
-      }
-      this.log.log(prettyResult);
+      this.log.log(toPrettyResult(result));
       this.log.scroll();
     });
   }

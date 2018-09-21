@@ -75,6 +75,12 @@ parser.add_argument(
     help="Which python interpreter to use for the engine. "
          "Defaults to `python` and only applies for the when --engine=py")
 
+parser.add_argument(
+    "--inject_noise",
+    default=False,
+    help="If true, inject noise into the root position at the start of each "
+    "tree search.")
+
 args = parser.parse_args()
 
 
@@ -94,7 +100,7 @@ if args.engine == "py":
                    "gtp.py",
                    "--load_file", args.model,
                    "--minigui_mode=true",
-                   "--num_readouts", "100",
+                   "--num_readouts", "400",
                    "--conv_width", "128",
                    "--verbose", "2"]
 else:
@@ -103,7 +109,7 @@ else:
         "--model=%s" % args.model,
         "--num_readouts=400",
         "--soft_pick=false",
-        "--inject_noise=false",
+        "--inject_noise=%s" % args.inject_noise,
         "--disable_resign_pct=0",
         "--ponder_limit=100000",
         "--courtesy_pass=true",

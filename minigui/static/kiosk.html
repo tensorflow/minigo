@@ -3,12 +3,12 @@
 
 <html>
   <head>
-    <title>minigo</title>
+    <title>Minigo: kiosk</title>
     <link href="style.css" rel="stylesheet">
     <script type="text/javascript" src="socketio/socket.io.min.js"></script>
     <script data-main="kiosk" src="require/require.js"></script>
     <style>
-      .ui-container {
+      .minigui {
         display: flex;
         flex-wrap: wrap;
         flex-direction: row;
@@ -26,7 +26,9 @@
     </style>
   </head>
   <body>
-    <div class="ui-container">
+    <div class="minigui"
+         data-gtp-report_search_interval="50"
+         data-gtp-ponder_limit="0">
       <div class="main-board-pad board"><div id="main-board"></div></div>
       <div class="sp-3vh"></div>
       <div class="fs-0">

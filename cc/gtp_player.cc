@@ -292,12 +292,12 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
     }
     oss << ch;
   }
+  j["toPlay"] = position.to_play() == Color::kBlack ? "B" : "W";
+  j["moveNum"] = position.n();
   j["board"] = oss.str();
-  j["toPlay"] = position.to_play() == Color::kBlack ? "Black" : "White";
   if (!history().empty()) {
     j["lastMove"] = history().back().c.ToKgs();
   }
-  j["moveNum"] = position.n();
   j["q"] = root()->parent != nullptr ? root()->parent->Q() : 0;
   j["gameOver"] = game_over();
 
@@ -510,7 +510,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
 
   nlohmann::json j = {
       {"moveNum", pos.n()},
-      {"toPlay", pos.to_play()},
+      {"toPlay", pos.to_play() == Color::kBlack ? "B" : "W"},
   };
 
   auto& search = j["search"];

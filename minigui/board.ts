@@ -15,9 +15,7 @@
 import {getElement, pixelRatio} from './util'
 import {View} from './view'
 import {DataObj, Grid, Layer} from './layer'
-import {BoardSize, Color, Coord, Move, Point} from './base'
-
-const COL_LABELS = 'ABCDEFGHJKLMNOPQRST';
+import {BoardSize, COL_LABELS, Color, Coord, Move, Nullable, Point} from './base'
 
 namespace Annotation {
   export enum Shape {
@@ -131,7 +129,7 @@ class Board extends View {
     return this.stones[p.row * this.size + p.col];
   }
 
-  canvasToBoard(x: number, y: number, threshold?: number): Point | null {
+  canvasToBoard(x: number, y: number, threshold?: number): Nullable<Point> {
     let pr = pixelRatio();
     x *= pr;
     y *= pr;
@@ -222,9 +220,11 @@ class Board extends View {
   }
 }
 
+type ClickListener = (p: Point) => void;
+
 class ClickableBoard extends Board {
   protected p: Point | null;
-  protected listeners = new Array<(p: Point) => void>();
+  protected listeners: ClickListener[] = [];
   public enabled = false;
 
   constructor(parent: HTMLElement | string, public size: BoardSize,
@@ -254,8 +254,10 @@ class ClickableBoard extends Board {
     });
 
     this.ctx.canvas.addEventListener('mouseleave', (e) => {
-      this.p = null;
-      this.draw();
+      if (this.p != null) {
+        this.p = null;
+        this.draw();
+      }
     });
 
     this.ctx.canvas.addEventListener('click', (e) => {
@@ -266,6 +268,7 @@ class ClickableBoard extends Board {
         listener(this.p);
       }
       this.p = null;
+      this.draw();
     });
   }
 

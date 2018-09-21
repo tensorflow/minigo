@@ -3,12 +3,12 @@
 
 <html>
   <head>
-    <title>Minigo</title>
+    <title>Minigo: LW demo</title>
     <link href="style.css" rel="stylesheet">
     <script type="text/javascript" src="socketio/socket.io.min.js"></script>
-    <script data-main="minigui" src="require/require.js"></script>
+    <script data-main="demo_app" src="require/require.js"></script>
     <style>
-      .ui-container {
+      .minigui {
         display: flex;
         flex-wrap: wrap;
         flex-direction: row;
@@ -25,10 +25,6 @@
         border-radius: 0.6vh;
         width: 7vh;
         height: 4vh;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
       }
 
       .winrate-graph { width: 34vh; height: 19vh; }
@@ -41,7 +37,9 @@
   </head>
 
   <body>
-    <div class="ui-container">
+    <div class="minigui"
+         data-gtp-report_search_interval="250"
+         data-gtp-ponder_limit="0">
       <div class="main-board-pad board"><div id="main-board"></div></div>
       <div class="sp-3vh"></div>
       <div class="fs-0">

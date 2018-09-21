@@ -14,9 +14,10 @@
 
 import {App, GameStateMsg} from './app'
 import {Board} from './board'
-import * as lyr from './layer'
 import {heatMapN, heatMapDq} from './heat_map'
+import * as lyr from './layer'
 import {Log} from './log'
+import {toPrettyResult} from './util'
 import {WinrateGraph} from './winrate_graph'
 
 class KioskApp extends App {
@@ -64,30 +65,15 @@ class KioskApp extends App {
     if (this.gameOver) {
       window.setTimeout(() => { this.newGame(); }, 3);
     } else {
-      this.genmove();
+      this.gtp.send('genmove').then((move: string) => {
+        this.gtp.send('gamestate');
+      });
     }
-  }
-
-  private genmove() {
-    this.gtp.send('genmove').then((move: string) => {
-      this.gtp.send('gamestate');
-    });
   }
 
   protected onGameOver() {
     this.gtp.send('final_score').then((result: string) => {
-      let prettyResult: string;
-      if (result[0] == 'W') {
-        prettyResult = 'White wins by ';
-      } else {
-        prettyResult = 'Black wins by ';
-      }
-      if (result[2] == 'R') {
-        prettyResult += 'resignation';
-      } else {
-        prettyResult += result.substr(2) + ' points';
-      }
-      this.log.log(prettyResult);
+      this.log.log(toPrettyResult(result));
       this.log.scroll();
     });
   }

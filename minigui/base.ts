@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+const COL_LABELS = 'ABCDEFGHJKLMNOPQRST';
+
 enum Color {
   Empty,
   Black,
@@ -47,11 +49,12 @@ type Move = Point | 'pass' | 'resign';
 type Nullable<T> = T | null;
 
 export {
-  Color,
-  otherColor,
   BoardSize,
+  COL_LABELS,
+  Color,
   Coord,
-  Point,
   Move,
   Nullable,
+  Point,
+  otherColor,
 }

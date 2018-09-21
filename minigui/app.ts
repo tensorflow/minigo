@@ -40,7 +40,7 @@ class Position {
 
 interface SearchMsg {
   moveNum: number;
-  toPlay: string;
+  toPlay: string | Color;
   search: string[] | Move[];
   n: number[];
   dq: number[];
@@ -56,15 +56,32 @@ interface GameStateMsg {
   gameOver: boolean;
 }
 
+// App base class used by the different Minigui UI implementations.
 abstract class App {
+  // WebSocket connection to the Miniui backend server.
   protected gtp = new Socket();
+
+  // Board size.
   protected size: number;
+
+  // True if Minigo is processing a genmove command.
   protected engineBusy = false;
+
+  // The list of board positions played.
+  // TODO(tommadams): This will need to be turned into a tree when we add an
+  // analysis mode.
   protected positionHistory: Position[];
+
+  // The current position being displayed on the boards.
   protected activePosition: Position;
+
+  // True when the backend reports that the game is over.
   protected gameOver = true;
+
+  // Whose turn is it.
   protected toPlay = Color.Black;
 
+  // List of Board views.
   private boards: Board[] = [];
 
   protected abstract onGameOver(): void;
@@ -94,9 +111,20 @@ abstract class App {
     this.gtp.send('gamestate');
     this.gtp.send('info');
 
-    // TODO(tommadams): Make this configurable.
-    this.gtp.send('report_search_interval 250');
-    this.gtp.send('ponder_limit 0');
+    // Iterate over the data-* attributes attached to the main minigui container
+    // element, looking for data-gtp-* attributes. Send any matching ones as GTP
+    // commands to the backend.
+    let containerElem = document.querySelector('.minigui') as HTMLElement;
+    if (containerElem != null) {
+      let dataset = containerElem.dataset;
+      for (let key in dataset) {
+        if (key.startsWith('gtp')) {
+          let cmd = key.substr(3).toLowerCase();
+          let args = dataset[key];
+          this.gtp.send(`${cmd} ${args}`);
+        }
+      }
+    }
 
     this.updateBoards(this.activePosition);
   }
@@ -112,6 +140,7 @@ abstract class App {
   protected onSearch(msg: SearchMsg) {
     // Parse move variations.
     msg.search = util.parseMoves(msg.search as string[], this.size);
+    msg.toPlay = util.parseGtpColor(msg.toPlay as string);
     if (msg.pv) {
       msg.pv = util.parseMoves(msg.pv as string[], this.size);
     }

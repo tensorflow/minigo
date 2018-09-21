@@ -66,6 +66,23 @@ function partialUpdate(src: any, dst: any, propNames: string[]) {
   return dst;
 }
 
+// Converts a result like "B+R" or "W+3.5" to a human-readable string like
+// "Black wins by resignation" or "White wins by 3.5 points".
+function toPrettyResult(result: string) {
+  let prettyResult: string;
+  if (result[0] == 'W') {
+    prettyResult = 'White wins by ';
+  } else {
+    prettyResult = 'Black wins by ';
+  }
+  if (result[2] == 'R') {
+    prettyResult += 'resignation';
+  } else {
+    prettyResult += result.substr(2) + ' points';
+  }
+  return prettyResult;
+}
+
 export {
   emptyBoard,
   getElement,
@@ -75,4 +92,5 @@ export {
   partialUpdate,
   pixelRatio,
   querySelector,
+  toPrettyResult,
 }

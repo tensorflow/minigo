@@ -258,16 +258,17 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
                 else:
                     board.append(".")
         msg["board"] = "".join(board)
-        msg["toPlay"] = "Black" if position.to_play == 1 else "White"
         if position.recent:
             msg["lastMove"] = coords.to_kgs(position.recent[-1].move)
         else:
             msg["lastMove"] = None
-        msg["n"] = position.n
+        msg["toPlay"] = "B" if position.to_play == 1 else "W"
+        msg["moveNum"] = position.n
         if root.parent and root.parent.parent:
             msg["q"] = root.parent.Q
         else:
             msg["q"] = 0
+        msg["gameOver"] = position.is_game_over()
         dbg("mg-gamestate:%s" % json.dumps(msg, sort_keys=True))
 
     def cmd_genmove(self, color=None):
@@ -309,23 +310,31 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
         Args:
           leaves: list of leaf MCTSNodes returned by tree_search().
          """
+
         root = self._player.get_root()
+
+        msg = {
+            "moveNum": root.position.n,
+            "toPlay": "B" if root.position.to_play == go.BLACK else "W",
+        }
+
         if leaves:
             path = []
             leaf = leaves[0]
             while leaf != root:
                 path.append(leaf.fmove)
                 leaf = leaf.parent
-            path = [coords.to_kgs(coords.from_flat(m)) for m in reversed(path)]
-            dbg("mg-search:%s" % " ".join(path))
+            msg["search"] = [coords.to_kgs(coords.from_flat(m))
+                             for m in reversed(path)]
+        else:
+            msg["search"] = []
 
-        q = root.child_Q - root.Q
-        q = ['%.3f' % x for x in q]
-        dbg("mg-q:%s" % " ".join(q))
+        dq = root.child_Q - root.Q
+        msg["dq"] = [int(round(x * 100)) for x in dq]
 
-        n = ['%d' % x for x in root.child_N]
-        dbg("mg-n:%s" % " ".join(n))
+        msg["n"] = [int(n) for n in root.child_N]
 
         nodes = root.most_visited_path_nodes()
-        path = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
-        dbg("mg-pv:%s" % " ".join(path))
+        msg["pv"] = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
+
+        dbg("mg-search:%s" % json.dumps(msg, sort_keys=True))

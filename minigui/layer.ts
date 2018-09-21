@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {BoardSize, Color, otherColor, Coord, Point, Move} from './base'
-import {Annotation, Board, COL_LABELS} from './board'
+import {BoardSize, COL_LABELS, Color, otherColor, Coord, Point, Move} from './base'
+import {Annotation, Board} from './board'
 import {pixelRatio} from './util'
 
 const STAR_POINTS = {
