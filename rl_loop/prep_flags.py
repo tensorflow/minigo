@@ -49,10 +49,6 @@ def prepare_subprocess_cmd(subprocess_cmd):
     Returns:
         List[str], ['python', 'train.py', '--train_flag=blah', '--more_flags']
     '''
-    subprocess_cmd_bytes = [
-        s.encode('utf8') if isinstance(s, str) else s
-        for s in subprocess_cmd
-    ]
     help_cmd = subprocess_cmd + ['--helpfull']
     help_output = subprocess.run(help_cmd, stdout=subprocess.PIPE).stdout
     help_output = help_output.decode('ascii')
@@ -73,3 +69,11 @@ def run(cmd):
     cmd = prepare_subprocess_cmd(cmd)
     print("Running the following cmd", cmd)
     return subprocess.run(cmd, capture_output=True)
+
+def checked_run(cmd):
+    completed_process = run(cmd)
+    if completed_process.returncode > 0:
+        print("Command failed!")
+        print("stdout:\n", completed_process.stdout)
+        print("stderr:\n", completed_process.stderr)
+    raise RuntimeError
