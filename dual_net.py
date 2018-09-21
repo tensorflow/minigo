@@ -24,7 +24,6 @@ import functools
 import os.path
 import sys
 
-import argh
 from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
@@ -482,18 +481,3 @@ def export_model(model_path):
         n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
     with tf.gfile.GFile(os.path.join(model_path + '.pb'), 'wb') as f:
         f.write(out_graph.SerializeToString())
-
-
-
-
-
-
-
-parser = argparse.ArgumentParser()
-argh.add_commands(parser, [export_model])
-
-if __name__ == '__main__':
-    # Let absl.flags parse known flags from argv, then pass the remaining flags
-    # into argh for dispatching.
-    remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    argh.dispatch(parser, argv=remaining_argv[1:])
