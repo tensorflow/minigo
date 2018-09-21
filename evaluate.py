@@ -109,8 +109,9 @@ def play_match(black_model, white_model, games, sgf_dir):
                                                                    timeper,
                                                                    dur))
 
-def main(black_model, white_model):
+def main(argv):
     """Play matches between two neural nets."""
+    _, black_model, white_model = argv
     utils.ensure_dir_exists(FLAGS.eval_sgf_dir)
     play_match(black_model, white_model, FLAGS.num_evaluation_games, FLAGS.eval_sgf_dir)
 

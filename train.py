@@ -128,7 +128,7 @@ def train(*tf_records: "Records to train on"):
 
 def main(argv):
     """Train on examples and export the updated model weights."""
-    tf_records = argv
+    tf_records = argv[1:]
     logging.info("Training on %s records: %s to %s",
                  len(tf_records), tf_records[0], tf_records[-1])
     with utils.logged_timer("Training"):

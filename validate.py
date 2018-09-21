@@ -54,19 +54,20 @@ def validate(*tf_records):
         estimator.evaluate(_input_fn, steps=steps, name=FLAGS.validate_name)
 
 
-def main(*validation_paths):
+def main(argv):
     """Validate a model's performance on a set of holdout data."""
+    _, *validation_paths = argv
     if FLAGS.expand_validation_dirs:
         tf_records = []
         with utils.logged_timer("Building lists of holdout files"):
             for record_dir in validation_paths:
-                tf_records.extend(gfile.Glob(os.path.join(record_dir, '**', '*.zz')))
+                tf_records.extend(gfile.Glob(os.path.join(record_dir, '*.zz')))
     else:
         tf_records = validation_paths
 
+    if not tf_records:
+        raise RuntimeError("Did not find any holdout files for validating!")
     validate(*tf_records)
-
-
 
 if __name__ == "__main__":
     app.run(main)

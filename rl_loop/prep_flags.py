@@ -11,6 +11,7 @@ the flagfile and pass in only those flags that are accepted by some_module.py
 
 import re
 import subprocess
+import sys
 from absl import flags
 
 # Matches both
@@ -68,12 +69,11 @@ def run(cmd):
     '''Prepare and run a subprocess cmd, returning a CompletedProcess.'''
     cmd = prepare_subprocess_cmd(cmd)
     print("Running the following cmd", cmd)
-    return subprocess.run(cmd, capture_output=True)
+    return subprocess.run(cmd, stdout=sys.stdout, stderr=subprocess.PIPE)
 
 def checked_run(cmd):
     completed_process = run(cmd)
     if completed_process.returncode > 0:
         print("Command failed!")
-        print("stdout:\n", completed_process.stdout)
-        print("stderr:\n", completed_process.stderr)
-    raise RuntimeError
+        print("stderr:\n", completed_process.stderr.decode('ascii'))
+        raise RuntimeError
