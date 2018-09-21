@@ -219,6 +219,7 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
 
         self._last_report_time = None
         self._report_search_interval = 0.0
+        self._last_pv = None
 
     def cmd_echo(self, *args):
         return " ".join(args)
@@ -266,10 +267,7 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
             msg["lastMove"] = None
         msg["toPlay"] = "B" if position.to_play == 1 else "W"
         msg["moveNum"] = position.n
-        if root.parent and root.parent.parent:
-            msg["q"] = root.parent.Q
-        else:
-            msg["q"] = 0
+        msg["q"] = root.parent.Q if root.parent and root.parent.parent else 0
         msg["gameOver"] = position.is_game_over()
         dbg("mg-gamestate:%s" % json.dumps(msg, sort_keys=True))
 
@@ -337,6 +335,9 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
         msg["n"] = [int(n) for n in root.child_N]
 
         nodes = root.most_visited_path_nodes()
-        msg["pv"] = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
+        pv = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
+        if pv != self._last_pv:
+            msg["pv"] = pv
+            self._last_pv = pv
 
         dbg("mg-search:%s" % json.dumps(msg, sort_keys=True))

@@ -277,7 +277,6 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
     return response;
   }
 
-  nlohmann::json j;
   const auto& position = root()->position;
 
   std::ostringstream oss;
@@ -292,14 +291,16 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
     }
     oss << ch;
   }
-  j["toPlay"] = position.to_play() == Color::kBlack ? "B" : "W";
-  j["moveNum"] = position.n();
-  j["board"] = oss.str();
+  nlohmann::json j = {
+      {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
+      {"moveNum", position.n()},
+      {"board", oss.str()},
+      {"q", root()->parent != nullptr ? root()->parent->Q() : 0},
+      {"gameOver", game_over()},
+  };
   if (!history().empty()) {
     j["lastMove"] = history().back().c.ToKgs();
   }
-  j["q"] = root()->parent != nullptr ? root()->parent->Q() : 0;
-  j["gameOver"] = game_over();
 
   std::cerr << "mg-gamestate: " << j.dump() << std::endl;
 
