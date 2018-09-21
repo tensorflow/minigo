@@ -81,6 +81,12 @@ parser.add_argument(
     help="If true, inject noise into the root position at the start of each "
     "tree search.")
 
+parser.add_argument(
+    "--resign_threshold",
+    default=-0.8,
+    type=float,
+    help="Resign threshold.")
+
 args = parser.parse_args()
 
 
@@ -102,6 +108,7 @@ if args.engine == "py":
                    "--minigui_mode=true",
                    "--num_readouts", "400",
                    "--conv_width", "128",
+                   "--resign_threshold", str(args.resign_threshold),
                    "--verbose", "2"]
 else:
     GTP_COMMAND = [
@@ -115,6 +122,7 @@ else:
         "--courtesy_pass=true",
         "--engine=%s" % args.engine,
         "--virtual_losses=%d" % args.virtual_losses,
+        "--resign_threshold=%f" % args.resign_threshold,
         "--mode=gtp"]
 
 

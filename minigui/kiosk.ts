@@ -63,7 +63,7 @@ class KioskApp extends App {
     this.winrateGraph.setWinrate(msg.moveNum, msg.q);
 
     if (this.gameOver) {
-      window.setTimeout(() => { this.newGame(); }, 3);
+      window.setTimeout(() => { this.newGame(); }, 3000);
     } else {
       this.gtp.send('genmove').then((move: string) => {
         this.gtp.send('gamestate');

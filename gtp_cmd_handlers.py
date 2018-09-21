@@ -224,9 +224,11 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
         return " ".join(args)
 
     def cmd_info(self):
-        return "num_readouts: %d report_search_interval: %.1f n: %d" % (
-            self._player.get_num_readouts(),
-            self._report_search_interval * 1000, go.N)
+        return ("num_readouts: %d report_search_interval: %.1f n: %d "
+                "resign_threshold: %f" % (
+                    self._player.get_num_readouts(),
+                    self._report_search_interval * 1000, go.N,
+                    self._player.resign_threshold))
 
     def cmd_readouts(self, readouts: int):
         readouts = max(8, readouts)
