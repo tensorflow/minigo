@@ -163,7 +163,8 @@ class MCTSPlayer(MCTSPlayerInterface):
             if not self.two_player_mode:
                 self.searches_pi.pop()
             self.comments.pop()
-            return False
+            raise
+
         self.position = self.root.position  # for showboard
         del self.root.parent.children
         return True  # GTP requires positive result.
