@@ -21,7 +21,9 @@ source ${SCRIPT_DIR}/common.sh
 source ${SCRIPT_DIR}/utils.sh
 
 export NUM_NODES=128
+
 ZONE=us-central1-f
+
 
 echo "TPU Cluster Creation"
 echo "--------------------------------------"

@@ -299,8 +299,10 @@ class SelfPlayer {
         bleakest_move = i;
       }
     }
-    std::cout << "Bleakest eval: move=" << bleakest_move
-              << " Q=" << history[bleakest_move].node->Q() << std::endl;
+    if (!player->options().resign_enabled) {
+      std::cout << "Bleakest eval: move=" << bleakest_move
+                << " Q=" << history[bleakest_move].node->Q() << std::endl;
+    }
 
     // If resignation is disabled, check to see if the first time Q_perspective
     // crossed the resign_threshold the eventual winner of the game would have
