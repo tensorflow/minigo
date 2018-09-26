@@ -255,7 +255,7 @@ class MCTSNode(object):
             return probs
         return probs / np.sum(probs)
 
-    def _top_child(self):
+    def best_child(self):
         # Sort by child_N tie break with action score.
         return np.argmax(self.child_N + self.child_action_score / 10000)
 
@@ -263,8 +263,7 @@ class MCTSNode(object):
         node = self
         output = []
         while node.children:
-            next_kid = node._top_child()
-            node = node.children.get(next_kid)
+            node = node.children.get(node.best_child())
             assert node is not None
             output.append(node)
         return output
