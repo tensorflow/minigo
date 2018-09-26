@@ -19,6 +19,7 @@ sys.path.insert(0, '.')
 
 import os
 import pickle
+import random
 
 from absl import app, flags
 import numpy as np
@@ -34,11 +35,11 @@ flags.DEFINE_string('embedding_file', None, 'Where to save the embeddings.')
 
 flags.DEFINE_string('model', 'saved_models/000721-eagle', 'Minigo Model')
 
+flags.DEFINE_integer('num_games', 1000, 'Number of games to sample total')
+
 flags.DEFINE_integer('first', 20, 'first move in game to consider')
 flags.DEFINE_integer('last', 150, 'last move in game to consider')
 flags.DEFINE_integer('every', 10, 'choose every X position from game')
-
-flags.DEFINE_integer('embedding_size', 361, 'Size of embedding')
 
 flags.mark_flags_as_required(['sgf_root', 'embedding_file'])
 
@@ -53,10 +54,10 @@ FLAGS = flags.FLAGS
 def get_files():
   files = []
   for d in os.listdir(FLAGS.sgf_root):
-    for f in os.listdir(os.path.join(FLAGS.sgf_root, d))[:2000]:
+    for f in os.listdir(os.path.join(FLAGS.sgf_root, d)):
         if f.endswith('.sgf'):
             files.append(os.path.join(FLAGS.sgf_root, d, f))
-  return files
+  return random.sample(files, FLAGS.num_games)
 
 
 def main(argv):
@@ -75,10 +76,12 @@ def main(argv):
 
     try:
       progress = tqdm(get_files())
-      embeddings = np.empty([len(progress), FLAGS.embedding_size])
+      embeddings = []
       metadata = []
       for i, f in enumerate(progress):
         short_f = os.path.basename(f)
+        short_f = short_f.replace('minigo-cc-evaluator', '')
+        short_f = short_f.replace('-000', '-')
         progress.set_description('Processing %s' % short_f)
 
         processed = []
@@ -94,14 +97,13 @@ def main(argv):
           # If len(processed) gets too large may have to chunk.
           res = sess.run(predictions, feed_dict={features: processed})
           for r in res['shared']:
-            assert np.size(r) == FLAGS.embedding_size, np.size(r)
-            embeddings[i] = r.flatten()
+            embeddings.append(r.flatten())
     except:
       # Raise shows us the error but only after the finally block executes.
       raise
     finally:
       with open(FLAGS.embedding_file, 'wb') as pickle_file:
-        pickle.dump([metadata, embeddings], pickle_file)
+        pickle.dump([metadata, np.array(embeddings)], pickle_file)
 
 if __name__ == "__main__":
     app.run(main)
