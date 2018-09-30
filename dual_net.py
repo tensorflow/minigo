@@ -67,8 +67,9 @@ flags.DEFINE_float('value_cost_weight', 1.0,
 flags.DEFINE_float('sgd_momentum', 0.9,
                    'Momentum parameter for learning rate.')
 
-flags.DEFINE_string('model_dir', None,
-                    'The working directory of the model')
+flags.DEFINE_string('work_dir', None,
+                    'The Estimator working directory. Used to dump: '
+                    'checkpoints, tensorboard logs, etc..')
 
 flags.DEFINE_bool('use_tpu', False, 'Whether to use TPU for training.')
 
@@ -279,7 +280,7 @@ def model_fn(features, labels, mode, params=None):
 
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
-        summary_writer = summary.create_file_writer(FLAGS.model_dir)
+        summary_writer = summary.create_file_writer(FLAGS.work_dir)
         with summary_writer.as_default(), \
                 summary.always_record_summaries():
             for metric_name, metric_op in metric_ops.items():
@@ -409,7 +410,7 @@ def _get_nontpu_estimator():
         keep_checkpoint_max=FLAGS.keep_checkpoint_max)
     return tf.estimator.Estimator(
         model_fn,
-        model_dir=FLAGS.model_dir,
+        model_dir=FLAGS.work_dir,
         config=run_config)
 
 
@@ -421,7 +422,7 @@ def _get_tpu_estimator():
     run_config = tpu_config.RunConfig(
         master=tpu_grpc_url,
         evaluation_master=tpu_grpc_url,
-        model_dir=FLAGS.model_dir,
+        model_dir=FLAGS.work_dir,
         save_checkpoints_steps=max(1000, FLAGS.iterations_per_loop),
         save_summary_steps=FLAGS.summary_steps,
         keep_checkpoint_max=FLAGS.keep_checkpoint_max,
@@ -449,7 +450,7 @@ def bootstrap():
     # train() requires data, and I didn't feel like creating training data in
     # order to run the full train pipeline for 1 step.
     initial_checkpoint_name = 'model.ckpt-1'
-    save_file = os.path.join(FLAGS.model_dir, initial_checkpoint_name)
+    save_file = os.path.join(FLAGS.work_dir, initial_checkpoint_name)
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()
@@ -467,7 +468,7 @@ def export_model(model_path):
     Args:
         model_path: The path (can be a gs:// path) to export model to
     """
-    estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.model_dir)
+    estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.work_dir)
     latest_checkpoint = estimator.latest_checkpoint()
     all_checkpoint_files = tf.gfile.Glob(latest_checkpoint + '*')
     for filename in all_checkpoint_files:

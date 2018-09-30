@@ -26,7 +26,7 @@ flags.DEFINE_string('export_path', None,
                     'Where to export the model after training.')
 
 # From dual_net.py
-flags.declare_key_flag('model_dir')
+flags.declare_key_flag('work_dir')
 flags.declare_key_flag('train_batch_size')
 flags.declare_key_flag('num_tpu_cores')
 flags.declare_key_flag('use_tpu')
@@ -116,8 +116,8 @@ def train(*tf_records: "Records to train on"):
                 shuffle_buffer_size=FLAGS.shuffle_buffer_size,
                 random_rotation=True)
 
-        hooks = [UpdateRatioSessionHook(FLAGS.model_dir),
-                 EchoStepCounterHook(output_dir=FLAGS.model_dir)]
+        hooks = [UpdateRatioSessionHook(FLAGS.work_dir),
+                 EchoStepCounterHook(output_dir=FLAGS.work_dir)]
 
     steps = FLAGS.steps_to_train
     logging.info("Training, steps = %s, batch = %s -> %s examples",

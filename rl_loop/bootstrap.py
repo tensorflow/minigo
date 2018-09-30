@@ -16,7 +16,7 @@ def bootstrap(unused_argv):
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
     prep_flags.checked_run([
         'python', 'bootstrap.py',
-        '--bootstrap_export_path={}'.format(bootstrap_model_path),
+        '--export_path={}'.format(bootstrap_model_path),
         '--flagfile=rl_loop/distributed_flags'])
 
 if __name__ == '__main__':
