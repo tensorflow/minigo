@@ -80,7 +80,7 @@ def main(argv):
       metadata = []
       for i, f in enumerate(progress):
         short_f = os.path.basename(f)
-        short_f = short_f.replace('minigo-cc-evaluator', '')
+        short_f = short_f.replace('-minigo-cc-evaluator', '-')
         short_f = short_f.replace('-000', '-')
         progress.set_description('Processing %s' % short_f)
 
