@@ -1,5 +1,3 @@
 FROM gcr.io/$PROJECT/cc-base:0.17
 
-COPY cc_wrapper.sh /app
-
-CMD ["/bin/sh", "cc_wrapper.sh"]
+CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=cc"]

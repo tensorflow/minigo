@@ -1,4 +1,17 @@
 # One line per flag
---model_dir=estimator_working_dir
+# Training related flags
+--work_dir=estimator_working_dir
 --use_tpu
 --tpu_name=$TPU_NAME
+# Selfplay related flags
+--inject_noise=true
+--soft_pick=true
+--random_symmetry=true
+--virtual_losses=8
+--parallel_games=32
+--num_readouts=800
+--disable_resign_pct=0.10
+# This flag can be overwritten by --flags_path (see cc/main.cc for details)
+--resign_threshold=-0.999
+
+
