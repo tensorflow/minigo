@@ -24,7 +24,7 @@ from absl import flags
 from tensorflow import gfile
 import re
 
-import shipname
+from rl_loop import shipname
 
 flags.DEFINE_string(
     'base_dir', None,

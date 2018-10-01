@@ -27,10 +27,10 @@ sys.path.insert(0, '.')
 from absl import app
 from tensorflow import gfile
 
-import example_buffer as eb
-import fsdb
-import prep_flags
-import shipname
+from rl_loop import example_buffer as eb
+from rl_loop import fsdb
+from rl_loop import prep_flags
+from rl_loop import shipname
 import utils
 
 

@@ -26,9 +26,9 @@ sys.path.insert(0, '.')
 
 from absl import app, flags
 from tensorflow import gfile
-import fsdb
-import prep_flags
-import shipname
+from rl_loop import fsdb
+from rl_loop import prep_flags
+from rl_loop import shipname
 import utils
 
 flags.DEFINE_string('pro_dataset', None,

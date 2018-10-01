@@ -36,7 +36,7 @@ import sgf
 
 import coords
 import sgf_wrapper
-import shipname
+from rl_loop import shipname
 import utils
 
 DebugRow = collections.namedtuple('DebugRow', [

@@ -16,8 +16,8 @@ import time
 from absl import app, flags
 sys.path.insert(0, '.')
 
-import fsdb
-import prep_flags
+from rl_loop import fsdb
+from rl_loop import prep_flags
 
 # From rl_loop/fsdb.py
 flags.declare_key_flag('bucket_name')

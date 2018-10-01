@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import os
+import sys
+
+sys.path.insert(0, '.')
 
 from absl import app, flags
-import fsdb
-import prep_flags
-import shipname
+from rl_loop import fsdb
+from rl_loop import prep_flags
+from rl_loop import shipname
 
 # From rl_loop/fsdb.py
 # Must pass one or the other in.
