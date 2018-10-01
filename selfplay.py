@@ -106,15 +106,17 @@ def play(network):
     return player
 
 
-def run_game(load_file, selfplay_dir, holdout_dir,
-             sgf_dir, holdout_pct=0.05):
+def run_game(load_file, selfplay_dir=None, holdout_dir=None,
+             sgf_dir=None, holdout_pct=0.05):
     '''Takes a played game and record results and game data.'''
-    minimal_sgf_dir = os.path.join(sgf_dir, 'clean')
-    full_sgf_dir = os.path.join(sgf_dir, 'full')
-    utils.ensure_dir_exists(minimal_sgf_dir)
-    utils.ensure_dir_exists(full_sgf_dir)
-    utils.ensure_dir_exists(selfplay_dir)
-    utils.ensure_dir_exists(holdout_dir)
+    if sgf_dir is not None:
+        minimal_sgf_dir = os.path.join(sgf_dir, 'clean')
+        full_sgf_dir = os.path.join(sgf_dir, 'full')
+        utils.ensure_dir_exists(minimal_sgf_dir)
+        utils.ensure_dir_exists(full_sgf_dir)
+    if selfplay_dir is not None
+        utils.ensure_dir_exists(selfplay_dir)
+        utils.ensure_dir_exists(holdout_dir)
 
     with utils.logged_timer("Loading weights from %s ... " % load_file):
         network = dual_net.DualNetwork(load_file)
@@ -124,29 +126,30 @@ def run_game(load_file, selfplay_dir, holdout_dir,
 
     output_name = '{}-{}'.format(int(time.time()), socket.gethostname())
     game_data = player.extract_data()
-    with gfile.GFile(os.path.join(minimal_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
-        f.write(player.to_sgf(use_comments=False))
-    with gfile.GFile(os.path.join(full_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
-        f.write(player.to_sgf())
+    if sgf_dir is not None:
+        with gfile.GFile(os.path.join(minimal_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
+            f.write(player.to_sgf(use_comments=False))
+        with gfile.GFile(os.path.join(full_sgf_dir, '{}.sgf'.format(output_name)), 'w') as f:
+            f.write(player.to_sgf())
 
     tf_examples = preprocessing.make_dataset_from_selfplay(game_data)
 
-    # Hold out 5% of games for validation.
-    if random.random() < holdout_pct:
-        fname = os.path.join(holdout_dir,
-                             "{}.tfrecord.zz".format(output_name))
-    else:
-        fname = os.path.join(selfplay_dir,
-                             "{}.tfrecord.zz".format(output_name))
+    if selfplay_dir is not None:
+        # Hold out 5% of games for validation.
+        if random.random() < holdout_pct:
+            fname = os.path.join(holdout_dir,
+                                 "{}.tfrecord.zz".format(output_name))
+        else:
+            fname = os.path.join(selfplay_dir,
+                                 "{}.tfrecord.zz".format(output_name))
 
-    preprocessing.write_tf_examples(fname, tf_examples)
+        preprocessing.write_tf_examples(fname, tf_examples)
 
 
 def main(argv):
     '''Entry point for running one selfplay game.'''
     del argv  # Unused
-    flags.mark_flags_as_required([
-        'load_file', 'selfplay_dir', 'holdout_dir', 'sgf_dir'])
+    flags.mark_flag_as_required('load_file')
 
     run_game(
         load_file=FLAGS.load_file,

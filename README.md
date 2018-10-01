@@ -183,14 +183,14 @@ To watch Minigo play a game, you need to specify a model. Here's an example
 to play using the latest model in your bucket
 
 ```shell
-READOUTS=400
-python3 rl_loop.py selfplay --v 2 \
-                            --bucket_name $BUCKET_NAME \
-                            --num_readouts=$READOUTS
+python3 selfplay.py \
+  --verbose=2 \
+  --num_readouts=400 \
+  --load_file=gs://$BUCKET_NAME/models/000737-fury
 ```
 
 where `READOUTS` is how many searches to make per move.  Timing information and
-statistics will be printed at each move.  Setting verbosity (`--v`) to 3 or
+statistics will be printed at each move.  Setting verbosity to 3 or
 higher will print a board at each move.
 
 Playing Against Minigo
