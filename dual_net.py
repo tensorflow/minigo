@@ -19,11 +19,14 @@ move prediction and score estimation.
 """
 
 from absl import flags
-import argparse
 import functools
 import os.path
 import sys
 
+<<<<<<< HEAD
+=======
+import fire
+>>>>>>> master
 from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
@@ -44,6 +47,12 @@ flags.DEFINE_integer('train_batch_size', 256,
 
 flags.DEFINE_integer('conv_width', 256 if go.N == 19 else 32,
                      'The width of each conv layer in the shared trunk.')
+
+flags.DEFINE_integer('policy_conv_width', 2,
+                     'The width of the policy conv layer.')
+
+flags.DEFINE_integer('value_conv_width', 1,
+                     'The width of the value conv layer.')
 
 flags.DEFINE_integer('fc_width', 256 if go.N == 19 else 64,
                      'The width of the fully connected layer in value head.')
@@ -111,6 +120,10 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'keep_checkpoint_max', default=5, help='Number of checkpoints to keep.')
 
+flags.DEFINE_bool(
+    'use_random_symmetry', True,
+    help='If true random symmetries be used when doing inference.')
+
 flags.register_multi_flags_validator(
     ['use_tpu', 'iterations_per_loop', 'summary_steps'],
     lambda flags: (not flags['use_tpu'] or
@@ -150,20 +163,19 @@ class DualNetwork():
         without redifining the entire graph."""
         tf.train.Saver().restore(self.sess, save_file)
 
-    def run(self, position, use_random_symmetry=True):
-        probs, values = self.run_many([position],
-                                      use_random_symmetry=use_random_symmetry)
+    def run(self, position):
+        probs, values = self.run_many([position])
         return probs[0], values[0]
 
-    def run_many(self, positions, use_random_symmetry=True):
+    def run_many(self, positions):
         processed = list(map(features_lib.extract_features, positions))
-        if use_random_symmetry:
+        if FLAGS.use_random_symmetry:
             syms_used, processed = symmetries.randomize_symmetries_feat(
                 processed)
         outputs = self.sess.run(self.inference_output,
                                 feed_dict={self.inference_input: processed})
         probabilities, value = outputs['policy_output'], outputs['value_output']
-        if use_random_symmetry:
+        if FLAGS.use_random_symmetry:
             probabilities = symmetries.invert_symmetries_pi(
                 syms_used, probabilities)
         return probabilities, value
@@ -375,20 +387,22 @@ def model_inference_fn(features, training):
         shared_output = my_res_layer(shared_output)
 
     # policy head
-    policy_conv = my_conv2d(shared_output, filters=2, kernel_size=1)
+    policy_conv = my_conv2d(
+        shared_output, filters=FLAGS.policy_conv_width, kernel_size=1)
     policy_conv = tf.nn.relu(my_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
-        tf.reshape(policy_conv, [-1, 2 * go.N * go.N]),
+        tf.reshape(policy_conv, [-1, FLAGS.policy_conv_width * go.N * go.N]),
         go.N * go.N + 1)
 
     policy_output = tf.nn.softmax(logits, name='policy_output')
 
     # value head
-    value_conv = my_conv2d(shared_output, filters=1, kernel_size=1)
+    value_conv = my_conv2d(
+        shared_output, filters=FLAGS.value_conv_width, kernel_size=1)
     value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
 
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
-        tf.reshape(value_conv, [-1, go.N * go.N]),
+        tf.reshape(value_conv, [-1, FLAGS.value_conv_width * go.N * go.N]),
         FLAGS.fc_width))
     value_output = tf.nn.tanh(
         tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),

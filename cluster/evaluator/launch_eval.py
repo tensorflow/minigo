@@ -15,31 +15,35 @@
 import sys
 sys.path.insert(0, '.')
 
+import fire
 from absl import flags
 import kubernetes
-import argparse
 import yaml
 import json
 import os
-import argh
 import time
 from rl_loop import fsdb
 
+from ratings import ratings
 
-def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=2):
+
+def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=5):
     """Launches an evaluator job.
     m1_path, m2_path: full gs:// paths to the .pb files to match up
-    job_name: string, appended to the container, used to differentiate the job names
-    (e.g. 'minigo-cc-evaluator-v5-123-v7-456')
+    job_name: string, appended to the container, used to differentiate the job
+    names (e.g. 'minigo-cc-evaluator-v5-123-v7-456')
     bucket_name: Where to write the sgfs, passed into the job as $BUCKET_NAME
     completions: the number of completions desired
     """
     if not all([m1_path, m2_path, job_name, bucket_name]):
-        print("Provide all of m1_path, m2_path, job_name, and bucket_name params")
+        print("Provide all of m1_path, m2_path, job_name, and bucket_name "
+              "params")
         return
     api_instance = get_api()
 
     raw_job_conf = open("cluster/evaluator/cc-evaluator.yaml").read()
+
+    os.environ['BUCKET_NAME'] = bucket_name
 
     os.environ['MODEL_BLACK'] = m1_path
     os.environ['MODEL_WHITE'] = m2_path
@@ -71,35 +75,68 @@ def same_run_eval(black_num=0, white_num=0):
 
     b = fsdb.get_model(black_num)
     w = fsdb.get_model(white_num)
-    bucket = fsdb.eval_dir
 
     b_model_path = os.path.join(fsdb.models_dir(), b)
     w_model_path = os.path.join(fsdb.models_dir(), w)
 
     launch_eval_job(b_model_path + ".pb",
-               w_model_path + ".pb",
-               "{:d}-{:d}".format(black_num, white_num),
-               bucket)
+                    w_model_path + ".pb",
+                    "{:d}-{:d}".format(black_num, white_num),
+                    flags.FLAGS.bucket_name)
 
 
-def zoo_loop():
+def _append_pairs(new_pairs, dry_run):
+    desired_pairs = restore_pairs() or []
+    desired_pairs += new_pairs
+    print("Adding {} new pairs, queue has {} pairs".format(len(new_pairs), len(desired_pairs)))
+    if not dry_run:
+        save_pairs(desired_pairs)
+
+
+def add_uncertain_pairs(dry_run=False):
+    new_pairs = ratings.suggest_pairs()
+    _append_pairs(new_pairs, dry_run)
+
+
+def add_top_pairs(dry_run=False):
+    """ Pairs up the top twenty models against each other.
+    #1 plays 2,3,4,5, #2 plays 3,4,5,6 etc. for a total of 15*4 matches.
+    """
+    top = ratings.top_n(10)
+    new_pairs = []
+    for idx, t in enumerate(top[:5]):
+        new_pairs += [[t[0], o[0]] for o in top[idx+1:idx+5]]
+    print(new_pairs)
+    _append_pairs(new_pairs, dry_run)
+
+
+def zoo_loop(sgf_dir=None, max_jobs=40):
     """Manages creating and cleaning up match jobs.
 
     - Load whatever pairs didn't get queued last time, and whatever our most
       recently seen model was.
     - Loop and...
         - If a new model is detected, create and append new pairs to the list
-        - Automatically queue models from a list of pairs to keep a cluster busy
+        - Automatically queue models from a list of pairs to keep a cluster
+          busy
         - As jobs finish, delete them from the cluster.
         - If we crash, write out the list of pairs we didn't manage to queue
+
+    sgf_dir -- the directory where sgf eval games should be used for computing
+      ratings.
+    max_jobs -- the maximum number of concurrent jobs.  jobs * completions * 2
+      should be around 500 to keep kubernetes from losing track of completions
     """
     desired_pairs = restore_pairs() or []
     last_model_queued = restore_last_model()
 
+    if sgf_dir:
+        sgf_dir = os.path.abspath(sgf_dir)
+
     api_instance = get_api()
     try:
         while True:
-            last_model = fsdb.get_latest_model()[0]
+            last_model = fsdb.get_latest_pb()[0]
             if last_model_queued < last_model:
                 print("Adding models {} to {} to be scheduled".format(
                     last_model_queued+1, last_model))
@@ -110,10 +147,21 @@ def zoo_loop():
 
             cleanup(api_instance)
             r = api_instance.list_job_for_all_namespaces()
-            if len(r.items) < 8:
-                if not desired_pairs:
-                    time.sleep(60*5)
-                    continue
+            if len(r.items) < max_jobs:
+                if len(desired_pairs) == 0:
+                    if sgf_dir:
+                        print("Out of pairs!  Syncing new eval games...")
+                        ratings.sync(sgf_dir)
+                        print("Updating ratings and getting suggestions...")
+                        add_uncertain_pairs()
+                        desired_pairs = restore_pairs() or []
+                        print("Got {} new pairs".format(len(desired_pairs)))
+                        print(ratings.top_n())
+                    else:
+                        print("Out of pairs!  Sleeping")
+                        time.sleep(300)
+                        continue
+
                 next_pair = desired_pairs.pop()  # take our pair off
                 print("Enqueuing:", next_pair)
                 try:
@@ -123,11 +171,13 @@ def zoo_loop():
                     raise
                 save_pairs(sorted(desired_pairs))
                 save_last_model(last_model)
+                time.sleep(6)
 
             else:
-                print("{}\t{} jobs outstanding.".format(
-                    time.strftime("%I:%M:%S %p"), len(r.items)))
-            time.sleep(30)
+                print("{}\t{} jobs outstanding. ({} to be scheduled)".format(
+                      time.strftime("%I:%M:%S %p"),
+                      len(r.items), len(desired_pairs)))
+                time.sleep(60)
     except:
         print("Unfinished pairs:")
         print(sorted(desired_pairs))
@@ -137,13 +187,13 @@ def zoo_loop():
 
 
 def restore_pairs():
-    with open('closest_pairs.json') as f:
+    with open('pairlist.json') as f:
         pairs = json.loads(f.read())
     return pairs
 
 
 def save_pairs(pairs):
-    with open('closest_pairs.json', 'w') as f:
+    with open('pairlist.json', 'w') as f:
         json.dump(pairs, f)
 
 
@@ -173,9 +223,8 @@ def cleanup(api_instance=None):
     for job in r.items:
         if job.status.succeeded == job.spec.completions:
             print(job.metadata.name, "finished!")
-            resp = api.delete_namespaced_job(
+            api.delete_namespaced_job(
                 job.metadata.name, 'default', body=delete_opts)
-
 
 
 def make_pairs_for_model(model_num=0):
@@ -188,17 +237,18 @@ def make_pairs_for_model(model_num=0):
         return
     pairs = []
     pairs += [[model_num, model_num - i]
-              for i in range(1, 10)if model_num - i > 0]
+              for i in range(1, 5) if model_num - i > 0]
     pairs += [[model_num, model_num - i]
-              for i in range(10, 20, 2)if model_num - i > 0]
-    pairs += [[model_num, model_num - i]
-              for i in range(20, 51, 5)if model_num - i > 0]
+              for i in range(5, 71, 10) if model_num - i > 0]
     return pairs
 
 
-parser = argparse.ArgumentParser()
-argh.add_commands(parser, [zoo_loop, same_run_eval, cleanup, launch_eval_job])
-
 if __name__ == '__main__':
     remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    argh.dispatch(parser, argv=remaining_argv[1:])
+    fire.Fire({
+        'zoo_loop': zoo_loop,
+        'same_run_eval': same_run_eval,
+        'cleanup': cleanup,
+        'add_top_pairs': add_top_pairs,
+        'launch_eval_job': launch_eval_job,
+    }, remaining_argv[1:])

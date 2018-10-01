@@ -62,6 +62,11 @@ golden_chunk_dir = _with_base('data', 'golden_chunks')
 flags_path = _with_base('flags.txt')
 
 
+def get_pbs():
+    all_pbs = gfile.Glob(os.path.join(models_dir(), '*.pb'))
+    return all_pbs
+
+
 def get_models():
     """Finds all models, returning a list of model number and names
     sorted increasing.
@@ -82,6 +87,11 @@ def get_latest_model():
     Returns: (17, 000017-modelname)
     """
     return get_models()[-1]
+
+
+def get_latest_pb():
+    pb = os.path.basename(get_pbs()[-1])
+    return shipname.detect_model_num(pb), pb
 
 
 def get_model(model_num):

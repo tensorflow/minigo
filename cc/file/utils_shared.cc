@@ -14,6 +14,7 @@
 
 #include "cc/file/utils.h"
 
+#include <errno.h>
 #include <sys/stat.h>
 
 #include "absl/strings/match.h"

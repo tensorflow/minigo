@@ -44,9 +44,15 @@ parser.add_argument(
     "--engine",
     default="py",
     type=str,
-    help="Which Minigo engine to use: \"py\" for the Python implementation, "
-         "\"cc\" for the C++ implementation.")
+    help="Which Minigo engine to use: \"py\" for the Python engine, or "
+         "one of the C++ engines (run \"cc/main --helpon=factory\" for the "
+         "C++ engine list.")
 
+parser.add_argument(
+    "--virtual_losses",
+    default=8,
+    type=int,
+    help="Number of virtual losses when running tree search.")
 
 parser.add_argument(
     "--python_for_engine",
@@ -77,20 +83,19 @@ if args.engine == "py":
                    "--num_readouts", "1000",
                    "--conv_width", "128",
                    "--verbose", "2"]
-elif args.engine == "cc":
+else:
     GTP_COMMAND = [
         "bazel-bin/cc/main",
-        "--model=" + args.model,
+        "--model=%s" % args.model,
         "--num_readouts=1000",
         "--soft_pick=false",
         "--inject_noise=false",
         "--disable_resign_pct=0",
         "--ponder_limit=100000",
         "--courtesy_pass=true",
+        "--engine=%s" % args.engine,
+        "--virtual_losses=%d" % args.virtual_losses,
         "--mode=gtp"]
-else:
-    raise ValueError(
-        "Expected \"py\" or \"cc\" for engine, got \"%s\"" % args.engine)
 
 
 def _open_pipes():

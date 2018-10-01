@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: minigo-tpu-player-container
-        image: gcr.io/tensor-go/minigo-tpu-player:0.21
+        image: gcr.io/tensor-go/minigo-tpu-player:v12
         imagePullPolicy: Always
         resources:
           limits:

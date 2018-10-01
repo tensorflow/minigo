@@ -54,8 +54,7 @@ def eval_pv(eval_positions):
             path = []
             node = mcts.root
             while node.children:
-                next_kid = np.argmax(node.child_N)
-                node = node.children.get(next_kid)
+                node = node.children.get(node.best_child())
                 path.append("{},{}".format(node.fmove, int(node.N)))
 
             save_file = os.path.join(

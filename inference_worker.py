@@ -91,6 +91,8 @@ class RwMutex(object):
 
     @contextmanager
     def read_lock(self):
+        # the first reader will acquire resource_lock, additional readers
+        # increment read_count.
         self._acquire_read()
         try:
             yield
@@ -98,14 +100,17 @@ class RwMutex(object):
             self._release_read()
 
     def _acquire_write(self):
+        # This waits till all readers release at the same time
         self._resource_lock.acquire()
 
     def _release_write(self):
         self._resource_lock.release()
 
     def _acquire_read(self):
+        # read lock is locking access to read_count so that it's value isn't double updated.
         with self._read_lock:
             self._read_count += 1
+            # Only one of the read threads needs the resource lock.
             if self._read_count == 1:
                 self._resource_lock.acquire()
 
@@ -359,18 +364,18 @@ class Worker(object):
             raise RuntimeError("Board size mismatch: server=%d, worker=%d" % (
                 config.board_size, go.N))
 
-        positions_per_inference = (config.games_per_inference *
-                                   config.virtual_losses)
-        if positions_per_inference % self.parallel_inferences != 0:
+        self.positions_per_inference = (config.games_per_inference *
+                                        config.virtual_losses)
+        if self.positions_per_inference % self.parallel_inferences != 0:
             raise RuntimeError(
                 "games_per_inference * virtual_losses must be divisible by "
                 "parallel_tpus")
-        self.batch_size = positions_per_inference // self.parallel_inferences
+        self.batch_size = self.positions_per_inference // self.parallel_inferences
 
         dbg("parallel_inferences = %d" % self.parallel_inferences)
         dbg("games_per_inference = %d" % config.games_per_inference)
         dbg("virtual_losses = %d" % config.virtual_losses)
-        dbg("positions_per_inference = %d" % positions_per_inference)
+        dbg("positions_per_inference = %d" % self.positions_per_inference)
         dbg("batch_size = %d" % self.batch_size)
 
     def _run_threads(self):
@@ -416,9 +421,16 @@ class Worker(object):
             pass
 
         dbg("running worker", thread_id)
+        # Don't start counting till we've warmed up.
+        batches = 0
+        batch_group_start = time.time()
+
         while self._running:
             features_response = self.stub.GetFeatures(
                 inference_service_pb2.GetFeaturesRequest())
+
+            if batches == 0:
+              warm_start = time.time()
 
             policy, value, model_path = self.sess.run(
                 features_response.features)
@@ -429,6 +441,17 @@ class Worker(object):
                 model_path=model_path)
 
             self.stub.PutOutputs(put_outputs_request)
+
+            batches += 1
+            if batches % 100 == 0:
+                end_time = time.time()
+                batch_time = end_time - batch_group_start
+                dbg("recent: {:.2f}s/{}, total: {:.2f}s/{} inferences".format(
+                    batch_time,
+                    100 * self.positions_per_inference,
+                    end_time - warm_start,
+                    batches * self.positions_per_inference))
+                batch_group_start = end_time
 
         dbg("stopping worker", thread_id)
 

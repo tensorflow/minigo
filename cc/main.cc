@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -104,9 +105,9 @@ DEFINE_bool(run_forever, false,
 
 // Inference flags.
 DEFINE_string(model, "",
-              "Path to a minigo model. If remote_inference=false, the model "
+              "Path to a minigo model. If engine!=remote, the model "
               "should be a serialized GraphDef proto. If "
-              "remote_inference=true, the model should be saved checkpoint.");
+              "engine=remote, the model should be saved checkpoint.");
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
@@ -149,6 +150,17 @@ std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
   return file::JoinPath(root_dir, sub_dirs);
 }
 
+std::string FormatInferenceInfo(
+    const std::vector<MctsPlayer::InferenceInfo>& inferences) {
+  std::vector<std::string> parts;
+  parts.reserve(inferences.size());
+  for (const auto& info : inferences) {
+    parts.push_back(absl::StrCat(info.model, "(", info.first_move, ",",
+                                 info.last_move, ")"));
+  }
+  return absl::StrJoin(parts, ", ");
+}
+
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
               const MctsPlayer& player_b, const MctsPlayer& player_w,
               bool write_comments) {
@@ -189,6 +201,10 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
   options.result = player_b.result_string();
   options.black_name = player_b.name();
   options.white_name = player_w.name();
+  options.game_comment = absl::StrCat(
+      "B inferences: ", FormatInferenceInfo(player_b.inferences()), "\n",
+      "W inferences: ", FormatInferenceInfo(player_w.inferences()));
+
   auto sgf_str = sgf::CreateSgfString(moves, options);
 
   auto output_path = file::JoinPath(output_dir, output_name + ".sgf");
@@ -283,8 +299,10 @@ class SelfPlayer {
         bleakest_move = i;
       }
     }
-    std::cout << "Bleakest eval: move=" << bleakest_move
-              << " Q=" << history[bleakest_move].node->Q() << std::endl;
+    if (!player->options().resign_enabled) {
+      std::cout << "Bleakest eval: move=" << bleakest_move
+                << " Q=" << history[bleakest_move].node->Q() << std::endl;
+    }
 
     // If resignation is disabled, check to see if the first time Q_perspective
     // crossed the resign_threshold the eventual winner of the game would have

@@ -144,7 +144,8 @@ Otherwise, all commands fetching files from GCS will hang.
 
 For instance, this would set a bucket, authenticate, and then look for the most
 recent model.
-```bash
+
+```shell
 # When you first start we reccomend using our minigo-pub bucket.
 # Later you can setup your own bucket and store data there.
 export BUCKET_NAME=minigo-pub/v9-19x19
@@ -166,13 +167,14 @@ argument usually need the path to the model basename, e.g.
 `gs://$BUCKET_NAME/models/000737-fury`
 
 You'll need to copy them to your local disk.  This fragment copies the files
-associated with $MODEL_NAME to the directory specified by `MINIGO_MODELS`
+associated with `$MODEL_NAME` to the directory specified by `MINIGO_MODELS`:
 
 ```shell
 MODEL_NAME=000532-ace
 MINIGO_MODELS=$HOME/minigo-models
-mkdir -p $MINIGO_MODELS
-gsutil ls gs://$BUCKET_NAME/models | grep $MODEL_NAME | gsutil cp -I $MINIGO_MODELS
+mkdir -p $MINIGO_MODELS/models
+gsutil ls gs://$BUCKET_NAME/models/$MODEL_NAME.* | \
+       gsutil cp -I $MINIGO_MODELS/models
 ```
 
 Selfplay
@@ -182,11 +184,14 @@ to play using the latest model in your bucket
 
 ```shell
 READOUTS=400
-python rl_loop.py selfplay --num_readouts=$READOUTS -v 2
+python3 rl_loop.py selfplay --v 2 \
+                            --bucket_name $BUCKET_NAME \
+                            --num_readouts=$READOUTS
 ```
+
 where `READOUTS` is how many searches to make per move.  Timing information and
-statistics will be printed at each move.  Setting verbosity (-v) to 3 or higher
-will print a board at each move.
+statistics will be printed at each move.  Setting verbosity (`--v`) to 3 or
+higher will print a board at each move.
 
 Playing Against Minigo
 ----------------------
@@ -195,7 +200,7 @@ Minigo uses the
 [GTP Protocol](http://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html),
 and you can use any gtp-compliant program with it.
 
-```
+```shell
 # Latest model should look like: /path/to/models/000123-something
 LATEST_MODEL=$(ls -d $MINIGO_MODELS/* | tail -1 | cut -f 1 -d '.')
 BOARD_SIZE=19 python3 gtp.py --load_file=$LATEST_MODEL --num_readouts=$READOUTS --verbose=3
@@ -220,8 +225,10 @@ GTP](http://gogui.sourceforge.net/doc/reference-twogtp.html).
 gogui-twogtp -black 'python3 gtp.py --load_file=$LATEST_MODEL' -white 'gogui-display' -size 19 -komi 7.5 -verbose -auto
 ```
 
-Another way to play via GTP is to watch it play against GnuGo, while spectating the games
-```
+Another way to play via GTP is to watch it play against GnuGo, while
+spectating the games:
+
+```shell
 BLACK="gnugo --mode gtp"
 WHITE="python3 gtp.py --load_file=$LATEST_MODEL"
 TWOGTP="gogui-twogtp -black \"$BLACK\" -white \"$WHITE\" -games 10 \
@@ -240,6 +247,7 @@ reinforcement learning on 9x9. These are the basic commands used to produce the
 models and games referenced above.
 
 The commands are
+
  - bootstrap: initializes a random model
  - selfplay: plays games with the latest model, producing data used for training
  - train: trains a new model with the selfplay results from the most recent N
@@ -258,7 +266,7 @@ selfplay can immediately start playing with this random model.
 
 If these directories don't exist, bootstrap will create them for you.
 
-```bash
+```shell
 export MODEL_NAME=000000-bootstrap
 python3 main.py bootstrap \
   --working-dir=estimator_working_dir \
@@ -271,12 +279,12 @@ Self-play
 This command starts self-playing, outputting its raw game data in a
 tensorflow-compatible format as well as in SGF form in the directories
 
-```
+```shell
 gsutil ls gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker/*.tfrecord.zz
 gsutil ls gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
 ```
 
-```bash
+```shell
 BOARD_SIZE=19 python3 selfplay.py \
   --load_file=gs://$BUCKET_NAME/models/$MODEL_NAME \
   --num_readouts 10 \
@@ -289,23 +297,25 @@ BOARD_SIZE=19 python3 selfplay.py \
 Training
 --------
 
-This command takes a directory of tfexample files from selfplay and trains a new
-model, starting from the latest model weights in the `estimator_working_dir` parameter.
+This command takes a directory of tfexample files from selfplay and trains a
+new model, starting from the latest model weights in the `estimator_working_dir`
+parameter.
 
 Run the training job:
-```
+
+```shell
 BOARD_SIZE=19 python3 main.py train-dir \
   gs://$BUCKET_NAME/data/training_chunks \
   gs://$BUCKET_NAME/models/000001-somename \
   --model_dir estimator_working_dir
 ```
 
-At the end of training, the latest checkpoint will be exported to the directory with the given name.
-Additionally, you can follow along with the training progress with
-TensorBoard - if you point TensorBoard at the estimator working dir, it will
-find the training log files and display them.
+At the end of training, the latest checkpoint will be exported to the directory
+with the given name.  Additionally, you can follow along with the training
+progress with TensorBoard - if you point TensorBoard at the estimator working
+dir, it will find the training log files and display them.
 
-```
+```shell
 tensorboard --logdir=estimator_working_dir
 ```
 
@@ -322,10 +332,10 @@ By default, Minigo will hold out 5% of selfplay games for validation, and write
 them to `gs://$BUCKET_NAME/data/holdout/<model_name>`.  This can be changed by
 adjusting the `holdout_pct` flag on the `selfplay` command.
 
-With this setup, `python rl_loop.py validate --logdir=estimator_working_dir --` will figure out
-the most recent model, grab the holdout data from the fifty models prior to that
-one, and calculate the validation error, writing the tensorboard logs to
-`logdir`.
+With this setup, `python rl_loop.py validate --logdir=estimator_working_dir --`
+will figure out the most recent model, grab the holdout data from the fifty
+models prior to that one, and calculate the validation error, writing the
+tensorboard logs to `logdir`.
 
 
 ### Validating on a different set of data
@@ -340,16 +350,16 @@ to
 import preprocessing
 filenames = [generate a list of filenames here]
 for f in filenames:
-     try:
-         preprocessing.make_dataset_from_sgf(f, f.replace(".sgf", ".tfrecord.zz"))
-     except:
-         print(f)
+    try:
+        preprocessing.make_dataset_from_sgf(f, f.replace(".sgf", ".tfrecord.zz"))
+    except:
+        print(f)
 ```
 
 Once you've collected all the files in a directory, producing validation is as
 easy as
 
-```
+```shell
 BOARD_SIZE=19 python main.py validate path/to/validation/files/ --load_file=$LATEST_MODEL
 --logdir=path/to/tb/logs --num-steps=<number of positions to run validation on>
 ```
