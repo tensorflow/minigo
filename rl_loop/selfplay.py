@@ -22,8 +22,10 @@ import prep_flags
 # From rl_loop/fsdb.py
 flags.declare_key_flag('bucket_name')
 
-flags.DEFINE_enum('mode', ['cc', 'tpu'],
+flags.DEFINE_enum('mode', None, ['cc', 'tpu'],
                   'Which setup to use: cc on GPU or cc/py on TPU.')
+
+FLAGS = flags.FLAGS
 
 def run_cc():
     _, model_name = fsdb.get_latest_model()
@@ -62,9 +64,9 @@ def run_tpu():
 
 def main(unused_argv):
     flags.mark_flags_as_required(['bucket_name', 'mode'])
-    if mode == 'cc':
+    if FLAGS.mode == 'cc':
         run_cc()
-    elif mode == 'tpu':
+    elif FLAGS.mode == 'tpu':
         run_tpu()
 
 if __name__ == '__main__':

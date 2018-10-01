@@ -24,7 +24,7 @@ import tempfile
 
 sys.path.insert(0, '.')
 
-from absl import app, flags
+from absl import app
 from tensorflow import gfile
 
 import example_buffer as eb

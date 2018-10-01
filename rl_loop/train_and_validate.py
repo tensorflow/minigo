@@ -19,8 +19,8 @@ We run as subprocesses because it gives us some isolation.
 
 import itertools
 import os
-import subprocess
 import sys
+import time
 
 sys.path.insert(0, '.')
 
@@ -28,6 +28,7 @@ from absl import app, flags
 from tensorflow import gfile
 import fsdb
 import prep_flags
+import shipname
 import utils
 
 flags.DEFINE_string('pro_dataset', None,
@@ -36,6 +37,8 @@ flags.DEFINE_string('pro_dataset', None,
 # From fsdb.py - must pass one of the two.
 flags.declare_key_flag('base_dir')
 flags.declare_key_flag('bucket_name')
+
+FLAGS = flags.FLAGS
 
 try:
     TPU_NAME = os.environ['TPU_NAME']
@@ -70,16 +73,16 @@ def validate_holdout_selfplay():
     holdout_dirs = (os.path.join(fsdb.holdout_dir(), d)
                     for d in reversed(gfile.ListDirectory(fsdb.holdout_dir()))
                     if gfile.IsDirectory(os.path.join(fsdb.holdout_dir(), d))
-                     for f in gfile.ListDirectory(os.path.join(fsdb.holdout_dir(), d)))
+                    for f in gfile.ListDirectory(os.path.join(fsdb.holdout_dir(), d)))
 
     # This is a roundabout way of computing how many hourly directories we need
     # to read in order to encompass 20,000 holdout games.
     holdout_dirs = set(itertools.islice(holdout_dirs), 20000)
     cmd = ['python', 'validate.py'] + list(holdout_dirs) + [
-           '--use_tpu',
-           '--tpu_name={}'.format(TPU_NAME),
-           '--flagfile=rl_loop/distributed_flags',
-           '--expand_validation_dirs']
+        '--use_tpu',
+        '--tpu_name={}'.format(TPU_NAME),
+        '--flagfile=rl_loop/distributed_flags',
+        '--expand_validation_dirs']
     prep_flags.run(cmd)
 
 def validate_pro():
