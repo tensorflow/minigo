@@ -37,6 +37,11 @@ flags.DEFINE_string('pro_dataset', None,
 flags.declare_key_flag('base_dir')
 flags.declare_key_flag('bucket_name')
 
+try:
+    TPU_NAME = os.environ['TPU_NAME']
+except KeyError:
+    raise Exception("Must have $TPU_NAME configured")
+
 def train():
     model_num, model_name = fsdb.get_latest_model()
     print("Training on gathered game data, initializing from {}".format(
@@ -52,6 +57,8 @@ def train():
     save_file = os.path.join(fsdb.models_dir(), new_model_name)
 
     cmd = ['python', 'train.py', training_file,
+           '--use_tpu',
+           '--tpu_name={}'.format(TPU_NAME),
            '--flagfile=rl_loop/distributed_flags',
            '--export_path={}'.format(save_file)]
 
@@ -69,6 +76,8 @@ def validate_holdout_selfplay():
     # to read in order to encompass 20,000 holdout games.
     holdout_dirs = set(itertools.islice(holdout_dirs), 20000)
     cmd = ['python', 'validate.py'] + list(holdout_dirs) + [
+           '--use_tpu',
+           '--tpu_name={}'.format(TPU_NAME),
            '--flagfile=rl_loop/distributed_flags',
            '--expand_validation_dirs']
     prep_flags.run(cmd)
@@ -76,7 +85,10 @@ def validate_holdout_selfplay():
 def validate_pro():
     """Validate on professional data."""
     cmd = ['python', 'validate.py', FLAGS.pro_dataset,
-           '--flagfile=rl_loop/distributed_flags', '--validate_name=pro']
+           '--use_tpu',
+           '--tpu_name={}'.format(TPU_NAME),
+           '--flagfile=rl_loop/distributed_flags',
+           '--validate_name=pro']
     prep_flags.run(cmd)
 
 

@@ -37,7 +37,7 @@ PYTHONPATH= BOARD_SIZE=9 python3 tests/run_tests.py || {
   exit 1
 }
 
-BOARD_SIZE=9 python3 local_rl_loop.py || {
+BOARD_SIZE=9 python3 rl_loop/local_integration_test.py || {
   echo >&2 "--------------------------------------"
   echo >&2 "Integration test did not pass successfully!"
   exit 1

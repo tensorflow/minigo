@@ -42,15 +42,14 @@ def main(unused_argv):
     utils.ensure_dir_exists(fsdb.sgf_dir())
     utils.ensure_dir_exists(fsdb.eval_dir())
     utils.ensure_dir_exists(fsdb.golden_chunk_dir())
-    scratch_dir = os.path.join(flags.FLAGS.base_dir, 'scratch')
-    utils.ensure_dir_exists(scratch_dir)
+    utils.ensure_dir_exists(fsdb.working_dir())
 
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
     prep_flags.checked_run([
         'python', 'bootstrap.py',
         '--export_path={}'.format(bootstrap_model_path),
-        '--work_dir={}'.format(scratch_dir),
+        '--work_dir={}'.format(fsdb.working_dir()),
         '--flagfile=rl_loop/local_flags'])
 
     selfplay_cmd = [
@@ -76,7 +75,7 @@ def main(unused_argv):
     # TODO(amj): refactor example_buffer so it can be called the same way
     # as everything else.
     eb.make_chunk_for(output_dir=fsdb.golden_chunk_dir(),
-                      local_dir=scratch_dir,
+                      local_dir=fsdb.working_dir(),
                       game_dir=fsdb.selfplay_dir(),
                       model_num=1,
                       positions=64,
@@ -92,7 +91,7 @@ def main(unused_argv):
     # Train on shuffled game data
     prep_flags.checked_run([
         'python', 'train.py', *tf_records, 
-        '--work_dir={}'.format(scratch_dir),
+        '--work_dir={}'.format(fsdb.working_dir()),
         '--export_path={}'.format(trained_model_path),
         '--flagfile=rl_loop/local_flags'])
 
@@ -100,7 +99,7 @@ def main(unused_argv):
     prep_flags.checked_run([
         'python', 'validate.py',
         os.path.join(fsdb.holdout_dir(), bootstrap_name),
-        '--work_dir={}'.format(scratch_dir),
+        '--work_dir={}'.format(fsdb.working_dir()),
         '--flagfile=rl_loop/local_flags'])
 
     # Verify that trained model works for selfplay

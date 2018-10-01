@@ -1,9 +1,22 @@
-# One line per flag
-# Training related flags
---work_dir=estimator_working_dir
---use_tpu
---tpu_name=$TPU_NAME
-# Selfplay related flags
+# This file is an enumeration of all hyperparameters required by the
+# AGZ pipeline. The flags in this file get passed into all of the scripts
+# in the rl_loop/ directory via the prep_flags.py helper library.
+
+# One line per flag.
+
+# Network architecture flags
+--conv_width=256
+--fc_width=256
+--trunk_layers=19
+
+# Training-related flags
+--train_batch_size=256
+--lr_rates=0.01,0.001,0.0001
+--l2_strength=0.0001
+--sgd_momentum=0.9
+
+# Selfplay related flags.
+# These flags can be overwritten by --flags_path (see cc/main.cc for details)
 --inject_noise=true
 --soft_pick=true
 --random_symmetry=true
@@ -11,7 +24,6 @@
 --parallel_games=32
 --num_readouts=800
 --disable_resign_pct=0.10
-# This flag can be overwritten by --flags_path (see cc/main.cc for details)
 --resign_threshold=-0.999
 
 
