@@ -6,8 +6,8 @@ http_archive(
 
 http_archive(
     name = "com_google_absl",
-    strip_prefix = "abseil-cpp-a7e522daf1ec9cda69b356472f662142dd0c1215",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/a7e522daf1ec9cda69b356472f662142dd0c1215.zip"],
+    strip_prefix = "abseil-cpp-5441bbe1db5d0f2ca24b5b60166367b0966790af",
+    urls = ["https://github.com/abseil/abseil-cpp/archive/5441bbe1db5d0f2ca24b5b60166367b0966790af.zip"],
 )
 
 new_http_archive(
@@ -21,12 +21,6 @@ http_archive(
     name = "com_google_googletest",
     strip_prefix = "googletest-master",
     urls = ["https://github.com/google/googletest/archive/master.zip"],
-)
-
-http_archive(
-    name = "com_googlesource_code_cctz",
-    strip_prefix = "cctz-2.2",
-    urls = ["https://github.com/google/cctz/archive/v2.2.zip"],
 )
 
 http_archive(
