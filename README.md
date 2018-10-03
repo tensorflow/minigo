@@ -171,7 +171,7 @@ You'll need to copy them to your local disk.  This fragment copies the files
 associated with `$MODEL_NAME` to the directory specified by `MINIGO_MODELS`:
 
 ```shell
-MODEL_NAME=000532-ace
+MODEL_NAME=000737-fury
 MINIGO_MODELS=$HOME/minigo-models
 mkdir -p $MINIGO_MODELS/models
 gsutil ls gs://$BUCKET_NAME/models/$MODEL_NAME.* | \
@@ -187,7 +187,7 @@ to play using the latest model in your bucket
 python3 selfplay.py \
   --verbose=2 \
   --num_readouts=400 \
-  --load_file=gs://$BUCKET_NAME/models/000737-fury
+  --load_file=$MINIGO_MODELS/models/$MODEL_NAME
 ```
 
 where `READOUTS` is how many searches to make per move.  Timing information and
@@ -261,7 +261,10 @@ it gets picked up by selfplay workers.
 Configuration for things like "where do debug SGFs get written", "where does
 training data get written", "where do the latest models get published" are
 managed by the helper scripts in the rl_loop directory. Those helper scripts
-execute the same commands as demonstrated below.
+execute the same commands as demonstrated below. Configuration for things like
+"what size network is being used?" or "how many readouts during selfplay" can
+be passed in as flags. The mask_flags.py utility helps ensure all parts of the
+pipeline are using the same network configuration.
 
 All local paths in the examples can be replaced with `gs://` GCS paths, and the
 Kubernetes-orchestrated version of the reinforcement learning loop uses GCS.
@@ -291,7 +294,7 @@ as well as in SGF form in the directories.
 
 ```shell
 BOARD_SIZE=19 python3 selfplay.py \
-  --load_file=models/$MODEL_NAME \
+  --load_file=outputs/models/$MODEL_NAME \
   --num_readouts 10 \
   --verbose 3 \
   --selfplay_dir=outputs/data/selfplay \
