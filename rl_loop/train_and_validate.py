@@ -59,7 +59,7 @@ def train():
         time.sleep(1 * 60)
     save_file = os.path.join(fsdb.models_dir(), new_model_name)
 
-    cmd = ['python', 'train.py', training_file,
+    cmd = ['python3', 'train.py', training_file,
            '--use_tpu',
            '--tpu_name={}'.format(TPU_NAME),
            '--flagfile=rl_loop/distributed_flags',
@@ -78,7 +78,7 @@ def validate_holdout_selfplay():
     # This is a roundabout way of computing how many hourly directories we need
     # to read in order to encompass 20,000 holdout games.
     holdout_dirs = set(itertools.islice(holdout_dirs), 20000)
-    cmd = ['python', 'validate.py'] + list(holdout_dirs) + [
+    cmd = ['python3', 'validate.py'] + list(holdout_dirs) + [
         '--use_tpu',
         '--tpu_name={}'.format(TPU_NAME),
         '--flagfile=rl_loop/distributed_flags',
@@ -87,7 +87,7 @@ def validate_holdout_selfplay():
 
 def validate_pro():
     """Validate on professional data."""
-    cmd = ['python', 'validate.py', FLAGS.pro_dataset,
+    cmd = ['python3', 'validate.py', FLAGS.pro_dataset,
            '--use_tpu',
            '--tpu_name={}'.format(TPU_NAME),
            '--flagfile=rl_loop/distributed_flags',
