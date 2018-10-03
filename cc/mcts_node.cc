@@ -17,11 +17,10 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <iomanip>
-#include <sstream>
 #include <tuple>
 #include <utility>
 
+#include "absl/strings/str_format.h"
 #include "cc/algorithm.h"
 #include "cc/check.h"
 
@@ -89,9 +88,6 @@ Coord MctsNode::GetMostVisitedMove() const {
 }
 
 std::string MctsNode::Describe() const {
-  using std::setprecision;
-  using std::setw;
-
   auto child_action_score = CalculateChildActionScore();
   using SortInfo = std::tuple<float, float, int>;
   std::array<SortInfo, kNumMoves> sort_order;
@@ -100,12 +96,10 @@ std::string MctsNode::Describe() const {
   }
   std::sort(sort_order.begin(), sort_order.end(), std::greater<SortInfo>());
 
-  std::ostringstream oss;
-  oss << std::fixed;
-  oss << setprecision(4) << Q() << "\n";
-  oss << MostVisitedPathString() << "\n";
-  oss << "move : action    Q     U     P   P-Dir    N  soft-N  p-delta  "
-         "p-rel";
+  auto result = absl::StrFormat(
+      "%0.4f\n%s\n"
+      "move : action    Q     U     P   P-Dir    N  soft-N  p-delta  p-rel",
+      Q(), MostVisitedPathString());
 
   float child_N_sum = 0;
   for (const auto& e : edges) {
@@ -116,20 +110,14 @@ std::string MctsNode::Describe() const {
     float soft_N = child_N(i) / child_N_sum;
     float p_delta = soft_N - child_P(i);
     float p_rel = p_delta / child_P(i);
-    // clang-format off
-    oss << "\n" << std::left << setw(5) << i.ToKgs() << std::right
-        << ": " << setw(6) << setprecision(3) << child_action_score[i]
-        << " " << setw(6) << child_Q(i)
-        << " " << setw(5) << child_U(i)
-        << " " << setw(5) << child_P(i)
-        << " " << setw(5) << child_original_P(i)
-        << " " << setw(5) << static_cast<int>(child_N(i))
-        << " " << setw(5) << setprecision(4) << soft_N
-        << " " << setw(8) << setprecision(5) << p_delta
-        << " " << setw(5) << setprecision(2) << p_rel;
-    // clang-format on
+    absl::StrAppendFormat(
+        &result,
+        "\n%-5s: % 4.3f % 4.3f %0.3f %0.3f %0.3f %5d %0.4f % 6.5f % 3.2f",
+        i.ToKgs(), child_action_score[i], child_Q(i), child_U(i), child_P(i),
+        child_original_P(i), static_cast<int>(child_N(i)), soft_N, p_delta,
+        p_rel);
   }
-  return oss.str();
+  return result;
 }
 
 std::vector<Coord> MctsNode::MostVisitedPath() const {
@@ -146,17 +134,17 @@ std::vector<Coord> MctsNode::MostVisitedPath() const {
 }
 
 std::string MctsNode::MostVisitedPathString() const {
-  std::ostringstream oss;
+  std::string result;
   const auto* node = this;
   for (Coord c : MostVisitedPath()) {
     auto it = node->children.find(c);
     MG_CHECK(it != node->children.end());
     node = it->second.get();
-    oss << node->move.ToKgs() << " (" << static_cast<int>(node->N())
-        << ") ==> ";
+    absl::StrAppendFormat(&result, "%s (%d) ==> ", node->move.ToKgs(),
+                          static_cast<int>(node->N()));
   }
-  oss << std::fixed << std::setprecision(5) << "Q: " << node->Q();
-  return oss.str();
+  absl::StrAppendFormat(&result, "Q: %0.5f", node->Q());
+  return result;
 }
 
 void MctsNode::GetMoveHistory(

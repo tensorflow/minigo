@@ -16,13 +16,13 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <utility>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/time/clock.h"
 #include "cc/check.h"
@@ -263,8 +263,7 @@ void MctsPlayer::PlayMove(Coord c) {
   root_->parent->PruneChildren(c);
 
   if (options_.verbose) {
-    std::cerr << name() << " Q: " << std::setw(8) << std::setprecision(5)
-              << root_->Q() << "\n";
+    std::cerr << absl::StreamFormat("%s Q: %0.5f\n", name(), root_->Q());
     std::cerr << "Played >>" << c << std::endl;
   }
 
@@ -279,14 +278,7 @@ void MctsPlayer::PlayMove(Coord c) {
 }
 
 std::string MctsPlayer::FormatScore(float score) const {
-  std::ostringstream oss;
-  oss << std::fixed;
-  if (score > 0) {
-    oss << "B+" << std::setprecision(1) << score;
-  } else {
-    oss << "W+" << std::setprecision(1) << -score;
-  }
-  return oss.str();
+  return absl::StrFormat("%c+%.1f", score > 0 ? 'B' : 'W', std::abs(score));
 }
 
 void MctsPlayer::PushHistory(Coord c) {

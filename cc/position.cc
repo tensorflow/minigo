@@ -14,10 +14,10 @@
 
 #include "cc/position.h"
 
-#include <iomanip>
 #include <sstream>
 #include <utility>
 
+#include "absl/strings/str_format.h"
 #include "cc/tiny_set.h"
 
 namespace minigo {
@@ -104,7 +104,6 @@ std::string Position::ToSimpleString() const {
 
 std::string Position::ToGroupString() const {
   std::ostringstream oss;
-  oss << std::setfill('0') << std::hex;
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
       Coord c(row, col);
@@ -113,7 +112,7 @@ std::string Position::ToGroupString() const {
         oss << kPrintEmpty << ".  ";
       } else {
         oss << (s.color() == Color::kWhite ? kPrintWhite : kPrintBlack);
-        oss << std::setw(2) << s.group_id() << " ";
+        oss << absl::StreamFormat("%02x ", s.group_id());
       }
     }
     oss << kPrintNormal << "\n";
@@ -139,7 +138,7 @@ std::string Position::ToPrettyString(bool use_ansi_colors) const {
 
   format_cols();
   for (int row = 0; row < kN; ++row) {
-    oss << std::setw(2) << (kN - row) << " ";
+    oss << absl::StreamFormat("%2d ", kN - row);
     for (int col = 0; col < kN; ++col) {
       Coord c(row, col);
       auto color = stones_[c].color();
@@ -151,7 +150,7 @@ std::string Position::ToPrettyString(bool use_ansi_colors) const {
         oss << print_empty << (c == ko_ ? "* " : ". ");
       }
     }
-    oss << print_normal << std::setw(2) << (kN - row);
+    oss << print_normal << absl::StreamFormat("%2d", kN - row);
     oss << "\n";
   }
   format_cols();

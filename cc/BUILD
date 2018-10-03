@@ -141,6 +141,7 @@ minigo_cc_library(
         "//cc/dual_net",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
     ],
@@ -159,6 +160,7 @@ minigo_cc_library(
         ":check",
         ":inline_vector",
         ":tiny_set",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 

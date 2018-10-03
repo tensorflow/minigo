@@ -15,9 +15,7 @@
 #include "cc/sgf.h"
 
 #include <cctype>
-#include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <utility>
 
 #include "absl/strings/ascii.h"
