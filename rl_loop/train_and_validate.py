@@ -27,7 +27,7 @@ sys.path.insert(0, '.')
 from absl import app, flags
 from tensorflow import gfile
 from rl_loop import fsdb
-from rl_loop import prep_flags
+import mask_flags
 from rl_loop import shipname
 import utils
 
@@ -65,7 +65,7 @@ def train():
            '--flagfile=rl_loop/distributed_flags',
            '--export_path={}'.format(save_file)]
 
-    return prep_flags.run(cmd)
+    return mask_flags.run(cmd)
 
 
 def validate_holdout_selfplay():
@@ -83,7 +83,7 @@ def validate_holdout_selfplay():
         '--tpu_name={}'.format(TPU_NAME),
         '--flagfile=rl_loop/distributed_flags',
         '--expand_validation_dirs']
-    prep_flags.run(cmd)
+    mask_flags.run(cmd)
 
 def validate_pro():
     """Validate on professional data."""
@@ -92,7 +92,7 @@ def validate_pro():
            '--tpu_name={}'.format(TPU_NAME),
            '--flagfile=rl_loop/distributed_flags',
            '--validate_name=pro']
-    prep_flags.run(cmd)
+    mask_flags.run(cmd)
 
 
 def loop(unused_argv):

@@ -23,10 +23,7 @@ import functools
 import os.path
 import sys
 
-<<<<<<< HEAD
-=======
 import fire
->>>>>>> master
 from tqdm import tqdm
 import numpy as np
 import tensorflow as tf

@@ -17,7 +17,7 @@ from absl import app, flags
 sys.path.insert(0, '.')
 
 from rl_loop import fsdb
-from rl_loop import prep_flags
+import mask_flags
 
 # From rl_loop/fsdb.py
 flags.declare_key_flag('bucket_name')
@@ -36,7 +36,7 @@ def run_cc():
         time.sleep(10 * 60)
         sys.exit()
 
-    prep_flags.checked_run([
+    mask_flags.checked_run([
         'bazel-bin/cc/main',
         '--model={}'.format(model_name),
         '--mode=selfplay',
@@ -50,7 +50,7 @@ def run_cc():
         '--flagfile=rl_loop/distributed_flags'])
 
 def run_tpu():
-    prep_flags.checked_run([
+    mask_flags.checked_run([
         'bazel-bin/cc/main',
         '--mode=selfplay',
         '--engine=remote',

@@ -38,7 +38,6 @@ flags.DEFINE_bool('expand_validation_dirs', True,
 
 # From dual_net.py
 flags.declare_key_flag('work_dir')
-flags.declare_key_flag('train_batch_size')
 flags.declare_key_flag('use_tpu')
 flags.declare_key_flag('num_tpu_cores')
 

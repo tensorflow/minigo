@@ -29,7 +29,7 @@ from tensorflow import gfile
 
 from rl_loop import example_buffer as eb
 from rl_loop import fsdb
-from rl_loop import prep_flags
+import mask_flags
 from rl_loop import shipname
 import utils
 
@@ -46,7 +46,7 @@ def main(unused_argv):
 
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
-    prep_flags.checked_run([
+    mask_flags.checked_run([
         'python', 'bootstrap.py',
         '--export_path={}'.format(bootstrap_model_path),
         '--work_dir={}'.format(fsdb.working_dir()),
@@ -62,11 +62,11 @@ def main(unused_argv):
         '--flagfile=rl_loop/local_flags']
 
     # Selfplay twice
-    prep_flags.checked_run(selfplay_cmd)
-    prep_flags.checked_run(selfplay_cmd)
+    mask_flags.checked_run(selfplay_cmd)
+    mask_flags.checked_run(selfplay_cmd)
     # and once more to generate a held out game for validation
     # exploits flags behavior where if you pass flag twice, second one wins.
-    prep_flags.checked_run(selfplay_cmd + ['--holdout_pct=100'])
+    mask_flags.checked_run(selfplay_cmd + ['--holdout_pct=100'])
 
     # Double check that at least one sgf has been generated.
     assert os.listdir(os.path.join(fsdb.sgf_dir(), 'full'))
@@ -89,14 +89,14 @@ def main(unused_argv):
     trained_model_path = os.path.join(fsdb.models_dir(), trained_model_name)
 
     # Train on shuffled game data
-    prep_flags.checked_run([
+    mask_flags.checked_run([
         'python', 'train.py', *tf_records, 
         '--work_dir={}'.format(fsdb.working_dir()),
         '--export_path={}'.format(trained_model_path),
         '--flagfile=rl_loop/local_flags'])
 
     # Validate the trained model on held out game
-    prep_flags.checked_run([
+    mask_flags.checked_run([
         'python', 'validate.py',
         os.path.join(fsdb.holdout_dir(), bootstrap_name),
         '--work_dir={}'.format(fsdb.working_dir()),
@@ -104,10 +104,10 @@ def main(unused_argv):
 
     # Verify that trained model works for selfplay
     # exploits flags behavior where if you pass flag twice, second one wins.
-    prep_flags.checked_run(
+    mask_flags.checked_run(
         selfplay_cmd + ['--load_file={}'.format(trained_model_path)])
 
-    prep_flags.checked_run([
+    mask_flags.checked_run([
         'python', 'evaluate.py',
         bootstrap_model_path, trained_model_path,
         '--games=1',

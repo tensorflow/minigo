@@ -114,7 +114,7 @@ def run_game(load_file, selfplay_dir=None, holdout_dir=None,
         full_sgf_dir = os.path.join(sgf_dir, 'full')
         utils.ensure_dir_exists(minimal_sgf_dir)
         utils.ensure_dir_exists(full_sgf_dir)
-    if selfplay_dir is not None
+    if selfplay_dir is not None:
         utils.ensure_dir_exists(selfplay_dir)
         utils.ensure_dir_exists(holdout_dir)
 

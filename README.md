@@ -12,8 +12,9 @@ independent effort by Go enthusiasts to replicate the results of the AlphaGo
 Zero paper ("Mastering the Game of Go without Human Knowledge," *Nature*), with
 some resources generously made available by Google.
 
-Minigo is based off of Brian Lee's "MuGo" -- a pure Python implementation of the
-first AlphaGo paper ["Mastering the Game of Go with Deep Neural Networks and
+Minigo is based off of Brian Lee's "[MuGo](https://github.com/brilee/MuGo)"
+-- a pure Python implementation of the first AlphaGo paper
+["Mastering the Game of Go with Deep Neural Networks and
 Tree Search"](https://www.nature.com/articles/nature16961) published in
 *Nature*. This implementation adds features and architecture changes present in
 the more recent AlphaGo Zero paper, ["Mastering the Game of Go without Human
@@ -253,9 +254,17 @@ The commands are
  - train: trains a new model with the selfplay results from the most recent N
    generations.
 
-Training works via tf.Estimator; a local directory keeps track of training
-progress, and the latest checkpoint is periodically exported to GCS, where it
-gets picked up by selfplay workers.
+Training works via tf.Estimator; a working directory manages checkpoints and
+training logs, and the latest checkpoint is periodically exported to GCS, where
+it gets picked up by selfplay workers.
+
+Configuration for things like "where do debug SGFs get written", "where does
+training data get written", "where do the latest models get published" are
+managed by the helper scripts in the rl_loop directory. Those helper scripts
+execute the same commands as demonstrated below.
+
+All local paths in the examples can be replaced with `gs://` GCS paths, and the
+Kubernetes-orchestrated version of the reinforcement learning loop uses GCS.
 
 Bootstrap
 ---------
@@ -268,52 +277,48 @@ If these directories don't exist, bootstrap will create them for you.
 
 ```shell
 export MODEL_NAME=000000-bootstrap
-python3 main.py bootstrap \
-  --working-dir=estimator_working_dir \
-  --model-save-path="gs://$BUCKET_NAME/models/$MODEL_NAME"
+BOARD_SIZE=19 python3 bootstrap.py \
+  --work_dir=estimator_working_dir \
+  --export_path=outputs/models/$MODEL_NAME
 ```
 
 Self-play
 ---------
 
-This command starts self-playing, outputting its raw game data in a
-tensorflow-compatible format as well as in SGF form in the directories
+This command starts self-playing, outputting its raw game data as tf.Examples
+as well as in SGF form in the directories.
 
-```shell
-gsutil ls gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker/*.tfrecord.zz
-gsutil ls gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker/*.sgf
-```
 
 ```shell
 BOARD_SIZE=19 python3 selfplay.py \
-  --load_file=gs://$BUCKET_NAME/models/$MODEL_NAME \
+  --load_file=models/$MODEL_NAME \
   --num_readouts 10 \
   --verbose 3 \
-  --selfplay_dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
-  --holdout_dir=gs://$BUCKET_NAME/data/selfplay/$MODEL_NAME/local_worker \
-  --sgf_dir=gs://$BUCKET_NAME/sgf/$MODEL_NAME/local_worker
+  --selfplay_dir=outputs/data/selfplay \
+  --holdout_dir=outputs/data/holdout \
+  --sgf_dir=outputs/sgf
 ```
 
 Training
 --------
 
-This command takes a directory of tfexample files from selfplay and trains a
+This command takes a directory of tf.Example files from selfplay and trains a
 new model, starting from the latest model weights in the `estimator_working_dir`
 parameter.
 
 Run the training job:
 
 ```shell
-BOARD_SIZE=19 python3 main.py train-dir \
-  gs://$BUCKET_NAME/data/training_chunks \
-  gs://$BUCKET_NAME/models/000001-somename \
-  --model_dir estimator_working_dir
+BOARD_SIZE=19 python3 train.py \
+  outputs/data/selfplay/* \
+  --work_dir=estimator_working_dir \
+  --export_path=outputs/models/000001-first_generation
 ```
 
-At the end of training, the latest checkpoint will be exported to the directory
-with the given name.  Additionally, you can follow along with the training
-progress with TensorBoard - if you point TensorBoard at the estimator working
-dir, it will find the training log files and display them.
+At the end of training, the latest checkpoint will be exported to.
+Additionally, you can follow along with the training progress with TensorBoard.
+If you point TensorBoard at the estimator working directory, it will find the
+training log files and display them.
 
 ```shell
 tensorboard --logdir=estimator_working_dir
@@ -328,15 +333,12 @@ command.
 
 ### Validating on holdout data
 
-By default, Minigo will hold out 5% of selfplay games for validation, and write
-them to `gs://$BUCKET_NAME/data/holdout/<model_name>`.  This can be changed by
-adjusting the `holdout_pct` flag on the `selfplay` command.
+By default, MiniGo will hold out 5% of selfplay games for validation. This can
+be changed by adjusting the `holdout_pct` flag on the `selfplay` command.
 
-With this setup, `python rl_loop.py validate --logdir=estimator_working_dir --`
-will figure out the most recent model, grab the holdout data from the fifty
-models prior to that one, and calculate the validation error, writing the
-tensorboard logs to `logdir`.
-
+With this setup, `rl_loop/train_and_validate.py` will validate on the same
+window of games that were used to train, writing TensorBoard logs to the
+estimator working directory.
 
 ### Validating on a different set of data
 
@@ -360,13 +362,15 @@ Once you've collected all the files in a directory, producing validation is as
 easy as
 
 ```shell
-BOARD_SIZE=19 python main.py validate path/to/validation/files/ --load_file=$LATEST_MODEL
---logdir=path/to/tb/logs --num-steps=<number of positions to run validation on>
+BOARD_SIZE=19 python3 validate.py \
+  validation_files/ \
+  --work_dir=estimator_working_dir \
+  --validation_name=pro_dataset
 ```
 
-the `main.py validate` command will glob all the .tfrecord.zz files under the
-directories given as positional arguments and compute the validation error for
-`num_steps * TRAINING_BATCH_SIZE` positions from those files.
+The validate.py will glob all the .tfrecord.zz files under the
+directories given as positional arguments and compute the validation error
+for the positions from those files.
 
 Running Minigo on a Kubernetes Cluster
 ==============================

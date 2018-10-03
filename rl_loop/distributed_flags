@@ -1,6 +1,6 @@
 # This file is an enumeration of all hyperparameters required by the
 # AGZ pipeline. The flags in this file get passed into all of the scripts
-# in the rl_loop/ directory via the prep_flags.py helper library.
+# in the rl_loop/ directory via the mask_flags.py helper library.
 
 # One line per flag.
 

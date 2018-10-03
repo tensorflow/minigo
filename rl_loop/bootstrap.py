@@ -18,8 +18,8 @@ import sys
 sys.path.insert(0, '.')
 
 from absl import app, flags
+import mask_flags
 from rl_loop import fsdb
-from rl_loop import prep_flags
 from rl_loop import shipname
 
 # From rl_loop/fsdb.py
@@ -30,7 +30,7 @@ flags.declare_key_flag('base_dir')
 def bootstrap(unused_argv):
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
-    prep_flags.checked_run([
+    mask_flags.checked_run([
         'python', 'bootstrap.py',
         '--export_path={}'.format(bootstrap_model_path),
         '--flagfile=rl_loop/distributed_flags'])
