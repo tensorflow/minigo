@@ -17,8 +17,9 @@ import sys
 sys.path.insert(0, ".")  # to run from minigo/ dir
 
 
-import argparse
+from absl import flags
 from flask import Flask
+import absl.app
 
 from flask_socketio import SocketIO
 
@@ -27,115 +28,87 @@ import json
 import logging
 import subprocess
 
-parser = argparse.ArgumentParser()
+flags.DEFINE_string("model", None, "Model path.")
 
-parser.add_argument(
-    "--model",
-    required=True,
-    type=str,
-    help="Model path.")
+flags.DEFINE_integer(
+    "board_size", 19,
+    "Board size to use when running Python Minigo engine: either 9 or 19.")
 
-parser.add_argument(
-    "--board_size",
-    default=19,
-    type=int,
-    help="Board size to use when running Python Minigo engine: either 9 or "
-         "19.")
+flags.DEFINE_integer("port", 5001, "Port to listen on.")
 
-parser.add_argument(
-    "--port",
-    default=5001,
-    type=int,
-    help="Port to listen on.")
+flags.DEFINE_string("host", "127.0.0.1", "The hostname or IP to listen on.")
 
-parser.add_argument(
-    "--host",
-    default="127.0.0.1",
-    type=str,
-    help="The hostname or IP to listen on.")
+flags.DEFINE_string(
+    "engine", "py",
+    "Which Minigo engine to use: \"py\" for the Python engine, or "
+    "one of the C++ engines (run \"cc/main --helpon=factory\" for the "
+    "C++ engine list.")
 
-parser.add_argument(
-    "--engine",
-    default="py",
-    type=str,
-    help="Which Minigo engine to use: \"py\" for the Python engine, or "
-         "one of the C++ engines (run \"cc/main --helpon=factory\" for the "
-         "C++ engine list.")
+flags.DEFINE_integer(
+    "virtual_losses", 8, "Number of virtual losses when running tree search.")
 
-parser.add_argument(
-    "--virtual_losses",
-    default=8,
-    type=int,
-    help="Number of virtual losses when running tree search.")
+flags.DEFINE_string(
+    "python_for_engine", "python",
+    "Which python interpreter to use for the engine. "
+    "Defaults to `python` and only applies for the when --engine=py")
 
-parser.add_argument(
-    "--python_for_engine",
-    default="python",
-    type=str,
-    help="Which python interpreter to use for the engine. "
-         "Defaults to `python` and only applies for the when --engine=py")
-
-parser.add_argument(
-    "--inject_noise",
-    default=False,
-    help="If true, inject noise into the root position at the start of each "
+flags.DEFINE_boolean(
+    "inject_noise", False,
+    "If true, inject noise into the root position at the start of each "
     "tree search.")
 
-parser.add_argument(
-    "--resign_threshold",
-    default=-0.8,
-    type=float,
-    help="Resign threshold.")
+flags.DEFINE_integer(
+    "num_readouts", 400,
+    "Number of searches to add to the MCTS search tree before playing a move.")
 
-args = parser.parse_args()
+flags.DEFINE_float("resign_threshold", -0.8, "Resign threshold.")
 
+FLAGS = flags.FLAGS
 
 # Suppress Flask's info logging.
-log = logging.getLogger('werkzeug')
+log = logging.getLogger("werkzeug")
 log.setLevel(logging.WARNING)
 
 app = Flask(__name__, static_url_path="", static_folder="static")
 app.config["SECRET_KEY"] = "woo"
-socketio = SocketIO(app)
-
-
-python_binary = args.python_for_engine
-
-if args.engine == "py":
-    GTP_COMMAND = [python_binary,  "-u",  # turn off buffering
-                   "gtp.py",
-                   "--load_file", args.model,
-                   "--minigui_mode=true",
-                   "--num_readouts", "400",
-                   "--conv_width", "128",
-                   "--resign_threshold", str(args.resign_threshold),
-                   "--verbose", "2"]
-else:
-    GTP_COMMAND = [
-        "bazel-bin/cc/main",
-        "--model=%s" % args.model,
-        "--num_readouts=400",
-        "--soft_pick=false",
-        "--inject_noise=%s" % args.inject_noise,
-        "--disable_resign_pct=0",
-        "--ponder_limit=100000",
-        "--courtesy_pass=true",
-        "--engine=%s" % args.engine,
-        "--virtual_losses=%d" % args.virtual_losses,
-        "--resign_threshold=%f" % args.resign_threshold,
-        "--mode=gtp"]
+socketio = SocketIO(app, logger=log, engineio_logger=log)
 
 
 def _open_pipes():
+    if FLAGS.engine == "py":
+        GTP_COMMAND = [FLAGS.python_for_engine,  "-u",  # turn off buffering
+                       "gtp.py",
+                       "--load_file=%s" % FLAGS.model,
+                       "--minigui_mode=true",
+                       "--num_readouts=%d" % FLAGS.num_readouts,
+                       "--conv_width=128",
+                       "--resign_threshold=%f" % FLAGS.resign_threshold,
+                       "--verbose=2"]
+    else:
+        GTP_COMMAND = [
+            "bazel-bin/cc/main",
+            "--model=%s" % FLAGS.model,
+            "--num_readouts=%d" % FLAGS.num_readouts,
+            "--soft_pick=false",
+            "--inject_noise=%s" % FLAGS.inject_noise,
+            "--disable_resign_pct=0",
+            "--ponder_limit=100000",
+            "--courtesy_pass=true",
+            "--engine=%s" % FLAGS.engine,
+            "--virtual_losses=%d" % FLAGS.virtual_losses,
+            "--resign_threshold=%f" % FLAGS.resign_threshold,
+            "--mode=gtp"]
+
     return subprocess.Popen(GTP_COMMAND,
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            env=dict(os.environ, BOARD_SIZE=str(args.board_size)))
+                            env=dict(os.environ, BOARD_SIZE=str(FLAGS.board_size)))
 
 
-token = ''
+token = ""
 echo_streams = True
+p = None
 
 
 def std_bg_thread(stream):
@@ -170,17 +143,22 @@ def stdin_cmd(message):
         p = _open_pipes()
 
 
-p = _open_pipes()
-stderr_thread = socketio.start_background_task(
-    target=functools.partial(std_bg_thread, "stderr"))
-stdout_thread = socketio.start_background_task(
-    target=functools.partial(std_bg_thread, "stdout"))
-
-
 @app.route("/")
 def index():
     return app.send_static_file("index.html")
 
 
+def main(unused_argv):
+    global p
+    p = _open_pipes()
+    socketio.start_background_task(
+        target=functools.partial(std_bg_thread, "stderr"))
+    socketio.start_background_task(
+        target=functools.partial(std_bg_thread, "stdout"))
+
+    socketio.run(app, port=FLAGS.port, host=FLAGS.host)
+
+
 if __name__ == "__main__":
-    socketio.run(app, port=args.port, host=args.host)
+    flags.mark_flags_as_required(["model"])
+    absl.app.run(main)
