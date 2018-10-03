@@ -100,6 +100,10 @@ class Board extends View {
     }
   }
 
+  // Update the board's layers from the given state object.
+  // Board layers that are derived from DataLayer will look in the state object
+  // for a named property. If that property exists, the layer will update its
+  // internal state from it.
   update(state: any) {
     if (state.toPlay !== undefined) {
       this.toPlay = state.toPlay as Color;

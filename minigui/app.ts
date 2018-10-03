@@ -129,6 +129,13 @@ abstract class App {
     this.updateBoards(this.activePosition);
   }
 
+  // Updates all layers of the App's boards from a state object. Typically the
+  // static object is a JSON blob sent from the backend with things like the
+  // stones on the board, the current principle variation, visit counts, etc.
+  // Layers that derive from DataLayer will check the given state object for a
+  // specific property. If the state object contains a matching property, the
+  // layer will update its copy of the state and signal that the board should
+  // be redrawn (by their update method returning true).
   protected updateBoards(state: any) {
     for (let board of this.boards) {
       if (board.update(state)) {
@@ -146,6 +153,11 @@ abstract class App {
     }
 
     // Update the board state with contents of the search.
+    // Copies the properties named in `props` that are present in `msg` into the
+    // current position history.
+    // TODO(tommadams): It would be more flexible to allow the position history
+    // to store any/all properties return in the SearchMsg, without having to
+    // specify this property list.
     const props = ['n', 'dq', 'pv', 'search'];
     util.partialUpdate(msg, this.positionHistory[msg.moveNum], props);
 
