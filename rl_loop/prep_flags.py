@@ -24,11 +24,13 @@ only those flags that are accepted by some_module.py and run as a subprocess
 
 Usage example:
     import prep_flags
-    prep_flags.run(['python', 'train_and_validate.py', '--custom_flag',
-                    '--flagfile=flags'])
+    prep_flags.run(['python', 'train.py', '--custom_flag', '--flagfile=flags'])
     # will be transformed into
-    subprocess.run(['python', 'train_and_validate.py', '--custom_flag',
+    subprocess.run(['python', 'train.py', '--custom_flag',
                     '--train_only_flag=...', '--more_train_only=...''])
+
+Command line usage example:
+    python -m prep_flags train.py --custom_flag --flagfile=flags
 '''
 
 import re
@@ -98,3 +100,8 @@ def checked_run(cmd):
         print("Command failed!")
         print("stderr:\n", completed_process.stderr.decode('ascii'))
         raise RuntimeError
+
+
+if __name__ == '__main__':
+    sys.argv.pop(0)
+    checked_run(['python'] + sys.argv)
