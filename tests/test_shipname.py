@@ -14,20 +14,20 @@
 
 import unittest
 
-import shipname
+import rl_loop.shipname
 
 
 class TestShipname(unittest.TestCase):
     def test_bootstrap_gen(self):
-        name = shipname.generate(0)
+        name = rl_loop.shipname.generate(0)
         self.assertIn('bootstrap', name)
 
     def test_detect_name(self):
         string = '000017-model.index'
-        detected_name = shipname.detect_model_name(string)
+        detected_name = rl_loop.shipname.detect_model_name(string)
         self.assertEqual('000017-model', detected_name)
 
     def test_detect_num(self):
         string = '000017-model.index'
-        detected_name = shipname.detect_model_num(string)
+        detected_name = rl_loop.shipname.detect_model_num(string)
         self.assertEqual(17, detected_name)

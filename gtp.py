@@ -35,8 +35,6 @@ flags.DEFINE_bool('minigui_mode', False, 'Whether to add minigui logging.')
 
 flags.DEFINE_string('load_file', None, 'Path to model save files.')
 
-# this should be called "verbosity" but flag name conflicts with absl.logging.
-flags.DEFINE_integer('verbose', 1, 'How much debug info to print.')
 
 # See mcts.py, strategies.py for other configurations around gameplay
 
@@ -44,14 +42,14 @@ FLAGS = flags.FLAGS
 
 
 def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False,
-                      minigui_mode=False, verbosity=1):
+                      minigui_mode=False):
     '''Takes a path to model files and set up a GTP engine instance.'''
     n = DualNetwork(load_file)
     if cgos_mode:
         player = CGOSPlayer(network=n, seconds_per_move=5, timed_match=True,
-                            verbosity=verbosity, two_player_mode=True)
+                            two_player_mode=True)
     else:
-        player = MCTSPlayer(network=n, verbosity=verbosity, two_player_mode=True)
+        player = MCTSPlayer(network=n, two_player_mode=True)
 
     name = "Minigo-" + os.path.basename(load_file)
     version = "0.2"
@@ -78,8 +76,7 @@ def main(argv):
     engine = make_gtp_instance(FLAGS.load_file,
                                cgos_mode=FLAGS.cgos_mode,
                                kgs_mode=FLAGS.kgs_mode,
-                               minigui_mode=FLAGS.minigui_mode,
-                               verbosity=FLAGS.verbose)
+                               minigui_mode=FLAGS.minigui_mode)
     dbg("GTP engine ready\n")
     for msg in sys.stdin:
         if not engine.handle_msg(msg.strip()):

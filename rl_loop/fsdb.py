@@ -17,12 +17,14 @@
 This module works equivalently with local filesystems and GCS.
 """
 import os
+import sys
+sys.path.insert(0, '.')
 
 from absl import flags
 from tensorflow import gfile
 import re
 
-import shipname
+from rl_loop import shipname
 
 flags.DEFINE_string(
     'base_dir', None,
@@ -50,13 +52,14 @@ def _with_base(*args):
 
 
 # Functions to compute various important directories, based on FLAGS input.
+working_dir = _with_base('work_dir')
 models_dir = _with_base('models')
 selfplay_dir = _with_base('data', 'selfplay')
 holdout_dir = _with_base('data', 'holdout')
 sgf_dir = _with_base('sgf')
 eval_dir = _with_base('sgf', 'eval')
-training_chunk_dir = _with_base('data', 'training_chunks')
 golden_chunk_dir = _with_base('data', 'golden_chunks')
+flags_path = _with_base('flags.txt')
 
 
 def get_pbs():
@@ -104,8 +107,12 @@ def get_hour_dirs(root=None):
                        gfile.ListDirectory(root)))
 
 
+def get_games(model_name):
+    return gfile.Glob(os.path.join(selfplay_dir(), model_name, '*.zz'))
+
+
 def game_counts(n_back=20):
     """Prints statistics for the most recent n_back models"""
     for _, model_name in get_models[-n_back:]:
-        games = gfile.Glob(os.path.join(selfplay_dir(), model_name, '*.zz'))
+        games = get_games(model_name)
         print("Model: {}, Games: {}".format(model_name, len(games)))

@@ -8,30 +8,17 @@ extension-pkg-whitelist=
 # Add files or directories to the blacklist. They should be base names, not
 # paths.
 ignore=
-      # cloud_logging.py,
-      # coords.py,
       dual_net.py,
-      # evaluation.py,
-      example_buffer.py,
       features.py,
-      fsdb.py,
       go.py,
       gtp_cmd_handlers.py,
       gtp_engine.py,
-      # gtp.py,
       inference_worker.py,
-      local_rl_loop.py,
-      main.py,
       mcts.py,
       preprocessing.py,
-      rl_loop.py,
-      rl_runner.py,
-      # selfplay.py,
       sgf_wrapper.py,
-      # shipname.py,
       strategies.py,
       symmetries.py,
-      # utils.py,
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.

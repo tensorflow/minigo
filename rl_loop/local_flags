@@ -1,0 +1,8 @@
+--conv_width=8
+--fc_width=16
+--trunk_layers=1
+--train_batch_size=16
+--shuffle_buffer_size=1000
+--num_evaluation_games=1
+--verbose=0
+--num_readouts=10

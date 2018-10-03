@@ -18,7 +18,7 @@ from tensorflow import gfile
 from tqdm import tqdm
 
 import dual_net
-import shipname
+from rl_loop import shipname
 from strategies import MCTSPlayer
 import sgf_wrapper
 from utils import logged_timer

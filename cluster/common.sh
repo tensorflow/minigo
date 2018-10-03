@@ -31,9 +31,7 @@ export SERVICE_ACCOUNT_KEY_LOCATION=${SERVICE_ACCOUNT_KEY_LOCATION:-"/tmp/${SERV
 
 # Constants for docker container creation
 export VERSION_TAG=${VERSION_TAG:-"0.16"}
-export GPU_PLAYER_CONTAINER=${GPU_PLAYER_CONTAINER:-"minigo-gpu-player"}
 export GPU_EVALUATOR_CONTAINER=${GPU_EVALUATOR_CONTAINER:-"minigo-gpu-evaluator"}
-export CPU_PLAYER_CONTAINER=${CPU_PLAYER_CONTAINER:-"minigo-player"}
 export CC_PLAYER_CONTAINER=${CC_PLAYER_CONTAINER:-"minigo-cc-player"}
 export MINIGUI_PY_CPU_CONTAINER=${MINIGUI_PY_CPU_CONTAINER:-"minigui-py-cpu-v2"}
 

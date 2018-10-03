@@ -31,8 +31,6 @@ spec:
           value: /etc/credentials/service-account.json
         - name: BUCKET_NAME
           value: $BUCKET_NAME
-        - name: WORK_DIR
-          value: $WORK_DIR
       volumes:
       - name: service-credentials
         secret:

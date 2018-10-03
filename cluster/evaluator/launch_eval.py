@@ -21,8 +21,8 @@ import kubernetes
 import yaml
 import json
 import os
-import fsdb
 import time
+from rl_loop import fsdb
 
 from ratings import ratings
 

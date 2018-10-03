@@ -16,28 +16,40 @@
 
 import os
 import time
-from absl import flags
+from absl import app, flags
 from tensorflow import gfile
 
+import dual_net
 from strategies import MCTSPlayer
 import sgf_wrapper
+import utils
+
+flags.DEFINE_string('eval_sgf_dir', None, 'Where to write evaluation results.')
+
+flags.DEFINE_integer('num_evaluation_games', 16, 'How many games to play')
+
+# From strategies.py
+flags.declare_key_flag('num_readouts')
+flags.declare_key_flag('verbose')
+
+FLAGS = flags.FLAGS
 
 
-def play_match(black_net, white_net, games, sgf_dir, verbosity):
+def play_match(black_model, white_model, games, sgf_dir):
     """Plays matches between two neural nets.
 
-    black_net: Instance of minigo.DualNetwork, a wrapper around a tensorflow
-        convolutional network.
-    white_net: Instance of the minigo.DualNetwork.
-    games: number of games to play. We play all the games at the same time.
-    sgf_dir: directory to write the sgf results.
+    Args:
+        black_model: Path to the model for black player
+        white_model: Path to the model for white player
     """
-    readouts = flags.FLAGS.num_readouts  # Flag defined in strategies.py
+    with utils.logged_timer("Loading weights"):
+        black_net = dual_net.DualNetwork(black_model)
+        white_net = dual_net.DualNetwork(white_model)
 
-    black = MCTSPlayer(
-        black_net, verbosity=verbosity, two_player_mode=True)
-    white = MCTSPlayer(
-        white_net, verbosity=verbosity, two_player_mode=True)
+    readouts = FLAGS.num_readouts
+
+    black = MCTSPlayer(black_net, two_player_mode=True)
+    white = MCTSPlayer(white_net, two_player_mode=True)
 
     black_name = os.path.basename(black_net.save_file)
     white_name = os.path.basename(white_net.save_file)
@@ -61,7 +73,7 @@ def play_match(black_net, white_net, games, sgf_dir, verbosity):
                 active.tree_search()
 
             # print some stats on the search
-            if verbosity >= 3:
+            if FLAGS.verbose >= 3:
                 print(active.root.position)
 
             # First, check the roots for hopeless games.
@@ -89,10 +101,20 @@ def play_match(black_net, white_net, games, sgf_dir, verbosity):
             dur = time.time() - start
             num_move += 1
 
-            if (verbosity > 1) or (verbosity == 1 and num_move % 10 == 9):
+            if (FLAGS.verbose > 1) or (FLAGS.verbose == 1 and num_move % 10 == 9):
                 timeper = (dur / readouts) * 100.0
                 print(active.root.position)
                 print("%d: %d readouts, %.3f s/100. (%.2f sec)" % (num_move,
                                                                    readouts,
                                                                    timeper,
                                                                    dur))
+
+def main(argv):
+    """Play matches between two neural nets."""
+    _, black_model, white_model = argv
+    utils.ensure_dir_exists(FLAGS.eval_sgf_dir)
+    play_match(black_model, white_model, FLAGS.num_evaluation_games, FLAGS.eval_sgf_dir)
+
+if __name__ == '__main__':
+    flags.mark_flag_as_required('eval_sgf_dir')
+    app.run(main)
