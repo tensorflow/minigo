@@ -47,13 +47,13 @@ def main(unused_argv):
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
     mask_flags.checked_run([
-        'python', 'bootstrap.py',
+        'python3', 'bootstrap.py',
         '--export_path={}'.format(bootstrap_model_path),
         '--work_dir={}'.format(fsdb.working_dir()),
         '--flagfile=rl_loop/local_flags'])
 
     selfplay_cmd = [
-        'python', 'selfplay.py',
+        'python3', 'selfplay.py',
         '--load_file={}'.format(bootstrap_model_path),
         '--selfplay_dir={}'.format(os.path.join(fsdb.selfplay_dir(), bootstrap_name)),
         '--holdout_dir={}'.format(os.path.join(fsdb.holdout_dir(), bootstrap_name)),
@@ -90,14 +90,14 @@ def main(unused_argv):
 
     # Train on shuffled game data
     mask_flags.checked_run([
-        'python', 'train.py', *tf_records, 
+        'python3', 'train.py', *tf_records,
         '--work_dir={}'.format(fsdb.working_dir()),
         '--export_path={}'.format(trained_model_path),
         '--flagfile=rl_loop/local_flags'])
 
     # Validate the trained model on held out game
     mask_flags.checked_run([
-        'python', 'validate.py',
+        'python3', 'validate.py',
         os.path.join(fsdb.holdout_dir(), bootstrap_name),
         '--work_dir={}'.format(fsdb.working_dir()),
         '--flagfile=rl_loop/local_flags'])
@@ -108,7 +108,7 @@ def main(unused_argv):
         selfplay_cmd + ['--load_file={}'.format(trained_model_path)])
 
     mask_flags.checked_run([
-        'python', 'evaluate.py',
+        'python3', 'evaluate.py',
         bootstrap_model_path, trained_model_path,
         '--games=1',
         '--eval_sgf_dir={}'.format(fsdb.eval_dir()),

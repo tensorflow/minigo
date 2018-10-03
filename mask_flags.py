@@ -18,19 +18,19 @@ Having one big flagfile is great for seeing all the configuration at a glance.
 However, absl.flags will throw an error if you pass an undefined flag.
 
 To solve this problem, we filter the global flagfile by running
-    python some_module.py --helpfull
+    python3 some_module.py --helpfull
 to generate a list of all flags that some_module.py accepts. Then, we pass in
 only those flags that are accepted by some_module.py and run as a subprocess
 
 Usage example:
     import mask_flags
-    mask_flags.run(['python', 'train.py', '--custom_flag', '--flagfile=flags'])
+    mask_flags.run(['python3', 'train.py', '--custom_flag', '--flagfile=flags'])
     # will be transformed into
-    subprocess.run(['python', 'train.py', '--custom_flag',
+    subprocess.run(['python3', 'train.py', '--custom_flag',
                     '--train_only_flag=...', '--more_train_only=...''])
 
 Command line usage example:
-    python -m mask_flags train.py --custom_flag --flagfile=flags
+    python3 -m mask_flags train.py --custom_flag --flagfile=flags
 '''
 
 import re
@@ -106,4 +106,4 @@ def checked_run(cmd):
 
 if __name__ == '__main__':
     sys.argv.pop(0)
-    checked_run(['python'] + sys.argv)
+    checked_run(['python3'] + sys.argv)
