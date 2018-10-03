@@ -488,8 +488,11 @@ def export_model(model_path):
         print("Copying {} to {}".format(filename, destination_path))
         tf.gfile.Copy(filename, destination_path)
     # also export a .pb for C++ inference
-    n = DualNetwork(latest_checkpoint)
+    freeze_graph(model_path)
+
+def freeze_graph(model_path):
+    n = DualNetwork(model_path)
     out_graph = tf.graph_util.convert_variables_to_constants(
         n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
-    with tf.gfile.GFile(os.path.join(model_path + '.pb'), 'wb') as f:
+    with tf.gfile.GFile(model_path + '.pb', 'wb') as f:
         f.write(out_graph.SerializeToString())

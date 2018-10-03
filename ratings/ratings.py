@@ -296,7 +296,7 @@ def wins_subset(bucket):
 
 def main():
     root = os.path.abspath(os.path.join("sgf", fsdb.FLAGS.bucket_name, "sgf/eval"))
-    sync(root, True)
+    sync(root)
     models = fsdb.get_models()
     data = wins_subset(fsdb.models_dir())
     print(len(data))
