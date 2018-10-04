@@ -37,6 +37,19 @@ function check_gcloud_exists() {
 }
 
 
+# Checks that the cbt (Cloud Bigtable) CLI exists.
+function check_cbt_exists() {
+  command -v cbt >/dev/null 2>&1 || {
+    echo >&2 "cbt command is not defined"
+    echo >&2 "Install Google Cloud SDK first:"
+    echo >&2 "   https://cloud.google.com/sdk/downloads"
+    echo >&2 "then:"
+    echo >&2 "   gcloud components install cbt"
+    exit 1
+  }
+}
+
+
 # Creates a cloud bucket if it doesn't exist. Recall that cloud buckets are
 # a global namespace.
 #
@@ -57,6 +70,37 @@ function create_gcs_bucket() {
     echo >&2 "Bucket $BUCKET_NAME does not exist. Creating."
     gsutil mb -l $BUCKET_LOCATION gs://$BUCKET_NAME
   }
+}
+
+
+# Creates a Cloud Bigtable instance and table for storing games.
+# Globals:
+#   PROJECT: The cloud project
+#   CBT_INSTANCE: The Cloud Bigtable instance to create within PROJECT
+#   CBT_ZONE:  The zone in which to create the instance
+#   CBT_TABLE:  The name of the Cloud Bigtable table within the instance
+function create_cbt_table() {
+  check_cbt_exists
+  if [[ -z "${PROJECT}" ]]; then
+    echo >&2 "PROJECT is not defined"
+    return 1
+  fi
+  if [[ -z "${CBT_INSTANCE}" ]]; then
+    echo >&2 "CBT_INSTANCE is not defined"
+    return 1
+  fi
+  if [[ -z "${CBT_TABLE}" ]]; then
+    echo >&2 "CBT_TABLE is not defined"
+    return 1
+  fi
+  if ! ( cbt -project ${PROJECT} createinstance ${CBT_INSTANCE} ${CBT_INSTANCE} \
+                                                ${CBT_INSTANCE}-c ${CBT_ZONE} 3 SSD && \
+         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createtable ${CBT_TABLE} && \
+         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} tfexample && \
+         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} metadata ); then
+    echo "Could not create table ${CBT_TABLE} on instance ${CBT_INSTANCE} in project ${PROJECT}"
+    return 1
+  fi
 }
 
 

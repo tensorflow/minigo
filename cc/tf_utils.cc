@@ -16,6 +16,7 @@
 
 #include <array>
 #include <memory>
+#include <algorithm>
 
 #include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
@@ -39,9 +40,7 @@ namespace {
 template <typename T, size_t N>
 std::array<uint8_t, N> ConvertToBytes(const std::array<T, N>& src) {
   std::array<uint8_t, N> dst;
-  for (size_t i = 0; i < N; ++i) {
-    dst[i] = static_cast<uint8_t>(src[i]);
-  }
+  std::copy(src.begin(), src.end(), dst.begin());
   return dst;
 }
 
@@ -97,11 +96,7 @@ void WriteTfExamples(const std::string& path,
 
 }  // namespace
 
-void WriteGameExamples(const std::string& output_dir,
-                       const std::string& output_name,
-                       const MctsPlayer& player) {
-  MG_CHECK(file::RecursivelyCreateDir(output_dir));
-
+std::vector<tensorflow::Example> MakeExamples(const MctsPlayer& player) {
   // Write the TensorFlow examples.
   std::vector<tensorflow::Example> examples;
   examples.reserve(player.history().size());
@@ -113,8 +108,15 @@ void WriteGameExamples(const std::string& output_dir,
                          &features);
     examples.push_back(MakeTfExample(features, h.search_pi, player.result()));
   }
+  return examples;
+}
 
+void WriteGameExamples(const std::string& output_dir,
+                       const std::string& output_name,
+                       const MctsPlayer& player) {
+  MG_CHECK(file::RecursivelyCreateDir(output_dir));
   auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");
+  auto examples = MakeExamples(player);
   WriteTfExamples(output_path, examples);
 }
 

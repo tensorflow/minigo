@@ -12,9 +12,10 @@ so for now we recommend installing
 Minigo++ depends on the Tensorflow C++ libraries, but we have not yet set up
 Bazel WORKSPACE and BUILD rules to automatically download and configure
 Tensorflow so (for now at least) you must perform a manual step to build the
-library:
+library.  This depends on `zip`, so be sure that package is installed first:
 
 ```shell
+sudo apt-get install zip
 ./cc/configure_tensorflow.sh
 ```
 
@@ -26,8 +27,8 @@ This will automatically perform the first steps of
 but instead of installing the Tensorflow package, it extracts the generated C++
 headers into the `cc/tensorflow` subdirectory of the repo. The script then
 builds the required Tensorflow shared libraries and copies them to the same
-directory. The tensorflow cc\_library build target in cc/BUILD pulls these
-header & library files together into a format the Bazel understands how to link
+directory. The tensorflow cc\_library build target in `cc/BUILD` pulls these
+header and library files together into a format the Bazel understands how to link
 against.
 
 ## Building
@@ -69,14 +70,14 @@ To run Minigo with a 9x9 model:
 
 ```shell
 bazel build --define=board_size=9 -c opt cc:main
-bazel-bin/cc/main --model=$MODEL_PATH
+bazel-bin/cc/main --model=$MODEL_PATH --mode=selfplay
 ```
 
 To run Minigo with a 19x19 model:
 
 ```shell
 bazel build -c opt cc:main
-bazel-bin/cc/main --model=$MODEL_PATH
+bazel-bin/cc/main --model=$MODEL_PATH --mode=selfplay
 ```
 
 The Minigo binary has a lot of command line arguments that configure its

@@ -118,6 +118,10 @@ DEFINE_string(output_dir, "",
               "Output directory. If empty, no examples are written.");
 DEFINE_string(holdout_dir, "",
               "Holdout directory. If empty, no examples are written.");
+DEFINE_string(output_bigtable, "",
+              "Output Bigtable specification, of the form: "
+              "project,instance,table. "
+              "If empty, no examples are written to Bigtable.");
 DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
 DEFINE_double(holdout_pct, 0.03,
               "Fraction of games to hold out for validation.");
@@ -331,6 +335,14 @@ class SelfPlayer {
     const bool use_ansi_colors = isatty(fileno(stderr));
 
     GameOptions game_options;
+    std::vector<std::string> bigtable_spec = absl::StrSplit(FLAGS_output_bigtable, ',');
+    bool use_bigtable = bigtable_spec.size() == 3;
+    if (!bigtable_spec.empty() && !use_bigtable) {
+      MG_FATAL()
+        << "Bigtable output must be of the form: project,instance,table";
+      return;
+    }
+
     do {
       std::unique_ptr<MctsPlayer> player;
 
@@ -382,6 +394,15 @@ class SelfPlayer {
           is_holdout ? game_options.holdout_dir : game_options.output_dir;
       if (!example_dir.empty()) {
         tf_utils::WriteGameExamples(GetOutputDir(now, example_dir), output_name,
+                                    *player);
+      }
+      if (use_bigtable) {
+        const auto& gcp_project_name = bigtable_spec[0];
+        const auto& instance_name = bigtable_spec[1];
+        const auto& table_name = bigtable_spec[2];
+        tf_utils::WriteGameExamples(gcp_project_name,
+                                    instance_name,
+                                    table_name,
                                     *player);
       }
 

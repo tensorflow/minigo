@@ -209,6 +209,10 @@ minigo_cc_library(
     srcs = select({
         "//cc/config:enable_tf": ["tf_utils.cc"],
         "//conditions:default": ["tf_utils_dummy.cc"],
+    })
+    + select({
+        "//cc/config:enable_bt": ["tf_bt_utils.cc"],
+        "//conditions:default": ["tf_bt_utils_dummy.cc"],
     }),
     hdrs = ["tf_utils.h"],
     deps = [
@@ -217,7 +221,13 @@ minigo_cc_library(
         ":mcts",
         "//cc/file",
         "//cc/dual_net",
+        "@com_google_absl//absl/strings:str_format",
     ] + select({
+        "//cc/config:enable_bt":
+	    ["@com_github_googlecloudplatform_google_cloud_cpp//google/cloud/bigtable:bigtable_client"],
+        "//conditions:default": [],
+    })
+    + select({
         "//cc/config:enable_tf": ["//cc:tensorflow"],
         "//conditions:default": [],
     }),

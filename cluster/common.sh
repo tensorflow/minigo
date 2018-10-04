@@ -46,3 +46,11 @@ export BUCKET_NAME=${BUCKET_NAME:-"${PROJECT}-minigo-v5-${BOARD_SIZE}"}
 # For more about locations, see
 # https://cloud.google.com/storage/docs/bucket-locations
 export BUCKET_LOCATION=${BUCKET_LOCATION:-"asia-east1"}
+
+# Bigtable resources
+export CBT_INSTANCE=${CBT_INSTANCE:-"minigo-instance"}
+export CBT_ZONE=${CBT_ZONE:-"us-central1-b"}
+export CBT_TABLE=${CBT_TABLE:-"games"}
+
+# Needed for Bigtable clients or any gRPC code running on a GCE VM
+export GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt

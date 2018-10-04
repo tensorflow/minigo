@@ -10,6 +10,12 @@ http_archive(
     urls = ["https://github.com/abseil/abseil-cpp/archive/5441bbe1db5d0f2ca24b5b60166367b0966790af.zip"],
 )
 
+http_archive(
+    name = "com_github_googlecloudplatform_google_cloud_cpp",
+    strip_prefix = "google-cloud-cpp-0.2.0",
+    url = "https://github.com/GoogleCloudPlatform/google-cloud-cpp/archive/v0.2.0.zip",
+)
+
 new_http_archive(
     name = "com_google_benchmark",
     build_file = "cc/benchmark.BUILD",
@@ -35,6 +41,14 @@ http_archive(
     strip_prefix = "rules_protobuf-0.8.2",
     urls = ["https://github.com/pubref/rules_protobuf/archive/v0.8.2.zip"],
 )
+
+load("@com_github_googlecloudplatform_google_cloud_cpp//bazel:google_cloud_cpp_deps.bzl", "google_cloud_cpp_deps")
+google_cloud_cpp_deps()
+
+# Have to manually call the corresponding function for gRPC:
+#   https://github.com/bazelbuild/bazel/issues/1550
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+grpc_deps()
 
 load("@org_pubref_rules_protobuf//cpp:rules.bzl", "cpp_proto_repositories")
 load("@org_pubref_rules_protobuf//python:rules.bzl", "py_proto_repositories")
