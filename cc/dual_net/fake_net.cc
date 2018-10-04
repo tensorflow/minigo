@@ -31,11 +31,11 @@ FakeNet::FakeNet(absl::Span<const float> priors, float value) : value_(value) {
   }
 }
 
-void FakeNet::RunMany(absl::Span<const BoardFeatures> features,
-                      absl::Span<Output> outputs, std::string* model) {
-  for (auto& output : outputs) {
-    output.policy = priors_;
-    output.value = value_;
+void FakeNet::RunMany(std::vector<const DualNet::BoardFeatures*> features,
+                      std::vector<Output*> outputs, std::string* model) {
+  for (auto* output : outputs) {
+    output->policy = priors_;
+    output->value = value_;
   }
   if (model != nullptr) {
     *model = "FakeNet";

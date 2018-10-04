@@ -14,6 +14,7 @@
 
 #include "cc/dual_net/tf_dual_net.h"
 
+#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "cc/check.h"
 #include "cc/constants.h"
@@ -33,42 +34,28 @@ using tensorflow::TensorShape;
 
 namespace minigo {
 
-TfDualNet::TfDualNet(const std::string& graph_path) : graph_path_(graph_path) {
+TfDualNet::TfDualNet(std::string graph_path) : graph_path_(graph_path) {
   GraphDef graph_def;
 
   // If we can't find the specified graph, try adding a .pb extension.
   auto* env = Env::Default();
-  if (!env->FileExists(graph_path_).ok()) {
-    auto alt_path = absl::StrCat(graph_path_, ".pb");
-    if (env->FileExists(alt_path).ok()) {
-      std::cerr << graph_path << " doesn't exist, using " << alt_path
-                << std::endl;
-      graph_path_ = alt_path;
-    }
+  if (!env->FileExists(graph_path).ok()) {
+    graph_path = absl::StrCat(graph_path, ".pb");
   }
 
-  TF_CHECK_OK(ReadBinaryProto(env, graph_path_, &graph_def));
+  TF_CHECK_OK(ReadBinaryProto(env, graph_path, &graph_def));
 
   SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
   session_.reset(NewSession(options));
   TF_CHECK_OK(session_->Create(graph_def));
 
-  inputs_.clear();
-  inputs_.emplace_back(
-      "pos_tensor",
-      Tensor(DT_FLOAT, TensorShape({1, kN, kN, kNumStoneFeatures})));
+  inputs_.emplace_back("pos_tensor",
+                       Tensor(DT_FLOAT, TensorShape({FLAGS_batch_size, kN, kN,
+                                                     kNumStoneFeatures})));
 
-  output_names_.clear();
-  output_names_.push_back("policy_output");
-  output_names_.push_back("value_output");
-
-  // Tensorflow lazily initializes the first time Session::Run is called, which
-  // can take hundreds of milliseconds. This intefers with time control, so
-  // explicitly run inference once during construction.
-  Output output;
-  BoardFeatures features;
-  RunMany({&features, 1}, {&output, 1}, nullptr);
+  output_names_.emplace_back("policy_output");
+  output_names_.emplace_back("value_output");
 }
 
 TfDualNet::~TfDualNet() {
@@ -77,20 +64,17 @@ TfDualNet::~TfDualNet() {
   }
 }
 
-void TfDualNet::RunMany(absl::Span<const BoardFeatures> features,
-                        absl::Span<Output> outputs, std::string* model) {
+void TfDualNet::RunMany(std::vector<const BoardFeatures*> features,
+                        std::vector<Output*> outputs, std::string* model) {
   MG_DCHECK(features.size() == outputs.size());
 
   int batch_size = static_cast<int>(features.size());
-  auto& feature_tensor = inputs_[0].second;
-  if (feature_tensor.dim_size(0) != batch_size) {
-    feature_tensor =
-        Tensor(DT_FLOAT, TensorShape({batch_size, kN, kN, kNumStoneFeatures}));
-  }
-
+  auto* feature_tensor = inputs_.front().second.flat<float>().data();
   // Copy the features into the input tensor.
-  memcpy(feature_tensor.flat<float>().data(), features.data(),
-         features.size() * sizeof(BoardFeatures));
+  for (const auto* feature : features) {
+    feature_tensor =
+        std::copy(feature->begin(), feature->end(), feature_tensor);
+  }
 
   // Run the model.
   TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
@@ -99,14 +83,18 @@ void TfDualNet::RunMany(absl::Span<const BoardFeatures> features,
   const auto& policy_tensor = outputs_[0].flat<float>();
   const auto& value_tensor = outputs_[1].flat<float>();
   for (int i = 0; i < batch_size; ++i) {
-    memcpy(outputs[i].policy.data(), policy_tensor.data() + i * kNumMoves,
-           sizeof(outputs[i].policy));
-    outputs[i].value = value_tensor.data()[i];
+    memcpy(outputs[i]->policy.data(), policy_tensor.data() + i * kNumMoves,
+           sizeof(outputs[i]->policy));
+    outputs[i]->value = value_tensor.data()[i];
   }
 
   if (model != nullptr) {
     *model = graph_path_;
   }
+}
+
+std::unique_ptr<DualNet> NewTfDualNet(const std::string& graph_path) {
+  return absl::make_unique<TfDualNet>(graph_path);
 }
 
 }  // namespace minigo

@@ -102,7 +102,7 @@ bool GtpPlayer::MaybePonder() {
     std::cerr << "pondering..." << std::endl;
   }
 
-  TreeSearch(options().batch_size);
+  TreeSearch();
 
   ponder_count_ += options().batch_size;
   if (ponder_count_ >= ponder_limit_) {
@@ -139,8 +139,8 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   return true;
 }
 
-absl::Span<MctsNode* const> GtpPlayer::TreeSearch(int batch_size) {
-  auto leaves = MctsPlayer::TreeSearch(batch_size);
+absl::Span<MctsNode* const> GtpPlayer::TreeSearch() {
+  auto leaves = MctsPlayer::TreeSearch();
   if (!leaves.empty() && report_search_interval_ != absl::ZeroDuration()) {
     auto now = absl::Now();
     if (now - last_report_time_ > report_search_interval_) {

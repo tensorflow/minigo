@@ -17,6 +17,7 @@
 #include <sys/sysinfo.h>
 #include <iostream>
 
+#include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
 #include "cc/check.h"
 #include "cc/constants.h"
@@ -40,6 +41,12 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
   // Let's just use all the processors we can.
   interpreter_->SetNumThreads(get_nprocs());
 
+  // Resize input tensor to batch size.
+  interpreter_->ResizeInputTensor(
+      0, {FLAGS_batch_size, kN, kN, DualNet::kNumStoneFeatures});
+
+  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
+
   // Initialize input.
   const auto& inputs = interpreter_->inputs();
   MG_CHECK(inputs.size() == 1);
@@ -50,6 +57,7 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
   MG_CHECK(input_ != nullptr);
   MG_CHECK(input_->type == kTfLiteUInt8);
   MG_CHECK(input_->dims->size == 4);
+  MG_CHECK(input_->dims->data[0] == FLAGS_batch_size);
   MG_CHECK(input_->dims->data[1] == kN);
   MG_CHECK(input_->dims->data[2] == kN);
   MG_CHECK(input_->dims->data[3] == DualNet::kNumStoneFeatures);
@@ -73,18 +81,18 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
   MG_CHECK(policy_ != nullptr);
   MG_CHECK(policy_->type == kTfLiteUInt8);
   MG_CHECK(policy_->dims->size == 2);
+  MG_CHECK(policy_->dims->data[0] == FLAGS_batch_size);
+  MG_CHECK(policy_->dims->data[1] == kNumMoves);
 
   MG_CHECK(value_ != nullptr);
   MG_CHECK(value_->type == kTfLiteUInt8);
   MG_CHECK(value_->dims->size == 1);
-
-  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
+  MG_CHECK(value_->dims->data[0] == FLAGS_batch_size);
 }
 
-LiteDualNet::~LiteDualNet() {}
-
-void LiteDualNet::RunMany(absl::Span<const BoardFeatures> features,
-                          absl::Span<Output> outputs, std::string* model) {
+// TODO(csigg): Support both float and uint8_t.
+void LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
+                          std::vector<Output*> outputs, std::string* model) {
   int batch_size = static_cast<int>(features.size());
 
   // Allow a smaller batch size than we run inference on because the first
@@ -95,8 +103,9 @@ void LiteDualNet::RunMany(absl::Span<const BoardFeatures> features,
   // TODO(tommadams): Make BoardFeatures a uint8_t array and memcpy here.
   auto* data = input_->data.uint8;
   for (size_t j = 0; j < features.size(); ++j) {
-    const auto& board = features[j];
+    const auto& board = *features[j];
     for (size_t i = 0; i < board.size(); ++i) {
+      // TODO(csigg): Apply dequantization parameters?
       data[j * kNumStoneFeatures + i] = static_cast<uint8_t>(board[i]);
     }
   }
@@ -109,11 +118,11 @@ void LiteDualNet::RunMany(absl::Span<const BoardFeatures> features,
   const auto& value_params = value_->params;
   for (int j = 0; j < batch_size; ++j) {
     for (int i = 0; i < kNumMoves; ++i) {
-      outputs[j].policy[i] =
+      outputs[j]->policy[i] =
           policy_params.scale *
           (policy_data[j * batch_size + i] - policy_params.zero_point);
     }
-    outputs[j].value =
+    outputs[j]->value =
         value_params.scale * (value_data[j] - value_params.zero_point);
   }
 
@@ -122,4 +131,7 @@ void LiteDualNet::RunMany(absl::Span<const BoardFeatures> features,
   }
 }
 
+std::unique_ptr<DualNet> NewLiteDualNet(const std::string& model_path) {
+  return absl::make_unique<LiteDualNet>(model_path);
+}
 }  // namespace minigo

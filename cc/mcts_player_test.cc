@@ -67,7 +67,14 @@ class TestablePlayer : public MctsPlayer {
   }
 
   DualNet::Output Run(const DualNet::BoardFeatures& features) {
-    return network()->Run(features, nullptr);
+    DualNet::Output output;
+    network()->RunMany({&features}, {&output}, nullptr);
+    return output;
+  }
+
+  void TreeSearch(int virtual_losses) {
+    mutable_options()->batch_size = virtual_losses;
+    TreeSearch();
   }
 };
 
@@ -392,10 +399,10 @@ TEST(MctsPlayerTest, ExtractDataResignEnd) {
 // four connected neighbor is set true the policy is set to 0.01.
 class MergeFeaturesNet : public DualNet {
  public:
-  void RunMany(absl::Span<const BoardFeatures> features,
-               absl::Span<Output> outputs, std::string* model) override {
+  void RunMany(std::vector<const BoardFeatures*> features,
+               std::vector<Output*> outputs, std::string* model) override {
     for (size_t i = 0; i < features.size(); ++i) {
-      Run(features[i], &outputs[i]);
+      Run(*features[i], outputs[i]);
     }
     if (model != nullptr) {
       *model = "MergeFeaturesNet";

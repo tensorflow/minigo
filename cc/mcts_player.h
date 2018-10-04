@@ -170,7 +170,7 @@ class MctsPlayer {
 
   // Returns the list of nodes that TreeSearch performed inference on.
   // The contents of the returned Span is valid until the next call TreeSearch.
-  virtual absl::Span<MctsNode* const> TreeSearch(int batch_size);
+  virtual absl::Span<MctsNode* const> TreeSearch();
 
   // Returns the root of the game tree.
   MctsNode* game_root() { return &game_root_; }

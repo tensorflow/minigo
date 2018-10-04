@@ -41,7 +41,8 @@ class InferenceServerTest : public ::testing::Test {
     value_ = 0.1;
     dual_net_ = absl::make_unique<FakeNet>(priors_, value_);
 
-    server_ = absl::make_unique<InferenceServer>(virtual_losses_, games_per_inference_, port_);
+    server_ = absl::make_unique<InferenceServer>(virtual_losses_,
+                                                 games_per_inference_, port_);
     for (int i = 0; i < games_per_inference_; ++i) {
       clients_.push_back(server_->NewDualNet());
     }
@@ -105,10 +106,11 @@ TEST_F(InferenceServerTest, Test) {
 
     // Run the model.
     const std::string& src = get_features_response.features();
-    std::vector<DualNet::BoardFeatures> features(batch_size);
+    std::vector<const DualNet::BoardFeatures*> features(batch_size);
     for (int i = 0; i < batch_size; ++i) {
       for (int j = 0; j < DualNet::kNumBoardFeatures; ++j) {
-        features[i][j] = static_cast<float>(src[i * DualNet::kNumBoardFeatures + j]);
+        features[i][j] =
+            static_cast<float>(src[i * DualNet::kNumBoardFeatures + j]);
       }
     }
     std::vector<DualNet::Output> outputs(batch_size);
@@ -134,7 +136,8 @@ TEST_F(InferenceServerTest, Test) {
   });
 
   int vlosses = virtual_losses_;
-  std::vector<DualNet::BoardFeatures> features(vlosses * clients_.size());
+  std::vector<const DualNet::BoardFeatures*> features(vlosses *
+                                                      clients_.size());
   std::vector<DualNet::Output> outputs(vlosses * clients_.size());
   std::vector<std::thread> client_threads;
   for (size_t i = 0; i < clients_.size(); ++i) {

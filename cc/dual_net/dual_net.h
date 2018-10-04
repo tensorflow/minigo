@@ -23,6 +23,9 @@
 #include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/position.h"
+#include "gflags/gflags.h"
+
+DECLARE_int32(batch_size);
 
 namespace minigo {
 
@@ -68,18 +71,10 @@ class DualNet {
 
   virtual ~DualNet();
 
-  // Runs inference on a batch of input features.
-  // If `model` is non-null, it will be set with the name of the model used for
-  // the inference.
-  virtual void RunMany(absl::Span<const BoardFeatures> features,
-                       absl::Span<Output> outputs, std::string* model) = 0;
-
-  // Runs inference on features from a single position.
-  Output Run(const BoardFeatures features, std::string* model) {
-    Output output;
-    RunMany({&features, 1}, {&output, 1}, model);
-    return output;
-  }
+  // Runs inference on a batch of input features. Implementations must handle
+  // features of size up to FLAGS_batch_size.
+  virtual void RunMany(std::vector<const BoardFeatures*> features,
+                       std::vector<Output*> outputs, std::string* model) = 0;
 };
 
 }  // namespace minigo

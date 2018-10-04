@@ -53,7 +53,7 @@ class GtpPlayer : public MctsPlayer {
   Coord SuggestMove() override;
 
  protected:
-  absl::Span<MctsNode* const> TreeSearch(int batch_size) override;
+  absl::Span<MctsNode* const> TreeSearch() override;
 
  private:
   struct Response {

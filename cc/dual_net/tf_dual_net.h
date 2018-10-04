@@ -28,13 +28,14 @@
 
 namespace minigo {
 
+// TODO(csigg): Move to implementation file.
 class TfDualNet : public DualNet {
  public:
-  explicit TfDualNet(const std::string& graph_path);
+  explicit TfDualNet(std::string graph_path);
   ~TfDualNet() override;
 
-  void RunMany(absl::Span<const BoardFeatures> features,
-               absl::Span<Output> outputs, std::string* model) override;
+  void RunMany(std::vector<const BoardFeatures*> features,
+               std::vector<Output*> outputs, std::string* model) override;
 
  private:
   std::unique_ptr<tensorflow::Session> session_;
@@ -43,6 +44,8 @@ class TfDualNet : public DualNet {
   std::vector<tensorflow::Tensor> outputs_;
   std::string graph_path_;
 };
+
+std::unique_ptr<DualNet> NewTfDualNet(const std::string& graph_path);
 
 }  // namespace minigo
 

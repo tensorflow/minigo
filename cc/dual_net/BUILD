@@ -21,6 +21,7 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:position",
+        "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -54,6 +55,7 @@ minigo_cc_library(
     copts = factory_engine_copts,
     deps = [
         ":dual_net",
+        ":batching_dual_net",
         "//cc:base",
         "//cc:check",
         "@com_github_gflags_gflags//:gflags",
@@ -102,7 +104,6 @@ minigo_cc_library(
         "//cc:check",
         "//cc:tensorflow",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -117,7 +118,22 @@ minigo_cc_library(
         "//cc:check",
         "//cc:tf_lite",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+    ],
+)
+
+minigo_cc_library(
+    name = "batching_dual_net",
+    srcs = ["batching_dual_net.cc"],
+    hdrs = [
+        "batching_dual_net.h",
+        "factory.h",
+    ],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:check",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
