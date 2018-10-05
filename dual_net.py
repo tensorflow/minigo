@@ -287,19 +287,22 @@ def model_fn(features, labels, mode, params=None):
         if est_mode == tf.estimator.ModeKeys.EVAL:
             return metric_ops
 
+        # NOTE: global_step is rounded to a multiple of FLAGS.summary_steps.
+        eval_step = tf.reduce_min(step)
+
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
         summary_writer = summary.create_file_writer(FLAGS.work_dir)
         with summary_writer.as_default(), \
-                summary.always_record_summaries():
+                summary.record_summaries_every_n_global_steps(
+                    FLAGS.summary_steps, eval_step):
             for metric_name, metric_op in metric_ops.items():
-                summary.scalar(metric_name, metric_op[1])
+                summary.scalar(metric_name, metric_op[1], step=eval_step)
 
         # Reset metrics occasionally so that they are mean of recent batches.
         reset_op = tf.variables_initializer(tf.local_variables("metrics"))
         cond_reset_op = tf.cond(
-            tf.equal(tf.mod(tf.reduce_min(step),
-                            FLAGS.summary_steps), tf.to_int64(1)),
+            tf.equal(eval_step % FLAGS.summary_steps, tf.to_int64(1)),
             lambda: reset_op,
             lambda: tf.no_op())
 
