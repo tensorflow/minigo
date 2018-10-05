@@ -14,14 +14,19 @@
 
 #include "cc/dual_net/tf_dual_net.h"
 
+#include <utility>
+#include <vector>
+
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "cc/check.h"
 #include "cc/constants.h"
 #include "tensorflow/core/framework/graph.pb.h"
+#include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/public/session.h"
 
 using tensorflow::DT_FLOAT;
 using tensorflow::Env;
@@ -33,6 +38,24 @@ using tensorflow::Tensor;
 using tensorflow::TensorShape;
 
 namespace minigo {
+namespace {
+
+class TfDualNet : public DualNet {
+ public:
+  explicit TfDualNet(std::string graph_path);
+
+  ~TfDualNet() override;
+
+  void RunMany(std::vector<const BoardFeatures*> features,
+               std::vector<Output*> outputs, std::string* model) override;
+
+ private:
+  std::unique_ptr<tensorflow::Session> session_;
+  std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
+  std::vector<std::string> output_names_;
+  std::vector<tensorflow::Tensor> outputs_;
+  std::string graph_path_;
+};
 
 TfDualNet::TfDualNet(std::string graph_path) : graph_path_(graph_path) {
   GraphDef graph_def;
@@ -92,6 +115,7 @@ void TfDualNet::RunMany(std::vector<const BoardFeatures*> features,
     *model = graph_path_;
   }
 }
+}  // namespace
 
 std::unique_ptr<DualNet> NewTfDualNet(const std::string& graph_path) {
   return absl::make_unique<TfDualNet>(graph_path);

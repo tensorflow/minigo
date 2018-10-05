@@ -21,13 +21,35 @@
 #include "absl/strings/string_view.h"
 #include "cc/check.h"
 #include "cc/constants.h"
+#include "tensorflow/contrib/lite/context.h"
+#include "tensorflow/contrib/lite/interpreter.h"
 #include "tensorflow/contrib/lite/kernels/register.h"
+#include "tensorflow/contrib/lite/model.h"
 
 using tflite::FlatBufferModel;
 using tflite::InterpreterBuilder;
 using tflite::ops::builtin::BuiltinOpResolver;
 
 namespace minigo {
+namespace {
+
+class LiteDualNet : public DualNet {
+ public:
+  explicit LiteDualNet(const std::string& graph_path);
+
+  void RunMany(std::vector<const BoardFeatures*> features,
+               std::vector<Output*> outputs, std::string* model) override;
+
+ private:
+  std::unique_ptr<tflite::FlatBufferModel> model_;
+  std::unique_ptr<tflite::Interpreter> interpreter_;
+
+  TfLiteTensor* input_ = nullptr;
+  TfLiteTensor* policy_ = nullptr;
+  TfLiteTensor* value_ = nullptr;
+
+  std::string graph_path_;
+};
 
 LiteDualNet::LiteDualNet(const std::string& graph_path)
     : graph_path_(graph_path) {
@@ -43,7 +65,7 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
 
   // Resize input tensor to batch size.
   interpreter_->ResizeInputTensor(
-      0, {FLAGS_batch_size, kN, kN, DualNet::kNumStoneFeatures});
+      0, {FLAGS_batch_size, kN, kN, kNumStoneFeatures});
 
   MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
 
@@ -60,7 +82,7 @@ LiteDualNet::LiteDualNet(const std::string& graph_path)
   MG_CHECK(input_->dims->data[0] == FLAGS_batch_size);
   MG_CHECK(input_->dims->data[1] == kN);
   MG_CHECK(input_->dims->data[2] == kN);
-  MG_CHECK(input_->dims->data[3] == DualNet::kNumStoneFeatures);
+  MG_CHECK(input_->dims->data[3] == kNumStoneFeatures);
 
   // Initialize outputs.
   const auto& outputs = interpreter_->outputs();
@@ -130,6 +152,7 @@ void LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
     *model = graph_path_;
   }
 }
+}  // namespace
 
 std::unique_ptr<DualNet> NewLiteDualNet(const std::string& model_path) {
   return absl::make_unique<LiteDualNet>(model_path);

@@ -103,6 +103,7 @@ minigo_cc_library(
         "//cc:base",
         "//cc:check",
         "//cc:tensorflow",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -117,6 +118,7 @@ minigo_cc_library(
         "//cc:base",
         "//cc:check",
         "//cc:tf_lite",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
 )
