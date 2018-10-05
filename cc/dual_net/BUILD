@@ -86,10 +86,10 @@ minigo_cc_library(
         ":dual_net",
         "//cc:thread_safe_queue",
         "//proto:inference_service_proto",
+        "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
-        "@com_github_grpc_grpc//:grpc++",
     ],
 )
 
@@ -103,8 +103,10 @@ minigo_cc_library(
         "//cc:base",
         "//cc:check",
         "//cc:tensorflow",
+        "//cc:thread_safe_queue",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
