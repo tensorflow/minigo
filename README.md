@@ -147,7 +147,7 @@ For instance, this would set a bucket, authenticate, and then look for the most
 recent model.
 
 ```shell
-# When you first start we reccomend using our minigo-pub bucket.
+# When you first start we recommend using our minigo-pub bucket.
 # Later you can setup your own bucket and store data there.
 export BUCKET_NAME=minigo-pub/v9-19x19
 gcloud auth application-default login
