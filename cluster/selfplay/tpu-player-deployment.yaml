@@ -3,20 +3,20 @@ kind: Deployment
 metadata:
   name: tpu-player-deployment
 spec:
-  replicas: 128
+  replicas: 4
   selector:
     matchLabels:
       app: tpu-player
   template:
     metadata:
       annotations:
-        tf-version.cloud-tpus.google.com: "1.9"
+        tf-version.cloud-tpus.google.com: "1.11"
       labels:
         app: tpu-player
     spec:
       containers:
       - name: minigo-tpu-player-container
-        image: gcr.io/tensor-go/minigo-tpu-player:v12
+        image: gcr.io/tensor-go/minigo-tpu-player:v13
         imagePullPolicy: Always
         resources:
           limits:

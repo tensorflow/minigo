@@ -54,7 +54,7 @@ def run_tpu():
         'bazel-bin/cc/main',
         '--mode=selfplay',
         '--engine=remote',
-        '--checkpoint-dir={}'.format(fsdb.working_dir()),
+        '--checkpoint_dir={}'.format(fsdb.working_dir()),
         '--output_dir={}'.format(fsdb.selfplay_dir()),
         '--holdout_dir={}'.format(fsdb.holdout_dir()),
         '--sgf_dir={}'.format(fsdb.sgf_dir()),

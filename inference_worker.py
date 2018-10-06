@@ -410,6 +410,7 @@ class Worker(object):
         dbg("starting model loader thread")
         while self._running:
             freshest = saver.latest_checkpoint(FLAGS.checkpoint_dir)
+            dbg("latest checkpoint: %s" % freshest)
             if freshest:
                 self.sess.maybe_load_model(freshest)
             # Wait a few seconds before checking again.

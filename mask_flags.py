@@ -36,33 +36,30 @@ Command line usage example:
 import re
 import subprocess
 import sys
+import time
 from absl import flags
 
 # Matches both
 #   --some_flag: Flag description
 #   --[no]bool_flag: Flag description
-FLAG_HELP_RE = re.compile(r'--((\[no\])?)([\w_-]+):')
+FLAG_HELP_RE_PY = re.compile(r'--((\[no\])?)([\w_-]+):')
+FLAG_HELP_RE_CC = re.compile(r'-((\[no\])?)([\w_-]+) \(')
 FLAG_RE = re.compile(r'--[\w_-]+')
 
 
-def parse_helpfull_output(help_output):
+def parse_helpfull_output(help_output, regex=FLAG_HELP_RE_PY):
     '''Parses the output of --helpfull.
     Args:
         help_output: str, the full output of --helpfull.
 
     Returns a set of flags that are valid flags.'''
     valid_flags = set()
-    for _, no_prefix, flag_name in FLAG_HELP_RE.findall(help_output):
+    for _, no_prefix, flag_name in regex.findall(help_output):
         valid_flags.add('--' + flag_name)
         if no_prefix:
             valid_flags.add('--no' + flag_name)
     return valid_flags
 
-
-assert parse_helpfull_output('''
-    --some_flag: Flag description
-    --[no]bool_flag: Flag description
-    ''') == {'--some_flag', '--bool_flag', '--nobool_flag'}
 
 def prepare_subprocess_cmd(subprocess_cmd):
     '''Prepares a subprocess command by running --helpfull and masking flags.
@@ -77,9 +74,14 @@ def prepare_subprocess_cmd(subprocess_cmd):
     help_cmd = subprocess_cmd + ['--helpfull']
     help_output = subprocess.run(help_cmd, stdout=subprocess.PIPE).stdout
     help_output = help_output.decode('ascii')
-    valid_flags = parse_helpfull_output(help_output)
+    if 'python' in subprocess_cmd[0]:
+        valid_flags = parse_helpfull_output(help_output)
+    else:
+        valid_flags = parse_helpfull_output(help_output, regex=FLAG_HELP_RE_CC)
     parsed_flags = flags.FlagValues().read_flags_from_files(subprocess_cmd[1:])
     def valid_argv(argv):
+        ''' Figures out if a flag parsed from the flagfile matches a flag in
+        the command about to be run.'''
         flagname_match = FLAG_RE.match(argv)
         if not flagname_match:
             return True
@@ -90,16 +92,22 @@ def prepare_subprocess_cmd(subprocess_cmd):
 
 def run(cmd):
     '''Prepare and run a subprocess cmd, returning a CompletedProcess.'''
+    print("Preparing the following cmd:")
+    for token in cmd:
+        print(token)
     cmd = prepare_subprocess_cmd(cmd)
-    print("Running the following cmd", cmd)
-    return subprocess.run(cmd, stdout=sys.stdout, stderr=subprocess.PIPE)
+    print("Running the following cmd:")
+    for token in cmd:
+        print(token)
+    return subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
 
 def checked_run(cmd):
     '''Prepare and run a subprocess cmd, checking for successful completion.'''
     completed_process = run(cmd)
     if completed_process.returncode > 0:
-        print("Command failed!")
-        print("stderr:\n", completed_process.stderr.decode('ascii'))
+        print("Command failed!  Hanging around in case someone needs a "
+              "docker connection. (Ctrl-C to quit now)")
+        time.sleep(300)
         raise RuntimeError
     return completed_process
 

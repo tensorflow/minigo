@@ -29,10 +29,10 @@ ADD staging/requirements.txt /app/requirements.txt
 
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /app/requirements.txt
-RUN pip3 install "tensorflow==1.9.0rc2"
+RUN pip3 install "tensorflow==1.11.0"
 
 ADD staging/ /app
 WORKDIR /app
 
-RUN bazel build -c opt --define=board_size=19 --define=remote=1 cc/main
+RUN bazel build -c opt --define=board_size=19 --define=remote=1 cc/main --define=tf=1
 CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=tpu"]

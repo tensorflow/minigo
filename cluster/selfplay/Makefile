@@ -12,13 +12,12 @@
 define staging =
 	mkdir -p staging
 	cp ../../WORKSPACE staging/
+	cp -r -p ../../rl_loop/ staging/
 	cp -r -p ../../cc/ staging/
 	cp -r -p ../../proto/ staging/
 	rm -rfd staging/cc/tensorflow
 	cp ../../*.py staging/
 	cp ../../requirements.txt staging/
-	cp player_wrapper.sh staging/
-	cp tpu_wrapper.sh staging/
 endef
 
 tpu-image:

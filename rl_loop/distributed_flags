@@ -25,5 +25,3 @@
 --num_readouts=800
 --disable_resign_pct=0.10
 --resign_threshold=-0.999
-
-
