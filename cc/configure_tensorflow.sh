@@ -91,7 +91,7 @@ bazel build -c opt --config=opt --copt="${cc_opt_flags}" \
     //tensorflow:libtensorflow_framework.so
 
 echo "Copying tensorflow libraries to ${dst_dir}"
-cp bazel-bin/tensorflow/libtensorflow_*.so "${dst_dir}"
+cp bazel-bin/tensorflow/{libgrpc_runtime,libtensorflow_*}.so "${dst_dir}"
 
 echo "Building toco"
 bazel build -c opt --config=opt --copt="${cc_opt_flags}" //tensorflow/contrib/lite/toco:toco
