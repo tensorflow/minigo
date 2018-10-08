@@ -15,9 +15,7 @@ rm -rf ${dst_dir}/*
 mkdir -p ${dst_dir}
 
 # TODO(tommadams): we should probably switch to Clang at some point.
-# TF lite is broken in the v1.9.0 release. Checkout at the commit that fixed it.
-# TODO(tommadams): switch to v1.9.1 when that's released.
-commit_tag="v1.9.0"
+commit_tag="v1.11.0"
 
 echo "Cloning tensorflow to ${tmp_dir}"
 git clone https://github.com/tensorflow/tensorflow "${tmp_dir}"
@@ -60,7 +58,37 @@ echo "Copying tensor flow headers to ${dst_dir}"
 cp -r ${tmp_dir}/tensorflow-*.data/purelib/tensorflow/include/* "${dst_dir}"
 
 echo "Building tensorflow libraries"
-bazel build -c opt --config=opt --copt="${cc_opt_flags}" //tensorflow:libtensorflow_cc.so //tensorflow:libtensorflow_framework.so
+
+# Add a custom BUILD target for the gRPC runtime.
+# TODO(tommadams): Remove this once the gRPC runtime is linked in to TensorFlow.
+cat <<EOF >> tensorflow/BUILD
+
+tf_cc_shared_object(
+    name = "libgrpc_runtime.so",
+    linkopts = select({
+        "//tensorflow:darwin": [
+            "-Wl,-exported_symbols_list",  # This line must be directly followed by the exported_symbols.lds file
+            "\$(location //tensorflow:tf_exported_symbols.lds)",
+        ],
+        "//tensorflow:windows": [],
+        "//conditions:default": [
+            "-z defs",
+            "-Wl,--version-script",  #  This line must be directly followed by the version_script.lds file
+            "\$(location //tensorflow:tf_version_script.lds)",
+        ],
+    }),
+    deps = [
+        "//tensorflow:tf_exported_symbols.lds",
+        "//tensorflow:tf_version_script.lds",
+       "//tensorflow/core/distributed_runtime/rpc:grpc_runtime",
+    ]
+)
+EOF
+
+bazel build -c opt --config=opt --copt="${cc_opt_flags}" \
+    //tensorflow:libgrpc_runtime.so \
+    //tensorflow:libtensorflow_cc.so \
+    //tensorflow:libtensorflow_framework.so
 
 echo "Copying tensorflow libraries to ${dst_dir}"
 cp bazel-bin/tensorflow/libtensorflow_*.so "${dst_dir}"
@@ -71,18 +99,13 @@ cp bazel-bin/tensorflow/contrib/lite/toco/toco "${dst_dir}"
 
 echo "Building TF Lite"
 
-# TF lite is broken in the v1.9.0 release. Checkout at the commit that fixed it.
-# TODO(tommadams): switch to v1.9.1 when that's released.
-commit_tag="474b40bc7cb33d25f9bdc187d021e94a807bf1bd"
-git checkout "${commit_tag}"
-
-./tensorflow/contrib/lite/download_dependencies.sh
-make -j $(nproc) -f tensorflow/contrib/lite/Makefile
-cp tensorflow/contrib/lite/gen/lib/libtensorflow-lite.a $dst_dir/libtensorflow_lite.a
+./tensorflow/contrib/lite/tools/make/download_dependencies.sh
+make -j $(nproc) -f tensorflow/contrib/lite/tools/make/Makefile
+cp tensorflow/contrib/lite/tools/make/gen/linux_x86_64/lib/libtensorflow-lite.a $dst_dir/libtensorflow_lite.a
 for dir in contrib/lite contrib/lite/kernels contrib/lite/profiling contrib/lite/schema; do
   mkdir -p $dst_dir/tensorflow/$dir
   cp tensorflow/$dir/*.h $dst_dir/tensorflow/$dir/
 done
-cp -r tensorflow/contrib/lite/downloads/flatbuffers/include/flatbuffers $dst_dir/
+cp -r tensorflow/contrib/lite/tools/make/downloads/flatbuffers/include/flatbuffers $dst_dir/
 
 popd
