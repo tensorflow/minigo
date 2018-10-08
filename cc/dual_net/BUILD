@@ -40,6 +40,9 @@ factory_engine_deps = select({
     "//cc/config:enable_tf": [":tf_dual_net"],
     "//conditions:default": [],
 }) + select({
+    "//cc/config:enable_tpu": [":tpu_dual_net"],
+    "//conditions:default": [],
+}) + select({
     "//cc/config:enable_lite": [":lite_dual_net"],
     "//conditions:default": [],
 }) + select({
@@ -108,6 +111,21 @@ minigo_cc_library(
         "//cc:tf_lite",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+    ],
+)
+
+minigo_cc_library(
+    name = "tpu_dual_net",
+    srcs = ["tpu_dual_net.cc"],
+    hdrs = ["tpu_dual_net.h"],
+    tags = ["manual"],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:check",
+        "//cc:tensorflow",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 

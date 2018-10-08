@@ -411,6 +411,23 @@ def model_inference_fn(features, training):
     return policy_output, value_output, logits
 
 
+def const_model_inference_fn(features):
+    """Builds the model graph with weights marked as constant.
+
+    This improves TPU inference performance because it prevents the weights
+    being transferred to the TPU every call to Session.run().
+
+    Returns:
+        (policy_output, value_output, logits) tuple of tensors.
+    """
+    def custom_getter(getter, name, *args, **kwargs):
+        with tf.control_dependencies(None):
+            return tf.guarantee_const(
+                getter(name, *args, **kwargs), name=name + "/GuaranteeConst")
+    with tf.variable_scope("", custom_getter=custom_getter):
+        return model_inference_fn(features, False)
+
+
 def get_estimator():
     if FLAGS.use_tpu:
         return _get_tpu_estimator()
@@ -493,9 +510,54 @@ def export_model(model_path):
     # also export a .pb for C++ inference
     freeze_graph(model_path)
 
+
 def freeze_graph(model_path):
     n = DualNetwork(model_path)
     out_graph = tf.graph_util.convert_variables_to_constants(
         n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
     with tf.gfile.GFile(model_path + '.pb', 'wb') as f:
         f.write(out_graph.SerializeToString())
+
+
+def freeze_graph_tpu(model_path):
+    """Custom freeze_graph implementation for Cloud TPU."""
+
+    assert FLAGS.tpu_name
+    sess = tf.Session(FLAGS.tpu_name)
+
+    output_names = []
+    with sess.graph.as_default():
+        # Replicate the inference function for each TPU core.
+        replicated_features = []
+        for i in range(FLAGS.parallel_tpus):
+            features = tf.placeholder(
+                tf.float32, [None, go.N, go.N,
+                             features_lib.NEW_FEATURES_PLANES],
+                name='pos_tensor_%d' % i)
+            replicated_features.append((features,))
+        outputs = tf.contrib.tpu.replicate(
+            const_model_inference_fn, replicated_features)
+
+        # The replicate op assigns names like output_0_shard_0 to the output
+        # names. Give them human readable names.
+        for i, (policy_output, value_output, _) in enumerate(outputs):
+            policy_name = 'policy_output_%d' % i
+            value_name = 'value_output_%d' % i
+            output_names.extend([policy_name, value_name])
+            tf.identity(policy_output, policy_name)
+            tf.identity(value_output, value_name)
+
+        # Add initialize and shutdown TPU ops.
+        init_def = tf.contrib.tpu.initialize_system()
+        shutdown_def = tf.contrib.tpu.shutdown_system()
+
+        tf.train.Saver().restore(sess, model_path)
+
+    # Make sure we serialize the initialize and shutdown TPU ops.
+    output_names.extend(['ConfigureDistributedTPU', 'ShutdownDistributedTPU'])
+
+    # Freeze the graph.
+    model_def = tf.graph_util.convert_variables_to_constants(
+        sess, sess.graph.as_graph_def(), output_names)
+    with tf.gfile.GFile(model_path + '.pb', 'wb') as f:
+        f.write(model_def.SerializeToString())
