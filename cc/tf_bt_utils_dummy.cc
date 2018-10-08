@@ -23,9 +23,9 @@ void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
                        const std::string& table_name,
                        const MctsPlayer& player) {
-  MG_FATAL()
-      << "Can't write TensorFlow examples to Bigtable without Bigtable support enabled. "
-         "Please recompile, passing --define=bt=1 to bazel build.";
+  MG_FATAL() << "Can't write TensorFlow examples to Bigtable without Bigtable "
+                "support enabled. "
+                "Please recompile, passing --define=bt=1 to bazel build.";
 }
 
 }  // namespace tf_utils

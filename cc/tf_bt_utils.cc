@@ -19,15 +19,15 @@
 #include "absl/strings/str_format.h"
 #include "cc/constants.h"
 #include "cc/mcts_player.h"
-#include "tensorflow/core/example/example.pb.h"
-#include "google/cloud/bigtable/table.h"
 #include "google/cloud/bigtable/read_modify_write_rule.h"
+#include "google/cloud/bigtable/table.h"
+#include "tensorflow/core/example/example.pb.h"
 
-using google::cloud::bigtable::Table;
-using google::cloud::bigtable::SetCell;
+using google::cloud::bigtable::bigendian64_t;
 using google::cloud::bigtable::CreateDefaultDataClient;
 using google::cloud::bigtable::ReadModifyWriteRule;
-using google::cloud::bigtable::bigendian64_t;
+using google::cloud::bigtable::SetCell;
+using google::cloud::bigtable::Table;
 
 namespace minigo {
 namespace tf_utils {
@@ -36,10 +36,8 @@ namespace tf_utils {
 // Linked from tf_utils.cc
 std::vector<tensorflow::Example> MakeExamples(const MctsPlayer& player);
 
-
 // Writes a list of tensorflow Example protos to a series of Bigtable rows.
-void WriteTfExamples(Table& table,
-                     const std::string& row_prefix,
+void WriteTfExamples(Table& table, const std::string& row_prefix,
                      const std::vector<tensorflow::Example>& examples) {
   int move = 0;
   for (const auto& example : examples) {
@@ -59,23 +57,20 @@ void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& table_name,
                        const MctsPlayer& player) {
   auto examples = MakeExamples(player);
-  Table table(CreateDefaultDataClient(gcp_project_name,
-                                      instance_name,
+  Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
                                       google::cloud::bigtable::ClientOptions()),
               table_name);
   // This will be everything from a single game, so retrieve the game
   // counter from the Bigtable and increment it atomically.
   using namespace google::cloud::bigtable;
-  auto rule = ReadModifyWriteRule::IncrementAmount("metadata",
-                                                   "game_counter",
-                                                   1);
+  auto rule =
+      ReadModifyWriteRule::IncrementAmount("metadata", "game_counter", 1);
   auto row = table.ReadModifyWriteRow("table_state", rule);
   uint64_t game_counter = 0;
   std::chrono::microseconds age{};
   for (auto const& cell : row.cells()) {
     if (cell.family_name() == "metadata" &&
-        cell.column_qualifier() == "game_counter" &&
-        cell.timestamp() > age) {
+        cell.column_qualifier() == "game_counter" && cell.timestamp() > age) {
       age = cell.timestamp();
       game_counter = cell.value_as<bigendian64_t>().get();
     }
@@ -83,10 +78,9 @@ void WriteGameExamples(const std::string& gcp_project_name,
 
   auto row_prefix = absl::StrFormat("g_%010d", game_counter);
   WriteTfExamples(table, row_prefix, examples);
-  std::cerr << "Bigtable rows written to prefix "
-            << row_prefix << " : "
+  std::cerr << "Bigtable rows written to prefix " << row_prefix << " : "
             << examples.size() << std::endl;
 }
 
-} // namespace tf_utils
-} // namespace minigo
+}  // namespace tf_utils
+}  // namespace minigo

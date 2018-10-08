@@ -39,8 +39,7 @@ void WriteGameExamples(const std::string& output_dir,
 // the examples.
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
-                       const std::string& table_name,
-                       const MctsPlayer& player);
+                       const std::string& table_name, const MctsPlayer& player);
 
 }  // namespace tf_utils
 }  // namespace minigo

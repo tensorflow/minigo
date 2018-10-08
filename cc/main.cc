@@ -335,11 +335,12 @@ class SelfPlayer {
     const bool use_ansi_colors = isatty(fileno(stderr));
 
     GameOptions game_options;
-    std::vector<std::string> bigtable_spec = absl::StrSplit(FLAGS_output_bigtable, ',');
+    std::vector<std::string> bigtable_spec =
+        absl::StrSplit(FLAGS_output_bigtable, ',');
     bool use_bigtable = bigtable_spec.size() == 3;
     if (!bigtable_spec.empty() && !use_bigtable) {
       MG_FATAL()
-        << "Bigtable output must be of the form: project,instance,table";
+          << "Bigtable output must be of the form: project,instance,table";
       return;
     }
 
@@ -400,9 +401,7 @@ class SelfPlayer {
         const auto& gcp_project_name = bigtable_spec[0];
         const auto& instance_name = bigtable_spec[1];
         const auto& table_name = bigtable_spec[2];
-        tf_utils::WriteGameExamples(gcp_project_name,
-                                    instance_name,
-                                    table_name,
+        tf_utils::WriteGameExamples(gcp_project_name, instance_name, table_name,
                                     *player);
       }
 

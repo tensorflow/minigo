@@ -14,9 +14,9 @@
 
 #include "cc/tf_utils.h"
 
+#include <algorithm>
 #include <array>
 #include <memory>
-#include <algorithm>
 
 #include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
