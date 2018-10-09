@@ -39,3 +39,8 @@ config_setting(
     name = "enable_bt",
     define_values = {"bt": "1"},
 )
+
+config_setting(
+    name = "enable_gpu",
+    define_values = {"gpu": "1"},
+)
