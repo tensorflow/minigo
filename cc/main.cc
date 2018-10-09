@@ -338,7 +338,7 @@ class SelfPlayer {
     std::vector<std::string> bigtable_spec =
         absl::StrSplit(FLAGS_output_bigtable, ',');
     bool use_bigtable = bigtable_spec.size() == 3;
-    if (!bigtable_spec.empty() && !use_bigtable) {
+    if (!FLAGS_output_bigtable.empty() && !use_bigtable) {
       MG_FATAL()
           << "Bigtable output must be of the form: project,instance,table";
       return;
