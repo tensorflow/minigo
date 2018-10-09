@@ -97,6 +97,10 @@ minigo_cc_library(
     name = "tf_dual_net",
     srcs = ["tf_dual_net.cc"],
     hdrs = ["tf_dual_net.h"],
+    copts = select({
+        "//cc/config:enable_gpu": ["-DMINIGO_ENABLE_GPU=1"],
+        "//conditions:default": [],
+    }),
     tags = ["manual"],
     deps = [
         ":dual_net",
