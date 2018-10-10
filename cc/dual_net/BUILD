@@ -35,6 +35,9 @@ factory_engine_copts = select({
 }) + select({
     "//cc/config:enable_lite": ["-DMG_ENABLE_LITE_DUAL_NET"],
     "//conditions:default": [],
+}) + select({
+    "//cc/config:enable_trt": ["-DMG_ENABLE_TRT_DUAL_NET"],
+    "//conditions:default": [],
 })
 
 factory_engine_deps = select({
@@ -45,6 +48,9 @@ factory_engine_deps = select({
     "//conditions:default": [],
 }) + select({
     "//cc/config:enable_lite": [":lite_dual_net"],
+    "//conditions:default": [],
+}) + select({
+    "//cc/config:enable_trt": [":trt_dual_net"],
     "//conditions:default": [],
 })
 
@@ -130,6 +136,23 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
+    name = "trt_dual_net",
+    srcs = ["trt_dual_net.cc"],
+    hdrs = ["trt_dual_net.h"],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:check",
+        "//cc:cuda",
+        "//cc:tensorrt",
+        "//cc:thread_safe_queue",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+minigo_cc_library(
     name = "batching_dual_net",
     srcs = ["batching_dual_net.cc"],
     hdrs = [
@@ -149,8 +172,11 @@ minigo_cc_test_9_only(
     name = "dual_net_test",
     size = "small",
     srcs = ["dual_net_test.cc"],
+    copts = factory_engine_copts,
+    data = glob(["test_model.*"]),
     deps = [
         ":dual_net",
+        ":factory",
         "//cc:position",
         "//cc:test_utils",
         "@com_google_googletest//:gtest_main",

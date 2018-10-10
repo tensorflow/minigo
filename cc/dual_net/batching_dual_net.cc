@@ -63,6 +63,10 @@ class BatchingService {
     notification.WaitForNotification();
   }
 
+  DualNet::InputLayout GetInputLayout() const {
+    return dual_net_->GetInputLayout();
+  }
+
  private:
   void MaybeRunBatches() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     while (size_t batch_size =
@@ -149,6 +153,10 @@ class BatchingDualNet : public DualNet {
                std::vector<Output*> outputs, std::string* model) override {
     service_->RunMany(std::move(features), std::move(outputs), model);
   };
+
+  InputLayout GetInputLayout() const override {
+    return service_->GetInputLayout();
+  }
 
  protected:
   BatchingService* service_;

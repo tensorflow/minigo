@@ -55,6 +55,11 @@ class DualNet {
   using StoneFeatures = std::array<float, kNumStoneFeatures>;
   using BoardFeatures = std::array<float, kNumBoardFeatures>;
 
+  enum class InputLayout {
+    kNHWC,
+    kNCHW,
+  };
+
   // Generates the board features from the history of recent moves, where
   // history[0] is the current board position, and history[i] is the board
   // position from i moves ago.
@@ -75,6 +80,8 @@ class DualNet {
   // features of size up to FLAGS_batch_size.
   virtual void RunMany(std::vector<const BoardFeatures*> features,
                        std::vector<Output*> outputs, std::string* model) = 0;
+
+  virtual InputLayout GetInputLayout() const;
 };
 
 }  // namespace minigo

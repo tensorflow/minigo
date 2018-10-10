@@ -36,6 +36,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_trt",
+    define_values = {"trt": "1"},
+)
+
+config_setting(
     name = "enable_bt",
     define_values = {"bt": "1"},
 )

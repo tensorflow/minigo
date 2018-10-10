@@ -12,15 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/dual_net/dual_net.h"
-
 #include <array>
 #include <deque>
 #include <vector>
 
+#include "cc/dual_net/dual_net.h"
 #include "cc/position.h"
+#include "cc/random.h"
+#include "cc/symmetries.h"
 #include "cc/test_utils.h"
 #include "gtest/gtest.h"
+
+#if MG_ENABLE_TF_DUAL_NET
+#include "cc/dual_net/tf_dual_net.h"
+#endif
+#if MG_ENABLE_LITE_DUAL_NET
+#include "cc/dual_net/lite_dual_net.h"
+#endif
+#if MG_ENABLE_TRT_DUAL_NET
+#include "cc/dual_net/trt_dual_net.h"
+#endif
 
 namespace minigo {
 namespace {
@@ -124,5 +135,70 @@ TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   EXPECT_EQ(j2, GetStoneFeatures(features, Coord::FromString("J2")));
 }
 
+// Checks that the different backends produce the same result.
+TEST(DualNetTest, TestBackendsEqual) {
+  using Function = std::unique_ptr<DualNet> (*)(const std::string&);
+  std::vector<std::pair<std::string, Function>> factories;
+
+#if MG_ENABLE_TF_DUAL_NET
+  factories.emplace_back("TfDualNet", &NewTfDualNet);
+#endif
+#if MG_ENABLE_LITE_DUAL_NET
+  factories.emplace_back("LiteDualNet", &NewLiteDualNet);
+#endif
+#if MG_ENABLE_TRT_DUAL_NET
+  factories.emplace_back("TrtDualNet", &NewTrtDualNet);
+#endif
+  // Note: InferenceServer is not supported.
+
+  DualNet::BoardFeatures nhwc_features;
+  Random().Uniform(0.0f, 1.0f, absl::MakeSpan(nhwc_features));
+  DualNet::BoardFeatures nchw_features;
+  using OutIter =
+      symmetry::NchwOutputIterator<kN, DualNet::kNumStoneFeatures, float>;
+  std::copy(nhwc_features.begin(), nhwc_features.end(),
+            OutIter(nchw_features.data()));
+
+  DualNet::Output ref_output;
+  std::string ref_name;
+
+  auto policy_string = [](const std::array<float, kNumMoves>& policy) {
+    std::ostringstream oss;
+    std::copy(policy.begin(), policy.end(),
+              std::ostream_iterator<float>(oss, " "));
+    return oss.str();
+  };
+
+  for (const auto& pair : factories) {
+    const auto& name = pair.first;
+    std::cerr << "Running " << name << std::endl;
+
+    auto dual_net = pair.second("cc/dual_net/test_model");
+
+    auto* features = dual_net->GetInputLayout() == DualNet::InputLayout::kNHWC
+                         ? &nhwc_features
+                         : &nchw_features;
+    DualNet::Output output;
+    dual_net->RunMany({features}, {&output}, nullptr);
+
+    if (ref_name.empty()) {
+      ref_output = output;
+      ref_name = name;
+      continue;
+    }
+
+    auto pred = [](float left, float right) {
+      return std::abs(left - right) <
+             0.0001f * (1.0f + std::abs(left) + std::abs(right));
+    };
+    EXPECT_EQ(std::equal(output.policy.begin(), output.policy.end(),
+                         ref_output.policy.begin(), pred),
+              true)
+        << name << ": " << policy_string(output.policy) << std::endl
+        << ref_name << ": " << policy_string(ref_output.policy);
+    EXPECT_NEAR(output.value, ref_output.value, 0.0001f)
+        << name << " vs " << ref_name;
+  }
+}
 }  // namespace
 }  // namespace minigo

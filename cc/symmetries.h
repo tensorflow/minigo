@@ -15,6 +15,7 @@
 #ifndef CC_SYMMETRIES_H_
 #define CC_SYMMETRIES_H_
 
+#include <algorithm>
 #include <cstring>
 
 #include "cc/check.h"
@@ -74,156 +75,163 @@ inline Symmetry Inverse(Symmetry sym) {
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void Identity(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  memcpy(dst, src, N * N * num_channels * sizeof(T));
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void Identity(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  std::copy_n(src, N * N * num_channels, dst);
 }
 
-template <typename T, int N, int num_channels>
-inline void Rot90(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  const int col_stride = num_channels;
-  const int row_stride = col_stride * N;
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void Rot90(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  const int row_stride = num_channels * N;
   for (int j = 0; j < N; ++j) {
-    const auto* s = src + (N - 1 - j) * col_stride;
-    auto* d = dst + j * row_stride;
+    auto s = src + (N - 1 - j) * num_channels;
     for (int i = 0; i < N; ++i) {
-      memcpy(d, s, col_stride * sizeof(T));
-      d += col_stride;
+      dst = std::copy_n(s, num_channels, dst);
       s += row_stride;
     }
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void Rot180(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  const int col_stride = num_channels;
-  const int row_stride = col_stride * N;
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void Rot180(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  const int row_stride = num_channels * N;
   for (int j = 0; j < N; ++j) {
-    const auto* s = src + (N - 1 - j) * row_stride + (N - 1) * col_stride;
-    auto* d = dst + j * row_stride;
+    auto s = src + (N - 1 - j) * row_stride + (N - 1) * num_channels;
     for (int i = 0; i < N; ++i) {
-      memcpy(d, s, col_stride * sizeof(T));
-      d += col_stride;
-      s -= col_stride;
+      dst = std::copy_n(s, num_channels, dst);
+      s -= num_channels;
     }
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void Rot270(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  const int col_stride = num_channels;
-  const int row_stride = col_stride * N;
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void Rot270(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  const int row_stride = num_channels * N;
   for (int j = 0; j < N; ++j) {
-    const auto* s = src + (N - 1) * row_stride + j * col_stride;
-    auto* d = dst + j * row_stride;
+    auto s = src + (N - 1) * row_stride + j * num_channels;
     for (int i = 0; i < N; ++i) {
-      memcpy(d, s, col_stride * sizeof(T));
-      d += col_stride;
+      dst = std::copy_n(s, num_channels, dst);
       s -= row_stride;
     }
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void Flip(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  const int col_stride = num_channels;
-  const int row_stride = col_stride * N;
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void Flip(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  const int row_stride = num_channels * N;
   for (int j = 0; j < N; ++j) {
-    const auto* s = src + j * col_stride;
-    auto* d = dst + j * row_stride;
+    auto s = src + j * num_channels;
     for (int i = 0; i < N; ++i) {
-      memcpy(d, s, col_stride * sizeof(T));
-      d += col_stride;
+      dst = std::copy_n(s, num_channels, dst);
       s += row_stride;
     }
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void FlipRot90(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  const int col_stride = num_channels;
-  const int row_stride = col_stride * N;
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void FlipRot90(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  const int row_stride = num_channels * N;
   for (int j = 0; j < N; ++j) {
-    const auto* s = src + (N - 1 - j) * row_stride;
-    auto* d = dst + j * row_stride;
+    auto s = src + (N - 1 - j) * row_stride;
     for (int i = 0; i < N; ++i) {
-      memcpy(d, s, col_stride * sizeof(T));
-      d += col_stride;
-      s += col_stride;
+      dst = std::copy_n(s, num_channels, dst);
+      s += num_channels;
     }
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void FlipRot180(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  const int col_stride = num_channels;
-  const int row_stride = col_stride * N;
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void FlipRot180(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  const int row_stride = num_channels * N;
   for (int j = 0; j < N; ++j) {
-    const auto* s = src + (N - 1) * row_stride + (N - 1 - j) * col_stride;
-    auto* d = dst + j * row_stride;
+    auto s = src + (N - 1) * row_stride + (N - 1 - j) * num_channels;
     for (int i = 0; i < N; ++i) {
-      memcpy(d, s, col_stride * sizeof(T));
-      d += col_stride;
+      dst = std::copy_n(s, num_channels, dst);
       s -= row_stride;
     }
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void FlipRot270(const T* src, T* dst) {
-  MG_CHECK(src != dst);
-  const int col_stride = num_channels;
-  const int row_stride = col_stride * N;
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void FlipRot270(SrcIt src, DstIt dst) {
+  MG_CHECK(dst != src);
+  const int row_stride = num_channels * N;
   for (int j = 0; j < N; ++j) {
-    const auto* s = src + j * row_stride + (N - 1) * col_stride;
-    auto* d = dst + j * row_stride;
+    auto s = src + j * row_stride + (N - 1) * num_channels;
     for (int i = 0; i < N; ++i) {
-      memcpy(d, s, col_stride * sizeof(T));
-      d += col_stride;
-      s -= col_stride;
+      dst = std::copy_n(s, num_channels, dst);
+      s -= num_channels;
     }
   }
 }
 
-template <typename T, int N, int num_channels>
-inline void ApplySymmetry(Symmetry sym, const T* src, T* dst) {
+template <int N, int num_channels, typename SrcIt, typename DstIt>
+inline void ApplySymmetry(Symmetry sym, SrcIt src, DstIt dst) {
   switch (sym) {
     case kIdentity:
-      Identity<T, N, num_channels>(src, dst);
+      Identity<N, num_channels>(src, dst);
       break;
     case Symmetry::kRot90:
-      Rot90<T, N, num_channels>(src, dst);
+      Rot90<N, num_channels>(src, dst);
       break;
     case Symmetry::kRot180:
-      Rot180<T, N, num_channels>(src, dst);
+      Rot180<N, num_channels>(src, dst);
       break;
     case Symmetry::kRot270:
-      Rot270<T, N, num_channels>(src, dst);
+      Rot270<N, num_channels>(src, dst);
       break;
     case Symmetry::kFlip:
-      Flip<T, N, num_channels>(src, dst);
+      Flip<N, num_channels>(src, dst);
       break;
     case Symmetry::kFlipRot90:
-      FlipRot90<T, N, num_channels>(src, dst);
+      FlipRot90<N, num_channels>(src, dst);
       break;
     case Symmetry::kFlipRot180:
-      FlipRot180<T, N, num_channels>(src, dst);
+      FlipRot180<N, num_channels>(src, dst);
       break;
     case Symmetry::kFlipRot270:
-      FlipRot270<T, N, num_channels>(src, dst);
+      FlipRot270<N, num_channels>(src, dst);
       break;
     default:
       MG_FATAL() << static_cast<int>(sym);
       break;
   }
 }
+
+template <int N, int num_channels, typename T>
+class NchwOutputIterator {
+ public:
+  using difference_type = std::ptrdiff_t;
+  using value_type = T;
+  using reference = T&;
+  using pointer = T*;
+  using iterator_category = std::output_iterator_tag;
+
+  NchwOutputIterator(T* features) : ptr_(features), offset_(0) {}
+
+  NchwOutputIterator& operator++() {
+    offset_ += N * N;
+    if (offset_ >= N * N * num_channels) {
+      offset_ -= N * N * num_channels - 1;
+    }
+    return *this;
+  }
+
+  reference operator*() const { return ptr_[offset_]; }
+
+  bool operator!=(const T* ptr) { return ptr != ptr_ + offset_; }
+
+ private:
+  T* ptr_;
+  size_t offset_;
+};
 
 }  // namespace symmetry
 }  // namespace minigo

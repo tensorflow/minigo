@@ -43,16 +43,24 @@ http_archive(
 )
 
 load("@com_github_googlecloudplatform_google_cloud_cpp//bazel:google_cloud_cpp_deps.bzl", "google_cloud_cpp_deps")
+
 google_cloud_cpp_deps()
 
 # Have to manually call the corresponding function for gRPC:
 #   https://github.com/bazelbuild/bazel/issues/1550
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+
 grpc_deps()
 
 load("@org_pubref_rules_protobuf//cpp:rules.bzl", "cpp_proto_repositories")
 load("@org_pubref_rules_protobuf//python:rules.bzl", "py_proto_repositories")
+load("//cc:cuda_configure.bzl", "cuda_configure")
+load("//cc:tensorrt_configure.bzl", "tensorrt_configure")
 
 cpp_proto_repositories()
 
 py_proto_repositories()
+
+cuda_configure(name = "local_config_cuda")
+
+tensorrt_configure(name = "local_config_tensorrt")

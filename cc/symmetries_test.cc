@@ -43,7 +43,7 @@ TEST(SymmetriesTest, TestRot90_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Rot90<float, 4, 1>(original.data(), actual.data());
+  Rot90<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -64,12 +64,12 @@ TEST(SymmetriesTest, TestRot180_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Rot180<float, 4, 1>(original.data(), actual.data());
+  Rot180<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Rot90<float, 4, 1>(original.data(), tmp.data());
-  Rot90<float, 4, 1>(tmp.data(), actual.data());
+  Rot90<4, 1>(original.data(), tmp.data());
+  Rot90<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -90,13 +90,13 @@ TEST(SymmetriesTest, TestRot270_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Rot270<float, 4, 1>(original.data(), actual.data());
+  Rot270<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp1, tmp2;
-  Rot90<float, 4, 1>(original.data(), tmp1.data());
-  Rot90<float, 4, 1>(tmp1.data(), tmp2.data());
-  Rot90<float, 4, 1>(tmp2.data(), actual.data());
+  Rot90<4, 1>(original.data(), tmp1.data());
+  Rot90<4, 1>(tmp1.data(), tmp2.data());
+  Rot90<4, 1>(tmp2.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -117,7 +117,7 @@ TEST(SymmetriesTest, TestFlip_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Flip<float, 4, 1>(original.data(), actual.data());
+  Flip<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -138,12 +138,12 @@ TEST(SymmetriesTest, TestFlipRot90_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  FlipRot90<float, 4, 1>(original.data(), actual.data());
+  FlipRot90<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Flip<float, 4, 1>(original.data(), tmp.data());
-  Rot90<float, 4, 1>(tmp.data(), actual.data());
+  Flip<4, 1>(original.data(), tmp.data());
+  Rot90<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -164,12 +164,12 @@ TEST(SymmetriesTest, TestFlipRot180_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  FlipRot180<float, 4, 1>(original.data(), actual.data());
+  FlipRot180<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Flip<float, 4, 1>(original.data(), tmp.data());
-  Rot180<float, 4, 1>(tmp.data(), actual.data());
+  Flip<4, 1>(original.data(), tmp.data());
+  Rot180<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -190,12 +190,12 @@ TEST(SymmetriesTest, TestFlipRot270_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  FlipRot270<float, 4, 1>(original.data(), actual.data());
+  FlipRot270<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Flip<float, 4, 1>(original.data(), tmp.data());
-  Rot270<float, 4, 1>(tmp.data(), actual.data());
+  Flip<4, 1>(original.data(), tmp.data());
+  Rot270<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -216,7 +216,7 @@ TEST(SymmetriesTest, TestRot90_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Rot90<float, 4, 3>(original.data(), actual.data());
+  Rot90<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -237,12 +237,12 @@ TEST(SymmetriesTest, TestRot180_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Rot180<float, 4, 3>(original.data(), actual.data());
+  Rot180<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Rot90<float, 4, 3>(original.data(), tmp.data());
-  Rot90<float, 4, 3>(tmp.data(), actual.data());
+  Rot90<4, 3>(original.data(), tmp.data());
+  Rot90<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -263,13 +263,13 @@ TEST(SymmetriesTest, TestRot270_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Rot270<float, 4, 3>(original.data(), actual.data());
+  Rot270<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp1, tmp2;
-  Rot90<float, 4, 3>(original.data(), tmp1.data());
-  Rot90<float, 4, 3>(tmp1.data(), tmp2.data());
-  Rot90<float, 4, 3>(tmp2.data(), actual.data());
+  Rot90<4, 3>(original.data(), tmp1.data());
+  Rot90<4, 3>(tmp1.data(), tmp2.data());
+  Rot90<4, 3>(tmp2.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -290,7 +290,7 @@ TEST(SymmetriesTest, TestFlip_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Flip<float, 4, 3>(original.data(), actual.data());
+  Flip<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -311,12 +311,12 @@ TEST(SymmetriesTest, TestFlipRot90_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  FlipRot90<float, 4, 3>(original.data(), actual.data());
+  FlipRot90<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Flip<float, 4, 3>(original.data(), tmp.data());
-  Rot90<float, 4, 3>(tmp.data(), actual.data());
+  Flip<4, 3>(original.data(), tmp.data());
+  Rot90<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -337,12 +337,12 @@ TEST(SymmetriesTest, TestFlipRot180_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  FlipRot180<float, 4, 3>(original.data(), actual.data());
+  FlipRot180<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Flip<float, 4, 3>(original.data(), tmp.data());
-  Rot180<float, 4, 3>(tmp.data(), actual.data());
+  Flip<4, 3>(original.data(), tmp.data());
+  Rot180<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -363,12 +363,12 @@ TEST(SymmetriesTest, TestFlipRot270_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  FlipRot270<float, 4, 3>(original.data(), actual.data());
+  FlipRot270<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Flip<float, 4, 3>(original.data(), tmp.data());
-  Rot270<float, 4, 3>(tmp.data(), actual.data());
+  Flip<4, 3>(original.data(), tmp.data());
+  Rot270<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -385,11 +385,35 @@ TEST(SymmetriesTest, Inverses) {
 
     Symmetry sym = static_cast<Symmetry>(i);
     std::array<float, 48> transformed, inverse;
-    ApplySymmetry<float, 4, 3>(sym, original.data(), transformed.data());
-    ApplySymmetry<float, 4, 3>(Inverse(sym), transformed.data(),
-                               inverse.data());
+    ApplySymmetry<4, 3>(sym, original.data(), transformed.data());
+    ApplySymmetry<4, 3>(Inverse(sym), transformed.data(), inverse.data());
 
     EXPECT_THAT(inverse, ElementsAreArray(original));
+  }
+}
+
+TEST(SymmetriesTest, NchwOutput) {
+  for (int i = 0; i < kNumSymmetries; ++i) {
+    // clang-format off
+    std::array<float, 48> original = {
+        11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
+        51,  52,  53,   61,  62,  63,   71,  72,  73,   81,  82,  83,
+        91,  92,  93,  101, 102, 103,  111, 112, 113,  121, 122, 123,
+        131, 132, 133,  141, 142, 143,  151, 152, 153,  161, 162, 163,
+    };
+    // clang-format on
+
+    Symmetry sym = static_cast<Symmetry>(i);
+    std::array<float, 48> nhwc_output, nchw_output;
+    ApplySymmetry<4, 3>(sym, original.data(), nhwc_output.data());
+    using OutIter = NchwOutputIterator<4, 3, float>;
+    ApplySymmetry<4, 3>(sym, original.data(), OutIter(nchw_output.data()));
+
+    for (int c = 0; c < 3; ++c) {
+      for (int j = 0; j < 16; ++j) {
+        EXPECT_EQ(nchw_output[c * 16 + j], nhwc_output[j * 3 + c]);
+      }
+    }
   }
 }
 

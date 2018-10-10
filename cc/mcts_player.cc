@@ -348,8 +348,16 @@ void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves) {
     leaves[i]->GetMoveHistory(DualNet::kMoveHistory, &recent_positions_);
     DualNet::SetFeatures(recent_positions_, leaves[i]->position.to_play(),
                          &raw_features);
-    symmetry::ApplySymmetry<float, kN, DualNet::kNumStoneFeatures>(
-        symmetries_used_[i], raw_features.data(), features_[i].data());
+    if (network_->GetInputLayout() == DualNet::InputLayout::kNCHW) {
+      using OutIter =
+          symmetry::NchwOutputIterator<kN, DualNet::kNumStoneFeatures, float>;
+      symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
+          symmetries_used_[i], raw_features.data(),
+          OutIter(features_[i].data()));
+    } else {
+      symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
+          symmetries_used_[i], raw_features.data(), features_[i].data());
+    }
   }
 
   std::vector<const DualNet::BoardFeatures*> feature_ptrs;
@@ -383,9 +391,8 @@ void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves) {
   for (size_t i = 0; i < leaves.size(); ++i) {
     MctsNode* leaf = leaves[i];
     const auto& output = outputs_[i];
-    symmetry::ApplySymmetry<float, kN, 1>(
-        symmetry::Inverse(symmetries_used_[i]), output.policy.data(),
-        raw_policy.data());
+    symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(symmetries_used_[i]),
+                                   output.policy.data(), raw_policy.data());
     raw_policy[Coord::kPass] = output.policy[Coord::kPass];
     leaf->IncorporateResults(raw_policy, output.value, root_);
   }
