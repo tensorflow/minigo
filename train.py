@@ -39,6 +39,10 @@ flags.DEFINE_integer('steps_to_train', None,
 flags.DEFINE_string('export_path', None,
                     'Where to export the model after training.')
 
+flags.DEFINE_bool('use_bt', False,
+                  'Whether to use Bigtable as input.  '
+                  '(Only supported with --use_tpu, currently.)')
+
 # From dual_net.py
 flags.declare_key_flag('work_dir')
 flags.declare_key_flag('train_batch_size')
@@ -114,11 +118,17 @@ def train(*tf_records: "Records to train on"):
         effective_batch_size *= FLAGS.num_tpu_cores
 
     if FLAGS.use_tpu:
-        def _input_fn(params):
-            return preprocessing.get_tpu_input_tensors(
-                params['batch_size'],
-                tf_records,
-                random_rotation=True)
+        if FLAGS.use_bt:
+            def _input_fn(params):
+                return preprocessing.get_tpu_bt_input_tensors(
+                    params['batch_size'],
+                    random_rotation=True)
+        else:
+            def _input_fn(params):
+                return preprocessing.get_tpu_input_tensors(
+                    params['batch_size'],
+                    tf_records,
+                    random_rotation=True)
         # Hooks are broken with TPUestimator at the moment.
         hooks = []
     else:
