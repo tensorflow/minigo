@@ -146,6 +146,7 @@ class TrtDualNet : public DualNet {
     parser->registerOutput("policy_output");
     parser->registerOutput("value_output");
 
+    cudaSetDevice(0);
     auto* builder = nvinfer1::createInferBuilder(logger_);
     auto* network = builder->createNetwork();
 
@@ -170,7 +171,6 @@ class TrtDualNet : public DualNet {
     // If all GPUs support fast fp16 math, enable it.
     builder->setFp16Mode(enable_fp16_mode);
 
-    cudaSetDevice(0);
     auto* engine = [&] {
       // Building TensorRT engines is not thread-safe.
       static absl::Mutex mutex;
