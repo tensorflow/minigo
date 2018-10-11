@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -66,6 +67,8 @@ DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed. "
               "This seed is used to control the moves played, not whether a "
               "game has resignation disabled or is a holdout.");
+DEFINE_bool(even, false,
+            "In eval mode, whether the models should play black in turn.");
 
 // Tree search flags.
 DEFINE_int32(num_readouts, 100,
@@ -465,46 +468,232 @@ class SelfPlayer {
   uint64_t flags_timestamp_ = 0;
 };
 
+class Evaluator {
+  class Barrier {
+   public:
+    explicit Barrier(size_t count)
+        : count_(count), num_waiting_(0), generation_(0) {}
+
+    void Wait() {
+      absl::MutexLock lock(&mutex_);
+      if (++num_waiting_ == count_) {
+        IncrementGeneration();
+      } else {
+        auto generation = generation_;
+        while (generation != generation_) {
+          cond_var_.Wait(&mutex_);
+        }
+      }
+    }
+
+    void DecrementCount() {
+      absl::MutexLock lock(&mutex_);
+      if (num_waiting_ == --count_) {
+        IncrementGeneration();
+      }
+    }
+
+   private:
+    void IncrementGeneration() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+      ++generation_;
+      num_waiting_ = 0;
+      cond_var_.SignalAll();
+    }
+
+    absl::Mutex mutex_;
+    absl::CondVar cond_var_;
+    size_t count_ GUARDED_BY(&mutex_);
+    size_t num_waiting_ GUARDED_BY(&mutex_);
+    size_t generation_ GUARDED_BY(&mutex_);
+  };
+
+  class WrappedDualNet : public DualNet {
+   public:
+    explicit WrappedDualNet(const std::unique_ptr<DualNet>& dual_net)
+        : dual_net_(dual_net) {}
+
+   private:
+    void RunMany(std::vector<const BoardFeatures*> features,
+                 std::vector<Output*> outputs, std::string* model) override {
+      dual_net_->RunMany(std::move(features), std::move(outputs), model);
+    };
+
+    const std::unique_ptr<DualNet>& dual_net_;
+  };
+
+  struct Model {
+    std::string name;
+    std::unique_ptr<DualNetFactory> factory;
+    std::atomic<int> black_wins;
+    std::atomic<int> white_wins;
+  };
+
+ public:
+  void Run() {
+    auto start_time = absl::Now();
+
+    auto create_model = [](const std::string& model_path) {
+      auto model = absl::make_unique<Model>();
+      model->name = static_cast<std::string>(file::Stem(model_path));
+      model->factory = NewDualNetFactory(model_path);
+      model->black_wins = 0;
+      model->white_wins = 0;
+      return model;
+    };
+
+    auto prev_model = create_model(FLAGS_model);
+    auto cur_model = create_model(FLAGS_model_two);
+
+    std::cerr << "DualNet factories created from " << FLAGS_model << "\n  and "
+              << FLAGS_model_two << " in "
+              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
+              << std::endl;
+
+    ParseMctsPlayerOptionsFromFlags(&options_);
+    options_.inject_noise = false;
+    options_.soft_pick = false;
+    options_.random_symmetry = true;
+
+    int num_games = FLAGS_parallel_games;
+    barrier_ = absl::make_unique<Barrier>(num_games);
+
+    for (int i = 0; i < num_games;) {
+      threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, i,
+                                      cur_model.get(), prev_model.get()));
+      ++i;
+      if (FLAGS_even && i < num_games) {
+        threads_.emplace_back([&, i] {
+          // Wait for the other games to play the first move.
+          barrier_->Wait();
+          ThreadRun(i, prev_model.get(), cur_model.get());
+        });
+        ++i;
+      }
+    }
+
+    for (auto& t : threads_) {
+      t.join();
+    }
+
+    std::cerr << "Evaluated " << num_games << " games, total time "
+              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
+              << std::endl;
+
+    auto print_name = [](std::string name) {
+      if (name.size() > 20) {
+        name.resize(17);
+        name.append("...");
+      } else {
+        name.append(20 - name.size(), ' ');
+      }
+      std::cerr << name;
+    };
+    auto print_wins = [&](int wins) {
+      std::cerr << "   " << std::setw(3) << wins << " " << std::setw(6)
+                << wins * 100.0f / num_games << "%";
+    };
+    auto print_result = [&](const Model& model) {
+      print_name(model.name);
+      print_wins(model.black_wins + model.white_wins);
+      print_wins(model.black_wins);
+      print_wins(model.white_wins);
+      std::cerr << std::endl;
+    };
+
+    std::cerr << "wins                        total         black         white"
+              << std::endl
+              << std::fixed << std::setprecision(2);
+    print_result(*prev_model);
+    print_result(*cur_model);
+    std::cerr << "                                  ";
+    print_wins(prev_model->black_wins + cur_model->black_wins);
+    print_wins(prev_model->white_wins + cur_model->white_wins);
+    std::cerr << std::endl;
+  }
+
+ private:
+  void ThreadRun(int thread_id, Model* model, Model* other_model) {
+    // The player and other_player reference this pointer.
+    std::unique_ptr<DualNet> dual_net;
+
+    auto player_options = options_;
+    // If an random seed was explicitly specified, make sure we use a
+    // different seed for each thread.
+    if (player_options.random_seed != 0) {
+      player_options.random_seed += 1299283 * thread_id;
+    }
+
+    player_options.verbose = thread_id == 0;
+    player_options.name = model->name;
+    auto player = absl::make_unique<MctsPlayer>(
+        absl::make_unique<WrappedDualNet>(dual_net), player_options);
+
+    player_options.verbose = false;
+    player_options.name = other_model->name;
+    auto other_player = absl::make_unique<MctsPlayer>(
+        absl::make_unique<WrappedDualNet>(dual_net), player_options);
+
+    auto* black = player.get();
+    auto* white = other_player.get();
+
+    auto* factory = model->factory.get();
+    auto* other_factory = other_model->factory.get();
+
+    while (!player->game_over()) {
+      dual_net = factory->New();
+      barrier_->Wait();  // Wait for all threads to create DualNet.
+      auto move = player->SuggestMove();
+      dual_net.reset();
+      if (player->options().verbose) {
+        std::cerr << player->root()->Describe() << "\n";
+      }
+      player->PlayMove(move);
+      other_player->PlayMove(move);
+      if (player->options().verbose) {
+        std::cerr << player->root()->position.ToPrettyString();
+      }
+      std::swap(factory, other_factory);
+      std::swap(player, other_player);
+    }
+    barrier_->DecrementCount();
+
+    MG_CHECK(player->result() == other_player->result());
+    if (player->result() > 0) {
+      ++model->black_wins;
+    }
+    if (player->result() < 0) {
+      ++other_model->white_wins;
+    }
+
+    if (black->options().verbose) {
+      std::cerr << black->result_string() << "\n";
+      std::cerr << "Black was: " << black->name() << "\n";
+    }
+
+    // Write SGF.
+    if (!FLAGS_sgf_dir.empty()) {
+      std::string output_name =
+          absl::StrCat(GetOutputName(absl::Now(), thread_id), "-",
+                       black->name(), "-", white->name());
+      WriteSgf(FLAGS_sgf_dir, output_name, *black, *white, true);
+    }
+
+    std::cerr << "Thread " << thread_id << " stopping" << std::endl;
+  }
+
+  MctsPlayer::Options options_;
+  std::unique_ptr<Barrier> barrier_;
+  std::vector<std::thread> threads_;
+};
+
 void SelfPlay() {
   SelfPlayer player;
   player.Run();
 }
 
 void Eval() {
-  MctsPlayer::Options options;
-  ParseMctsPlayerOptionsFromFlags(&options);
-  options.inject_noise = false;
-  options.soft_pick = false;
-  options.random_symmetry = true;
-
-  options.name = std::string(file::Stem(FLAGS_model));
-  auto black_factory = NewDualNetFactory(FLAGS_model);
-  auto black = absl::make_unique<MctsPlayer>(black_factory->New(), options);
-
-  options.name = std::string(file::Stem(FLAGS_model_two));
-  auto white_factory = NewDualNetFactory(FLAGS_model_two);
-  auto white = absl::make_unique<MctsPlayer>(white_factory->New(), options);
-
-  auto* player = black.get();
-  auto* other_player = white.get();
-  while (!player->game_over()) {
-    auto move = player->SuggestMove();
-    std::cerr << player->root()->Describe() << "\n";
-    player->PlayMove(move);
-    other_player->PlayMove(move);
-    std::cerr << player->root()->position.ToPrettyString();
-    std::swap(player, other_player);
-  }
-  std::cerr << player->result_string() << "\n";
-  std::cerr << "Black was: " << black->name() << "\n";
-
-  std::string output_name = absl::StrCat(GetOutputName(absl::Now(), 0), "-",
-                                         black->name(), "-", white->name());
-
-  // Write SGF.
-  if (!FLAGS_sgf_dir.empty()) {
-    WriteSgf(FLAGS_sgf_dir, output_name, *black, *white, true);
-  }
+  Evaluator evaluator;
+  evaluator.Run();
 }
 
 void Gtp() {
