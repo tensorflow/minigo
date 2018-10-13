@@ -27,6 +27,7 @@ flags.DEFINE_enum('mode', None, ['cc', 'tpu'],
 
 FLAGS = flags.FLAGS
 
+
 def run_cc():
     _, model_name = fsdb.get_latest_model()
     num_games_finished = len(fsdb.get_games(model_name))
@@ -49,11 +50,12 @@ def run_cc():
             fsdb.sgf_dir(), model_name),
         '--flagfile=rl_loop/distributed_flags'])
 
+
 def run_tpu():
     mask_flags.checked_run([
         'bazel-bin/cc/main',
         '--mode=selfplay',
-        '--engine=remote',
+        '--engine=tpu',
         '--checkpoint_dir={}'.format(fsdb.working_dir()),
         '--output_dir={}'.format(fsdb.selfplay_dir()),
         '--holdout_dir={}'.format(fsdb.holdout_dir()),
@@ -62,12 +64,14 @@ def run_tpu():
         '--run_forever=true',
         '--flagfile=rl_loop/distributed_flags'])
 
+
 def main(unused_argv):
     flags.mark_flags_as_required(['bucket_name', 'mode'])
     if FLAGS.mode == 'cc':
         run_cc()
     elif FLAGS.mode == 'tpu':
         run_tpu()
+
 
 if __name__ == '__main__':
     app.run(main)

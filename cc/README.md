@@ -105,20 +105,14 @@ C++ Minigo currently supports three separate engines for performing inference:
 
  - tf: peforms inference using the TensorFlow libraries built by
    `cc/configure_tensorflow.sh`.
- - remote: launches a Python subprocess that performs inference using the
-   version of TensorFlow installed on the system. The paths to TensorFlow and
-   the Python binary are resolved normally, so the ones from your virtual
-   environment will be used if you have one. The remote inference engine is
-   required for running Minigo on Cloud TPU.
  - lite: performs inference using TensorFlow Lite, which runs in software on
    the CPU.
 
 The Compilation and linking of these engines into the `//cc:main` binary is
-controlled by the Bazel defines `--define=tf=<0,1>`, `--define=remote=<0,1>`
-and `--define=lite=<0,1>`.
+controlled by the Bazel defines `--define=tf=<0,1>` and `--define=lite=<0,1>`.
 
 The choice of which engine to use is controlled by the command line argument
-`--engine=<tf,remote,lite>`.
+`--engine=<tf,lite>`.
 
 ## TensorFlow Lite
 
@@ -141,11 +135,10 @@ BATCH_SIZE=8
 ```
 
 You will also need to build the `//cc:main` target with TensorFlow Lite
-support (optionally disabling the TensorFlow and remote inference engines
-as shown below):
+support (optionally disabling the TensorFlow inference engine as shown below):
 
 ```
-bazel build -c opt --define=tf=0 --define=remote=0 --define=lite=1 cc:main
+bazel build -c opt --define=tf=0 --define=lite=1 cc:main
 ```
 
 
@@ -155,57 +148,3 @@ The C++ code follows
 [Google's C++ style guide](https://github.com/google/styleguide)
 and we use cpplint to delint.
 
-## Remote inference
-
-The C++ runtime supports running inference remotely on a separate process,
-potentially on a different machine: one process performs tree search and the
-other performs inference. Communication between the two processes is performed
-via [gRPC](https://grpc.io/).
-
-In this configuration, the tree search C++ code starts up a gRPC server with
-two important methods:
-
- * `GetFeatures`: called by the inference worker process to get the next batch
-    of input features to run inference on.
- * `PutOutputs`: called by the inference worker process at the end of inference
-    to send the `policy_output` and `value_output` outputs back to the tree
-    search process.
-
-The gRPC server (InferenceServer) and the tree search code run in the same
-process and communicate via an InferenceClient. Where the tree search code would
-normally perform inference directly, it instead uses the InferenceClient to pass
-an inference request to the InferenceServer via a queue. The InferenceClient
-then waits for the InferenceServer to pass the request on to the InferenceWorker
-and get the results back. The InferenceClient has a blocking API, so all of
-these details are hidden from the tree search code.
-
-```
-   +-----------------+
-   | InferenceWorker |
-   |    (TF model)   |
-   +-----------------+
-            |
-           RPC
-            |
-            v
-   +-----------------+
-   | InferenceServer |
-   |  (gRPC server)  |
-   +-----------------+
-            ^
-            |
-       request_queue
-            |
-   +-----------------+
-   | InferenceClient |
-   |  (tree search)  |
-   +-----------------+
-```
-
-The inference worker process is implemented by inference\_worker.py. It wraps
-the inference model in a TensorFlow loop that iterates indefinitely. RPC and
-DecodeProto operations are inserted at the top of the loop to fetch the input
-features from the tree search process. EncodeProto and RPC operations are
-inserted at the bottom of the loop to send the inference results back. This
-keeps all execution of the InferenceWorker inside TensorFlow for optimal
-performance.

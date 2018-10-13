@@ -105,9 +105,10 @@ DEFINE_bool(run_forever, false,
 
 // Inference flags.
 DEFINE_string(model, "",
-              "Path to a minigo model. If engine!=remote, the model "
-              "should be a serialized GraphDef proto. If "
-              "engine=remote, the model should be saved checkpoint.");
+              "Path to a minigo model. The format of the model depends on the "
+              "inferece engine. For engine=tf, the model should be a GraphDef "
+              "proto. For engine=lite, the model should be .tflite "
+              "flatbuffer.");
 DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
@@ -352,9 +353,7 @@ class SelfPlayer {
         auto old_model = FLAGS_model;
         MaybeReloadFlags();
         MG_CHECK(old_model == FLAGS_model)
-            << "Manually changing the model during selfplay is not supported. "
-               "Use --checkpoint_dir and --engine=remote to perform inference "
-               "using the most recent checkpoint from training.";
+            << "Manually changing the model during selfplay is not supported.";
         game_options.Init(thread_id, &rnd_);
         player = absl::make_unique<MctsPlayer>(dual_net_factory_->New(),
                                                game_options.player_options);

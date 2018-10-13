@@ -34,5 +34,5 @@ RUN pip3 install "tensorflow==1.11.0"
 ADD staging/ /app
 WORKDIR /app
 
-RUN bazel build -c opt --define=board_size=19 --define=remote=1 cc/main --define=tf=1
+RUN bazel build -c opt --define=board_size=19 cc/main --define=tf=1 --define=tpu=1
 CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=tpu"]

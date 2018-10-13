@@ -20,13 +20,6 @@
 #include "cc/dual_net/batching_dual_net.h"
 #include "gflags/gflags.h"
 
-#ifdef MG_ENABLE_REMOTE_DUAL_NET
-#include "cc/dual_net/inference_server.h"
-#ifndef MG_DEFAULT_ENGINE
-#define MG_DEFAULT_ENGINE "remote"
-#endif  // MG_DEFAULT_ENGINE
-#endif  // MG_ENABLE_REMOTE_DUAL_NET
-
 #ifdef MG_ENABLE_TF_DUAL_NET
 #include "cc/dual_net/tf_dual_net.h"
 #ifndef MG_DEFAULT_ENGINE
@@ -50,9 +43,6 @@
 
 DEFINE_string(engine, MG_DEFAULT_ENGINE,
               "The inference engine to use. Accepted values:"
-#ifdef MG_ENABLE_REMOTE_DUAL_NET
-              " \"remote\""
-#endif
 #ifdef MG_ENABLE_TF_DUAL_NET
               " \"tf\""
 #endif
@@ -68,14 +58,6 @@ namespace minigo {
 namespace {
 
 std::unique_ptr<DualNet> NewDualNet(const std::string& graph_path) {
-  if (FLAGS_engine == "remote") {
-#ifdef MG_ENABLE_REMOTE_DUAL_NET
-    return NewInferenceServer(graph_path);
-#else
-    MG_FATAL() << "Binary wasn't compiled with remote inference support";
-#endif  // MG_ENABLE_REMOTE_DUAL_NET
-  }
-
   if (FLAGS_engine == "tf") {
 #ifdef MG_ENABLE_TF_DUAL_NET
     return NewTfDualNet(graph_path);
