@@ -60,17 +60,20 @@ class CheckFailStream {
 
 }  // namespace internal
 
-#define MG_CHECK(cond) \
-  (cond) ? 0 : true & internal::CheckFailStream(#cond, __FILE__, __LINE__)
+}  // namespace minigo
 
-#define MG_FATAL() internal::CheckFailStream("FATAL", __FILE__, __LINE__)
+#define MG_CHECK(cond) \
+  (cond)               \
+      ? 0              \
+      : true & ::minigo::internal::CheckFailStream(#cond, __FILE__, __LINE__)
+
+#define MG_FATAL() \
+  ::minigo::internal::CheckFailStream("FATAL", __FILE__, __LINE__)
 
 #ifndef NDEBUG
 #define MG_DCHECK MG_CHECK
 #else
 #define MG_DCHECK(cond) MG_CHECK(true)
 #endif
-
-}  // namespace minigo
 
 #endif  // CC_CHECK_H_
