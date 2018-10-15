@@ -97,7 +97,9 @@ function create_cbt_table() {
                                                 ${CBT_INSTANCE}-c ${CBT_ZONE} 3 SSD && \
          cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createtable ${CBT_TABLE} && \
          cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} tfexample && \
-         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} metadata ); then
+         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${CBT_TABLE} tfexample maxversions=1 &&
+         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} metadata && \
+         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${CBT_TABLE} metadata maxversions=1 ); then
     echo "Could not create table ${CBT_TABLE} on instance ${CBT_INSTANCE} in project ${PROJECT}"
     return 1
   fi
