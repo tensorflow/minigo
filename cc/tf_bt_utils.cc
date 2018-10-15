@@ -29,6 +29,7 @@
 #include "tensorflow/core/lib/io/record_reader.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
+#include "tensorflow/core/platform/logging.h"
 
 using google::cloud::bigtable::bigendian64_t;
 using google::cloud::bigtable::CreateDefaultDataClient;
@@ -176,6 +177,10 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
   table.BulkApply(std::move(game_batch));
   auto finish_time = absl::Now();
   double elapsed = absl::ToDoubleSeconds(finish_time - start_time);
+  VLOG(2) << "Total changes: " << changes << " at " << changes / elapsed
+          << " changes/second";
+  VLOG(2) << "Total games: " << paths.size() << " at " << paths.size() / elapsed
+          << " games/second";
 }
 
 }  // namespace tf_utils
