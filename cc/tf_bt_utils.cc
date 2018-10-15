@@ -150,10 +150,15 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
 
     auto row_prefix = absl::StrFormat("g_%010d", game_counter);
 
+    // Transforms something like:
+    //     gs://minigo/data/play/2018-10-14-13/1539522000-8x7lb.tfrecord.zz
+    // into:
+    //     2018-10-14-13-1539522000-8x7lb
     auto game_id = path;
     game_id.erase(game_id.rfind(".tfrecord.zz"));
     game_id[game_id.rfind('/')] = '-';
     game_id.erase(0, game_id.rfind('/') + 1);
+
     auto zero_row = absl::StrFormat("%s_m_%06d", row_prefix, 0);
     google::cloud::bigtable::SingleRowMutation zero_row_mutation(zero_row);
     zero_row_mutation.emplace_back(SetCell("metadata", "game_id", game_id));
