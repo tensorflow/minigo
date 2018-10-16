@@ -16,7 +16,8 @@ load(
 cc_library(
     name = "tensorflow",
     srcs = [
-        "tensorflow/libtensorflow_cc.so",
+        "tensorflow/libgrpc_runtime.so",
+        # "tensorflow/libtensorflow_cc.so",
         "tensorflow/libtensorflow_framework.so",
     ],
     hdrs = glob(

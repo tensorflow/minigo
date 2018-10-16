@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
-
 #include "cc/dual_net/tpu_dual_net.h"
 
+#include <algorithm>
+#include <thread>
+
+#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
+#include "absl/time/clock.h"
 #include "cc/check.h"
 #include "cc/constants.h"
 #include "tensorflow/core/framework/graph.pb.h"
@@ -35,24 +38,8 @@ using tensorflow::TensorShape;
 
 namespace minigo {
 
-TpuDualNet::TpuDualNet(const std::string& graph_path,
-                       const std::string& tpu_name)
-    : graph_path_(graph_path) {
-  GraphDef graph_def;
-
-  // If we can't find the specified graph, try adding a .pb extension.
-  auto* env = Env::Default();
-  if (!env->FileExists(graph_path_).ok()) {
-    auto alt_path = absl::StrCat(graph_path_, ".pb");
-    if (env->FileExists(alt_path).ok()) {
-      std::cerr << graph_path << " doesn't exist, using " << alt_path
-                << std::endl;
-      graph_path_ = alt_path;
-    }
-  }
-
-  TF_CHECK_OK(ReadBinaryProto(env, graph_path_, &graph_def));
-
+TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
+                           const std::string& tpu_name, int max_batch_size) {
   SessionOptions options;
   options.target = tpu_name;
   options.config.set_allow_soft_placement(true);
@@ -60,61 +47,51 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
   session_.reset(NewSession(options));
   TF_CHECK_OK(session_->Create(graph_def));
 
-  std::cerr << "Initializing TPU" << std::endl;
-  TF_CHECK_OK(session_->Run({}, {}, {"ConfigureDistributedTPU"}, nullptr));
-
   // TODO(tommadams): automatically figure out the number of replicas from the
   // GraphDef.
   num_replicas_ = 8;
+
+  max_sub_batch_size_ = (max_batch_size + num_replicas_ - 1) / num_replicas_;
   for (int i = 0; i < num_replicas_; ++i) {
     inputs_.emplace_back(
-        absl::StrCat("pos_tensor_", i),
-        Tensor(DT_FLOAT, TensorShape({1, kN, kN, kNumStoneFeatures})));
-    output_names_.push_back(absl::StrCat("policy_output_", i));
-    output_names_.push_back(absl::StrCat("value_output_", i));
-  }
-
-  // Tensorflow lazily initializes the first time Session::Run is called, which
-  // can take hundreds of milliseconds. This intefers with time control, so
-  // explicitly run inference once during construction.
-  BoardFeatures features;
-  Output output;
-  RunMany({&features}, {&output}, nullptr);
-}
-
-TpuDualNet::~TpuDualNet() {
-  if (session_ != nullptr) {
-    std::cerr << "Shutting down TPU" << std::endl;
-    TF_CHECK_OK(session_->Run({}, {}, {"ShutdownDistributedTPU"}, nullptr));
-    std::cerr << "Closing session" << std::endl;
-    TF_CHECK_OK(session_->Close());
+        absl::StrCat("tpu_pos_tensor_", i),
+        Tensor(DT_FLOAT,
+               TensorShape({max_sub_batch_size_, kN, kN, kNumStoneFeatures})));
+    output_names_.push_back(absl::StrCat("tpu_policy_output_", i));
+    output_names_.push_back(absl::StrCat("tpu_value_output_", i));
   }
 }
 
-void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
-                         std::vector<Output*> outputs, std::string* model) {
-  MG_DCHECK(features.size() == outputs.size());
+TpuDualNet::Worker::~Worker() {
+  std::cerr << "Closing session" << std::endl;
+  TF_CHECK_OK(session_->Close());
+}
+
+void TpuDualNet::Worker::InitializeTpu() {
+  std::cerr << "Initializing TPU" << std::endl;
+  TF_CHECK_OK(session_->Run({}, {}, {"ConfigureDistributedTPU"}, nullptr));
+}
+
+void TpuDualNet::Worker::ShutdownTpu() {
+  std::cerr << "Shutting down TPU" << std::endl;
+  TF_CHECK_OK(session_->Run({}, {}, {"ShutdownDistributedTPU"}, nullptr));
+}
+
+void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
+                                 std::vector<Output*> outputs) {
+  MG_CHECK(features.size() == outputs.size());
 
   auto batch_size = static_cast<int>(features.size());
-  auto sub_batch_size =
-      std::max((batch_size + num_replicas_ - 1) / num_replicas_, 1);
+  auto sub_batch_size = (batch_size + num_replicas_ - 1) / num_replicas_;
+  MG_CHECK(sub_batch_size <= max_sub_batch_size_);
 
   // Split the input features across all replicas.
   for (int replica = 0; replica < num_replicas_; ++replica) {
-    auto& feature_tensor = inputs_[replica].second;
-
-    // All input tensors must have the same batch size.
-    if (feature_tensor.dim_size(0) != sub_batch_size) {
-      feature_tensor = Tensor(
-          DT_FLOAT, TensorShape({sub_batch_size, kN, kN, kNumStoneFeatures}));
-    }
-
     int begin = replica * sub_batch_size;
     int end = std::min(batch_size, (replica + 1) * sub_batch_size);
-    auto* feature_data = feature_tensor.flat<float>().data();
+    auto* data = inputs_[replica].second.flat<float>().data();
     for (int i = begin; i < end; ++i) {
-      feature_data =
-          std::copy(features[i]->begin(), features[i]->end(), feature_data);
+      data = std::copy(features[i]->begin(), features[i]->end(), data);
     }
   }
 
@@ -132,6 +109,67 @@ void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
            sizeof(outputs[i]->policy));
     outputs[i]->value = value_tensor.data()[j];
   }
+}
+
+TpuDualNet::TpuDualNet(const std::string& graph_path,
+                       const std::string& tpu_name, int buffering,
+                       int max_batch_size)
+    : graph_path_(graph_path) {
+  MG_CHECK(buffering >= 1);
+
+  // If we can't find the specified graph, try adding a .pb extension.
+  auto* env = Env::Default();
+  if (!env->FileExists(graph_path_).ok()) {
+    auto alt_path = absl::StrCat(graph_path_, ".pb");
+    if (env->FileExists(alt_path).ok()) {
+      std::cerr << graph_path << " doesn't exist, using " << alt_path
+                << std::endl;
+      graph_path_ = alt_path;
+    }
+  }
+  GraphDef graph_def;
+  TF_CHECK_OK(ReadBinaryProto(env, graph_path_, &graph_def));
+
+  for (int i = 0; i < buffering; ++i) {
+    workers_.Push(absl::make_unique<TpuDualNet::Worker>(graph_def, tpu_name,
+                                                        max_batch_size));
+  }
+
+  // Use one of the workers to initialize the TPU.
+  auto worker = workers_.Pop();
+  worker->InitializeTpu();
+  workers_.Push(std::move(worker));
+
+  // Run warm-up inferences on all sessions.
+  // Tensorflow lazily initializes the first time Session::Run is called,
+  // which can take hundreds of milliseconds. This intefers with time control,
+  // so explicitly run inference once during construction.
+  std::cerr << "Running warm-up inferences" << std::endl;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < buffering; ++i) {
+    threads.emplace_back([this]() {
+      BoardFeatures features;
+      Output output;
+      RunMany({&features}, {&output}, nullptr);
+    });
+  }
+  for (auto& t : threads) {
+    t.join();
+  }
+}
+
+TpuDualNet::~TpuDualNet() {
+  // Use one of the workers to shutdown the TPU.
+  auto worker = workers_.Pop();
+  worker->ShutdownTpu();
+  workers_.Push(std::move(worker));
+}
+
+void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
+                         std::vector<Output*> outputs, std::string* model) {
+  auto worker = workers_.Pop();
+  worker->RunMany(features, outputs);
+  workers_.Push(std::move(worker));
 
   if (model != nullptr) {
     *model = graph_path_;

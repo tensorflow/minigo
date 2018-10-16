@@ -32,6 +32,9 @@ factory_engine_copts = select({
     "//cc/config:enable_lite": ["-DMG_ENABLE_LITE_DUAL_NET"],
     "//conditions:default": [],
 }) + select({
+    "//cc/config:enable_tpu": ["-DMG_ENABLE_TPU_DUAL_NET"],
+    "//conditions:default": [],
+}) + select({
     "//cc/config:enable_trt": ["-DMG_ENABLE_TRT_DUAL_NET"],
     "//conditions:default": [],
 })
@@ -40,10 +43,10 @@ factory_engine_deps = select({
     "//cc/config:enable_tf": [":tf_dual_net"],
     "//conditions:default": [],
 }) + select({
-    "//cc/config:enable_tpu": [":tpu_dual_net"],
+    "//cc/config:enable_lite": [":lite_dual_net"],
     "//conditions:default": [],
 }) + select({
-    "//cc/config:enable_lite": [":lite_dual_net"],
+    "//cc/config:enable_tpu": [":tpu_dual_net"],
     "//conditions:default": [],
 }) + select({
     "//cc/config:enable_trt": [":trt_dual_net"],
@@ -124,7 +127,10 @@ minigo_cc_library(
         "//cc:base",
         "//cc:check",
         "//cc:tensorflow",
+        "//cc:thread_safe_queue",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
     ],
 )
 

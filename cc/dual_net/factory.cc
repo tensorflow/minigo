@@ -48,6 +48,10 @@
 #endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_TRT_DUAL_NET
 
+// Flags defined in main.cc.
+DECLARE_int32(virtual_losses);
+DECLARE_int32(parallel_games);
+
 // Inference engine flags.
 DEFINE_string(engine, MG_DEFAULT_ENGINE,
               "The inference engine to use. Accepted values:"
@@ -65,59 +69,60 @@ DEFINE_string(engine, MG_DEFAULT_ENGINE,
 #endif
 );
 
+// TPU flags.
+DEFINE_string(
+    tpu_name, "",
+    "Cloud TPU name to run inference on, e.g. \"grpc://10.240.2.10:8470\"");
+
 // Batching flags.
 // TODO(tommadams): Calculate batch_size from other arguments (virtual_lossess,
 // parallel_games, etc) instead of having an explicit flag.
 DEFINE_int32(batch_size, 256, "Inference batch size.");
 
 namespace minigo {
-namespace {
-
-std::unique_ptr<DualNet> NewDualNet(const std::string& graph_path) {
-  if (FLAGS_engine == "tf") {
-#ifdef MG_ENABLE_TF_DUAL_NET
-    return NewTfDualNet(graph_path);
-#else
-    MG_FATAL() << "Binary wasn't compiled with tf inference support";
-#endif  // MG_ENABLE_TF_DUAL_NET
-  }
-
-  if (FLAGS_engine == "lite") {
-#ifdef MG_ENABLE_LITE_DUAL_NET
-    return NewLiteDualNet(graph_path);
-#else
-    MG_FATAL() << "Binary wasn't compiled with lite inference support";
-#endif  // MG_ENABLE_LITE_DUAL_NET
-  }
-
-  if (FLAGS_engine == "tpu") {
-#ifdef MG_ENABLE_TPU_DUAL_NET
-    return NewTpuDualNet(graph_path);
-#else
-    MG_FATAL() << "Binary wasn't compiled with TPU inference support";
-#endif  // MG_ENABLE_TPU_DUAL_NET
-  }
-
-  if (FLAGS_engine == "trt") {
-#ifdef MG_ENABLE_TRT_DUAL_NET
-    return NewTrtDualNet(graph_path, FLAGS_batch_size);
-#else
-    MG_FATAL() << "Binary wasn't compiled with TensorRT inference support";
-#endif  // MG_ENABLE_TRT_DUAL_NET
-  }
-
-  MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
-  return nullptr;
-}
-
-}  // namespace
 
 DualNetFactory::~DualNetFactory() = default;
 
 std::unique_ptr<DualNetFactory> NewDualNetFactory(
     const std::string& model_path) {
-  return NewBatchingFactory(NewDualNet(model_path),
-                            static_cast<size_t>(FLAGS_batch_size));
+  std::unique_ptr<DualNet> dual_net;
+  int batch_size = FLAGS_batch_size;
+
+#ifdef MG_ENABLE_TF_DUAL_NET
+  if (FLAGS_engine == "tf") {
+    dual_net = NewTfDualNet(model_path);
+  }
+#endif  // MG_ENABLE_TF_DUAL_NET
+
+#ifdef MG_ENABLE_LITE_DUAL_NET
+  if (FLAGS_engine == "lite") {
+    dual_net = NewLiteDualNet(model_path);
+  }
+#endif  // MG_ENABLE_LITE_DUAL_NET
+
+#ifdef MG_ENABLE_TPU_DUAL_NET
+  if (FLAGS_engine == "tpu") {
+    int inferences = FLAGS_virtual_losses * FLAGS_parallel_games;
+    int buffering = FLAGS_parallel_games == 1 ? 1 : 2;
+    MG_CHECK(inferences % buffering == 0);
+    batch_size = inferences / buffering;
+    dual_net = absl::make_unique<TpuDualNet>(model_path, FLAGS_tpu_name,
+                                             buffering, batch_size);
+  }
+#endif  // MG_ENABLE_TPU_DUAL_NET
+
+#ifdef MG_ENABLE_TRT_DUAL_NET
+  if (FLAGS_engine == "trt") {
+    dual_net = NewTrtDualNet(model_path, FLAGS_batch_size);
+  }
+#endif  // MG_ENABLE_TRT_DUAL_NET
+
+  if (dual_net == nullptr) {
+    MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
+  }
+
+  return NewBatchingFactory(std::move(dual_net),
+                            static_cast<size_t>(batch_size));
 }
 
 }  // namespace minigo
