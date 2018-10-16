@@ -125,7 +125,6 @@ minigo_cc_library(
         "//cc:check",
         "//cc:tensorflow",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -143,7 +142,6 @@ minigo_cc_library(
         "//cc:thread_safe_queue",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:span",
     ],
 )
 
