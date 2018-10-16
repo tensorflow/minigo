@@ -116,6 +116,13 @@ Running unit tests
 ./test.sh
 ```
 
+To run individual modules
+
+```
+BOARD_SIZE=9 python3 tests/run_tests.py test_go
+BOARD_SIZE=19 python3 tests/run_tests.py test_mcts
+```
+
 Automated Tests
 ----------------
 

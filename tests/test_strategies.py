@@ -125,7 +125,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
 
         # With dirichelet noise, majority of density should be in one node.
         max_p = np.max(player.root.child_prior)
-        self.assertGreater(max_p, 4 / (go.N ** 2 + 1))
+        self.assertGreater(max_p, 3 / (go.N ** 2 + 1))
 
     def test_pick_moves(self):
         player = initialize_basic_player()

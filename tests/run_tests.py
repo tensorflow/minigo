@@ -36,5 +36,12 @@ from absl import flags
 if __name__ == '__main__':
     # Parse test flags and initialize default flags
     flags.FLAGS(['ignore', '--flagfile=tests/test_flags'])
-    # Replicate the behavior of `python -m unittest discover tests`
-    unittest.main(module=None, argv=['run_tests.py', 'discover', '.'])
+
+    if len(sys.argv) == 1:
+        # Replicate the behavior of `python -m unittest discover tests`
+        unittest.main(module=None, argv=['run_tests.py', 'discover'])
+    elif len(sys.argv) >= 2:
+        # Replicate the behavior of `python -m unittest tests`
+        for arg in sys.argv[1:]:
+            assert arg.startswith('test_') and '.' not in arg, arg
+        unittest.main(module=None, argv=['run_tests.py'] + sys.argv[1:])
