@@ -67,7 +67,7 @@ DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed. "
               "This seed is used to control the moves played, not whether a "
               "game has resignation disabled or is a holdout.");
-DEFINE_bool(even, false,
+DEFINE_bool(even, true,
             "In eval mode, whether the models should play black in turn.");
 
 // Tree search flags.
@@ -469,6 +469,9 @@ class SelfPlayer {
 };
 
 class Evaluator {
+  // A barrier that blocks threads until the number of waiting threads reaches
+  // the 'count' threshold. Allows decrementing the threshold to handle the tail
+  // of a work queue where some threads exit early.
   class Barrier {
    public:
     explicit Barrier(size_t count)
@@ -507,6 +510,8 @@ class Evaluator {
     size_t generation_ GUARDED_BY(&mutex_);
   };
 
+  // References a pointer to an actual DualNet. Allows updating the pointer
+  // after the MctsPlayer has been constructed.
   class WrappedDualNet : public DualNet {
    public:
     explicit WrappedDualNet(const std::unique_ptr<DualNet>& dual_net)
@@ -579,14 +584,12 @@ class Evaluator {
               << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
               << std::endl;
 
-    auto print_name = [](std::string name) {
+    auto print_name = [](const std::string& name) {
       if (name.size() > 20) {
-        name.resize(17);
-        name.append("...");
+        std::cerr << name.substr(0, 17) << "...";
       } else {
-        name.append(20 - name.size(), ' ');
+        std::cerr << std::setw(20) << name;
       }
-      std::cerr << name;
     };
     auto print_wins = [&](int wins) {
       std::cerr << "   " << std::setw(3) << wins << " " << std::setw(6)
@@ -640,8 +643,16 @@ class Evaluator {
     auto* other_factory = other_model->factory.get();
 
     while (!player->game_over()) {
+      // Create the DualNet for a single move and dispose it again. This
+      // is required because a BatchingDualNet instance can prevent the
+      // inference queue from being flushed if it's not sending any requests.
+      // The number of requests per move can be smaller than num_readouts at the
+      // end of a game.
       dual_net = factory->New();
-      barrier_->Wait();  // Wait for all threads to create DualNet.
+      // Wait for all threads to create their DualNet. This prevents runaway
+      // threads from flushing the batching queue prematurely. It actually
+      // forces all players to move in lock-step to achieve optimal batching.
+      barrier_->Wait();
       auto move = player->SuggestMove();
       dual_net.reset();
       if (player->options().verbose) {
@@ -655,6 +666,7 @@ class Evaluator {
       std::swap(factory, other_factory);
       std::swap(player, other_player);
     }
+    // Notify the barrier that this thread is no longer participating.
     barrier_->DecrementCount();
 
     MG_CHECK(player->result() == other_player->result());
