@@ -41,6 +41,22 @@ void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
                        const std::string& table_name, const MctsPlayer& player);
 
+// Atomically increment the game counter in the given Bigtable by the given
+// delta.  Returns the new value.  Prior value will be returned - delta.
+uint64_t IncrementGameCounter(const std::string& gcp_project_name,
+                              const std::string& instance_name,
+                              const std::string& table_name, size_t delta);
+
+// Port Minigo games from the given GCS files, which must be in
+// `.tfrecord.zz` format.  If game_counter is >=0, use that
+// and increment from there.  Otherwise, atomically increment
+// and use the value from `table_state=metadata:game_counter`.
+void PortGamesToBigtable(const std::string& gcp_project_name,
+                         const std::string& instance_name,
+                         const std::string& table_name,
+                         const std::vector<std::string>& paths,
+                         int64_t game_counter = -1);
+
 }  // namespace tf_utils
 }  // namespace minigo
 

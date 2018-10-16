@@ -391,6 +391,22 @@ minigo_cc_binary(
 )
 
 minigo_cc_binary(
+    name = "tfrzz_to_cbt",
+    srcs = ["tfrzz_to_cbt.cc"],
+    deps = [
+        ":base",
+        ":check",
+        ":init",
+        ":tf_utils",
+        "//cc/file",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+minigo_cc_binary(
     name = "position_benchmark",
     srcs = ["position_benchmark.cc"],
     deps = [
