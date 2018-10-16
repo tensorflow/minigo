@@ -19,12 +19,13 @@ class BatchingService {
   };
 
  public:
-  explicit BatchingService(std::unique_ptr<DualNet> dual_net)
+  BatchingService(std::unique_ptr<DualNet> dual_net, size_t batch_size)
       : dual_net_(std::move(dual_net)),
         num_clients_(0),
         queue_counter_(0),
         run_counter_(0),
-        num_runs_(0) {}
+        num_runs_(0),
+        batch_size_(batch_size) {}
 
   ~BatchingService() {
     std::cerr << "Ran " << num_runs_ << " batches with an average size of "
@@ -45,7 +46,7 @@ class BatchingService {
   void RunMany(std::vector<const DualNet::BoardFeatures*> features,
                std::vector<DualNet::Output*> outputs, std::string* model) {
     size_t num_features = features.size();
-    MG_CHECK(num_features <= static_cast<size_t>(FLAGS_batch_size));
+    MG_CHECK(num_features <= batch_size_);
     MG_CHECK(num_features == outputs.size());
 
     absl::Notification notification;
@@ -70,11 +71,9 @@ class BatchingService {
  private:
   void MaybeRunBatches() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     while (size_t batch_size =
-               std::min(queue_counter_ - run_counter_,
-                        static_cast<size_t>(FLAGS_batch_size))) {
+               std::min(queue_counter_ - run_counter_, batch_size_)) {
       // Stop if we won't fill a batch and more clients will send requests.
-      if (static_cast<int>(batch_size) < FLAGS_batch_size &&
-          inference_queue_.size() != num_clients_) {
+      if (batch_size < batch_size_ && inference_queue_.size() != num_clients_) {
         break;
       }
 
@@ -139,11 +138,13 @@ class BatchingService {
 
   // For printing batching stats in the destructor only.
   size_t num_runs_ GUARDED_BY(&mutex_);
+
+  const size_t batch_size_;
 };
 
 class BatchingDualNet : public DualNet {
  public:
-  BatchingDualNet(BatchingService* service) : service_(service) {
+  explicit BatchingDualNet(BatchingService* service) : service_(service) {
     service_->IncrementClientCount();
   }
 
@@ -164,8 +165,8 @@ class BatchingDualNet : public DualNet {
 
 class BatchingFactory : public DualNetFactory {
  public:
-  explicit BatchingFactory(std::unique_ptr<DualNet> dual_net)
-      : service_(std::move(dual_net)) {}
+  BatchingFactory(std::unique_ptr<DualNet> dual_net, size_t batch_size)
+      : service_(std::move(dual_net), batch_size) {}
 
  private:
   std::unique_ptr<DualNet> New() override {
@@ -177,7 +178,7 @@ class BatchingFactory : public DualNetFactory {
 }  // namespace
 
 std::unique_ptr<DualNetFactory> NewBatchingFactory(
-    std::unique_ptr<DualNet> dual_net) {
-  return absl::make_unique<BatchingFactory>(std::move(dual_net));
+    std::unique_ptr<DualNet> dual_net, size_t batch_size) {
+  return absl::make_unique<BatchingFactory>(std::move(dual_net), batch_size);
 }
 }  // namespace minigo

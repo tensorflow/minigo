@@ -21,7 +21,6 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:position",
-        "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/types:span",
     ],
 )

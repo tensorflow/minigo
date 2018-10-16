@@ -59,9 +59,9 @@ class TfDualNet : public DualNet {
 
       inputs_.emplace_back(
           "pos_tensor",
-          tensorflow::Tensor(tensorflow::DT_FLOAT,
-                             tensorflow::TensorShape({FLAGS_batch_size, kN, kN,
-                                                      kNumStoneFeatures})));
+          tensorflow::Tensor(
+              tensorflow::DT_FLOAT,
+              tensorflow::TensorShape({1, kN, kN, kNumStoneFeatures})));
 
       output_names_.emplace_back("policy_output");
       output_names_.emplace_back("value_output");
@@ -76,11 +76,17 @@ class TfDualNet : public DualNet {
     void RunMany(std::vector<const BoardFeatures*> features,
                  std::vector<Output*> outputs) {
       int batch_size = static_cast<int>(features.size());
-      auto* feature_tensor = inputs_.front().second.flat<float>().data();
+      auto& feature_tensor = inputs_.front().second;
+      if (feature_tensor.dim_size(0) < batch_size) {
+        feature_tensor = Tensor(
+            DT_FLOAT, TensorShape({batch_size, kN, kN, kNumStoneFeatures}));
+      }
+
+      auto* feature_data = feature_tensor.flat<float>().data();
       // Copy the features into the input tensor.
       for (const auto* feature : features) {
-        feature_tensor =
-            std::copy(feature->begin(), feature->end(), feature_tensor);
+        feature_data =
+            std::copy(feature->begin(), feature->end(), feature_data);
       }
 
       // Run the model.

@@ -8,7 +8,7 @@
 namespace minigo {
 
 std::unique_ptr<DualNetFactory> NewBatchingFactory(
-    std::unique_ptr<DualNet> dual_net);
+    std::unique_ptr<DualNet> dual_net, size_t batch_size);
 
 }  // namespace minigo
 

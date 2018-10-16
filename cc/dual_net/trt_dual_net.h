@@ -5,7 +5,8 @@
 
 namespace minigo {
 
-std::unique_ptr<DualNet> NewTrtDualNet(const std::string& model_path);
+std::unique_ptr<DualNet> NewTrtDualNet(const std::string& model_path,
+                                       size_t max_batch_size);
 
 }  // namespace minigo
 

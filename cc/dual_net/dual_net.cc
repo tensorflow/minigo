@@ -17,8 +17,6 @@
 #include "cc/color.h"
 #include "cc/constants.h"
 
-DEFINE_int32(batch_size, 256, "Inference batch size.");
-
 namespace minigo {
 
 constexpr int DualNet::kNumStoneFeatures;

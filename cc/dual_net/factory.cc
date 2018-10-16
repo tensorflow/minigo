@@ -41,6 +41,7 @@
 #endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_TRT_DUAL_NET
 
+// Inference engine flags.
 DEFINE_string(engine, MG_DEFAULT_ENGINE,
               "The inference engine to use. Accepted values:"
 #ifdef MG_ENABLE_TF_DUAL_NET
@@ -53,6 +54,11 @@ DEFINE_string(engine, MG_DEFAULT_ENGINE,
               " \"trt\""
 #endif
 );
+
+// Batching flags.
+// TODO(tommadams): Calculate batch_size from other arguments (virtual_lossess,
+// parallel_games, etc) instead of having an explicit flag.
+DEFINE_int32(batch_size, 256, "Inference batch size.");
 
 namespace minigo {
 namespace {
@@ -76,7 +82,7 @@ std::unique_ptr<DualNet> NewDualNet(const std::string& graph_path) {
 
   if (FLAGS_engine == "trt") {
 #ifdef MG_ENABLE_TRT_DUAL_NET
-    return NewTrtDualNet(graph_path);
+    return NewTrtDualNet(graph_path, FLAGS_batch_size);
 #else
     MG_FATAL() << "Binary wasn't compiled with TensorRT inference support";
 #endif  // MG_ENABLE_TRT_DUAL_NET
@@ -92,7 +98,8 @@ DualNetFactory::~DualNetFactory() = default;
 
 std::unique_ptr<DualNetFactory> NewDualNetFactory(
     const std::string& model_path) {
-  return NewBatchingFactory(NewDualNet(model_path));
+  return NewBatchingFactory(NewDualNet(model_path),
+                            static_cast<size_t>(FLAGS_batch_size));
 }
 
 }  // namespace minigo

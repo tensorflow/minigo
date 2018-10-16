@@ -69,21 +69,21 @@ class TrtDualNet : public DualNet {
 
   class TrtWorker {
    public:
-    explicit TrtWorker(nvinfer1::ICudaEngine* engine) {
+    TrtWorker(nvinfer1::ICudaEngine* engine, size_t max_batch_size)
+        : max_batch_size_(max_batch_size) {
       context_ = engine->createExecutionContext();
       MG_CHECK(context_);
 
       void* host_ptr;
-      size_t input_size =
-          FLAGS_batch_size * (kN * kN * DualNet::kNumStoneFeatures);
+      size_t input_size = max_batch_size * kN * kN * DualNet::kNumStoneFeatures;
       MG_CHECK(cudaHostAlloc(&host_ptr, input_size * sizeof(float),
                              cudaHostAllocWriteCombined) == cudaSuccess);
       pos_tensor_ = static_cast<float*>(host_ptr);
-      size_t output_size = FLAGS_batch_size * (kNumMoves + 1);
+      size_t output_size = max_batch_size * (kNumMoves + 1);
       MG_CHECK(cudaHostAlloc(&host_ptr, output_size * sizeof(float),
                              cudaHostAllocDefault) == cudaSuccess);
       value_output_ = static_cast<float*>(host_ptr);
-      policy_output_ = value_output_ + FLAGS_batch_size;
+      policy_output_ = value_output_ + max_batch_size;
     }
 
     ~TrtWorker() {
@@ -95,7 +95,8 @@ class TrtDualNet : public DualNet {
 
     void RunMany(std::vector<const BoardFeatures*> features,
                  std::vector<Output*> outputs) {
-      int batch_size = static_cast<int>(features.size());
+      auto batch_size = features.size();
+      MG_CHECK(batch_size <= max_batch_size_);
 
       auto* feature_data = pos_tensor_;
       // Copy the features into the input tensor.
@@ -106,10 +107,10 @@ class TrtDualNet : public DualNet {
 
       // Run the model.
       void* buffers[] = {pos_tensor_, policy_output_, value_output_};
-      context_->execute(FLAGS_batch_size, buffers);
+      context_->execute(batch_size_, buffers);
 
       // Copy the policy and value out of the output tensors.
-      for (int i = 0; i < batch_size; ++i) {
+      for (size_t i = 0; i < batch_size; ++i) {
         memcpy(outputs[i]->policy.data(), policy_output_ + i * kNumMoves,
                sizeof(outputs[i]->policy));
         outputs[i]->value = value_output_[i];
@@ -122,6 +123,7 @@ class TrtDualNet : public DualNet {
     float* pos_tensor_;
     float* policy_output_;
     float* value_output_;
+    const size_t max_batch_size_;
   };
 
   struct InferenceData {
@@ -131,8 +133,10 @@ class TrtDualNet : public DualNet {
   };
 
  public:
-  explicit TrtDualNet(std::string graph_path)
-      : graph_path_(graph_path), running_(true) {
+  TrtDualNet(std::string graph_path, size_t max_batch_size)
+      : graph_path_(graph_path),
+        running_(true),
+        max_batch_size_(max_batch_size) {
     runtime_ = nvinfer1::createInferRuntime(logger_);
     MG_CHECK(runtime_);
 
@@ -158,7 +162,7 @@ class TrtDualNet : public DualNet {
         parser->parse(graph_path.c_str(), *network, nvinfer1::DataType::kFLOAT))
         << ". File path: '" << graph_path << "'";
 
-    builder->setMaxBatchSize(FLAGS_batch_size);
+    builder->setMaxBatchSize(max_batch_size_);
     builder->setMaxWorkspaceSize(1ull << 30);  // One gigabyte.
 
     int device_count = 0;
@@ -200,7 +204,7 @@ class TrtDualNet : public DualNet {
     auto functor = [this](const Pair& pair) {
       pthread_setname_np(pthread_self(), "TrtWorker");
       cudaSetDevice(pair.first);
-      TrtWorker worker(pair.second);
+      TrtWorker worker(pair.second, max_batch_size_);
       while (running_) {
         InferenceData inference;
         if (inference_queue_.PopWithTimeout(&inference, absl::Seconds(1))) {
@@ -260,12 +264,14 @@ class TrtDualNet : public DualNet {
   ThreadSafeQueue<InferenceData> inference_queue_;
   std::vector<std::thread> worker_threads_;
   std::atomic<bool> running_;
+  const size_t max_batch_size_;
 };
 
 }  // namespace
 
-std::unique_ptr<DualNet> NewTrtDualNet(const std::string& model_path) {
-  return absl::make_unique<TrtDualNet>(model_path);
+std::unique_ptr<DualNet> NewTrtDualNet(const std::string& model_path,
+                                       size_t max_batch_size) {
+  return absl::make_unique<TrtDualNet>(model_path, max_batch_size);
 }
 
 }  // namespace minigo

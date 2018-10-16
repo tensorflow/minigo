@@ -80,18 +80,10 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
   absl::string_view input_name = interpreter_->GetInputName(0);
   MG_CHECK(input_name == "pos_tensor");
 
-  // Resize input tensor to batch size.
-  MG_CHECK(interpreter_->ResizeInputTensor(
-               inputs[0], {FLAGS_batch_size, kN, kN,
-                           DualNet::kNumStoneFeatures}) == kTfLiteOk);
-
-  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
-
   input_ = interpreter_->tensor(inputs[0]);
   MG_CHECK(input_ != nullptr);
   MG_CHECK(input_->data.raw != nullptr);
   MG_CHECK(input_->dims->size == 4);
-  MG_CHECK(input_->dims->data[0] == FLAGS_batch_size);
   MG_CHECK(input_->dims->data[1] == kN);
   MG_CHECK(input_->dims->data[2] == kN);
   MG_CHECK(input_->dims->data[3] == kNumStoneFeatures);
@@ -116,14 +108,16 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
   MG_CHECK(policy_->type == input_->type);
   MG_CHECK(policy_->data.raw != nullptr);
   MG_CHECK(policy_->dims->size == 2);
-  MG_CHECK(policy_->dims->data[0] == FLAGS_batch_size);
+  MG_CHECK(policy_->dims->data[0] == input_->dims->data[0]);
   MG_CHECK(policy_->dims->data[1] == kNumMoves);
 
   MG_CHECK(value_ != nullptr);
   MG_CHECK(value_->type == input_->type);
   MG_CHECK(value_->data.raw != nullptr);
   MG_CHECK(value_->dims->size == 1);
-  MG_CHECK(value_->dims->data[0] == FLAGS_batch_size);
+  MG_CHECK(value_->dims->data[0] == input_->dims->data[0]);
+
+  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
 }
 
 void minigo::LiteDualNet::RunMany(
@@ -132,6 +126,8 @@ void minigo::LiteDualNet::RunMany(
   if (model != nullptr) {
     *model = graph_path_;
   }
+
+  MG_CHECK(features.size() <= input_->dims->data[0]);
 
   switch (input_->type) {
     case kTfLiteFloat32:
