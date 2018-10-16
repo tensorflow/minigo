@@ -127,7 +127,7 @@ void minigo::LiteDualNet::RunMany(
     *model = graph_path_;
   }
 
-  MG_CHECK(features.size() <= input_->dims->data[0]);
+  MG_CHECK(features.size() <= static_cast<size_t>(input_->dims->data[0]));
 
   switch (input_->type) {
     case kTfLiteFloat32:

@@ -115,6 +115,7 @@ minigo_cc_library(
     name = "trt_dual_net",
     srcs = ["trt_dual_net.cc"],
     hdrs = ["trt_dual_net.h"],
+    tags = ["manual"],
     deps = [
         ":dual_net",
         "//cc:base",

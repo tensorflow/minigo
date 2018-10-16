@@ -34,6 +34,7 @@ uint64_t IncrementGameCounter(const std::string& gcp_project_name,
   MG_FATAL() << "Can't increment a Bigtable game counter without Bigtable "
                 "support enabled. "
                 "Please recompile, passing --define=bt=1 to bazel build.";
+  return 0;
 }
 
 void PortGamesToBigtable(const std::string& gcp_project_name,
