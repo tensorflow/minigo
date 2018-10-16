@@ -4,10 +4,10 @@ This directory contains a in-developent C++ port of Minigo.
 
 ## Set up
 
-The C++ Minigo port uses __version 0.11.1__ of the [Bazel](https://bazel.build/)
+The C++ Minigo port uses __version 0.17.2__ of the [Bazel](https://bazel.build/)
 build system. We have experienced build issues with the latest version of Bazel,
 so for now we recommend installing
-[bazel-0.11.1-installer-linux-x86\_64.sh](https://github.com/bazelbuild/bazel/releases).
+[bazel-0.17.2-installer-linux-x86\_64.sh](https://github.com/bazelbuild/bazel/releases).
 
 Minigo++ depends on the Tensorflow C++ libraries, but we have not yet set up
 Bazel WORKSPACE and BUILD rules to automatically download and configure
