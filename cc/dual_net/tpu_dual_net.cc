@@ -95,33 +95,42 @@ void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
                          std::vector<Output*> outputs, std::string* model) {
   MG_DCHECK(features.size() == outputs.size());
 
-  // Send each RunMany call to a different TPU replica.
-  auto& replica_input = inputs_[current_replica_];
-  const auto& replica_output_name = output_names_[current_replica_];
-  current_replica_ = (current_replica_++) % num_replicas_;
+  auto batch_size = static_cast<int>(features.size());
+  auto sub_batch_size =
+      std::max((batch_size + num_replicas_ - 1) / num_replicas_, 1);
 
-  auto& feature_tensor = replica_input.second;
-  if (feature_tensor.dim_size(0) != batch_size) {
-    feature_tensor =
-        Tensor(DT_FLOAT, TensorShape({batch_size, kN, kN, kNumStoneFeatures}));
-  }
+  // Split the input features across all replicas.
+  for (int replica = 0; replica < num_replicas_; ++replica) {
+    auto& feature_tensor = inputs_[replica].second;
 
-  auto* feature_data = feature_tensor.flat<float>().data();
-  for (const auto* feature : features) {
-    feature_data = std::copy(feature->begin(), feature->end(), feature_data);
+    // All input tensors must have the same batch size.
+    if (feature_tensor.dim_size(0) != sub_batch_size) {
+      feature_tensor = Tensor(
+          DT_FLOAT, TensorShape({sub_batch_size, kN, kN, kNumStoneFeatures}));
+    }
+
+    int begin = replica * sub_batch_size;
+    int end = std::min(batch_size, (replica + 1) * sub_batch_size);
+    auto* feature_data = feature_tensor.flat<float>().data();
+    for (int i = begin; i < end; ++i) {
+      feature_data =
+          std::copy(features[i]->begin(), features[i]->end(), feature_data);
+    }
   }
 
   // Run the model.
-  TF_CHECK_OK(
-      session_->Run({replica_input}, {replica_output_name}, {}, &outputs_));
+  TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
 
   // Copy the policy and value out of the output tensors.
-  const auto& policy_tensor = outputs_[0].flat<float>();
-  const auto& value_tensor = outputs_[1].flat<float>();
   for (int i = 0; i < batch_size; ++i) {
-    memcpy(outputs[i]->policy.data(), policy_tensor.data() + i * kNumMoves,
+    int replica = i / sub_batch_size;
+    int j = i % sub_batch_size;
+
+    const auto& policy_tensor = outputs_[replica * 2].flat<float>();
+    const auto& value_tensor = outputs_[replica * 2 + 1].flat<float>();
+    memcpy(outputs[i]->policy.data(), policy_tensor.data() + j * kNumMoves,
            sizeof(outputs[i]->policy));
-    outputs[i]->value = value_tensor.data()[i];
+    outputs[i]->value = value_tensor.data()[j];
   }
 
   if (model != nullptr) {

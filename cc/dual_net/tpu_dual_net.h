@@ -40,15 +40,11 @@ class TpuDualNet : public DualNet {
 
  private:
   std::unique_ptr<tensorflow::Session> session_;
-
-  // One list of inputs and output names for each replica.
-  std::vector<std::vector<std::pair<std::string, tensorflow::Tensor>>> inputs_;
-  std::vector<std::vector<std::string>> output_names_;
-
+  std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
+  std::vector<std::string> output_names_;
   std::vector<tensorflow::Tensor> outputs_;
   std::string graph_path_;
   int num_replicas_ = 0;
-  int current_replica_ = 0;
 };
 
 }  // namespace minigo
