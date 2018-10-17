@@ -107,7 +107,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
   if (FLAGS_engine == "tpu") {
 #ifdef MG_ENABLE_TPU_DUAL_NET
     int inferences = FLAGS_virtual_losses * FLAGS_parallel_games;
-    int buffering = FLAGS_parallel_games == 1 ? 1 : 2;
+    int buffering = 2;
     MG_CHECK(inferences % buffering == 0);
     batch_size = inferences / buffering;
     dual_net = absl::make_unique<TpuDualNet>(model_path, FLAGS_tpu_name,
