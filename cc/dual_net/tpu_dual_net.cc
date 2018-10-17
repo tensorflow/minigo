@@ -22,7 +22,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
-#include "absl/time/clock.h"
 #include "cc/check.h"
 #include "cc/constants.h"
 #include "tensorflow/core/framework/graph.pb.h"
