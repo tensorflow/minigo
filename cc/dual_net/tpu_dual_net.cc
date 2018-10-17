@@ -18,7 +18,10 @@
 #include <thread>
 
 #include "absl/memory/memory.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 #include "absl/time/clock.h"
 #include "cc/check.h"
 #include "cc/constants.h"
@@ -39,7 +42,11 @@ using tensorflow::TensorShape;
 namespace minigo {
 
 TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
-                           const std::string& tpu_name, int max_batch_size) {
+                           const std::string& tpu_name, int num_replicas,
+                           int max_batch_size)
+    : num_replicas_(num_replicas),
+      max_sub_batch_size_((max_batch_size + num_replicas_ - 1) /
+                          num_replicas_) {
   SessionOptions options;
   options.target = tpu_name;
   options.config.set_allow_soft_placement(true);
@@ -47,11 +54,6 @@ TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
   session_.reset(NewSession(options));
   TF_CHECK_OK(session_->Create(graph_def));
 
-  // TODO(tommadams): automatically figure out the number of replicas from the
-  // GraphDef.
-  num_replicas_ = 8;
-
-  max_sub_batch_size_ = (max_batch_size + num_replicas_ - 1) / num_replicas_;
   for (int i = 0; i < num_replicas_; ++i) {
     inputs_.emplace_back(
         absl::StrCat("tpu_pos_tensor_", i),
@@ -130,9 +132,24 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
   GraphDef graph_def;
   TF_CHECK_OK(ReadBinaryProto(env, graph_path_, &graph_def));
 
+  // Count the number of times the model is replicated. There should be eight,
+  // one replica for each TPU core.
+  int num_replicas = 0;
+  for (const auto& node : graph_def.node()) {
+    absl::string_view name = node.name();
+    if (absl::ConsumePrefix(&name, "tpu_pos_tensor_")) {
+      int replica;
+      MG_CHECK(absl::SimpleAtoi(name, &replica));
+      num_replicas = std::max(num_replicas, replica + 1);
+    }
+  }
+  std::cerr << "Found " << num_replicas << " model replicas in graph "
+            << graph_path << std::endl;
+  MG_CHECK(num_replicas > 0);
+
   for (int i = 0; i < buffering; ++i) {
-    workers_.Push(absl::make_unique<TpuDualNet::Worker>(graph_def, tpu_name,
-                                                        max_batch_size));
+    workers_.Push(absl::make_unique<TpuDualNet::Worker>(
+        graph_def, tpu_name, num_replicas, max_batch_size));
   }
 
   // Use one of the workers to initialize the TPU.

@@ -48,7 +48,7 @@ class TpuDualNet : public DualNet {
   class Worker {
    public:
     Worker(const tensorflow::GraphDef& graph_def, const std::string& tpu_name,
-           int max_batch_size);
+           int num_replicas, int max_batch_size);
     ~Worker();
 
     void RunMany(std::vector<const DualNet::BoardFeatures*> features,
@@ -62,8 +62,8 @@ class TpuDualNet : public DualNet {
     std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
     std::vector<std::string> output_names_;
     std::vector<tensorflow::Tensor> outputs_;
-    int num_replicas_ = 0;
-    int max_sub_batch_size_;
+    const int num_replicas_ = 0;
+    const int max_sub_batch_size_;
   };
 
   ThreadSafeQueue<std::unique_ptr<Worker>> workers_;
