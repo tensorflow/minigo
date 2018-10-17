@@ -16,10 +16,11 @@ load(
 cc_library(
     name = "tensorflow",
     srcs = [
-        "tensorflow/libgrpc_runtime.so",
-        # "tensorflow/libtensorflow_cc.so",
         "tensorflow/libtensorflow_framework.so",
-    ],
+    ] + select({
+        "//cc/config:enable_tpu": ["tensorflow/libgrpc_runtime.so"],
+        "//conditions:default": ["tensorflow/libtensorflow_cc.so"],
+    }),
     hdrs = glob(
         ["tensorflow/**/*"],
         exclude = [
@@ -33,6 +34,7 @@ cc_library(
         "tensorflow",
         "tensorflow/external/nsync/public",
     ],
+    tags = ["manual"],
 )
 
 cc_library(
