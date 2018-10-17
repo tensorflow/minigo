@@ -63,9 +63,10 @@ A UI for Minigo
 1. By default, Minigui will use the Python Minigo engine. You can use the C++
    engine by first compiling it (see the
    [README](https://github.com/tensorflow/minigo/tree/master/cc/README.md)),
-   then passing `--engine=cc` when starting `minigui/serve.py`. You will need
-   to pass a frozen GraphDef proto as the `--model` command line argument
-   instead of the saved parameter data that the Python backend requires.
+   then passing `--engine=<tf,tpu,lite,trt>` when starting `minigui/serve.py`.
+   You will need to pass a frozen GraphDef proto as the `--model` command line
+   argument instead of the saved parameter data that the Python backend
+   requires.
 
    **Note:** Compiling tensorflow from scratch can take 2+ hours if your
    machine is not terribly beefy, So you might want to kick off the build and
@@ -82,6 +83,6 @@ A UI for Minigo
    C++ engine binary, not when running the Minigui server:
 
     ```shell
-    bazel build --define=board_size=19 cc:main
-    python minigui/serve.py --port=8888 --model=$MODEL_DIR/$MODEL.converted.pb --engine=cc
+    bazel build -c opt --define=tf=1 cc:main
+    python minigui/serve.py --port=8888 --model=$MODEL_DIR/$MODEL.converted.pb --engine=tf
     ```

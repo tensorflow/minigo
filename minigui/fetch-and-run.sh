@@ -84,5 +84,5 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   --port=$MINIGUI_PORT \
   --host=$MINIGUI_HOST \
   --python_for_engine=${MINIGUI_PYTHON} \
-  --engine=cc
+  --engine=tf
 }

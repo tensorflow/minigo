@@ -69,4 +69,4 @@ RUN cc/configure_tensorflow.sh
 # Now bring in the rest of our code; changing our code will only trigger rebuilds below here
 COPY staging /app
 
-RUN bazel build --copt=-march=ivybridge --define=board_size=19 cc/main
+RUN bazel build --copt=-march=ivybridge cc/main

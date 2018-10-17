@@ -1,7 +1,8 @@
 # Defines the preprocessor macro MINIGO_BOARD_SIZE=9 for all minigo_cc_*
 # build targets when bazel build is invoked with --define=board_size=9.
 # Defines the preprocessor macro MINIGO_BOARD_SIZE=19 for all minigo_cc_*
-# build targets when bazel build is invoked with --define=board_size=19.
+# build targets by default.
+
 def _board_size_copts():
     return select({
         "//cc/config:minigo9": ["-DMINIGO_BOARD_SIZE=9"],
