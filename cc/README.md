@@ -117,6 +117,7 @@ The choice of which engine to use is controlled by the command line argument
 ## TensorFlow Lite
 
 Minigo supports Tensorflow Lite as an inference engine.
+Build `//cc:main` with `--define=lite=1` and run with `--engine=lite`.
 
 First, run a frozen graph through Toco, the TensorFlow optimizing compiler:
 
@@ -143,8 +144,11 @@ bazel build -c opt --define=tf=0 --define=lite=1 cc:main
 
 ## Cloud TPU
 
-Minigo supports running inference on Cloud TPU. To freeze a model into a
-GraphDef proto that can be run on Cloud TPU, use `freeze_graph.py`:
+Minigo supports running inference on Cloud TPU.
+Build `//cc:main` with `--define=tpu=1` and run with `--engine=tpu`.
+
+To freeze a model into a GraphDef proto that can be run on Cloud TPU, use
+`freeze_graph.py`:
 
 ```
 BOARD_SIZE=19 python freeze_graph.py \
