@@ -141,6 +141,30 @@ support (optionally disabling the TensorFlow inference engine as shown below):
 bazel build -c opt --define=tf=0 --define=lite=1 cc:main
 ```
 
+## Cloud TPU
+
+Minigo supports running inference on Cloud TPU. To freeze a model into a
+GraphDef proto that can be run on Cloud TPU, use `freeze_graph.py`:
+
+```
+BOARD_SIZE=19 python freeze_graph.py \
+  --model_path=$MODEL_PATH \
+  --use_tpu=true \
+  --tpu_name=$TPU_NAME \
+  --parallel_tpus=8
+```
+
+Where `$MODEL_PATH` is the path to your model (either a local file or one on
+GCS), and `$TPU_NAME` is the gRPC name of your TPU, e.g.
+`grpc://10.240.2.10:8470`. This can be found from the output of
+`gcloud beta compute tpus list`.
+
+This command **must** be run from a Cloud TPU-ready GCE VM.
+
+This invocation to `freeze_graph.py` will replicate the model 8 times so that
+it can run on all eight cores of a Cloud TPU. To take advantage of this
+parallelism when running selfplay, `virtual_losses * parallel_games` must be at
+least 8, ideally 128 or higher.
 
 ## Style guide
 
