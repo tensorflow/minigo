@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Freeze a model to a GraphDef proto."""
 
 from absl import app, flags
 
@@ -21,7 +22,8 @@ flags.DEFINE_string('model_path', None, 'Path to model to freeze')
 FLAGS = flags.FLAGS
 
 
-def main(argv):
+def main(unused_argv):
+    """Freeze a model to a GraphDef proto."""
     if FLAGS.use_tpu:
         dual_net.freeze_graph_tpu(FLAGS.model_path)
     else:
