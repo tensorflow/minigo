@@ -551,8 +551,8 @@ def freeze_graph_tpu(model_path):
         # The ops aren't actually executed here. Instead, the serialized ops are
         # run by the C++ TpuDualNet implementation to perform one-time
         # initialization and shutdown of the TPU. We do it this way because
-        # TensorFlow currently doesn't currently expose a C++ API for TPU
-        # initialization and shutdown.
+        # TensorFlow currently doesn't expose a C++ API for TPU initialization
+        # and shutdown.
         init_def = tf.contrib.tpu.initialize_system()
         shutdown_def = tf.contrib.tpu.shutdown_system()
 
