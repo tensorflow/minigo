@@ -379,7 +379,6 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
   last_genmove_ = Color::kEmpty;
   NewGame();
 
-  std::vector<const Position::Stones*> recent_positions;
   for (const auto& move : sgf::GetMainLineMoves(ast)) {
     if (!root()->legal_moves[move.c]) {
       return Response::Error("illegal move");

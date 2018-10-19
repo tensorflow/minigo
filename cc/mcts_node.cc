@@ -43,8 +43,8 @@ void InitLegalMoves(MctsNode* node) {
       case Position::MoveType::kNoCapture: {
         // The move will not capture any stones: we can calculate the new
         // position's stone hash directly.
-        auto move_hash = position_hash ^ zobrist::MoveHash(c, to_play);
-        node->legal_moves[c] = !node->HasPositionBeenPlayedBefore(move_hash);
+        auto new_hash = position_hash ^ zobrist::MoveHash(c, to_play);
+        node->legal_moves[c] = !node->HasPositionBeenPlayedBefore(new_hash);
         break;
       }
 
@@ -59,8 +59,8 @@ void InitLegalMoves(MctsNode* node) {
         //  - we only care about new_position's stone_hash and not the rest of
         //    the bookkeeping that PlayMove updates.
         new_position.AddStoneToBoard(c, to_play);
-        auto move_hash = new_position.stone_hash();
-        node->legal_moves[c] = !node->HasPositionBeenPlayedBefore(move_hash);
+        auto new_hash = new_position.stone_hash();
+        node->legal_moves[c] = !node->HasPositionBeenPlayedBefore(new_hash);
         break;
       }
     }
@@ -84,6 +84,8 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
       position(parent->position) {
   position.PlayMove(move);
 
+  // Insert a cache of ancestor Zobrist hashes at regular depths in the tree.
+  // See the comment for superko_cache in the mcts_node.h for more details.
   if ((position.n() % kSuperKoCacheStride) == 0) {
     superko_cache = absl::make_unique<SuperkoCache>();
     superko_cache->reserve(position.n() + 1);

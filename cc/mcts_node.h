@@ -147,6 +147,11 @@ class MctsNode {
   // Number of virtual losses on this node.
   int num_virtual_losses_applied = 0;
 
+  // Each position contains a Zobrist hash of its stones, which can be used for
+  // superko detection. In order to accelerate superko detection, caches of all
+  // ancestor positions are added at regular depths in the search tree. This
+  // reduces superko detection time complexity from O(N) to O(1).
+  //
   // If non-null, superko_cache contains the Zobrist hash of all positions
   // played to this position, including position.stone_hash().
   // If null, clients should determine whether a position has appeared before
