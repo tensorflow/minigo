@@ -244,12 +244,6 @@ bool MctsPlayer::PlayMove(Coord c) {
     return false;
   }
 
-  if (!root_->legal_moves[c]) {
-    std::cerr << "Move " << c << " is illegal:\n"
-              << root_->position.ToSimpleString() << std::endl;
-    return false;
-  }
-
   // Handle resignations.
   if (c == Coord::kResign) {
     if (root_->position.to_play() == Color::kBlack) {
@@ -261,6 +255,12 @@ bool MctsPlayer::PlayMove(Coord c) {
     }
     game_over_ = true;
     return true;
+  }
+
+  if (!root_->legal_moves[c]) {
+    std::cerr << "Move " << c << " is illegal:\n"
+              << root_->position.ToSimpleString() << std::endl;
+    return false;
   }
 
   PushHistory(c);

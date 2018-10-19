@@ -347,7 +347,7 @@ Color Position::IsKoish(Coord c) const {
 }
 
 Position::MoveType Position::ClassifyMove(Coord c) const {
-  if (c == Coord::kPass) {
+  if (c == Coord::kPass || c == Coord::kResign) {
     return MoveType::kNoCapture;
   }
   if (!stones_[c].empty()) {
