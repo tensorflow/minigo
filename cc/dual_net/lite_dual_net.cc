@@ -172,7 +172,7 @@ void minigo::LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
   MG_CHECK(batch_size <= input_->dims->data[0]);
 
   // TODO(tommadams): Make BoardFeatures a uint8_t array and memcpy here.
-  const auto input_params = input_->params;
+  const auto& input_params = input_->params;
   for (size_t j = 0; j < features.size(); ++j) {
     const auto& board = *features[j];
     for (size_t i = 0; i < board.size(); ++i) {
