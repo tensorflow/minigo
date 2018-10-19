@@ -297,7 +297,7 @@ TEST(PositionTest, TestSameOpponentGroupNeighboringTwice) {
   EXPECT_EQ(2, black_group.num_liberties);
 }
 
-TEST(PositionTest, IsMoveSuicidal) {
+TEST(PositionTest, TestSuicidalMovesAreIllegal) {
   auto board = TestablePosition(R"(
       ...O.O...
       ....O....
@@ -310,11 +310,11 @@ TEST(PositionTest, IsMoveSuicidal) {
       .....XOO.)");
   std::vector<std::string> suicidal_moves = {"E9", "H5", "E3"};
   for (const auto& c : suicidal_moves) {
-    EXPECT_TRUE(board.IsMoveSuicidal(c, Color::kBlack));
+    EXPECT_EQ(Position::MoveType::kIllegal, board.ClassifyMove(c));
   }
   std::vector<std::string> nonsuicidal_moves = {"B5", "J1", "A9"};
   for (const auto& c : nonsuicidal_moves) {
-    EXPECT_FALSE(board.IsMoveSuicidal(c, Color::kBlack));
+    EXPECT_NE(Position::MoveType::kIllegal, board.ClassifyMove(c));
   }
 }
 
@@ -464,7 +464,7 @@ TEST(PositionTest, PlayRandomLegalMoves) {
   for (int i = 0; i < 10000; ++i) {
     std::vector<Coord> legal_moves;
     for (int c = 0; c < kN * kN; ++c) {
-      if (position.IsMoveLegal(c)) {
+      if (position.ClassifyMove(c) != Position::MoveType::kIllegal) {
         legal_moves.push_back(c);
       }
     }

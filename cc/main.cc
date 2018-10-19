@@ -46,6 +46,7 @@
 #include "cc/random.h"
 #include "cc/sgf.h"
 #include "cc/tf_utils.h"
+#include "cc/zobrist.h"
 #include "gflags/gflags.h"
 
 // Game options flags.
@@ -523,6 +524,7 @@ void Gtp() {
 
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
+  minigo::zobrist::Init(FLAGS_seed * 614944751);
 
   if (FLAGS_mode == "selfplay") {
     minigo::SelfPlay();

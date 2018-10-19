@@ -28,6 +28,7 @@
 #include "cc/group.h"
 #include "cc/inline_vector.h"
 #include "cc/stone.h"
+#include "cc/zobrist.h"
 
 namespace minigo {
 extern const std::array<inline_vector<Coord, 4>, kN * kN> kNeighborCoords;
@@ -166,7 +167,26 @@ class Position {
   float CalculateScore(float komi);
 
   // Returns true if playing this move is legal.
-  bool IsMoveLegal(Coord c) const;
+  // Does not check positional superko.
+  // MctsNode::legal_moves can be used to check for positional superko.
+  enum class MoveType {
+    // The position is illegal:
+    //  - a stone is already at that position.
+    //  - the move is ko.
+    //  - the move is suicidal.
+    kIllegal,
+
+    // The move will not capture an opponent's group.
+    // The move is not necessarily legal because of superko.
+    // Use MctsNode::legal_moves to check for positional superko.
+    kNoCapture,
+
+    // The move will capture an opponent's group.
+    // The move is not necessarily legal because of superko.
+    // Use MctsNode::legal_moves to check for positional superko.
+    kCapture,
+  };
+  MoveType ClassifyMove(Coord c) const;
 
   std::string ToSimpleString() const;
   std::string ToGroupString() const;
@@ -177,6 +197,7 @@ class Position {
   const Stones& stones() const { return stones_; }
   int n() const { return n_; }
   bool is_game_over() const { return num_consecutive_passes_ >= 2; }
+  zobrist::Hash stone_hash() const { return stone_hash_; }
 
   // The following methods are protected to enable direct testing by unit tests.
  protected:
@@ -190,9 +211,6 @@ class Position {
   // sides by stones of color C.
   // Returns Color::kEmpty otherwise.
   Color IsKoish(Coord c) const;
-
-  // Returns true if playing this move is suicidal.
-  bool IsMoveSuicidal(Coord c, Color color) const;
 
  private:
   // Play a pass move.
@@ -224,6 +242,11 @@ class Position {
 
   int n_;
   int num_consecutive_passes_ = 0;
+
+  // Zobrist hash of the stones. It can be used for positional superko.
+  // This has does not include number of consecutive passes or ko, so should not
+  // be used for caching inferences.
+  zobrist::Hash stone_hash_ = 0;
 };
 
 }  // namespace minigo

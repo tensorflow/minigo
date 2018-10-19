@@ -22,10 +22,13 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/position.h"
+#include "cc/zobrist.h"
 
 namespace minigo {
 
@@ -109,11 +112,13 @@ class MctsNode {
   // passing a pointer to the output array.
   std::array<float, kNumMoves> CalculateChildActionScore() const;
 
+  bool HasPositionBeenPlayedBefore(zobrist::Hash stone_hash) const;
+
   float CalculateSingleMoveChildActionScore(float to_play, float U_scale,
                                             int i) const {
     float Q = child_Q(i);
     float U = U_scale * child_P(i) / (1 + child_N(i));
-    return Q * to_play + U - 1000.0f * illegal_moves[i];
+    return Q * to_play + U - 1000.0f * !legal_moves[i];
   }
 
   MctsNode* MaybeAddChild(Coord c);
@@ -129,12 +134,10 @@ class MctsNode {
 
   std::array<EdgeStats, kNumMoves> edges;
 
-  // TODO(tommadams): a more compact representation.
-  std::array<bool, kNumMoves> illegal_moves;
+  std::array<bool, kNumMoves> legal_moves;
 
   // Map from move to resulting MctsNode.
-  // TODO(tommadams): use a better containiner.
-  std::unordered_map<int, std::unique_ptr<MctsNode>> children;
+  absl::flat_hash_map<uint64_t, std::unique_ptr<MctsNode>> children;
 
   bool is_expanded = false;
 
@@ -143,6 +146,15 @@ class MctsNode {
 
   // Number of virtual losses on this node.
   int num_virtual_losses_applied = 0;
+
+  // If non-null, superko_cache contains the Zobrist hash of all positions
+  // played to this position, including position.stone_hash().
+  // If null, clients should determine whether a position has appeared before
+  // during the game by walking up the tree (via the parent pointer), checking
+  // the position.stone_hash() of each node visited, until a node is found that
+  // contains a non-null superko_cache.
+  using SuperkoCache = absl::flat_hash_set<zobrist::Hash>;
+  std::unique_ptr<SuperkoCache> superko_cache;
 };
 
 }  // namespace minigo

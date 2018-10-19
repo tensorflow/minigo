@@ -276,32 +276,7 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
     return response;
   }
 
-  const auto& position = root()->position;
-
-  std::ostringstream oss;
-  for (const auto& stone : position.stones()) {
-    char ch;
-    if (stone.color() == Color::kBlack) {
-      ch = 'X';
-    } else if (stone.color() == Color::kWhite) {
-      ch = 'O';
-    } else {
-      ch = '.';
-    }
-    oss << ch;
-  }
-  nlohmann::json j = {
-      {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
-      {"moveNum", position.n()},
-      {"board", oss.str()},
-      {"q", root()->parent != nullptr ? root()->parent->Q() : 0},
-      {"gameOver", game_over()},
-  };
-  if (!history().empty()) {
-    j["lastMove"] = history().back().c.ToKgs();
-  }
-
-  std::cerr << "mg-gamestate: " << j.dump() << std::endl;
+  ReportGameState();
 
   return Response::Ok();
 }
@@ -316,7 +291,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
   auto c = SuggestMove();
   std::cerr << root()->Describe() << std::endl;
   last_genmove_ = root()->position.to_play();
-  PlayMove(c);
+  MG_CHECK(PlayMove(c));
 
   return Response::Ok(c.ToKgs());
 }
@@ -404,8 +379,20 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
   last_genmove_ = Color::kEmpty;
   NewGame();
 
+  std::vector<const Position::Stones*> recent_positions;
   for (const auto& move : sgf::GetMainLineMoves(ast)) {
-    PlayMove(move.c);
+    if (!root()->legal_moves[move.c]) {
+      return Response::Error("illegal move");
+    }
+
+    // Perform a single inference for each move with random symmetry disabled so
+    // that the same model will produce the same result every time we load the
+    // same SGF.
+    auto* leaf = root()->MaybeAddChild(move.c);
+    ProcessLeaves({&leaf, 1}, false);
+
+    MG_CHECK(PlayMove(move.c));
+    ReportGameState();
   }
 
   return Response::Ok();
@@ -447,11 +434,9 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
     return Response::Error("illegal move");
   }
 
-  if (!root()->position.IsMoveLegal(c)) {
+  if (!PlayMove(c)) {
     return Response::Error("illegal move");
   }
-
-  PlayMove(c);
   return Response::Ok();
 }
 
@@ -544,6 +529,35 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   }
 
   std::cerr << "mg-search:" << j.dump() << std::endl;
+}
+
+void GtpPlayer::ReportGameState() const {
+  const auto& position = root()->position;
+
+  std::ostringstream oss;
+  for (const auto& stone : position.stones()) {
+    char ch;
+    if (stone.color() == Color::kBlack) {
+      ch = 'X';
+    } else if (stone.color() == Color::kWhite) {
+      ch = 'O';
+    } else {
+      ch = '.';
+    }
+    oss << ch;
+  }
+  nlohmann::json j = {
+      {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
+      {"moveNum", position.n()},
+      {"board", oss.str()},
+      {"q", root()->parent != nullptr ? root()->parent->Q() : 0},
+      {"gameOver", game_over()},
+  };
+  if (!history().empty()) {
+    j["lastMove"] = history().back().c.ToKgs();
+  }
+
+  std::cerr << "mg-gamestate: " << j.dump() << std::endl;
 }
 
 }  // namespace minigo

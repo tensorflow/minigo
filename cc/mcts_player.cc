@@ -122,7 +122,7 @@ Coord MctsPlayer::SuggestMove() {
   // a prior call to SuggestMove.
   if (!root_->is_expanded) {
     auto* first_node = root_->SelectLeaf();
-    ProcessLeaves({&first_node, 1});
+    ProcessLeaves({&first_node, 1}, options_.random_symmetry);
   }
 
   if (options_.inject_noise) {
@@ -222,7 +222,7 @@ absl::Span<MctsNode* const> MctsPlayer::TreeSearch() {
   }
 
   if (!leaves_.empty()) {
-    ProcessLeaves(absl::MakeSpan(leaves_));
+    ProcessLeaves(absl::MakeSpan(leaves_), options_.random_symmetry);
     for (auto* leaf : leaves_) {
       leaf->RevertVirtualLoss(root_);
     }
@@ -236,11 +236,18 @@ bool MctsPlayer::ShouldResign() const {
          root_->Q_perspective() < options_.resign_threshold;
 }
 
-void MctsPlayer::PlayMove(Coord c) {
+bool MctsPlayer::PlayMove(Coord c) {
+  std::cerr << "PlayMove(" << c << ")" << std::endl;
   if (game_over_) {
     std::cerr << "ERROR: can't play move " << c << ", game is over"
               << std::endl;
-    return;
+    return false;
+  }
+
+  if (!root_->legal_moves[c]) {
+    std::cerr << "Move " << c << " is illegal:\n"
+              << root_->position.ToSimpleString() << std::endl;
+    return false;
   }
 
   // Handle resignations.
@@ -253,7 +260,7 @@ void MctsPlayer::PlayMove(Coord c) {
       result_string_ = "B+R";
     }
     game_over_ = true;
-    return;
+    return true;
   }
 
   PushHistory(c);
@@ -276,6 +283,8 @@ void MctsPlayer::PlayMove(Coord c) {
     result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
     game_over_ = true;
   }
+
+  return true;
 }
 
 std::string MctsPlayer::FormatScore(float score) const {
@@ -327,10 +336,11 @@ void MctsPlayer::PushHistory(Coord c) {
   }
 }
 
-void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves) {
+void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves,
+                               bool random_symmetry) {
   // Select symmetry operations to apply.
   symmetries_used_.resize(0);
-  if (options_.random_symmetry) {
+  if (random_symmetry) {
     symmetries_used_.reserve(leaves.size());
     for (size_t i = 0; i < leaves.size(); ++i) {
       symmetries_used_.push_back(static_cast<symmetry::Symmetry>(

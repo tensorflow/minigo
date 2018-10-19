@@ -94,7 +94,7 @@ define(["require", "exports", "./gtp_socket", "./base", "./board", "./util"], fu
             let lastMove = msg.lastMove ? util.parseGtpMove(msg.lastMove, this.size) : null;
             let position = new Position(msg.moveNum, stones, lastMove, this.toPlay);
             this.positionHistory[msg.moveNum] = position;
-            if (msg.moveNum == this.activePosition.moveNum + 1) {
+            if (msg.moveNum > this.activePosition.moveNum) {
                 this.activePosition = position;
                 this.updateBoards(this.activePosition);
             }

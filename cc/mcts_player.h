@@ -126,7 +126,7 @@ class MctsPlayer {
 
   virtual Coord SuggestMove();
 
-  void PlayMove(Coord c);
+  bool PlayMove(Coord c);
 
   bool ShouldResign() const;
 
@@ -162,7 +162,6 @@ class MctsPlayer {
   const std::string& name() const { return options_.name; }
   const std::vector<InferenceInfo>& inferences() const { return inferences_; }
 
-  // These methods are protected to facilitate direct testing.
  protected:
   Options* mutable_options() { return &options_; }
 
@@ -183,7 +182,7 @@ class MctsPlayer {
   DualNet* network() { return network_.get(); }
 
   // Run inference for the given leaf nodes & incorportate the inference output.
-  void ProcessLeaves(absl::Span<MctsNode*> leaves);
+  void ProcessLeaves(absl::Span<MctsNode*> leaves, bool random_symmetry);
 
  private:
   void PushHistory(Coord c);

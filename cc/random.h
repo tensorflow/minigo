@@ -58,6 +58,12 @@ class Random {
     return distribution(impl_);
   }
 
+  uint64_t UniformUint64() {
+    uint64_t a = impl_();
+    uint64_t b = impl_();
+    return (a << 32) | b;
+  }
+
   // Returns a uniform random number in the half-open range [0, 1).
   float operator()() {
     return std::uniform_real_distribution<float>(0, 1)(impl_);

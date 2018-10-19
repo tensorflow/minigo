@@ -118,6 +118,7 @@ minigo_cc_library(
         ":sgf",
         "//cc/dual_net",
         "@com_github_nlohmann_json//:json",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
@@ -158,7 +159,10 @@ minigo_cc_library(
         ":position",
         ":random",
         ":symmetries",
+        ":zobrist",
         "//cc/dual_net",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
@@ -180,6 +184,7 @@ minigo_cc_library(
         ":check",
         ":inline_vector",
         ":tiny_set",
+        ":zobrist",
         "@com_google_absl//absl/strings:str_format",
     ],
 )
@@ -261,6 +266,16 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
+    name = "zobrist",
+    srcs = ["zobrist.cc"],
+    hdrs = ["zobrist.h"],
+    deps = [
+        ":base",
+        ":random",
+    ],
+)
+
+minigo_cc_library(
     name = "test_utils",
     testonly = 1,
     srcs = ["test_utils.cc"],
@@ -292,7 +307,9 @@ minigo_cc_test_9_only(
         ":position",
         ":random",
         ":test_utils",
-        "@com_google_googletest//:gtest_main",
+        ":zobrist",
+        "@com_google_absl//absl/memory",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -304,9 +321,10 @@ minigo_cc_test_9_only(
         ":base",
         ":mcts",
         ":test_utils",
+        ":zobrist",
         "//cc/dual_net:fake_net",
         "@com_google_absl//absl/memory",
-        "@com_google_googletest//:gtest_main",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -382,6 +400,7 @@ minigo_cc_binary(
         ":random",
         ":sgf",
         ":tf_utils",
+        ":zobrist",
         "//cc/dual_net:factory",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",

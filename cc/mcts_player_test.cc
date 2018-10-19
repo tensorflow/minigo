@@ -474,3 +474,9 @@ TEST(MctsPlayerTest, SymmetriesTest) {
 
 }  // namespace
 }  // namespace minigo
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  ::minigo::zobrist::Init(614944751);
+  return RUN_ALL_TESTS();
+}

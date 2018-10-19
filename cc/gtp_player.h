@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
@@ -107,6 +108,8 @@ class GtpPlayer : public MctsPlayer {
 
   void ReportSearchStatus(const MctsNode* last_read);
 
+  void ReportGameState() const;
+
   // The color of the last genmove command, which under normal circumstances
   // is the color we are playing as.
   // Set to Color::kEmpty when the board is cleared.
@@ -118,7 +121,7 @@ class GtpPlayer : public MctsPlayer {
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;
 
-  std::map<std::string, CmdHandler> cmd_handlers_;
+  absl::flat_hash_map<std::string, CmdHandler> cmd_handlers_;
 
   std::vector<Coord> last_principal_variation_sent_;
 };

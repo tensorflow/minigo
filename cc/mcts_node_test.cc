@@ -17,9 +17,11 @@
 #include <array>
 #include <set>
 
+#include "absl/memory/memory.h"
 #include "cc/position.h"
 #include "cc/random.h"
 #include "cc/test_utils.h"
+#include "cc/zobrist.h"
 #include "gtest/gtest.h"
 
 namespace minigo {
@@ -245,7 +247,7 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   // action score for unvisited moves...
   root.stats->N = 100000;
   for (int i = 0; i < kNumMoves; ++i) {
-    if (root.position.IsMoveLegal(i)) {
+    if (root.position.ClassifyMove(i) != Position::MoveType::kIllegal) {
       root.edges[i].N = 10000;
     }
   }
@@ -398,10 +400,10 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
   float uniform_policy = 1.0 / 6;
 
   for (int i = 0; i < kNumMoves; ++i) {
-    if (root.illegal_moves[i]) {
-      EXPECT_FLOAT_EQ(0, root.edges[i].P);
-    } else {
+    if (root.legal_moves[i]) {
       EXPECT_FLOAT_EQ(uniform_policy, root.edges[i].P);
+    } else {
+      EXPECT_FLOAT_EQ(0, root.edges[i].P);
     }
   }
 
@@ -412,14 +414,80 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
   root.InjectNoise(noise);
 
   for (int i = 0; i < kNumMoves; ++i) {
-    if (root.illegal_moves[i]) {
-      EXPECT_FLOAT_EQ(0, root.edges[i].P);
-    } else {
+    if (root.legal_moves[i]) {
       EXPECT_LT(0.75 * uniform_policy, root.edges[i].P);
       EXPECT_GT(0.75 * uniform_policy + 0.25, root.edges[i].P);
+    } else {
+      EXPECT_FLOAT_EQ(0, root.edges[i].P);
     }
+  }
+}
+
+TEST(MctsNodeTest, TestSuperko) {
+  // clang-format off
+  std::vector<std::string> non_ko_moves = {
+    // Some moves at the top edge of the board that don't interfere with the kos
+    // at the bottom of the board.
+    "A9", "B9", "C9", "D9", "E9", "F9", "G9", "H9", "J9",
+    "A8", "B8", "C8", "D8", "E8", "F8", "G8", "H8", "J8",
+  };
+
+  std::vector<std::string> ko_moves = {
+      // Create two kos threats on the bottom edge of the board:
+      // .........
+      // .XO...OX.
+      // X.XO.O.OX
+      "A1", "F1", "B2", "G2", "C1", "H1", "J1", "D1", "H2", "C2",
+
+      // Capture one ko.
+      "G1", "B1", "pass", "H1",
+  };
+  // clang-format on
+
+  // Superko detection inserts caches into the tree at regularly spaced depths.
+  // For nodes that don't have a superko dectection cache, a linear search up
+  // the tree, comparing the stone hashes at each node is performed until a
+  // superko cache is hit.
+  // In order to verify that there isn't a bug related to the linear-scan &
+  // cache-lookup pair of checks, we run the superko test multiple times, with a
+  // different number of moves played at the start each time.
+  for (size_t iteration = 0; iteration < non_ko_moves.size(); ++iteration) {
+    std::vector<std::unique_ptr<MctsNode>> nodes;
+    MctsNode::EdgeStats root_stats;
+    BoardVisitor bv;
+    GroupVisitor gv;
+    nodes.push_back(absl::make_unique<MctsNode>(
+        &root_stats, Position(&bv, &gv, Color::kBlack)));
+
+    for (size_t move_idx = 0; move_idx < iteration; ++move_idx) {
+      Coord c = Coord::FromKgs(non_ko_moves[move_idx]);
+      ASSERT_TRUE(nodes.back()->legal_moves[c]);
+      nodes.push_back(absl::make_unique<MctsNode>(nodes.back().get(), c));
+    }
+
+    for (const auto& move : ko_moves) {
+      Coord c = Coord::FromKgs(move);
+      ASSERT_TRUE(nodes.back()->legal_moves[c]);
+      nodes.push_back(absl::make_unique<MctsNode>(nodes.back().get(), c));
+    }
+
+    // Without superko checking, it should look like capturing the second ko at
+    // C1 is valid.
+    auto c1 = Coord::FromKgs("C1");
+    EXPECT_EQ(Position::MoveType::kCapture,
+              nodes.back()->position.ClassifyMove(c1));
+
+    // When checking superko however, playing at C1 is not legal because it
+    // repeats a position.
+    EXPECT_FALSE(nodes.back()->legal_moves[c1]);
   }
 }
 
 }  // namespace
 }  // namespace minigo
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  ::minigo::zobrist::Init(614944751);
+  return RUN_ALL_TESTS();
+}

@@ -26,13 +26,55 @@
 
 namespace minigo {
 
+namespace {
+
+void InitLegalMoves(MctsNode* node) {
+  auto& position = node->position;
+  auto position_hash = position.stone_hash();
+  auto to_play = position.to_play();
+  for (int c = 0; c < kN * kN; ++c) {
+    switch (position.ClassifyMove(c)) {
+      case Position::MoveType::kIllegal: {
+        // The move is trivially not legal.
+        node->legal_moves[c] = false;
+        break;
+      }
+
+      case Position::MoveType::kNoCapture: {
+        // The move will not capture any stones: we can calculate the new
+        // position's stone hash directly.
+        auto move_hash = position_hash ^ zobrist::MoveHash(c, to_play);
+        node->legal_moves[c] = !node->HasPositionBeenPlayedBefore(move_hash);
+        break;
+      }
+
+      case Position::MoveType::kCapture: {
+        // The move will capture some opponent stones: in order to calculate the
+        // stone hash, we actually have to play the move.
+
+        Position new_position(position);
+        // It's safe to call AddStoneToBoard instead of PlayMove because:
+        //  - we know the move is not kPass.
+        //  - the move is legal (modulo superko).
+        //  - we only care about new_position's stone_hash and not the rest of
+        //    the bookkeeping that PlayMove updates.
+        new_position.AddStoneToBoard(c, to_play);
+        auto move_hash = new_position.stone_hash();
+        node->legal_moves[c] = !node->HasPositionBeenPlayedBefore(move_hash);
+        break;
+      }
+    }
+  }
+  node->legal_moves[Coord::kPass] = true;
+}
+
+constexpr int kSuperKoCacheStride = 8;
+
+}  // namespace
+
 MctsNode::MctsNode(EdgeStats* stats, const Position& position)
     : parent(nullptr), stats(stats), move(Coord::kInvalid), position(position) {
-  // TODO(tommadams): Only call IsMoveLegal if we want to select a leaf for
-  // expansion.
-  for (int i = 0; i < kNumMoves; ++i) {
-    illegal_moves[i] = !position.IsMoveLegal(i);
-  }
+  InitLegalMoves(this);
 }
 
 MctsNode::MctsNode(MctsNode* parent, Coord move)
@@ -41,11 +83,22 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
       move(move),
       position(parent->position) {
   position.PlayMove(move);
-  // TODO(tommadams): Only call IsMoveLegal if we want to select a leaf for
-  // expansion.
-  for (int i = 0; i < kNumMoves; ++i) {
-    illegal_moves[i] = !position.IsMoveLegal(i);
+
+  if ((position.n() % kSuperKoCacheStride) == 0) {
+    superko_cache = absl::make_unique<SuperkoCache>();
+    superko_cache->reserve(position.n() + 1);
+    superko_cache->insert(position.stone_hash());
+    for (auto* node = parent; node != nullptr; node = node->parent) {
+      if (node->superko_cache != nullptr) {
+        superko_cache->insert(node->superko_cache->begin(),
+                              node->superko_cache->end());
+        break;
+      }
+      superko_cache->insert(node->position.stone_hash());
+    }
   }
+
+  InitLegalMoves(this);
 }
 
 Coord MctsNode::GetMostVisitedMove() const {
@@ -167,7 +220,7 @@ void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise) {
 
   float scalar = 0;
   for (int i = 0; i < kNumMoves; ++i) {
-    if (illegal_moves[i] == 0) {
+    if (legal_moves[i]) {
       scalar += noise[i];
     }
   }
@@ -177,7 +230,7 @@ void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise) {
   }
 
   for (int i = 0; i < kNumMoves; ++i) {
-    float scaled_noise = scalar * (illegal_moves[i] ? 0 : noise[i]);
+    float scaled_noise = scalar * (legal_moves[i] ? noise[i] : 0);
     edges[i].P = 0.75f * edges[i].P + 0.25f * scaled_noise;
   }
 }
@@ -218,7 +271,7 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
 
   float policy_scalar = 0;
   for (int i = 0; i < kNumMoves; ++i) {
-    if (!illegal_moves[i]) {
+    if (legal_moves[i]) {
       policy_scalar += move_probabilities[i];
     }
   }
@@ -230,7 +283,7 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
   for (int i = 0; i < kNumMoves; ++i) {
     // Zero out illegal moves, and re-normalize move_probabilities.
     float move_prob =
-        illegal_moves[i] ? 0 : policy_scalar * move_probabilities[i];
+        legal_moves[i] ? policy_scalar * move_probabilities[i] : 0;
 
     edges[i].original_P = edges[i].P = move_prob;
     // Initialize child Q as current node's value, to prevent dynamics where
@@ -285,7 +338,6 @@ void MctsNode::RevertVirtualLoss(MctsNode* up_to) {
 }
 
 void MctsNode::PruneChildren(Coord c) {
-  // TODO(tommadams): Allocate children out of a pool and return them here.
   auto child = std::move(children[c]);
   children.clear();
   children[c] = std::move(child);
@@ -305,7 +357,6 @@ std::array<float, kNumMoves> MctsNode::CalculateChildActionScore() const {
 MctsNode* MctsNode::MaybeAddChild(Coord c) {
   auto it = children.find(c);
   if (it == children.end()) {
-    // TODO(tommadams): Allocate children out of a pool.
     auto child = absl::make_unique<MctsNode>(this, c);
     MctsNode* result = child.get();
     children[c] = std::move(child);
@@ -314,4 +365,18 @@ MctsNode* MctsNode::MaybeAddChild(Coord c) {
     return it->second.get();
   }
 }
+
+bool MctsNode::HasPositionBeenPlayedBefore(zobrist::Hash stone_hash) const {
+  for (const auto* node = this; node != nullptr; node = node->parent) {
+    if (node->superko_cache != nullptr) {
+      return node->superko_cache->count(stone_hash);
+    } else {
+      if (node->position.stone_hash() == stone_hash) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 }  // namespace minigo

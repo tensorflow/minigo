@@ -45,9 +45,10 @@ class TestablePosition : public Position {
   Color IsKoish(absl::string_view str) const {
     return Position::IsKoish(Coord::FromString(str));
   }
-  bool IsMoveSuicidal(absl::string_view str, Color color) const {
-    return Position::IsMoveSuicidal(Coord::FromString(str), color);
+  MoveType ClassifyMove(absl::string_view str) const {
+    return Position::ClassifyMove(Coord::FromString(str));
   }
+  using Position::ClassifyMove;
 
   BoardVisitor board_visitor;
   GroupVisitor group_visitor;
