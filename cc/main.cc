@@ -16,7 +16,6 @@
 #include <unistd.h>
 #include <cstring>
 #include <functional>
-#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -29,6 +28,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
@@ -67,8 +67,6 @@ DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed. "
               "This seed is used to control the moves played, not whether a "
               "game has resignation disabled or is a holdout.");
-DEFINE_bool(even, true,
-            "In eval mode, whether the models should play black in turn.");
 
 // Tree search flags.
 DEFINE_int32(num_readouts, 100,
@@ -470,8 +468,9 @@ class SelfPlayer {
 
 class Evaluator {
   // A barrier that blocks threads until the number of waiting threads reaches
-  // the 'count' threshold. Allows decrementing the threshold to handle the tail
-  // of a work queue where some threads exit early.
+  // the 'count' threshold. This implementation has different semantics than
+  // absl::Barrier: it can be reused and allows decrementing the threshold to
+  // handle the tail of a work queue where some threads exit early.
   class Barrier {
    public:
     explicit Barrier(size_t count)
@@ -514,8 +513,10 @@ class Evaluator {
   // after the MctsPlayer has been constructed.
   class WrappedDualNet : public DualNet {
    public:
-    explicit WrappedDualNet(const std::unique_ptr<DualNet>& dual_net)
-        : dual_net_(dual_net) {}
+    explicit WrappedDualNet(const std::unique_ptr<DualNet>* dual_net)
+        : dual_net_(*dual_net) {
+      MG_CHECK(dual_net);
+    }
 
    private:
     void RunMany(std::vector<const BoardFeatures*> features,
@@ -527,6 +528,11 @@ class Evaluator {
   };
 
   struct Model {
+    Model(const std::string& model_path)
+        : name(file::Stem(model_path)),
+          factory(NewDualNetFactory(model_path)),
+          black_wins(0),
+          white_wins(0) {}
     std::string name;
     std::unique_ptr<DualNetFactory> factory;
     std::atomic<int> black_wins;
@@ -537,17 +543,8 @@ class Evaluator {
   void Run() {
     auto start_time = absl::Now();
 
-    auto create_model = [](const std::string& model_path) {
-      auto model = absl::make_unique<Model>();
-      model->name = static_cast<std::string>(file::Stem(model_path));
-      model->factory = NewDualNetFactory(model_path);
-      model->black_wins = 0;
-      model->white_wins = 0;
-      return model;
-    };
-
-    auto prev_model = create_model(FLAGS_model);
-    auto cur_model = create_model(FLAGS_model_two);
+    auto prev_model = absl::make_unique<Model>(FLAGS_model);
+    auto cur_model = absl::make_unique<Model>(FLAGS_model_two);
 
     std::cerr << "DualNet factories created from " << FLAGS_model << "\n  and "
               << FLAGS_model_two << " in "
@@ -562,18 +559,11 @@ class Evaluator {
     int num_games = FLAGS_parallel_games;
     barrier_ = absl::make_unique<Barrier>(num_games);
 
-    for (int i = 0; i < num_games;) {
-      threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, i,
-                                      cur_model.get(), prev_model.get()));
-      ++i;
-      if (FLAGS_even && i < num_games) {
-        threads_.emplace_back([&, i] {
-          // Wait for the other games to play the first move.
-          barrier_->Wait();
-          ThreadRun(i, prev_model.get(), cur_model.get());
-        });
-        ++i;
-      }
+    for (int thread_id = 0; thread_id < num_games; ++thread_id) {
+      bool swap_models = (thread_id & 1) != 0;
+      threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
+                                      cur_model.get(), prev_model.get(),
+                                      swap_models));
     }
 
     for (auto& t : threads_) {
@@ -586,14 +576,14 @@ class Evaluator {
 
     auto print_name = [](const std::string& name) {
       if (name.size() > 20) {
-        std::cerr << name.substr(0, 17) << "...";
+        std::cerr << absl::StrFormat("%.20s...", name);
       } else {
-        std::cerr << std::setw(20) << name;
+        std::cerr << absl::StrFormat("%-20s", name);
       }
     };
     auto print_wins = [&](int wins) {
-      std::cerr << "   " << std::setw(3) << wins << " " << std::setw(6)
-                << wins * 100.0f / num_games << "%";
+      std::cerr << absl::StrFormat("   %3d %3.2f%%", wins,
+                                   wins * 100.0f / num_games);
     };
     auto print_result = [&](const Model& model) {
       print_name(model.name);
@@ -604,8 +594,7 @@ class Evaluator {
     };
 
     std::cerr << "wins                        total         black         white"
-              << std::endl
-              << std::fixed << std::setprecision(2);
+              << std::endl;
     print_result(*prev_model);
     print_result(*cur_model);
     std::cerr << "                                  ";
@@ -615,7 +604,16 @@ class Evaluator {
   }
 
  private:
-  void ThreadRun(int thread_id, Model* model, Model* other_model) {
+  void ThreadRun(int thread_id, Model* model, Model* other_model,
+                 bool swap_models) {
+    if (swap_models) {
+      std::swap(model, other_model);
+      // Wait for the barrier so that games with swapped models lag one move
+      // behind the other games, and the per-model inferences of all games run
+      // in sync.
+      barrier_->Wait();
+    }
+
     // The player and other_player reference this pointer.
     std::unique_ptr<DualNet> dual_net;
 
@@ -629,12 +627,12 @@ class Evaluator {
     player_options.verbose = thread_id == 0;
     player_options.name = model->name;
     auto player = absl::make_unique<MctsPlayer>(
-        absl::make_unique<WrappedDualNet>(dual_net), player_options);
+        absl::make_unique<WrappedDualNet>(&dual_net), player_options);
 
     player_options.verbose = false;
     player_options.name = other_model->name;
     auto other_player = absl::make_unique<MctsPlayer>(
-        absl::make_unique<WrappedDualNet>(dual_net), player_options);
+        absl::make_unique<WrappedDualNet>(&dual_net), player_options);
 
     auto* black = player.get();
     auto* white = other_player.get();
