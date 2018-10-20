@@ -371,7 +371,7 @@ MctsNode* MctsNode::MaybeAddChild(Coord c) {
 bool MctsNode::HasPositionBeenPlayedBefore(zobrist::Hash stone_hash) const {
   for (const auto* node = this; node != nullptr; node = node->parent) {
     if (node->superko_cache != nullptr) {
-      return node->superko_cache->count(stone_hash);
+      return node->superko_cache->contains(stone_hash);
     } else {
       if (node->position.stone_hash() == stone_hash) {
         return true;

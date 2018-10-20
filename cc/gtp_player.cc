@@ -387,6 +387,7 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
     // Perform a single inference for each move with random symmetry disabled so
     // that the same model will produce the same result every time we load the
     // same SGF.
+    // TODO(tommadams): Only do this when running in Minigui.
     auto* leaf = root()->MaybeAddChild(move.c);
     ProcessLeaves({&leaf, 1}, false);
 
