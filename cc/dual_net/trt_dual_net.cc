@@ -107,7 +107,7 @@ class TrtDualNet : public DualNet {
 
       // Run the model.
       void* buffers[] = {pos_tensor_, policy_output_, value_output_};
-      context_->execute(batch_size_, buffers);
+      context_->execute(max_batch_size_, buffers);
 
       // Copy the policy and value out of the output tensors.
       for (size_t i = 0; i < batch_size; ++i) {
