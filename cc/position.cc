@@ -58,7 +58,7 @@ Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play, int n)
       group_visitor_(gv),
       to_play_(to_play),
       n_(n),
-      stone_hash_(zobrist::ToPlayHash(to_play)) {}
+      stone_hash_(0) {}
 
 Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
     : Position(position) {
@@ -72,7 +72,6 @@ void Position::PlayMove(Coord c, Color color) {
     return;
   }
 
-  stone_hash_ ^= zobrist::ToPlayHash(to_play_);
   if (color == Color::kEmpty) {
     color = to_play_;
   } else {
@@ -86,7 +85,6 @@ void Position::PlayMove(Coord c, Color color) {
   n_ += 1;
   num_consecutive_passes_ = 0;
   to_play_ = OtherColor(to_play_);
-  stone_hash_ ^= zobrist::ToPlayHash(to_play_);
   previous_move_ = c;
 }
 
@@ -168,9 +166,7 @@ void Position::PassMove() {
   n_ += 1;
   num_consecutive_passes_ += 1;
   ko_ = Coord::kInvalid;
-  stone_hash_ ^= zobrist::ToPlayHash(to_play_);
   to_play_ = OtherColor(to_play_);
-  stone_hash_ ^= zobrist::ToPlayHash(to_play_);
   previous_move_ = Coord::kPass;
 }
 
