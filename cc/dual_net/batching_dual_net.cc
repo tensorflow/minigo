@@ -64,6 +64,8 @@ class BatchingService {
     notification.WaitForNotification();
   }
 
+  int GetBufferCount() const { return dual_net_->GetBufferCount(); }
+
   DualNet::InputLayout GetInputLayout() const {
     return dual_net_->GetInputLayout();
   }
@@ -154,6 +156,8 @@ class BatchingDualNet : public DualNet {
                std::vector<Output*> outputs, std::string* model) override {
     service_->RunMany(std::move(features), std::move(outputs), model);
   };
+
+  int GetBufferCount() const override { return service_->GetBufferCount(); }
 
   InputLayout GetInputLayout() const override {
     return service_->GetInputLayout();

@@ -24,6 +24,7 @@
 #include "absl/strings/strip.h"
 #include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/tensorflow/tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -41,11 +42,8 @@ using tensorflow::TensorShape;
 namespace minigo {
 
 TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
-                           const std::string& tpu_name, int num_replicas,
-                           int max_batch_size)
-    : num_replicas_(num_replicas),
-      max_sub_batch_size_((max_batch_size + num_replicas_ - 1) /
-                          num_replicas_) {
+                           const std::string& tpu_name, int num_replicas)
+    : num_replicas_(num_replicas), batch_capacity_(0) {
   SessionOptions options;
   options.target = tpu_name;
   options.config.set_allow_soft_placement(true);
@@ -54,10 +52,6 @@ TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
   TF_CHECK_OK(session_->Create(graph_def));
 
   for (int i = 0; i < num_replicas_; ++i) {
-    inputs_.emplace_back(
-        absl::StrCat("tpu_pos_tensor_", i),
-        Tensor(DT_FLOAT,
-               TensorShape({max_sub_batch_size_, kN, kN, kNumStoneFeatures})));
     output_names_.push_back(absl::StrCat("tpu_policy_output_", i));
     output_names_.push_back(absl::StrCat("tpu_value_output_", i));
   }
@@ -82,16 +76,16 @@ void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
                                  std::vector<Output*> outputs) {
   MG_CHECK(features.size() == outputs.size());
 
-  auto batch_size = static_cast<int>(features.size());
-  auto sub_batch_size = (batch_size + num_replicas_ - 1) / num_replicas_;
-  MG_CHECK(sub_batch_size <= max_sub_batch_size_);
+  size_t num_features = features.size();
+  size_t batch_size = (num_features + num_replicas_ - 1) / num_replicas_;
+  Reserve(batch_size);
 
   // Split the input features across all replicas.
   for (int replica = 0; replica < num_replicas_; ++replica) {
-    int begin = replica * sub_batch_size;
-    int end = std::min(batch_size, (replica + 1) * sub_batch_size);
+    size_t begin = replica * batch_size;
+    size_t end = std::min(num_features, (replica + 1) * batch_size);
     auto* data = inputs_[replica].second.flat<float>().data();
-    for (int i = begin; i < end; ++i) {
+    for (size_t i = begin; i < end; ++i) {
       data = std::copy(features[i]->begin(), features[i]->end(), data);
     }
   }
@@ -100,9 +94,9 @@ void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
   TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
 
   // Copy the policy and value out of the output tensors.
-  for (int i = 0; i < batch_size; ++i) {
-    int replica = i / sub_batch_size;
-    int j = i % sub_batch_size;
+  for (size_t i = 0; i < num_features; ++i) {
+    size_t replica = i / batch_size;
+    size_t j = i % batch_size;
 
     const auto& policy_tensor = outputs_[replica * 2].flat<float>();
     const auto& value_tensor = outputs_[replica * 2 + 1].flat<float>();
@@ -112,12 +106,25 @@ void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
   }
 }
 
-TpuDualNet::TpuDualNet(const std::string& graph_path,
-                       const std::string& tpu_name, int buffering,
-                       int max_batch_size)
-    : graph_path_(graph_path) {
-  MG_CHECK(buffering >= 1);
+void TpuDualNet::Worker::Reserve(size_t capacity) {
+  MG_CHECK(capacity > 0);
+  if (capacity <= batch_capacity_) {
+    return;
+  }
 
+  inputs_.clear();
+  for (int i = 0; i < num_replicas_; ++i) {
+    inputs_.emplace_back(
+        absl::StrCat("tpu_pos_tensor_", i),
+        Tensor(DT_FLOAT, TensorShape({static_cast<int>(capacity), kN, kN,
+                                      kNumStoneFeatures})));
+  }
+  batch_capacity_ = capacity;
+}
+
+TpuDualNet::TpuDualNet(const std::string& graph_path,
+                       const std::string& tpu_name)
+    : graph_path_(graph_path) {
   // If we can't find the specified graph, try adding a .pb extension.
   auto* env = Env::Default();
   if (!env->FileExists(graph_path_).ok()) {
@@ -146,9 +153,9 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
             << graph_path << std::endl;
   MG_CHECK(num_replicas > 0);
 
-  for (int i = 0; i < buffering; ++i) {
-    workers_.Push(absl::make_unique<TpuDualNet::Worker>(
-        graph_def, tpu_name, num_replicas, max_batch_size));
+  for (int i = 0; i < GetBufferCount(); ++i) {
+    workers_.Push(absl::make_unique<TpuDualNet::Worker>(graph_def, tpu_name,
+                                                        num_replicas));
   }
 
   // Use one of the workers to initialize the TPU.
@@ -158,12 +165,12 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
 
   // Run warm-up inferences on all sessions.
   // Tensorflow lazily initializes the first time Session::Run is called,
-  // which can take hundreds of milliseconds. This intefers with time control,
+  // which can take hundreds of milliseconds. This interfers with time control,
   // so explicitly run inference once during construction.
+  // TODO(tommadams): Is this still necessary without 'time control'?
   std::cerr << "Running warm-up inferences" << std::endl;
   std::vector<std::thread> threads;
-  threads.reserve(buffering);
-  for (int i = 0; i < buffering; ++i) {
+  for (int i = 0; i < GetBufferCount(); ++i) {
     threads.emplace_back([this]() {
       BoardFeatures features;
       Output output;
@@ -191,6 +198,12 @@ void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
   if (model != nullptr) {
     *model = graph_path_;
   }
+}
+
+int TpuDualNet::GetBufferCount() const {
+  // Double buffering: one running the current set of batches, the other filling
+  // up the next set of batches.
+  return 2;
 }
 
 }  // namespace minigo

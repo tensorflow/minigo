@@ -38,6 +38,7 @@
 #include "absl/time/time.h"
 #include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/dual_net/batching_dual_net.h"
 #include "cc/dual_net/factory.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
@@ -145,6 +146,21 @@ DEFINE_double(holdout_pct, 0.03,
 namespace minigo {
 namespace {
 
+std::unique_ptr<DualNetFactory> NewDualNetFactory(const std::string& model_path,
+                                                  int num_parallel_games) {
+  auto dual_net = NewDualNet(model_path);
+  // Calculate batch size suiteable for a DualNet which handles inference
+  // requests from num_parallel_games each with at most virtual_losses features
+  // each so that the maximum number of features in flight results in
+  // buffer_count batches.
+  int buffer_count = dual_net->GetBufferCount();
+  size_t batch_size =
+      std::max((FLAGS_virtual_losses * num_parallel_games + buffer_count - 1) /
+                   buffer_count,
+               FLAGS_virtual_losses);
+  return NewBatchingFactory(std::move(dual_net), batch_size);
+}
+
 std::string GetOutputName(absl::Time now, size_t i) {
   auto timestamp = absl::ToUnixSeconds(now);
   std::string output_name;
@@ -245,7 +261,7 @@ class SelfPlayer {
   void Run() {
     {
       absl::MutexLock lock(&mutex_);
-      dual_net_factory_ = NewDualNetFactory(FLAGS_model);
+      dual_net_factory_ = NewDualNetFactory(FLAGS_model, FLAGS_parallel_games);
     }
     for (int i = 0; i < FLAGS_parallel_games; ++i) {
       threads_.emplace_back(std::bind(&SelfPlayer::ThreadRun, this, i));
@@ -533,7 +549,7 @@ class Evaluator {
   struct Model {
     Model(const std::string& model_path)
         : name(file::Stem(model_path)),
-          factory(NewDualNetFactory(model_path)),
+          factory(NewDualNetFactory(model_path, FLAGS_parallel_games)),
           black_wins(0),
           white_wins(0) {}
     std::string name;
@@ -716,7 +732,7 @@ void Gtp() {
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   options.ponder_limit = FLAGS_ponder_limit;
   options.courtesy_pass = FLAGS_courtesy_pass;
-  auto dual_net_factory = NewDualNetFactory(FLAGS_model);
+  auto dual_net_factory = NewDualNetFactory(FLAGS_model, 1);
   auto player = absl::make_unique<GtpPlayer>(dual_net_factory->New(), options);
   player->Run();
 }
@@ -743,7 +759,7 @@ void Puzzle() {
     games.emplace_back(std::move(moves));
   }
 
-  auto factory = NewDualNetFactory(FLAGS_model);
+  auto factory = NewDualNetFactory(FLAGS_model, parallel_games);
   std::cerr << "DualNet factory created from " << FLAGS_model << " in "
             << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
             << std::endl;

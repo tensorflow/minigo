@@ -70,4 +70,6 @@ DualNet::InputLayout DualNet::GetInputLayout() const {
   return InputLayout::kNHWC;
 }
 
+int DualNet::GetBufferCount() const { return 1; }
+
 }  // namespace minigo

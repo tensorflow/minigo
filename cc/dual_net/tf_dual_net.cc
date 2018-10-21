@@ -51,17 +51,12 @@ namespace {
 class TfDualNet : public DualNet {
   class TfWorker {
    public:
-    explicit TfWorker(const tensorflow::GraphDef& graph_def) {
+    explicit TfWorker(const tensorflow::GraphDef& graph_def)
+        : batch_capacity_(0) {
       tensorflow::SessionOptions options;
       options.config.mutable_gpu_options()->set_allow_growth(true);
       session_.reset(tensorflow::NewSession(options));
       TF_CHECK_OK(session_->Create(graph_def));
-
-      inputs_.emplace_back(
-          "pos_tensor",
-          tensorflow::Tensor(
-              tensorflow::DT_FLOAT,
-              tensorflow::TensorShape({1, kN, kN, kNumStoneFeatures})));
 
       output_names_.emplace_back("policy_output");
       output_names_.emplace_back("value_output");
@@ -75,14 +70,10 @@ class TfDualNet : public DualNet {
 
     void RunMany(std::vector<const BoardFeatures*> features,
                  std::vector<Output*> outputs) {
-      int batch_size = static_cast<int>(features.size());
-      auto& feature_tensor = inputs_.front().second;
-      if (feature_tensor.dim_size(0) < batch_size) {
-        feature_tensor = Tensor(
-            DT_FLOAT, TensorShape({batch_size, kN, kN, kNumStoneFeatures}));
-      }
+      size_t num_features = features.size();
+      Reserve(num_features);
 
-      auto* feature_data = feature_tensor.flat<float>().data();
+      auto* feature_data = inputs_[0].second.flat<float>().data();
       // Copy the features into the input tensor.
       for (const auto* feature : features) {
         feature_data =
@@ -95,7 +86,7 @@ class TfDualNet : public DualNet {
       // Copy the policy and value out of the output tensors.
       const auto& policy_tensor = outputs_[0].flat<float>();
       const auto& value_tensor = outputs_[1].flat<float>();
-      for (int i = 0; i < batch_size; ++i) {
+      for (size_t i = 0; i < num_features; ++i) {
         memcpy(outputs[i]->policy.data(), policy_tensor.data() + i * kNumMoves,
                sizeof(outputs[i]->policy));
         outputs[i]->value = value_tensor.data()[i];
@@ -103,10 +94,25 @@ class TfDualNet : public DualNet {
     }
 
    private:
+    void Reserve(size_t capacity) {
+      MG_CHECK(capacity > 0);
+      if (capacity <= batch_capacity_) {
+        return;
+      }
+      inputs_.clear();
+      inputs_.emplace_back(
+          "pos_tensor", tensorflow::Tensor(tensorflow::DT_FLOAT,
+                                           tensorflow::TensorShape(
+                                               {static_cast<int>(capacity), kN,
+                                                kN, kNumStoneFeatures})));
+      batch_capacity_ = capacity;
+    }
+
     std::unique_ptr<tensorflow::Session> session_;
     std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
     std::vector<std::string> output_names_;
     std::vector<tensorflow::Tensor> outputs_;
+    size_t batch_capacity_;
   };
 
   struct InferenceData {
@@ -122,6 +128,8 @@ class TfDualNet : public DualNet {
 
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override;
+
+  int GetBufferCount() const override { return worker_threads_.size(); }
 
  private:
   static void PlaceOnDevice(tensorflow::GraphDef* graph_def,
@@ -142,6 +150,7 @@ class TfDualNet : public DualNet {
   ThreadSafeQueue<InferenceData> inference_queue_;
   std::vector<std::thread> worker_threads_;
   std::atomic<bool> running_;
+  int device_count_;
 };
 
 TfDualNet::TfDualNet(std::string graph_path)
@@ -168,19 +177,24 @@ TfDualNet::TfDualNet(std::string graph_path)
     }
   };
 
+  // Create two worker threads per device.
 #if MINIGO_ENABLE_GPU
-  TF_CHECK_OK(tensorflow::ValidateGPUMachineManager());
-  int device_count = tensorflow::GPUMachineManager()->VisibleDeviceCount();
-  for (int device_id = 0; device_id < device_count; ++device_id) {
-    auto device = std::to_string(device_id);
-    PlaceOnDevice(&graph_def, "/gpu:" + device);
-    // Two threads per device.
-    worker_threads_.emplace_back(functor, graph_def);
-    worker_threads_.emplace_back(functor, graph_def);
+  if (tensorflow::ValidateGPUMachineManager().ok()) {
+    int device_count = tensorflow::GPUMachineManager()->VisibleDeviceCount();
+    for (int device_id = 0; device_id < device_count; ++device_id) {
+      auto device = std::to_string(device_id);
+      PlaceOnDevice(&graph_def, "/gpu:" + device);
+      worker_threads_.emplace_back(functor, graph_def);
+      worker_threads_.emplace_back(functor, graph_def);
+    }
+    if (device_count) {
+      return;
+    }
   }
-#else
-  worker_threads_.emplace_back(functor, graph_def);
 #endif
+
+  worker_threads_.emplace_back(functor, graph_def);
+  worker_threads_.emplace_back(functor, graph_def);
 }
 
 TfDualNet::~TfDualNet() {

@@ -23,15 +23,8 @@
 
 namespace minigo {
 
-class DualNetFactory {
- public:
-  virtual ~DualNetFactory();
-
-  virtual std::unique_ptr<DualNet> New() = 0;
-};
-
-std::unique_ptr<DualNetFactory> NewDualNetFactory(
-    const std::string& model_path);
+// Creates one of the DualNet implementations based on the engine flag.
+std::unique_ptr<DualNet> NewDualNet(const std::string& model_path);
 
 }  // namespace minigo
 

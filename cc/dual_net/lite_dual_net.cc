@@ -47,6 +47,7 @@ class LiteDualNet : public DualNet {
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, T* feature_data,
                const T* policy_data, const T* value_data);
+  void Reserve(int capacity);
 
   std::unique_ptr<tflite::FlatBufferModel> model_;
   std::unique_ptr<tflite::Interpreter> interpreter_;
@@ -56,10 +57,11 @@ class LiteDualNet : public DualNet {
   TfLiteTensor* value_ = nullptr;
 
   std::string graph_path_;
+  int batch_capacity_;
 };
 
 minigo::LiteDualNet::LiteDualNet(std::string graph_path)
-    : graph_path_(graph_path) {
+    : graph_path_(graph_path), batch_capacity_(0) {
   if (!std::ifstream(graph_path).good()) {
     absl::StrAppend(&graph_path, ".tflite");
   }
@@ -73,6 +75,13 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
 
   // Let's just use all the processors we can.
   interpreter_->SetNumThreads(get_nprocs());
+}
+
+void minigo::LiteDualNet::Reserve(int capacity) {
+  MG_CHECK(capacity > 0);
+  if (capacity <= batch_capacity_) {
+    return;
+  }
 
   // Initialize input.
   const auto& inputs = interpreter_->inputs();
@@ -80,9 +89,16 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
   absl::string_view input_name = interpreter_->GetInputName(0);
   MG_CHECK(input_name == "pos_tensor");
 
+  // Resize input tensor to batch size.
+  MG_CHECK(interpreter_->ResizeInputTensor(
+               inputs[0], {static_cast<int>(capacity), kN, kN,
+                           DualNet::kNumStoneFeatures}) == kTfLiteOk);
+  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
+
   input_ = interpreter_->tensor(inputs[0]);
   MG_CHECK(input_ != nullptr);
   MG_CHECK(input_->dims->size == 4);
+  MG_CHECK(input_->dims->data[0] == capacity);
   MG_CHECK(input_->dims->data[1] == kN);
   MG_CHECK(input_->dims->data[2] == kN);
   MG_CHECK(input_->dims->data[3] == kNumStoneFeatures);
@@ -106,18 +122,19 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
   MG_CHECK(policy_ != nullptr);
   MG_CHECK(policy_->type == input_->type);
   MG_CHECK(policy_->dims->size == 2);
-  MG_CHECK(policy_->dims->data[0] == input_->dims->data[0]);
+  MG_CHECK(policy_->dims->data[0] == capacity);
   MG_CHECK(policy_->dims->data[1] == kNumMoves);
 
   MG_CHECK(value_ != nullptr);
   MG_CHECK(value_->type == input_->type);
   MG_CHECK(value_->dims->size == 1);
-  MG_CHECK(value_->dims->data[0] == input_->dims->data[0]);
+  MG_CHECK(value_->dims->data[0] == capacity);
 
-  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
   MG_CHECK(input_->data.raw != nullptr);
   MG_CHECK(policy_->data.raw != nullptr);
   MG_CHECK(value_->data.raw != nullptr);
+
+  batch_capacity_ = capacity;
 }
 
 void minigo::LiteDualNet::RunMany(
@@ -127,7 +144,8 @@ void minigo::LiteDualNet::RunMany(
     *model = graph_path_;
   }
 
-  MG_CHECK(features.size() <= static_cast<size_t>(input_->dims->data[0]));
+  int num_features = static_cast<int>(features.size());
+  Reserve(num_features);
 
   switch (input_->type) {
     case kTfLiteFloat32:
@@ -164,16 +182,16 @@ template <typename T>
 void minigo::LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
                                   std::vector<Output*> outputs, T* feature_data,
                                   const T* policy_data, const T* value_data) {
-  int batch_size = static_cast<int>(features.size());
+  int num_features = static_cast<int>(features.size());
 
   // Allow a smaller batch size than we run inference on because the first
   // inference made when starting the game has batch size 1 (instead of the
   // normal 8) to initialized the tree search.
-  MG_CHECK(batch_size <= input_->dims->data[0]);
+  MG_CHECK(num_features <= input_->dims->data[0]);
 
   // TODO(tommadams): Make BoardFeatures a uint8_t array and memcpy here.
   const auto& input_params = input_->params;
-  for (size_t j = 0; j < features.size(); ++j) {
+  for (int j = 0; j < num_features; ++j) {
     const auto& board = *features[j];
     for (size_t i = 0; i < board.size(); ++i) {
       // TODO(csigg): Apply dequantization parameters?
@@ -186,10 +204,10 @@ void minigo::LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
 
   const auto& policy_params = policy_->params;
   const auto& value_params = value_->params;
-  for (int j = 0; j < batch_size; ++j) {
+  for (int j = 0; j < num_features; ++j) {
     for (int i = 0; i < kNumMoves; ++i) {
       outputs[j]->policy[i] =
-          Convert<float>(policy_params, policy_data[j * batch_size + i]);
+          Convert<float>(policy_params, policy_data[j * num_features + i]);
     }
     outputs[j]->value = Convert<float>(value_params, value_data[j]);
   }

@@ -77,6 +77,9 @@ class DualNet {
   virtual void RunMany(std::vector<const BoardFeatures*> features,
                        std::vector<Output*> outputs, std::string* model) = 0;
 
+  // Returns the ideal number of inference requests in flight.
+  virtual int GetBufferCount() const;
+
   virtual InputLayout GetInputLayout() const;
 };
 
