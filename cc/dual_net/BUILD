@@ -161,6 +161,7 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:check",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
     ],
