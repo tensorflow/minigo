@@ -258,8 +258,7 @@ bool MctsPlayer::PlayMove(Coord c) {
   }
 
   if (!root_->legal_moves[c]) {
-    std::cerr << "Move " << c << " is illegal:\n"
-              << root_->position.ToSimpleString() << std::endl;
+    std::cerr << "Move " << c << " is illegal" << std::endl;
     return false;
   }
 
