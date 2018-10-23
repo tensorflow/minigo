@@ -415,6 +415,7 @@ minigo_cc_binary(
 minigo_cc_binary(
     name = "tfrzz_to_cbt",
     srcs = ["tfrzz_to_cbt.cc"],
+    tags = ["manual"],
     deps = [
         ":base",
         ":check",
@@ -423,6 +424,7 @@ minigo_cc_binary(
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],
