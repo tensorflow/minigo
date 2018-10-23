@@ -18,6 +18,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "cc/dual_net/batching_dual_net.h"
+#include "cc/dual_net/fake_dual_net.h"
 #include "gflags/gflags.h"
 
 #ifdef MG_ENABLE_TF_DUAL_NET
@@ -48,13 +49,17 @@
 #endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_TRT_DUAL_NET
 
+#ifndef MG_DEFAULT_ENGINE
+#define MG_DEFAULT_ENGINE "fake"
+#endif  // MG_DEFAULT_ENGINE
+
 // Flags defined in main.cc.
 DECLARE_int32(virtual_losses);
 DECLARE_int32(parallel_games);
 
 // Inference engine flags.
 DEFINE_string(engine, MG_DEFAULT_ENGINE,
-              "The inference engine to use. Accepted values:"
+              "The inference engine to use. Accepted values: \"fake\""
 #ifdef MG_ENABLE_TF_DUAL_NET
               " \"tf\""
 #endif
@@ -87,6 +92,10 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
     const std::string& model_path) {
   std::unique_ptr<DualNet> dual_net;
   int batch_size = FLAGS_batch_size;
+
+  if (FLAGS_engine == "fake") {
+    dual_net = absl::make_unique<FakeDualNet>();
+  }
 
   if (FLAGS_engine == "tf") {
 #ifdef MG_ENABLE_TF_DUAL_NET

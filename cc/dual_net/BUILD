@@ -61,6 +61,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         ":batching_dual_net",
+        ":fake_dual_net",
         "//cc:base",
         "//cc:check",
         "@com_github_gflags_gflags//:gflags",
@@ -70,10 +71,9 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
-    name = "fake_net",
-    testonly = 1,
-    srcs = ["fake_net.cc"],
-    hdrs = ["fake_net.h"],
+    name = "fake_dual_net",
+    srcs = ["fake_dual_net.cc"],
+    hdrs = ["fake_dual_net.h"],
     deps = [
         ":dual_net",
         "//cc:base",

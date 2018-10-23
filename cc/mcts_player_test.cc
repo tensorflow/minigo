@@ -21,7 +21,7 @@
 #include "cc/algorithm.h"
 #include "cc/color.h"
 #include "cc/constants.h"
-#include "cc/dual_net/fake_net.h"
+#include "cc/dual_net/fake_dual_net.h"
 #include "cc/position.h"
 #include "cc/test_utils.h"
 #include "gtest/gtest.h"
@@ -43,7 +43,7 @@ static constexpr char kAlmostDoneBoard[] = R"(
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(const Options& options)
-      : MctsPlayer(absl::make_unique<FakeNet>(), options) {}
+      : MctsPlayer(absl::make_unique<FakeDualNet>(), options) {}
 
   explicit TestablePlayer(std::unique_ptr<DualNet> network,
                           const Options& options)
@@ -51,7 +51,7 @@ class TestablePlayer : public MctsPlayer {
 
   TestablePlayer(absl::Span<const float> fake_priors, float fake_value,
                  const Options& options)
-      : MctsPlayer(absl::make_unique<FakeNet>(fake_priors, fake_value),
+      : MctsPlayer(absl::make_unique<FakeDualNet>(fake_priors, fake_value),
                    options) {}
 
   using MctsPlayer::PickMove;
@@ -99,7 +99,7 @@ std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(int n) {
   options.random_seed = 17;
   options.komi = 2.5;
   // Don't apply random symmetries. If we did, the probabilities we set in
-  // the FakeNet won't be chosen correctly (since the board position will be
+  // the FakeDualNet won't be chosen correctly (since the board position will be
   // randomly transformed).
   options.random_symmetry = false;
 
@@ -144,7 +144,7 @@ TEST(MctsPlayerTest, InjectNoise) {
   auto player = CreateBasicPlayer(options);
   auto* root = player->root();
 
-  // FakeNet should return normalized priors.
+  // FakeDualNet should return normalized priors.
   float sum_P = 0;
   for (int i = 0; i < kNumMoves; ++i) {
     sum_P += root->child_P(i);

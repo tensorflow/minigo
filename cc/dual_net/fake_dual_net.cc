@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/dual_net/fake_net.h"
+#include "cc/dual_net/fake_dual_net.h"
 
 #include "cc/check.h"
 
 namespace minigo {
 
-FakeNet::FakeNet(absl::Span<const float> priors, float value) : value_(value) {
+FakeDualNet::FakeDualNet(absl::Span<const float> priors, float value)
+    : value_(value) {
   if (!priors.empty()) {
     MG_CHECK(priors.size() == kNumMoves);
     for (int i = 0; i < kNumMoves; ++i) {
@@ -31,14 +32,14 @@ FakeNet::FakeNet(absl::Span<const float> priors, float value) : value_(value) {
   }
 }
 
-void FakeNet::RunMany(std::vector<const DualNet::BoardFeatures*> features,
-                      std::vector<Output*> outputs, std::string* model) {
+void FakeDualNet::RunMany(std::vector<const DualNet::BoardFeatures*> features,
+                          std::vector<Output*> outputs, std::string* model) {
   for (auto* output : outputs) {
     output->policy = priors_;
     output->value = value_;
   }
   if (model != nullptr) {
-    *model = "FakeNet";
+    *model = "FakeDualNet";
   }
 }
 

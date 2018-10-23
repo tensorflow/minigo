@@ -322,7 +322,7 @@ minigo_cc_test_9_only(
         ":mcts",
         ":test_utils",
         ":zobrist",
-        "//cc/dual_net:fake_net",
+        "//cc/dual_net:fake_dual_net",
         "@com_google_absl//absl/memory",
         "@com_google_googletest//:gtest",
     ],
