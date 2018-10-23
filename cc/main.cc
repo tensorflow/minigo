@@ -514,17 +514,17 @@ class Evaluator {
   class WrappedDualNet : public DualNet {
    public:
     explicit WrappedDualNet(const std::unique_ptr<DualNet>* dual_net)
-        : dual_net_(*dual_net) {
+        : dual_net_(dual_net) {
       MG_CHECK(dual_net);
     }
 
    private:
     void RunMany(std::vector<const BoardFeatures*> features,
                  std::vector<Output*> outputs, std::string* model) override {
-      dual_net_->RunMany(std::move(features), std::move(outputs), model);
+      dual_net_->get()->RunMany(std::move(features), std::move(outputs), model);
     };
 
-    const std::unique_ptr<DualNet>& dual_net_;
+    const std::unique_ptr<DualNet>* const dual_net_;
   };
 
   struct Model {
@@ -576,14 +576,14 @@ class Evaluator {
 
     auto print_name = [](const std::string& name) {
       if (name.size() > 20) {
-        std::cerr << absl::StrFormat("%.20s...", name);
+        std::cerr << absl::StreamFormat("%.20s...", name);
       } else {
-        std::cerr << absl::StrFormat("%-20s", name);
+        std::cerr << absl::StreamFormat("%-20s", name);
       }
     };
     auto print_wins = [&](int wins) {
-      std::cerr << absl::StrFormat("   %3d %3.2f%%", wins,
-                                   wins * 100.0f / num_games);
+      std::cerr << absl::StreamFormat("   %3d %3.2f%%", wins,
+                                      wins * 100.0f / num_games);
     };
     auto print_result = [&](const Model& model) {
       print_name(model.name);
