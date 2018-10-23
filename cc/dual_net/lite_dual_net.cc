@@ -48,6 +48,7 @@ class LiteDualNet : public DualNet {
                std::vector<Output*> outputs, T* feature_data,
                const T* policy_data, const T* value_data);
   void Reserve(int capacity);
+  void CheckTensorSizes() const;
 
   std::unique_ptr<tflite::FlatBufferModel> model_;
   std::unique_ptr<tflite::Interpreter> interpreter_;
@@ -91,17 +92,11 @@ void minigo::LiteDualNet::Reserve(int capacity) {
 
   // Resize input tensor to batch size.
   MG_CHECK(interpreter_->ResizeInputTensor(
-               inputs[0], {static_cast<int>(capacity), kN, kN,
-                           DualNet::kNumStoneFeatures}) == kTfLiteOk);
+      inputs[0], {static_cast<int>(capacity), kN, kN,
+                  DualNet::kNumStoneFeatures}) == kTfLiteOk);
   MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
 
   input_ = interpreter_->tensor(inputs[0]);
-  MG_CHECK(input_ != nullptr);
-  MG_CHECK(input_->dims->size == 4);
-  MG_CHECK(input_->dims->data[0] == capacity);
-  MG_CHECK(input_->dims->data[1] == kN);
-  MG_CHECK(input_->dims->data[2] == kN);
-  MG_CHECK(input_->dims->data[3] == kNumStoneFeatures);
 
   // Initialize outputs.
   const auto& outputs = interpreter_->outputs();
@@ -119,22 +114,28 @@ void minigo::LiteDualNet::Reserve(int capacity) {
     value_ = interpreter_->tensor(outputs[0]);
   }
 
+  batch_capacity_ = capacity;
+  CheckTensorSizes();
+}
+
+void LiteDualNet::CheckTensorSizes() const {
+  MG_CHECK(input_ != nullptr);
+  MG_CHECK(input_->dims->size == 4);
+  MG_CHECK(input_->dims->data[0] == batch_capacity_);
+  MG_CHECK(input_->dims->data[1] == kN);
+  MG_CHECK(input_->dims->data[2] == kN);
+  MG_CHECK(input_->dims->data[3] == kNumStoneFeatures);
+
   MG_CHECK(policy_ != nullptr);
   MG_CHECK(policy_->type == input_->type);
   MG_CHECK(policy_->dims->size == 2);
-  MG_CHECK(policy_->dims->data[0] == capacity);
+  MG_CHECK(policy_->dims->data[0] == batch_capacity_);
   MG_CHECK(policy_->dims->data[1] == kNumMoves);
 
   MG_CHECK(value_ != nullptr);
   MG_CHECK(value_->type == input_->type);
   MG_CHECK(value_->dims->size == 1);
-  MG_CHECK(value_->dims->data[0] == capacity);
-
-  MG_CHECK(input_->data.raw != nullptr);
-  MG_CHECK(policy_->data.raw != nullptr);
-  MG_CHECK(value_->data.raw != nullptr);
-
-  batch_capacity_ = capacity;
+  MG_CHECK(value_->dims->data[0] == batch_capacity_);
 }
 
 void minigo::LiteDualNet::RunMany(

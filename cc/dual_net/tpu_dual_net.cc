@@ -167,7 +167,6 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
   // Tensorflow lazily initializes the first time Session::Run is called,
   // which can take hundreds of milliseconds. This interfers with time control,
   // so explicitly run inference once during construction.
-  // TODO(tommadams): Is this still necessary without 'time control'?
   std::cerr << "Running warm-up inferences" << std::endl;
   std::vector<std::thread> threads;
   for (int i = 0; i < GetBufferCount(); ++i) {
