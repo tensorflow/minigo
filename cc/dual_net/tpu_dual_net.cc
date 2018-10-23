@@ -162,6 +162,7 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
   // so explicitly run inference once during construction.
   std::cerr << "Running warm-up inferences" << std::endl;
   std::vector<std::thread> threads;
+  threads.reserve(buffering);
   for (int i = 0; i < buffering; ++i) {
     threads.emplace_back([this]() {
       BoardFeatures features;

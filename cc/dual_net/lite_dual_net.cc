@@ -61,7 +61,7 @@ class LiteDualNet : public DualNet {
 minigo::LiteDualNet::LiteDualNet(std::string graph_path)
     : graph_path_(graph_path) {
   if (!std::ifstream(graph_path).good()) {
-    graph_path = absl::StrCat(graph_path, ".tflite");
+    absl::StrAppend(&graph_path, ".tflite");
   }
 
   model_ = FlatBufferModel::BuildFromFile(graph_path.c_str());
@@ -142,22 +142,22 @@ void minigo::LiteDualNet::RunMany(
 }
 
 template <typename T, typename S>
-T Convert(const TfLiteQuantizationParams&, const S& s) {
-  return static_cast<T>(s);
+T Convert(const TfLiteQuantizationParams&, const S& x) {
+  return static_cast<T>(x);
 }
 
 // Dequantize.
 template <>
 float Convert<float, uint8_t>(const TfLiteQuantizationParams& params,
-                              const uint8_t& u) {
-  return (u - params.zero_point) * params.scale;
+                              const uint8_t& x) {
+  return (x - params.zero_point) * params.scale;
 };
 
 // Quantize.
 template <>
 uint8_t Convert<uint8_t, float>(const TfLiteQuantizationParams& params,
-                                const float& f) {
-  return static_cast<uint8_t>(f / params.scale + params.zero_point);
+                                const float& x) {
+  return static_cast<uint8_t>(x / params.scale + params.zero_point);
 };
 
 template <typename T>

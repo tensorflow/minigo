@@ -151,7 +151,7 @@ TfDualNet::TfDualNet(std::string graph_path)
   // If we can't find the specified graph, try adding a .pb extension.
   auto* env = Env::Default();
   if (!env->FileExists(graph_path).ok()) {
-    graph_path = absl::StrCat(graph_path, ".pb");
+    absl::StrAppend(&graph_path, ".pb");
   }
 
   TF_CHECK_OK(ReadBinaryProto(env, graph_path, &graph_def));
