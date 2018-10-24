@@ -100,5 +100,19 @@ bool GetModTime(const std::string& path, uint64_t* mtime_usec) {
   return true;
 }
 
+bool ListDir(const std::string& directory, std::vector<std::string>* files) {
+  tensorflow::Status status;
+  auto* env = tensorflow::Env::Default();
+
+  status = env->GetChildren(directory, files);
+  if (!status.ok()) {
+    std::cerr << "Error getting " << directory << " content: " << status
+              << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
 }  // namespace file
 }  // namespace minigo

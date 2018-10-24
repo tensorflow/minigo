@@ -14,6 +14,7 @@
 
 #include "cc/file/utils.h"
 
+#include <dirent.h>
 #include <sys/stat.h>
 #include <cstdio>
 #include <iostream>
@@ -68,5 +69,19 @@ bool GetModTime(const std::string& path, uint64_t* mtime_usec) {
   return true;
 }
 
+bool ListDir(const std::string& directory, std::vector<std::string>* files) {
+  DIR* dirp = opendir(directory.c_str());
+  if (directory == nullptr) {
+    std::cerr << "Could not open directory " << directory << std::endl;
+    return false;
+  }
+  files->clear();
+  while (dirent* dp = readdir(dirp)) {
+    files->push_back(dp->d_name);
+  }
+  closedir(dirp);
+
+  return true;
+}
 }  // namespace file
 }  // namespace minigo

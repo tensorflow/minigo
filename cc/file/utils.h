@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #include "absl/strings/string_view.h"
 
 namespace minigo {
@@ -43,6 +44,11 @@ __attribute__((warn_unused_result)) bool ReadFile(const std::string& path,
 __attribute__((warn_unused_result)) bool GetModTime(const std::string& path,
                                                     uint64_t* mtime_usec);
 
+// Fills 'files' with the names of the files in 'directory'.
+// When compiled with --define=tf=1, uses TensorFlow's file APIs to enable
+// access to GCS. Only allows local file access otherwise.
+__attribute__((warn_unused_result)) bool ListDir(
+    const std::string& directory, std::vector<std::string>* files);
 }  // namespace file
 }  // namespace minigo
 

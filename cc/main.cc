@@ -51,7 +51,8 @@
 #include "gflags/gflags.h"
 
 // Game options flags.
-DEFINE_string(mode, "", "Mode to run in: \"selfplay\", \"eval\" or \"gtp\"");
+DEFINE_string(mode, "",
+              "Mode to run in: \"selfplay\", \"eval\", \"gtp\" or \"puzzle\".");
 DEFINE_int32(
     ponder_limit, 0,
     "If non-zero and in GTP mode, the number times of times to perform tree "
@@ -125,7 +126,9 @@ DEFINE_string(output_bigtable, "",
               "Output Bigtable specification, of the form: "
               "project,instance,table. "
               "If empty, no examples are written to Bigtable.");
-DEFINE_string(sgf_dir, "", "SGF directory. If empty, no SGF is written.");
+DEFINE_string(sgf_dir, "",
+              "SGF directory for selfplay and puzzles. If empty in selfplay "
+              "mode, no SGF is written.");
 DEFINE_double(holdout_pct, 0.03,
               "Fraction of games to hold out for validation.");
 
@@ -718,6 +721,77 @@ void Gtp() {
   player->Run();
 }
 
+void Puzzle() {
+  auto start_time = absl::Now();
+
+  std::vector<std::string> sgf_files;
+  MG_CHECK(file::ListDir(FLAGS_sgf_dir, &sgf_files));
+
+  std::vector<std::vector<Move>> games;
+  int parallel_games = 0;
+  for (const auto& sgf_file : sgf_files) {
+    if (!absl::EndsWith(sgf_file, ".sgf")) {
+      continue;
+    }
+    auto path = file::JoinPath(FLAGS_sgf_dir, sgf_file);
+    std::string contents;
+    MG_CHECK(file::ReadFile(path, &contents));
+    sgf::Ast ast;
+    MG_CHECK(ast.Parse(contents));
+    auto moves = GetMainLineMoves(ast);
+    parallel_games += moves.size();
+    games.emplace_back(std::move(moves));
+  }
+
+  auto factory = NewDualNetFactory(FLAGS_model);
+  std::cerr << "DualNet factory created from " << FLAGS_model << " in "
+            << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
+            << std::endl;
+
+  MctsPlayer::Options options;
+  ParseMctsPlayerOptionsFromFlags(&options);
+  options.verbose = false;
+
+  using Pair = std::pair<std::unique_ptr<MctsPlayer>, Move>;
+  std::vector<Pair> puzzles;
+  for (const auto& moves : games) {
+    std::vector<std::unique_ptr<MctsPlayer>> players(moves.size());
+    for (auto& player : players) {
+      player.reset(new MctsPlayer(factory->New(), options));
+    }
+    for (const auto& move : moves) {
+      puzzles.emplace_back(std::move(players.back()), move);
+      players.pop_back();
+      for (auto& player : players) {
+        player->PlayMove(move.c);
+      }
+    }
+  }
+
+  std::atomic<size_t> result(0);
+  std::vector<std::thread> threads;
+  for (auto& puzzle : puzzles) {
+    threads.emplace_back(std::bind(
+        [&](const Pair& pair) {
+          if (pair.first->SuggestMove() == pair.second.c) {
+            ++result;
+          }
+        },
+        std::move(puzzle)));
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+  std::cerr << "All threads stopped, total time "
+            << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
+            << std::endl;
+
+  std::cerr << absl::StreamFormat("Solved %d of %d puzzles (%3.1f%%).", result,
+                                  puzzles.size(),
+                                  result * 100.0f / puzzles.size())
+            << std::endl;
+}
+
 }  // namespace
 }  // namespace minigo
 
@@ -731,6 +805,8 @@ int main(int argc, char* argv[]) {
     minigo::Eval();
   } else if (FLAGS_mode == "gtp") {
     minigo::Gtp();
+  } else if (FLAGS_mode == "puzzle") {
+    minigo::Puzzle();
   } else {
     std::cerr << "Unrecognized mode \"" << FLAGS_mode << "\"\n";
     return 1;
