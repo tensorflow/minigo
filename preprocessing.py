@@ -220,6 +220,27 @@ def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
     dataset = dataset.map(
         functools.partial(batch_parse_tf_example, batch_size))
 
+    # TODO(sethtroisi@): Unify
+    if random_rotation:
+        # Unbatch the dataset so we can rotate it
+        dataset = dataset.apply(tf.contrib.data.unbatch())
+        dataset = dataset.apply(tf.contrib.data.map_and_batch(
+            _random_rotation_pure_tf,
+            batch_size,
+            drop_remainder=True))
+
+    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+    return dataset
+
+
+def get_tpu_bt_input_tensors(batch_size, num_repeats=1, random_rotation=True):
+    import bigtable_input
+    dataset = bigtable_input.get_unparsed_moves_from_last_n_games(500e3)
+    dataset = dataset.repeat(num_repeats)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
+    dataset = dataset.map(
+        functools.partial(batch_parse_tf_example, batch_size))
     if random_rotation:
         # Unbatch the dataset so we can rotate it
         dataset = dataset.apply(tf.contrib.data.unbatch())
