@@ -25,7 +25,9 @@ class BatchingService {
         queue_counter_(0),
         run_counter_(0),
         num_runs_(0),
-        batch_size_(batch_size) {}
+        batch_size_(batch_size) {
+    dual_net_->Reserve(batch_size);
+  }
 
   ~BatchingService() {
     std::cerr << "Ran " << num_runs_ << " batches with an average size of "

@@ -42,23 +42,27 @@ class LiteDualNet : public DualNet {
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override;
 
+  void Reserve(size_t capacity) override;
+
  private:
   template <typename T>
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, T* feature_data,
                const T* policy_data, const T* value_data);
-  void Reserve(int capacity);
-  void CheckTensorSizes() const;
 
   std::unique_ptr<tflite::FlatBufferModel> model_;
   std::unique_ptr<tflite::Interpreter> interpreter_;
+
+  int input_idx_;
+  int policy_idx_;
+  int value_idx_;
 
   TfLiteTensor* input_ = nullptr;
   TfLiteTensor* policy_ = nullptr;
   TfLiteTensor* value_ = nullptr;
 
   std::string graph_path_;
-  int batch_capacity_;
+  size_t batch_capacity_;
 };
 
 minigo::LiteDualNet::LiteDualNet(std::string graph_path)
@@ -76,66 +80,54 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
 
   // Let's just use all the processors we can.
   interpreter_->SetNumThreads(get_nprocs());
-}
 
-void minigo::LiteDualNet::Reserve(int capacity) {
-  MG_CHECK(capacity > 0);
-  if (capacity <= batch_capacity_) {
-    return;
-  }
-
-  // Initialize input.
   const auto& inputs = interpreter_->inputs();
   MG_CHECK(inputs.size() == 1);
   absl::string_view input_name = interpreter_->GetInputName(0);
   MG_CHECK(input_name == "pos_tensor");
+  input_idx_ = inputs[0];
 
-  // Resize input tensor to batch size.
-  MG_CHECK(interpreter_->ResizeInputTensor(
-      inputs[0], {static_cast<int>(capacity), kN, kN,
-                  DualNet::kNumStoneFeatures}) == kTfLiteOk);
-  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
+  // Check that the model matches the board size and feature count.
+  auto* input = interpreter_->tensor(input_idx_);
+  MG_CHECK(input->dims->size == 4);
+  MG_CHECK(input->dims->data[1] == kN);
+  MG_CHECK(input->dims->data[2] == kN);
+  MG_CHECK(input->dims->data[3] == kNumStoneFeatures);
 
-  input_ = interpreter_->tensor(inputs[0]);
-
-  // Initialize outputs.
   const auto& outputs = interpreter_->outputs();
   MG_CHECK(outputs.size() == 2);
   absl::string_view output_0_name = interpreter_->GetOutputName(0);
   absl::string_view output_1_name = interpreter_->GetOutputName(1);
   if (output_0_name == "policy_output") {
     MG_CHECK(output_1_name == "value_output") << output_1_name;
-    policy_ = interpreter_->tensor(outputs[0]);
-    value_ = interpreter_->tensor(outputs[1]);
+    policy_idx_ = outputs[0];
+    value_idx_ = outputs[1];
   } else {
     MG_CHECK(output_1_name == "policy_output") << output_1_name;
     MG_CHECK(output_0_name == "value_output") << output_0_name;
-    policy_ = interpreter_->tensor(outputs[1]);
-    value_ = interpreter_->tensor(outputs[0]);
+    policy_idx_ = outputs[1];
+    value_idx_ = outputs[0];
   }
-
-  batch_capacity_ = capacity;
-  CheckTensorSizes();
 }
 
-void LiteDualNet::CheckTensorSizes() const {
-  MG_CHECK(input_ != nullptr);
-  MG_CHECK(input_->dims->size == 4);
-  MG_CHECK(input_->dims->data[0] == batch_capacity_);
-  MG_CHECK(input_->dims->data[1] == kN);
-  MG_CHECK(input_->dims->data[2] == kN);
-  MG_CHECK(input_->dims->data[3] == kNumStoneFeatures);
+void minigo::LiteDualNet::Reserve(size_t capacity) {
+  MG_CHECK(capacity > 0);
+  if (capacity <= batch_capacity_) {
+    return;
+  }
 
-  MG_CHECK(policy_ != nullptr);
-  MG_CHECK(policy_->type == input_->type);
-  MG_CHECK(policy_->dims->size == 2);
-  MG_CHECK(policy_->dims->data[0] == batch_capacity_);
-  MG_CHECK(policy_->dims->data[1] == kNumMoves);
+  // Resize input tensor to batch size.
+  MG_CHECK(interpreter_->ResizeInputTensor(
+               input_idx_, {static_cast<int>(capacity), kN, kN,
+                            DualNet::kNumStoneFeatures}) == kTfLiteOk);
+  MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
 
-  MG_CHECK(value_ != nullptr);
-  MG_CHECK(value_->type == input_->type);
-  MG_CHECK(value_->dims->size == 1);
-  MG_CHECK(value_->dims->data[0] == batch_capacity_);
+  // Get the new inputs and outputs after AllocateTensor().
+  input_ = interpreter_->tensor(input_idx_);
+  policy_ = interpreter_->tensor(policy_idx_);
+  value_ = interpreter_->tensor(value_idx_);
+
+  batch_capacity_ = capacity;
 }
 
 void minigo::LiteDualNet::RunMany(
@@ -145,8 +137,7 @@ void minigo::LiteDualNet::RunMany(
     *model = graph_path_;
   }
 
-  int num_features = static_cast<int>(features.size());
-  Reserve(num_features);
+  Reserve(features.size());
 
   switch (input_->type) {
     case kTfLiteFloat32:

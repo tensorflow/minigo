@@ -77,6 +77,10 @@ class DualNet {
   virtual void RunMany(std::vector<const BoardFeatures*> features,
                        std::vector<Output*> outputs, std::string* model) = 0;
 
+  // Potentially prepares the DualNet to avoid expensive operations during
+  // RunMany() calls with up to 'capacity' features.
+  virtual void Reserve(size_t capacity);
+
   // Returns the ideal number of inference requests in flight.
   virtual int GetBufferCount() const;
 
