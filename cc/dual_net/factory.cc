@@ -79,19 +79,11 @@ namespace minigo {
 
 DualNetFactory::~DualNetFactory() = default;
 
-<<<<<<< HEAD
-std::unique_ptr<DualNetFactory> NewDualNetFactory(
-    const std::string& model_path) {
-  std::unique_ptr<DualNet> dual_net;
-  int batch_size = FLAGS_batch_size;
-
+std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
   if (FLAGS_engine == "fake") {
-    dual_net = absl::make_unique<FakeDualNet>();
+    return absl::make_unique<FakeDualNet>();
   }
 
-=======
-std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
->>>>>>> 6adabb0... Remove batch_size flag.
   if (FLAGS_engine == "tf") {
 #ifdef MG_ENABLE_TF_DUAL_NET
     return NewTfDualNet(model_path);
