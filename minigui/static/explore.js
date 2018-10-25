@@ -1,8 +1,9 @@
-define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./winrate_graph", "./util"], function (require, exports, app_1, base_1, board_1, lyr, log_1, winrate_graph_1, util_1) {
+define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./winrate_graph", "./util", "./variation_tree"], function (require, exports, app_1, base_1, board_1, lyr, log_1, winrate_graph_1, util_1, variation_tree_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     const HUMAN = 'Human';
     const MINIGO = 'Minigo';
+    variation_tree_1.testVariationTree();
     class DemoApp extends app_1.App {
         constructor() {
             super();

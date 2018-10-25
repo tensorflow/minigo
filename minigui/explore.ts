@@ -20,9 +20,12 @@ import * as lyr from './layer'
 import {Log} from './log'
 import {WinrateGraph} from './winrate_graph'
 import {getElement, toPrettyResult} from './util'
+import {VariationTree, testVariationTree} from './variation_tree'
 
 const HUMAN = 'Human';
 const MINIGO = 'Minigo';
+
+testVariationTree();
 
 // Demo app implementation that's shared between full and lightweight demo UIs.
 class DemoApp extends App {
