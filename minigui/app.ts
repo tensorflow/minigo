@@ -12,31 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Annotation, Position} from './position'
 import {Socket} from './gtp_socket'
-import {Nullable, Color, Move} from './base'
-import {Annotation, Board} from './board'
+import {Color, Move, N, Nullable, setBoardSize} from './base'
+import {Board} from './board'
 import * as util from './util'
-
-class Position {
-  search: Move[] = [];
-  pv: Move[] = [];
-  n: Nullable<number[]> = null;
-  dq: Nullable<number[]> = null;
-  annotations: Annotation[] = [];
-
-  constructor(public moveNum: number,
-              public stones: Color[],
-              public lastMove: Nullable<Move>,
-              public toPlay: Color) {
-    if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
-      this.annotations.push({
-        p: lastMove,
-        shape: Annotation.Shape.Dot,
-        color: '#ef6c02',
-      });
-    }
-  }
-}
 
 interface SearchMsg {
   moveNum: number;
@@ -61,18 +41,17 @@ abstract class App {
   // WebSocket connection to the Miniui backend server.
   protected gtp = new Socket();
 
-  // Board size.
-  protected size: number;
-
   // True if Minigo is processing a genmove command.
   protected engineBusy = false;
 
-  // The list of board positions played.
-  // TODO(tommadams): This will need to be turned into a tree when we add an
-  // analysis mode.
-  protected positionHistory: Position[];
+  // The root of the game tree, an empty board.
+  protected rootPosition: Position;
 
-  // The current position being displayed on the boards.
+  // The most recent position played.
+  protected latestPosition: Position;
+
+  // The most position currently being displayed. In some modes, this is
+  // different from the latestPosition.
   protected activePosition: Position;
 
   // True when the backend reports that the game is over.
@@ -93,9 +72,7 @@ abstract class App {
 
   protected connect() {
     let uri = `http://${document.domain}:${location.port}/minigui`;
-    return this.gtp.connect(uri).then((size: number) => {
-      this.size = size;
-    });
+    return this.gtp.connect(uri).then((size: number) => { setBoardSize(size); });
   }
 
   protected init(boards: Board[]) {
@@ -103,9 +80,10 @@ abstract class App {
   }
 
   protected newGame() {
-    this.activePosition = new Position(
-      0, util.emptyBoard(this.size), null, Color.Black)
-    this.positionHistory = [this.activePosition];
+    this.rootPosition = new Position(
+        null, 0, util.emptyBoard(), null, Color.Black)
+    this.latestPosition = this.rootPosition;
+    this.activePosition = this.rootPosition;
 
     this.gtp.send('clear_board');
     this.gtp.send('gamestate');
@@ -146,23 +124,29 @@ abstract class App {
 
   protected onSearch(msg: SearchMsg) {
     // Parse move variations.
-    msg.search = util.parseMoves(msg.search as string[], this.size);
+    msg.search = util.parseMoves(msg.search as string[], N);
     msg.toPlay = util.parseGtpColor(msg.toPlay as string);
     if (msg.pv) {
-      msg.pv = util.parseMoves(msg.pv as string[], this.size);
+      msg.pv = util.parseMoves(msg.pv as string[], N);
+    }
+
+    if (msg.moveNum != this.latestPosition.moveNum) {
+      throw new Error(
+          `Got a search msg for move ${msg.moveNum} but latest is ` +
+          `${this.latestPosition.moveNum}`);
     }
 
     // Update the board state with contents of the search.
     // Copies the properties named in `props` that are present in `msg` into the
-    // current position history.
-    // TODO(tommadams): It would be more flexible to allow the position history
+    // current position.
+    // TODO(tommadams): It would be more flexible to allow the position
     // to store any/all properties return in the SearchMsg, without having to
     // specify this property list.
     const props = ['n', 'dq', 'pv', 'search'];
-    util.partialUpdate(msg, this.positionHistory[msg.moveNum], props);
+    util.partialUpdate(msg, this.latestPosition, props);
 
     // Update the boards.
-    if (msg.moveNum == this.activePosition.moveNum) {
+    if (this.activePosition.moveNum == msg.moveNum) {
       this.updateBoards(msg);
     }
   }
@@ -181,15 +165,28 @@ abstract class App {
 
     this.toPlay = util.parseGtpColor(msg.toPlay);
     this.gameOver = msg.gameOver;
-    let lastMove =
-        msg.lastMove ? util.parseGtpMove(msg.lastMove, this.size) : null;
+    let lastMove = msg.lastMove ? util.parseGtpMove(msg.lastMove, N) : null;
 
-    // Create a new position.
-    let position = new Position(msg.moveNum, stones, lastMove, this.toPlay);
-    this.positionHistory[msg.moveNum] = position;
-    if (msg.moveNum > this.activePosition.moveNum) {
-      this.activePosition = position;
-      this.updateBoards(this.activePosition);
+    if (lastMove == null) {
+      if (msg.moveNum != 0) {
+        throw new Error(`moveNum == ${msg.moveNum} but don't have a lastMove`);
+      }
+      stones.forEach((color) => {
+        if (color != Color.Empty) {
+          throw new Error(`board isn't empty but don't have a lastMove`);
+        }
+      });
+    } else {
+      if (msg.moveNum != this.latestPosition.moveNum + 1) {
+        throw new Error(
+            `Expected game state for move ${this.latestPosition.moveNum + 1} ` +
+            `but got ${msg.moveNum}`);
+      }
+      this.latestPosition = this.latestPosition.addChild(lastMove, stones);
+      if (this.activePosition == this.latestPosition.parent) {
+        this.activePosition = this.latestPosition;
+        this.updateBoards(this.activePosition);
+      }
     }
 
     if (this.gameOver) {

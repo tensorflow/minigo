@@ -28,7 +28,12 @@
         height: 40px;
       }
 
-      .winrate-graph { width: 480px; height: 210px; }
+      #black-player { background-color: #222; color: #eee; }
+      #white-player { background-color: #fff; color: #222; }
+      #pass { background-color: #9c9389; color: #222; }
+      #reset { background-color: #8c6845; color: #ffe; }
+
+      .winrate-graph { width: 480px; height: 210px; cursor: crosshair; }
       .log-container { width: 480px; height: 590px; }
       .log { height: 566px; font-size: 10px; }
       .console-wrapper { height: 24px; }
@@ -39,8 +44,7 @@
   </head>
   <body>
     <div class="minigui"
-         data-gtp-report_search_interval="50"
-         data-gtp-ponder_limit="0">
+         data-gtp-report_search_interval="50">
       <div class="main-board-pad board"><div id="main-board"></div></div>
       <div class="sp-30"></div>
       <div class="fs-0">

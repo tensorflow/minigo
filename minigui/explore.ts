@@ -27,6 +27,7 @@ const MINIGO = 'Minigo';
 // Demo app implementation that's shared between full and lightweight demo UIs.
 class DemoApp extends App {
   private mainBoard: ClickableBoard;
+  private readsBoard: Board;
   private playerElems: HTMLElement[] = [];
   private winrateGraph = new WinrateGraph('winrate-graph');
   private log = new Log('log', 'console');
@@ -41,53 +42,19 @@ class DemoApp extends App {
       this.mainBoard = new ClickableBoard(
         'main-board',
         [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
+      this.mainBoard.enabled = true;
 
-      let boards: Board[] = [this.mainBoard];
+      this.readsBoard = new Board(
+        'reads-board',
+        [lyr.BoardStones]);
 
-      let searchElem = getElement('search-board');
-      if (searchElem) {
-        boards.push(new Board(
-            searchElem,
-            [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]));
-      }
-
-      let nElem = getElement('n-board');
-      if (nElem) {
-        boards.push(new Board(
-          nElem,
-          [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heatMapN], lyr.BoardStones]));
-      }
-
-      let dqElem = getElement('dq-board');
-      if (dqElem) {
-        boards.push(new Board(
-          'dq-board',
-          [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heatMapDq], lyr.BoardStones]));
-      }
-
-      this.init(boards);
+      this.init([this.mainBoard, this.readsBoard]);
 
       this.mainBoard.onClick((p) => {
         this.playMove(this.toPlay, p);
       });
 
       this.initButtons();
-
-      this.winrateGraph.onMoveChanged((moveNum: Nullable<number>) => {
-        let position: Position = this.latestPosition;
-        if (moveNum != null) {
-          for (let p = this.rootPosition; p; p = p.children[0]) {
-            if (p.moveNum == moveNum) {
-              position = p;
-              break;
-            }
-          }
-        }
-        if (position != this.activePosition) {
-          this.activePosition = position;
-          this.updateBoards(position);
-        }
-      });
 
       // Initialize log.
       this.log.onConsoleCmd((cmd: string) => {
@@ -106,25 +73,23 @@ class DemoApp extends App {
       }
     });
 
-    getElement('reset').addEventListener('click', () => {
-      this.gtp.newSession();
-      this.newGame();
+    getElement('load-sgf-input').addEventListener('change', (e: any) => {
+      let files: File[] = Array.prototype.slice.call(e.target.files);
+      if (files.length != 1) {
+        let names: string[] = [];
+        files.forEach((f) => { names.push(`"${f.name}"`); });
+        throw new Error(`Expected one file, got [${names.join(', ')}]`);
+      }
+      let reader = new FileReader();
+      reader.onload = () => {
+        this.newGame();
+        let sgf = reader.result.replace(/\n/g, '\\n');
+        this.gtp.send(`playsgf ${sgf}`).then(() => {
+          console.log('ok!');
+        });
+      };
+      reader.readAsText(files[0]);
     });
-
-    let initPlayerButton = (color: Color, elemId: string) => {
-      let elem = getElement(elemId);
-      this.playerElems[color] = elem;
-      elem.addEventListener('click', () => {
-        if (elem.innerText == HUMAN) {
-          elem.innerText = MINIGO;
-        } else {
-          elem.innerText = HUMAN;
-        }
-        this.onPlayerChanged();
-      });
-    };
-    initPlayerButton(Color.Black, 'black-player');
-    initPlayerButton(Color.White, 'white-player');
   }
 
   protected newGame() {
@@ -136,17 +101,6 @@ class DemoApp extends App {
   private onPlayerChanged() {
     if (this.engineBusy || this.gameOver) {
       return;
-    }
-
-    if (this.playerElems[this.toPlay].innerText == MINIGO) {
-      this.mainBoard.enabled = false;
-      this.engineBusy = true;
-      this.gtp.send('genmove').then((move: string) => {
-        this.engineBusy = false;
-        this.gtp.send('gamestate');
-      });
-    } else {
-      this.mainBoard.enabled = true;
     }
   }
 

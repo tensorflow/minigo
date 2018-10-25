@@ -261,9 +261,11 @@ bool MctsPlayer::PlayMove(Coord c) {
   PushHistory(c);
 
   root_ = root_->MaybeAddChild(c);
-  // Don't need to keep the parent's children around anymore because we'll
-  // never revisit them.
-  root_->parent->PruneChildren(c);
+  if (options_.prune_orphaned_nodes) {
+    // Don't need to keep the parent's children around anymore because we'll
+    // never revisit them during normal play.
+    root_->parent->PruneChildren(c);
+  }
 
   if (options_.verbose) {
     std::cerr << absl::StreamFormat("%s Q: %0.5f\n", name(), root_->Q());

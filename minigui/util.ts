@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {BoardSize, Color, otherColor, Move} from './base'
+import {BoardSize, Color, otherColor, Move, N} from './base'
 
 function getElement(id: string) {
   return document.getElementById(id) as HTMLElement;
@@ -51,8 +51,8 @@ function pixelRatio() {
   return window.devicePixelRatio || 1;
 }
 
-function emptyBoard(size: number): Color[] {
-  let result = new Array<Color>(size * size);
+function emptyBoard(): Color[] {
+  let result = new Array<Color>(N * N);
   result.fill(Color.Empty);
   return result;
 }

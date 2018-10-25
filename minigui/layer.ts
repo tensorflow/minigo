@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {BoardSize, COL_LABELS, Color, otherColor, Coord, Point, Move} from './base'
-import {Annotation, Board} from './board'
+import {Annotation} from './position'
+import {BoardSize, COL_LABELS, Color, otherColor, Coord, Point, Move, N} from './base'
+import {Board} from './board'
 import {pixelRatio} from './util'
 
 const STAR_POINTS = {
@@ -69,7 +70,6 @@ class Grid extends StaticLayer {
   draw() {
     let starPointRadius = Math.min(4, Math.max(this.board.stoneRadius / 10, 2.5));
     let ctx = this.board.ctx;
-    let size = this.board.size;
     let pr = pixelRatio();
 
     ctx.strokeStyle = this.style;
@@ -77,11 +77,11 @@ class Grid extends StaticLayer {
     ctx.lineCap = 'round';
 
     ctx.beginPath();
-    for (let i = 0; i < size; ++i) {
+    for (let i = 0; i < N; ++i) {
       let left = this.boardToCanvas(i, 0);
-      let right = this.boardToCanvas(i, size - 1);
+      let right = this.boardToCanvas(i, N - 1);
       let top = this.boardToCanvas(0, i);
-      let bottom = this.boardToCanvas(size - 1, i);
+      let bottom = this.boardToCanvas(N - 1, i);
       ctx.moveTo(0.5 + Math.round(left.x), 0.5 + Math.round(left.y));
       ctx.lineTo(0.5 + Math.round(right.x), 0.5 + Math.round(right.y));
       ctx.moveTo(0.5 + Math.round(top.x), 0.5 + Math.round(top.y));
@@ -92,7 +92,7 @@ class Grid extends StaticLayer {
     // Draw star points.
     ctx.fillStyle = this.style;
     ctx.strokeStyle = '';
-    for (let p of STAR_POINTS[size]) {
+    for (let p of STAR_POINTS[N]) {
       let c = this.boardToCanvas(p[0], p[1]);
       ctx.beginPath();
       ctx.arc(c.x + 0.5, c.y + 0.5, starPointRadius * pr, 0, 2 * Math.PI);
@@ -104,7 +104,6 @@ class Grid extends StaticLayer {
 class Label extends StaticLayer {
   draw() {
     let ctx = this.board.ctx;
-    let size = this.board.size;
 
     let textHeight = Math.floor(0.3 * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
@@ -113,27 +112,27 @@ class Label extends StaticLayer {
     // Draw column labels.
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    for (let i = 0; i < size; ++i) {
+    for (let i = 0; i < N; ++i) {
       let c = this.boardToCanvas(-0.66, i);
       ctx.fillText(COL_LABELS[i], c.x, c.y);
     }
     ctx.textBaseline = 'top';
-    for (let i = 0; i < size; ++i) {
-      let c = this.boardToCanvas(size - 0.33, i);
+    for (let i = 0; i < N; ++i) {
+      let c = this.boardToCanvas(N - 0.33, i);
       ctx.fillText(COL_LABELS[i], c.x, c.y);
     }
 
     // Draw row labels.
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    for (let i = 0; i < size; ++i) {
+    for (let i = 0; i < N; ++i) {
       let c = this.boardToCanvas(i, -0.66);
-      ctx.fillText((size - i).toString(), c.x, c.y);
+      ctx.fillText((N - i).toString(), c.x, c.y);
     }
     ctx.textAlign = 'left';
-    for (let i = 0; i < size; ++i) {
-      let c = this.boardToCanvas(i, size - 0.33);
-      ctx.fillText((size - i).toString(), c.x, c.y);
+    for (let i = 0; i < N; ++i) {
+      let c = this.boardToCanvas(i, N - 0.33);
+      ctx.fillText((N - i).toString(), c.x, c.y);
     }
   }
 }
@@ -145,14 +144,13 @@ class Caption extends StaticLayer {
 
   draw() {
     let ctx = this.board.ctx;
-    let size = this.board.size;
 
     let textHeight = Math.floor(0.4 * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
     ctx.fillStyle = '#9d7c4d';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    let c = this.boardToCanvas(size - 0.45, (size - 1) / 2);
+    let c = this.boardToCanvas(N - 0.45, (N - 1) / 2);
     ctx.fillText(this.caption, c.x, c.y);
   }
 }
@@ -180,14 +178,13 @@ class HeatMap extends DataLayer {
     }
 
     let ctx = this.board.ctx;
-    let size = this.board.size;
     let w = this.board.pointW;
     let h = this.board.pointH;
     let stones = this.board.stones;
     let p = {row: 0, col: 0};
     let i = 0;
-    for (p.row = 0; p.row < size; ++p.row) {
-      for (p.col = 0; p.col < size; ++p.col) {
+    for (p.row = 0; p.row < N; ++p.row) {
+      for (p.col = 0; p.col < N; ++p.col) {
         let rgba = this.colors[i];
         if (stones[i++] != Color.Empty) {
           continue;
@@ -228,10 +225,9 @@ class BoardStones extends StoneBaseLayer {
     this.blackStones = [];
     this.whiteStones = [];
     if (stones != null) {
-      let size = this.board.size;
       let i = 0;
-      for (let row = 0; row < size; ++row) {
-        for (let col = 0; col < size; ++col) {
+      for (let row = 0; row < N; ++row) {
+        for (let col = 0; col < N; ++col) {
           let color = stones[i++];
           if (color == Color.Black) {
             this.blackStones.push({row: row, col: col});
@@ -265,7 +261,6 @@ class Variation extends StoneBaseLayer {
     }
 
     let toPlay = this.board.toPlay;
-    let size = this.board.size;
     this.blackStones = [];
     this.whiteStones = [];
     this.blackLabels = [];
@@ -283,7 +278,7 @@ class Variation extends StoneBaseLayer {
     // The playedCount array keeps track of the number of times each point on
     // the board is played within the variation. For points that are played more
     // we only show the earliest move and mark it with an asterisk.
-    let playedCount = new Uint16Array(size * size);
+    let playedCount = new Uint16Array(N * N);
     let firstPlayed: VariationLabel[] = [];
 
     toPlay = otherColor(toPlay);
@@ -295,7 +290,7 @@ class Variation extends StoneBaseLayer {
         continue;
       }
 
-      let idx = move.row * size + move.col;
+      let idx = move.row * N + move.col;
       let label = {p: move, s: (i + 1).toString()};
       let count = ++playedCount[idx];
       if (toPlay == Color.Black) {
@@ -323,7 +318,6 @@ class Variation extends StoneBaseLayer {
     super.draw()
 
     let ctx = this.board.ctx;
-    let size = this.board.size;
 
     let textHeight = Math.floor(0.5 * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;

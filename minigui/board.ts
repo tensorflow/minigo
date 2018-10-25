@@ -15,20 +15,8 @@
 import {getElement, pixelRatio} from './util'
 import {View} from './view'
 import {DataObj, Grid, Layer} from './layer'
-import {BoardSize, COL_LABELS, Color, Coord, Move, Nullable, Point} from './base'
-
-namespace Annotation {
-  export enum Shape {
-    Dot,
-    Triangle,
-  }
-}
-
-interface Annotation {
-  p: Point;
-  shape: Annotation.Shape;
-  color: string;
-}
+import {BoardSize, COL_LABELS, Color, Coord, Move, N, Nullable, Point} from './base'
+import {Annotation} from './position'
 
 class Board extends View {
   toPlay = Color.Black;
@@ -43,8 +31,7 @@ class Board extends View {
 
   protected layers: Layer[];
 
-  constructor(parent: HTMLElement | string, public size: BoardSize,
-              layerDescs: any[]) {
+  constructor(parent: HTMLElement | string, layerDescs: any[]) {
     super();
 
     if (typeof(parent) == 'string') {
@@ -54,7 +41,7 @@ class Board extends View {
 
     this.backgroundColor = '#db6';
 
-    for (let i = 0; i < this.size * this.size; ++i) {
+    for (let i = 0; i < N * N; ++i) {
       this.stones.push(Color.Empty);
     }
 
@@ -80,8 +67,8 @@ class Board extends View {
     canvas.height = pr * (parent.offsetHeight);
     canvas.style.width = `${parent.offsetWidth}px`;
     canvas.style.height = `${parent.offsetHeight}px`;
-    this.pointW = this.ctx.canvas.width / (this.size + 1);
-    this.pointH = this.ctx.canvas.height / (this.size + 1);
+    this.pointW = this.ctx.canvas.width / (N + 1);
+    this.pointH = this.ctx.canvas.height / (N + 1);
     this.stoneRadius = Math.min(this.pointW, this.pointH);
   }
 
@@ -130,7 +117,7 @@ class Board extends View {
   }
 
   getStone(p: Point) {
-    return this.stones[p.row * this.size + p.col];
+    return this.stones[p.row * N + p.col];
   }
 
   canvasToBoard(x: number, y: number, threshold?: number): Nullable<Point> {
@@ -139,13 +126,12 @@ class Board extends View {
     y *= pr;
 
     let canvas = this.ctx.canvas;
-    let size = this.size;
 
-    y = y * (size + 1) / canvas.height - 0.5;
-    x = x * (size + 1) / canvas.width - 0.5;
+    y = y * (N + 1) / canvas.height - 0.5;
+    x = x * (N + 1) / canvas.width - 0.5;
     let row = Math.floor(y);
     let col = Math.floor(x);
-    if (row < 0 || row >= size || col < 0 || col >= size) {
+    if (row < 0 || row >= N || col < 0 || col >= N) {
       return null;
     }
 
@@ -163,11 +149,10 @@ class Board extends View {
 
   boardToCanvas(row: number, col: number): Coord {
     let canvas = this.ctx.canvas;
-    let size = this.size;
 
     return {
-      x: canvas.width * (col + 1.0) / (size + 1),
-      y: canvas.height * (row + 1.0) / (size + 1)
+      x: canvas.width * (col + 1.0) / (N + 1),
+      y: canvas.height * (row + 1.0) / (N + 1)
     };
   }
 
@@ -231,9 +216,8 @@ class ClickableBoard extends Board {
   protected listeners: ClickListener[] = [];
   public enabled = false;
 
-  constructor(parent: HTMLElement | string, public size: BoardSize,
-              layerDescs: any[]) {
-    super(parent, size, layerDescs);
+  constructor(parent: HTMLElement | string, layerDescs: any[]) {
+    super(parent, layerDescs);
 
     this.ctx.canvas.addEventListener('mousemove', (e) => {
       // Find the point on the board being hovered over.
@@ -291,7 +275,6 @@ class ClickableBoard extends Board {
 }
 
 export {
-  Annotation,
   Board,
   ClickableBoard,
   COL_LABELS,

@@ -92,7 +92,6 @@ def _open_pipes():
             "--soft_pick=false",
             "--inject_noise=%s" % FLAGS.inject_noise,
             "--disable_resign_pct=0",
-            "--ponder_limit=100000",
             "--courtesy_pass=true",
             "--engine=%s" % FLAGS.engine,
             "--virtual_losses=%d" % FLAGS.virtual_losses,

@@ -10,19 +10,19 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
             this.winrateGraph = new winrate_graph_1.WinrateGraph('winrate-graph');
             this.log = new log_1.Log('log', 'console');
             this.connect().then(() => {
-                this.mainBoard = new board_1.ClickableBoard('main-board', this.size, [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
+                this.mainBoard = new board_1.ClickableBoard('main-board', [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
                 let boards = [this.mainBoard];
                 let searchElem = util_1.getElement('search-board');
                 if (searchElem) {
-                    boards.push(new board_1.Board(searchElem, this.size, [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]));
+                    boards.push(new board_1.Board(searchElem, [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]));
                 }
                 let nElem = util_1.getElement('n-board');
                 if (nElem) {
-                    boards.push(new board_1.Board(nElem, this.size, [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heat_map_1.heatMapN], lyr.BoardStones]));
+                    boards.push(new board_1.Board(nElem, [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heat_map_1.heatMapN], lyr.BoardStones]));
                 }
                 let dqElem = util_1.getElement('dq-board');
                 if (dqElem) {
-                    boards.push(new board_1.Board('dq-board', this.size, [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heat_map_1.heatMapDq], lyr.BoardStones]));
+                    boards.push(new board_1.Board('dq-board', [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heat_map_1.heatMapDq], lyr.BoardStones]));
                 }
                 this.init(boards);
                 this.mainBoard.onClick((p) => {
@@ -30,18 +30,19 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
                 });
                 this.initButtons();
                 this.winrateGraph.onMoveChanged((moveNum) => {
-                    let position;
-                    if (moveNum == null) {
-                        position = this.positionHistory[this.positionHistory.length - 1];
+                    let position = this.latestPosition;
+                    if (moveNum != null) {
+                        for (let p = this.rootPosition; p; p = p.children[0]) {
+                            if (p.moveNum == moveNum) {
+                                position = p;
+                                break;
+                            }
+                        }
                     }
-                    else {
-                        position = this.positionHistory[moveNum];
+                    if (position != this.activePosition) {
+                        this.activePosition = position;
+                        this.updateBoards(position);
                     }
-                    if (position == this.activePosition) {
-                        return;
-                    }
-                    this.activePosition = position;
-                    this.updateBoards(position);
                 });
                 this.log.onConsoleCmd((cmd) => {
                     this.gtp.send(cmd).then(() => { this.log.scroll(); });
@@ -113,7 +114,7 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
                 throw new Error('resign not yet supported');
             }
             else {
-                let row = this.size - move.row;
+                let row = base_1.N - move.row;
                 let col = base_1.COL_LABELS[move.col];
                 moveStr = `${col}${row}`;
             }

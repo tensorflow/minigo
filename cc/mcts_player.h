@@ -81,6 +81,13 @@ class MctsPlayer {
     // If true, print debug info to stderr.
     bool verbose = true;
 
+    // If true, children of the current root node are pruned when a move is
+    // played. Under normal play, only the descendents of the move played ever
+    // have a chance of being visited again during tree search. However, when
+    // using Minigo to explore different variations and ponder about the best
+    // moves, it makes sense to keep the full tree around.
+    bool prune_orphaned_nodes = true;
+
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 

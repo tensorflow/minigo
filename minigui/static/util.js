@@ -38,8 +38,8 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
         return window.devicePixelRatio || 1;
     }
     exports.pixelRatio = pixelRatio;
-    function emptyBoard(size) {
-        let result = new Array(size * size);
+    function emptyBoard() {
+        let result = new Array(base_1.N * base_1.N);
         result.fill(base_1.Color.Empty);
         return result;
     }

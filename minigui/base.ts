@@ -32,6 +32,18 @@ enum BoardSize {
   Nineteen = 19,
 }
 
+let N = BoardSize.Nineteen;
+
+function setBoardSize(size: number) {
+  switch (size) {
+  }
+  if (size == BoardSize.Nine || size == BoardSize.Nineteen) {
+    N = size;
+  } else {
+    throw new Error(`Unsupported board size ${size}`);
+  }
+}
+
 // Canvas coordinate.
 interface Coord {
   x: number;
@@ -54,7 +66,9 @@ export {
   Color,
   Coord,
   Move,
+  N,
   Nullable,
   Point,
   otherColor,
+  setBoardSize,
 }

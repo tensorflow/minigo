@@ -39,8 +39,9 @@ class GtpPlayer : public MctsPlayer {
     // every report_search_interval to stderr in a format recognized by Minigui.
     absl::Duration report_search_interval;
 
-    // If non-zero, TreeSearch up to ponder_limit times while waiting for the
-    // other player to play.
+    // Maximum number of times to perform TreeSearch when pondering is enabled.
+    // The engine's ponder count is reset to 0 each time it receives a "ponder"
+    // GTP command.
     int ponder_limit = 0;
 
     // If true, we will always pass if the opponent passes.
@@ -102,9 +103,15 @@ class GtpPlayer : public MctsPlayer {
   Response HandleLoadsgf(absl::string_view cmd, CmdArgs args);
   Response HandleName(absl::string_view cmd, CmdArgs args);
   Response HandlePlay(absl::string_view cmd, CmdArgs args);
+  Response HandlePlaysgf(absl::string_view cmd, CmdArgs args);
+  Response HandlePonder(absl::string_view cmd, CmdArgs args);
   Response HandlePonderLimit(absl::string_view cmd, CmdArgs args);
+  Response HandlePruneNodes(absl::string_view cmd, CmdArgs args);
   Response HandleReadouts(absl::string_view cmd, CmdArgs args);
   Response HandleReportSearchInterval(absl::string_view cmd, CmdArgs args);
+
+  // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
+  Response ParseSgf(const std::string& sgf_str);
 
   void ReportSearchStatus(const MctsNode* last_read);
 
@@ -115,8 +122,9 @@ class GtpPlayer : public MctsPlayer {
   // Set to Color::kEmpty when the board is cleared.
   Color last_genmove_ = Color::kEmpty;
 
+  bool ponder_enabled_ = false;
   int ponder_count_ = 0;
-  int ponder_limit_;
+  int ponder_limit_ = 0;
   bool courtesy_pass_;
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;

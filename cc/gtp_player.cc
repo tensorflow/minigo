@@ -24,6 +24,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/time/clock.h"
 #include "cc/constants.h"
@@ -50,7 +51,10 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("loadsgf", &GtpPlayer::HandleLoadsgf);
   RegisterCmd("name", &GtpPlayer::HandleName);
   RegisterCmd("play", &GtpPlayer::HandlePlay);
+  RegisterCmd("playsgf", &GtpPlayer::HandlePlaysgf);
+  RegisterCmd("ponder", &GtpPlayer::HandlePonder);
   RegisterCmd("ponder_limit", &GtpPlayer::HandlePonderLimit);
+  RegisterCmd("prune_nodes", &GtpPlayer::HandlePruneNodes);
   RegisterCmd("readouts", &GtpPlayer::HandleReadouts);
   RegisterCmd("report_search_interval", &GtpPlayer::HandleReportSearchInterval);
 }
@@ -67,7 +71,6 @@ void GtpPlayer::Run() {
     if (!HandleCmd(line)) {
       break;
     }
-    ponder_count_ = 0;
   }
 }
 
@@ -83,16 +86,8 @@ void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
 }
 
 bool GtpPlayer::MaybePonder() {
-  // We ponder if all the following conditions are true:
-  //  1) Pondering is enabled.
-  //  2) We haven't pondered too much.
-  //  3) There's no GTP command pending on stdin.
-  //  4) It's the opponent's turn.
-  bool should_ponder =
-      (ponder_limit_ > 0 && ponder_count_ < ponder_limit_ &&
-       std::cin.rdbuf()->in_avail() == 0 && last_genmove_ != Color::kEmpty &&
-       last_genmove_ != root()->position.to_play());
-
+  bool should_ponder = ponder_enabled_ && ponder_count_ < ponder_limit_ &&
+                       std::cin.rdbuf()->in_avail() == 0;
   if (!should_ponder) {
     ponder_count_ = 0;
     return false;
@@ -103,12 +98,6 @@ bool GtpPlayer::MaybePonder() {
   }
 
   TreeSearch();
-
-  ponder_count_ += options().batch_size;
-  if (ponder_count_ >= ponder_limit_) {
-    std::cerr << root()->Describe() << "\n";
-    std::cerr << "finished pondering" << std::endl;
-  }
 
   return true;
 }
@@ -369,33 +358,7 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
   std::stringstream buffer;
   buffer << f.rdbuf();
 
-  sgf::Ast ast;
-  if (!ast.Parse(buffer.str())) {
-    std::cerr << "Couldn't parse \"" << args[0] << std::endl;
-    return Response::Error("cannot load file");
-  }
-
-  // Clear the board before replaying sgf.
-  last_genmove_ = Color::kEmpty;
-  NewGame();
-
-  for (const auto& move : sgf::GetMainLineMoves(ast)) {
-    if (!root()->legal_moves[move.c]) {
-      return Response::Error("illegal move");
-    }
-
-    // Perform a single inference for each move with random symmetry disabled so
-    // that the same model will produce the same result every time we load the
-    // same SGF.
-    // TODO(tommadams): Only do this when running in Minigui.
-    auto* leaf = root()->MaybeAddChild(move.c);
-    ProcessLeaves({&leaf, 1}, false);
-
-    MG_CHECK(PlayMove(move.c));
-    ReportGameState();
-  }
-
-  return Response::Ok();
+  return ParseSgf(buffer.str());
 }
 
 GtpPlayer::Response GtpPlayer::HandleName(absl::string_view cmd, CmdArgs args) {
@@ -440,6 +403,30 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
   return Response::Ok();
 }
 
+GtpPlayer::Response GtpPlayer::HandlePlaysgf(absl::string_view cmd,
+                                             CmdArgs args) {
+  auto sgf_str = absl::StrReplaceAll(absl::StrJoin(args, " "), {{"\\n", "\n"}});
+  return ParseSgf(sgf_str);
+}
+
+GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
+                                            CmdArgs args) {
+  auto response = CheckArgsExact(cmd, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  int x;
+  if (!absl::SimpleAtoi(args[0], &x)) {
+    return Response::Error("couldn't parse ", args[0], " as an integer");
+  }
+
+  ponder_enabled_ = x != 0;
+  ponder_count_ = 0;
+
+  return Response::Ok();
+}
+
 GtpPlayer::Response GtpPlayer::HandlePonderLimit(absl::string_view cmd,
                                                  CmdArgs args) {
   auto response = CheckArgsExact(cmd, 1, args);
@@ -450,13 +437,29 @@ GtpPlayer::Response GtpPlayer::HandlePonderLimit(absl::string_view cmd,
   int x;
   if (!absl::SimpleAtoi(args[0], &x) || x < 0) {
     return Response::Error("couldn't parse ", args[0], " as an integer >= 0");
-  } else {
-    ponder_limit_ = x;
   }
+
+  ponder_limit_ = x;
 
   return Response::Ok();
 }
 
+GtpPlayer::Response GtpPlayer::HandlePruneNodes(absl::string_view cmd,
+                                                CmdArgs args) {
+  auto response = CheckArgsExact(cmd, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  int x;
+  if (!absl::SimpleAtoi(args[0], &x)) {
+    return Response::Error("couldn't parse ", args[0], " as an integer");
+  }
+
+  mutable_options()->prune_orphaned_nodes = x != 0;
+
+  return Response::Ok();
+}
 GtpPlayer::Response GtpPlayer::HandleReadouts(absl::string_view cmd,
                                               CmdArgs args) {
   auto response = CheckArgsExact(cmd, 1, args);
@@ -486,6 +489,36 @@ GtpPlayer::Response GtpPlayer::HandleReportSearchInterval(absl::string_view cmd,
     return Response::Error("couldn't parse ", args[0], " as an integer >= 0");
   }
   report_search_interval_ = absl::Milliseconds(x);
+
+  return Response::Ok();
+}
+
+GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
+  sgf::Ast ast;
+  if (!ast.Parse(sgf_str)) {
+    std::cerr << "Couldn't parse SGF" << std::endl;
+    return Response::Error("cannot parse file");
+  }
+
+  // Clear the board before replaying sgf.
+  last_genmove_ = Color::kEmpty;
+  NewGame();
+
+  for (const auto& move : sgf::GetMainLineMoves(ast)) {
+    if (!root()->legal_moves[move.c]) {
+      return Response::Error("illegal move");
+    }
+
+    // Perform a single inference for each move with random symmetry disabled so
+    // that the same model will produce the same result every time we load the
+    // same SGF.
+    // TODO(tommadams): Only do this when running in Minigui.
+    auto* leaf = root()->MaybeAddChild(move.c);
+    ProcessLeaves({&leaf, 1}, false);
+
+    MG_CHECK(PlayMove(move.c));
+    ReportGameState();
+  }
 
   return Response::Ok();
 }

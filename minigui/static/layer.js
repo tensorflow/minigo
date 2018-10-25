@@ -1,7 +1,7 @@
-define(["require", "exports", "./base", "./board", "./util"], function (require, exports, base_1, board_1, util_1) {
+define(["require", "exports", "./position", "./base", "./util"], function (require, exports, position_1, base_1, util_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.Annotation = board_1.Annotation;
+    exports.Annotation = position_1.Annotation;
     const STAR_POINTS = {
         [base_1.BoardSize.Nine]: [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]],
         [base_1.BoardSize.Nineteen]: [[3, 3], [3, 9], [3, 15],
@@ -41,17 +41,16 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
         draw() {
             let starPointRadius = Math.min(4, Math.max(this.board.stoneRadius / 10, 2.5));
             let ctx = this.board.ctx;
-            let size = this.board.size;
             let pr = util_1.pixelRatio();
             ctx.strokeStyle = this.style;
             ctx.lineWidth = pr;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            for (let i = 0; i < size; ++i) {
+            for (let i = 0; i < base_1.N; ++i) {
                 let left = this.boardToCanvas(i, 0);
-                let right = this.boardToCanvas(i, size - 1);
+                let right = this.boardToCanvas(i, base_1.N - 1);
                 let top = this.boardToCanvas(0, i);
-                let bottom = this.boardToCanvas(size - 1, i);
+                let bottom = this.boardToCanvas(base_1.N - 1, i);
                 ctx.moveTo(0.5 + Math.round(left.x), 0.5 + Math.round(left.y));
                 ctx.lineTo(0.5 + Math.round(right.x), 0.5 + Math.round(right.y));
                 ctx.moveTo(0.5 + Math.round(top.x), 0.5 + Math.round(top.y));
@@ -60,7 +59,7 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
             ctx.stroke();
             ctx.fillStyle = this.style;
             ctx.strokeStyle = '';
-            for (let p of STAR_POINTS[size]) {
+            for (let p of STAR_POINTS[base_1.N]) {
                 let c = this.boardToCanvas(p[0], p[1]);
                 ctx.beginPath();
                 ctx.arc(c.x + 0.5, c.y + 0.5, starPointRadius * pr, 0, 2 * Math.PI);
@@ -72,31 +71,30 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
     class Label extends StaticLayer {
         draw() {
             let ctx = this.board.ctx;
-            let size = this.board.size;
             let textHeight = Math.floor(0.3 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.fillStyle = '#9d7c4d';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
-            for (let i = 0; i < size; ++i) {
+            for (let i = 0; i < base_1.N; ++i) {
                 let c = this.boardToCanvas(-0.66, i);
                 ctx.fillText(base_1.COL_LABELS[i], c.x, c.y);
             }
             ctx.textBaseline = 'top';
-            for (let i = 0; i < size; ++i) {
-                let c = this.boardToCanvas(size - 0.33, i);
+            for (let i = 0; i < base_1.N; ++i) {
+                let c = this.boardToCanvas(base_1.N - 0.33, i);
                 ctx.fillText(base_1.COL_LABELS[i], c.x, c.y);
             }
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
-            for (let i = 0; i < size; ++i) {
+            for (let i = 0; i < base_1.N; ++i) {
                 let c = this.boardToCanvas(i, -0.66);
-                ctx.fillText((size - i).toString(), c.x, c.y);
+                ctx.fillText((base_1.N - i).toString(), c.x, c.y);
             }
             ctx.textAlign = 'left';
-            for (let i = 0; i < size; ++i) {
-                let c = this.boardToCanvas(i, size - 0.33);
-                ctx.fillText((size - i).toString(), c.x, c.y);
+            for (let i = 0; i < base_1.N; ++i) {
+                let c = this.boardToCanvas(i, base_1.N - 0.33);
+                ctx.fillText((base_1.N - i).toString(), c.x, c.y);
             }
         }
     }
@@ -108,13 +106,12 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
         }
         draw() {
             let ctx = this.board.ctx;
-            let size = this.board.size;
             let textHeight = Math.floor(0.4 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.fillStyle = '#9d7c4d';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            let c = this.boardToCanvas(size - 0.45, (size - 1) / 2);
+            let c = this.boardToCanvas(base_1.N - 0.45, (base_1.N - 1) / 2);
             ctx.fillText(this.caption, c.x, c.y);
         }
     }
@@ -138,14 +135,13 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
                 return;
             }
             let ctx = this.board.ctx;
-            let size = this.board.size;
             let w = this.board.pointW;
             let h = this.board.pointH;
             let stones = this.board.stones;
             let p = { row: 0, col: 0 };
             let i = 0;
-            for (p.row = 0; p.row < size; ++p.row) {
-                for (p.col = 0; p.col < size; ++p.col) {
+            for (p.row = 0; p.row < base_1.N; ++p.row) {
+                for (p.col = 0; p.col < base_1.N; ++p.col) {
                     let rgba = this.colors[i];
                     if (stones[i++] != base_1.Color.Empty) {
                         continue;
@@ -182,10 +178,9 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
             this.blackStones = [];
             this.whiteStones = [];
             if (stones != null) {
-                let size = this.board.size;
                 let i = 0;
-                for (let row = 0; row < size; ++row) {
-                    for (let col = 0; col < size; ++col) {
+                for (let row = 0; row < base_1.N; ++row) {
+                    for (let col = 0; col < base_1.N; ++col) {
                         let color = stones[i++];
                         if (color == base_1.Color.Black) {
                             this.blackStones.push({ row: row, col: col });
@@ -212,7 +207,6 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
                 return false;
             }
             let toPlay = this.board.toPlay;
-            let size = this.board.size;
             this.blackStones = [];
             this.whiteStones = [];
             this.blackLabels = [];
@@ -220,7 +214,7 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
             if (variation == null) {
                 return true;
             }
-            let playedCount = new Uint16Array(size * size);
+            let playedCount = new Uint16Array(base_1.N * base_1.N);
             let firstPlayed = [];
             toPlay = base_1.otherColor(toPlay);
             for (let i = 0; i < variation.length; ++i) {
@@ -229,7 +223,7 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
                 if (move == 'pass' || move == 'resign') {
                     continue;
                 }
-                let idx = move.row * size + move.col;
+                let idx = move.row * base_1.N + move.col;
                 let label = { p: move, s: (i + 1).toString() };
                 let count = ++playedCount[idx];
                 if (toPlay == base_1.Color.Black) {
@@ -256,7 +250,6 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
         draw() {
             super.draw();
             let ctx = this.board.ctx;
-            let size = this.board.size;
             let textHeight = Math.floor(0.5 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.textAlign = 'center';
@@ -296,13 +289,13 @@ define(["require", "exports", "./base", "./board", "./util"], function (require,
                 let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
                 let sr = this.board.stoneRadius;
                 switch (annotation.shape) {
-                    case board_1.Annotation.Shape.Dot:
+                    case position_1.Annotation.Shape.Dot:
                         ctx.fillStyle = annotation.color;
                         ctx.beginPath();
                         ctx.arc(c.x, c.y, 0.08 * sr, 0, 2 * Math.PI);
                         ctx.fill();
                         break;
-                    case board_1.Annotation.Shape.Triangle:
+                    case position_1.Annotation.Shape.Triangle:
                         ctx.lineWidth = 3 * util_1.pixelRatio();
                         ctx.lineCap = 'round';
                         ctx.strokeStyle = annotation.color;

@@ -1,27 +1,7 @@
-define(["require", "exports", "./gtp_socket", "./base", "./board", "./util"], function (require, exports, gtp_socket_1, base_1, board_1, util) {
+define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"], function (require, exports, position_1, gtp_socket_1, base_1, util) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    class Position {
-        constructor(moveNum, stones, lastMove, toPlay) {
-            this.moveNum = moveNum;
-            this.stones = stones;
-            this.lastMove = lastMove;
-            this.toPlay = toPlay;
-            this.search = [];
-            this.pv = [];
-            this.n = null;
-            this.dq = null;
-            this.annotations = [];
-            if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
-                this.annotations.push({
-                    p: lastMove,
-                    shape: board_1.Annotation.Shape.Dot,
-                    color: '#ef6c02',
-                });
-            }
-        }
-    }
-    exports.Position = Position;
+    exports.Position = position_1.Position;
     class App {
         constructor() {
             this.gtp = new gtp_socket_1.Socket();
@@ -34,16 +14,15 @@ define(["require", "exports", "./gtp_socket", "./base", "./board", "./util"], fu
         }
         connect() {
             let uri = `http://${document.domain}:${location.port}/minigui`;
-            return this.gtp.connect(uri).then((size) => {
-                this.size = size;
-            });
+            return this.gtp.connect(uri).then((size) => { base_1.setBoardSize(size); });
         }
         init(boards) {
             this.boards = boards;
         }
         newGame() {
-            this.activePosition = new Position(0, util.emptyBoard(this.size), null, base_1.Color.Black);
-            this.positionHistory = [this.activePosition];
+            this.rootPosition = new position_1.Position(null, 0, util.emptyBoard(), null, base_1.Color.Black);
+            this.latestPosition = this.rootPosition;
+            this.activePosition = this.rootPosition;
             this.gtp.send('clear_board');
             this.gtp.send('gamestate');
             this.gtp.send('info');
@@ -68,14 +47,18 @@ define(["require", "exports", "./gtp_socket", "./base", "./board", "./util"], fu
             }
         }
         onSearch(msg) {
-            msg.search = util.parseMoves(msg.search, this.size);
+            msg.search = util.parseMoves(msg.search, base_1.N);
             msg.toPlay = util.parseGtpColor(msg.toPlay);
             if (msg.pv) {
-                msg.pv = util.parseMoves(msg.pv, this.size);
+                msg.pv = util.parseMoves(msg.pv, base_1.N);
+            }
+            if (msg.moveNum != this.latestPosition.moveNum) {
+                throw new Error(`Got a search msg for move ${msg.moveNum} but latest is ` +
+                    `${this.latestPosition.moveNum}`);
             }
             const props = ['n', 'dq', 'pv', 'search'];
-            util.partialUpdate(msg, this.positionHistory[msg.moveNum], props);
-            if (msg.moveNum == this.activePosition.moveNum) {
+            util.partialUpdate(msg, this.latestPosition, props);
+            if (this.activePosition.moveNum == msg.moveNum) {
                 this.updateBoards(msg);
             }
         }
@@ -91,12 +74,27 @@ define(["require", "exports", "./gtp_socket", "./base", "./board", "./util"], fu
             }
             this.toPlay = util.parseGtpColor(msg.toPlay);
             this.gameOver = msg.gameOver;
-            let lastMove = msg.lastMove ? util.parseGtpMove(msg.lastMove, this.size) : null;
-            let position = new Position(msg.moveNum, stones, lastMove, this.toPlay);
-            this.positionHistory[msg.moveNum] = position;
-            if (msg.moveNum > this.activePosition.moveNum) {
-                this.activePosition = position;
-                this.updateBoards(this.activePosition);
+            let lastMove = msg.lastMove ? util.parseGtpMove(msg.lastMove, base_1.N) : null;
+            if (lastMove == null) {
+                if (msg.moveNum != 0) {
+                    throw new Error(`moveNum == ${msg.moveNum} but don't have a lastMove`);
+                }
+                stones.forEach((color) => {
+                    if (color != base_1.Color.Empty) {
+                        throw new Error(`board isn't empty but don't have a lastMove`);
+                    }
+                });
+            }
+            else {
+                if (msg.moveNum != this.latestPosition.moveNum + 1) {
+                    throw new Error(`Expected game state for move ${this.latestPosition.moveNum + 1} ` +
+                        `but got ${msg.moveNum}`);
+                }
+                this.latestPosition = this.latestPosition.addChild(lastMove, stones);
+                if (this.activePosition == this.latestPosition.parent) {
+                    this.activePosition = this.latestPosition;
+                    this.updateBoards(this.activePosition);
+                }
             }
             if (this.gameOver) {
                 this.onGameOver();

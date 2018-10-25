@@ -2,19 +2,9 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.COL_LABELS = base_1.COL_LABELS;
-    var Annotation;
-    (function (Annotation) {
-        let Shape;
-        (function (Shape) {
-            Shape[Shape["Dot"] = 0] = "Dot";
-            Shape[Shape["Triangle"] = 1] = "Triangle";
-        })(Shape = Annotation.Shape || (Annotation.Shape = {}));
-    })(Annotation || (Annotation = {}));
-    exports.Annotation = Annotation;
     class Board extends view_1.View {
-        constructor(parent, size, layerDescs) {
+        constructor(parent, layerDescs) {
             super();
-            this.size = size;
             this.toPlay = base_1.Color.Black;
             this.stones = [];
             if (typeof (parent) == 'string') {
@@ -22,7 +12,7 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             }
             this.elem = parent;
             this.backgroundColor = '#db6';
-            for (let i = 0; i < this.size * this.size; ++i) {
+            for (let i = 0; i < base_1.N * base_1.N; ++i) {
                 this.stones.push(base_1.Color.Empty);
             }
             let canvas = document.createElement('canvas');
@@ -44,8 +34,8 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             canvas.height = pr * (parent.offsetHeight);
             canvas.style.width = `${parent.offsetWidth}px`;
             canvas.style.height = `${parent.offsetHeight}px`;
-            this.pointW = this.ctx.canvas.width / (this.size + 1);
-            this.pointH = this.ctx.canvas.height / (this.size + 1);
+            this.pointW = this.ctx.canvas.width / (base_1.N + 1);
+            this.pointH = this.ctx.canvas.height / (base_1.N + 1);
             this.stoneRadius = Math.min(this.pointW, this.pointH);
         }
         addLayers(descs) {
@@ -87,19 +77,18 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             }
         }
         getStone(p) {
-            return this.stones[p.row * this.size + p.col];
+            return this.stones[p.row * base_1.N + p.col];
         }
         canvasToBoard(x, y, threshold) {
             let pr = util_1.pixelRatio();
             x *= pr;
             y *= pr;
             let canvas = this.ctx.canvas;
-            let size = this.size;
-            y = y * (size + 1) / canvas.height - 0.5;
-            x = x * (size + 1) / canvas.width - 0.5;
+            y = y * (base_1.N + 1) / canvas.height - 0.5;
+            x = x * (base_1.N + 1) / canvas.width - 0.5;
             let row = Math.floor(y);
             let col = Math.floor(x);
-            if (row < 0 || row >= size || col < 0 || col >= size) {
+            if (row < 0 || row >= base_1.N || col < 0 || col >= base_1.N) {
                 return null;
             }
             if (threshold) {
@@ -114,10 +103,9 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
         }
         boardToCanvas(row, col) {
             let canvas = this.ctx.canvas;
-            let size = this.size;
             return {
-                x: canvas.width * (col + 1.0) / (size + 1),
-                y: canvas.height * (row + 1.0) / (size + 1)
+                x: canvas.width * (col + 1.0) / (base_1.N + 1),
+                y: canvas.height * (row + 1.0) / (base_1.N + 1)
             };
         }
         drawStones(ps, color, alpha) {
@@ -168,9 +156,8 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
     }
     exports.Board = Board;
     class ClickableBoard extends Board {
-        constructor(parent, size, layerDescs) {
-            super(parent, size, layerDescs);
-            this.size = size;
+        constructor(parent, layerDescs) {
+            super(parent, layerDescs);
             this.listeners = [];
             this.enabled = false;
             this.ctx.canvas.addEventListener('mousemove', (e) => {

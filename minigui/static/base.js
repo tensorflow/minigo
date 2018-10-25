@@ -23,5 +23,18 @@ define(["require", "exports"], function (require, exports) {
         BoardSize[BoardSize["Nineteen"] = 19] = "Nineteen";
     })(BoardSize || (BoardSize = {}));
     exports.BoardSize = BoardSize;
+    let N = BoardSize.Nineteen;
+    exports.N = N;
+    function setBoardSize(size) {
+        switch (size) {
+        }
+        if (size == BoardSize.Nine || size == BoardSize.Nineteen) {
+            exports.N = N = size;
+        }
+        else {
+            throw new Error(`Unsupported board size ${size}`);
+        }
+    }
+    exports.setBoardSize = setBoardSize;
 });
 //# sourceMappingURL=base.js.map
