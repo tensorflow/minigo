@@ -22,8 +22,8 @@
 
 #include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
-#include "cc/tensorflow/tensorflow/core/framework/graph.pb.h"
 #include "cc/thread_safe_queue.h"
+#include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/public/session.h"
 

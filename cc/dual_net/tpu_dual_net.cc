@@ -24,7 +24,6 @@
 #include "absl/strings/strip.h"
 #include "cc/check.h"
 #include "cc/constants.h"
-#include "cc/tensorflow/tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
