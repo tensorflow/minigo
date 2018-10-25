@@ -25,7 +25,7 @@
 cd "$(dirname "$0")"
 
 lint_fail=0
-pylint *.py || {
+python3 -m pylint *.py || {
   lint_fail=1
   echo >&2 "--------------------------------------"
   echo >&2 "Py linting did not pass successfully!"
