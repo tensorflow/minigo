@@ -60,7 +60,6 @@ minigo_cc_library(
     copts = factory_engine_copts,
     deps = [
         ":dual_net",
-        ":batching_dual_net",
         ":fake_dual_net",
         "//cc:base",
         "//cc:check",
@@ -155,7 +154,6 @@ minigo_cc_library(
     srcs = ["batching_dual_net.cc"],
     hdrs = [
         "batching_dual_net.h",
-        "factory.h",
     ],
     deps = [
         ":dual_net",

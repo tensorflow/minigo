@@ -401,6 +401,7 @@ minigo_cc_binary(
         ":sgf",
         ":tf_utils",
         ":zobrist",
+        "//cc/dual_net:batching_dual_net",
         "//cc/dual_net:factory",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",

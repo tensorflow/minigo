@@ -183,6 +183,8 @@ class BatchingFactory : public DualNetFactory {
 };
 }  // namespace
 
+DualNetFactory::~DualNetFactory() = default;
+
 std::unique_ptr<DualNetFactory> NewBatchingFactory(
     std::unique_ptr<DualNet> dual_net, size_t batch_size) {
   return absl::make_unique<BatchingFactory>(std::move(dual_net), batch_size);

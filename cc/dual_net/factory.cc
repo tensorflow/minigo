@@ -17,7 +17,6 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-#include "cc/dual_net/batching_dual_net.h"
 #include "cc/dual_net/fake_dual_net.h"
 #include "gflags/gflags.h"
 
@@ -76,8 +75,6 @@ DEFINE_string(
     "Cloud TPU name to run inference on, e.g. \"grpc://10.240.2.10:8470\"");
 
 namespace minigo {
-
-DualNetFactory::~DualNetFactory() = default;
 
 std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
   if (FLAGS_engine == "fake") {

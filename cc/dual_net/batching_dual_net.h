@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "cc/dual_net/factory.h"
+#include "cc/dual_net/dual_net.h"
 
 namespace minigo {
 
