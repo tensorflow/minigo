@@ -308,7 +308,7 @@ definitely the odd one out.
 This, combined with our better selfplay performance, made it a relatively
 painless decision to decide to roll back the few days progress.
 
-### v7, May 16-
+### v7, May 16-July-17
 
 Rolled back to model v5-173; continued with the flags & features added in v7a,
 but with holdout data being written from the start ;)  And also with the
@@ -318,5 +318,257 @@ We expect to see it go sideways as it adapts to the new proportion of
 resign-disabled games, then show a similar improvement to the v7a improvement.
 After that, if it flattens off again we'll lower the learning rate further.
 
+After our learning rate cuts, the ratings appeared to taper off.  A brief bit of
+"cyclic learning rate" didn't seem to jog it out of its local minima so we
+called a halt after ~530 models
+
+v7 also marked the beginning of an auto-pair for the evaluation matches that
+would attempt to pair the models about whom our rating algorithm had the
+greatest uncertainty.  The best way to increase the confidence of the rating is
+to have it play another model with a very close rank, so I wrote it to pick the
+model farthest away in time from among the closest rated.  These made for
+interesting games, as the models of about the same strength from very different
+points in training would take very different approaches.
+
 Our limiting factor continues to be our rate of selfplay.
 
+### v9, TPUS #1, July 19 - August 1
+
+By mid July we were able to get a Cloud TPU implementation working for selfplay and
+TPUs were enabled in GKE, allowing us to attempt running with about 600 TPU
+v2's.  Also, we were able to run our training job on a TPU as well, meaning that
+our training batch size could increase from 256 => 2048, which meant we could
+follow the learning rate schedule published in paper #2.
+
+Unfortunately, TPU code required that we change around where we did the rotation
+of the training examples, moving it from the host to inside the TF graph.
+Unfortunately, I didn't check the default value of the flag and rotating
+training examples was turned OFF until around model 115 or so.
+
+Still, this was a hugely successful run:  We were able to run a full 700k steps
+-- the length described in Paper 2 and 3 -- in only two weeks.  14M selfplay
+games were played; more than the 5M in paper2 and less than the 22M in paper 3.
+
+Here too we saw our top models show up after our first rate cut.  But after the
+second rate cut, performance tapered off and the run was stopped.
+
+The top model had a 100% winrate vs our friendly professionals who tried to play
+it, which was good to see.  Unfortunately, the model was not able to beat the
+best Leela Zero model (from before they mixed in ELF games), so there was
+clearly something still amiss.  It was unclear what factors caused the model to
+stop improving.  Perhaps not having rotation enabled from the beginning
+essentially 'clipped its wings', or perhaps the higher percentage of resign
+disabled games (20%) caused it to see too many useless game positions, or
+perhaps we had waited too long to cut the learning rate -- this was the AZ
+approach instead of the AGZ approach after all, so perhaps using the AGZ LR
+schedule was not appropriate.
+
+In any event, since we could do a full run in two weeks, we could now more
+easily forumulate hypotheses and test them.
+
+
+### v10, TPUS #2, August 28 - Sept 14
+
+Our first set of hypothesis were not ambitious.  Mostly we wanted to prove that
+our solution was 'stable' and that we could improve a few of the small things we
+knew were wrong with v9, but mostly to leave it the same.  The major differences were:
+
+1. Setting the games played with resign disabled back to 10% (from 20%)
+1. Keeping rotation in training on the whole time
+1. Playing slightly more games per model
+1. Cutting the learning rate the first time as soon as we saw `l2_cost` bottom out and start
+   rising, and letting it run at the second rate (0.001) for longer.
+1. "Slow window", [described here](https://medium.com/oracledevs/lessons-from-alpha-zero-part-6-hyperparameter-tuning-b1cfcbe4ca9a),
+   a way to quickly drop the initial games from out of the `window` positions
+   are drawn from.  Basically, the first games are true noise, so the quicker
+   you can get rid of them, the better.
+
+We were very excited about this run.  We had very close fidelity to the
+algorithm described in the paper, we had the hyperparameters for batch size and
+learning rate as close as we could make them.  Surely this would be the one...
+:)
+
+Overall, we played 22M games in 865 models over about two weeks.  The best v10
+models were able to pretty convincingly beat the best v9 models, which was
+great.  But with all the things we changed, which was responsible?
+
+In retrospect, probably the two most useful changes were leaving the learning
+rate at the `medium` setting for longer, giving it a longer time to meander
+through the loss landscape, and setting the resign disabled percent back to 10%.
+(Having rotation on in training the whole time obviously doesn't hurt, but it
+probably doesn't affect the overall skill ceiling)
+
+The theory on having the resign-disable games correctly set was based off of
+some of the [excellent results by Seth on the sensitivity of the value network to
+false-positive resigns](https://github.com/tensorflow/minigo/issues/483).  His
+analysis was to basically randomly flip the result of x% of training examples
+and measure the effects on value confidence and value error.  The observation
+was that having 5% of the data fouled was sufficient to dramatically affect
+value error.
+
+With this amount as a good proxy for 'the amount of data needed to impact
+training significantly', we could then think about how the percent of
+resign-disabled games might be affecting us.  With 20% of the
+games being played to scoring, sometimes requiring 2x or 3x as many moves, it
+meant that the moves sampled from these games were essentially 'useless' i.e.,
+from a point beyond which the outcome was no longer in doubt.  Since we were
+still sampling uniformly by game (i.e., picking 4 moves from the most recent
+500k games), this meant that for v9, exactly 20% of the training examples were
+from these games.  Reducing that to 10% probably gave us an edge in establishing
+a better value net.
+
+It seemed like there was no real difference from playing more games per model,
+and 'slow window' doesn't seem to dramatically affect how long it takes to get
+out of the early learning phase.  (Basically, policy improves while value
+cost drops to 1.0, implying pure randomness, until eventually the net starts to
+figure out what 'causes' wins and value error drops below 1.0)
+
+v10 showed that we could reach about the same level as v9, and that we'd plateau
+after a certain point.  Also, we noted that the variance in strength between
+successive networks was really high!  It seemed to expand as training continued,
+suggesting that we were in some very reliable minima.  Was this a function of the higher batch
+size, the higher number of games per model, or both, or neither?
+
+Qualitatively, v10's Go was interesting for a couple reasons.  We saw the
+familiar 'flower' joseki that was the zero-bot signature, but we also saw the
+knight's move approach to the 4-4 point come into favor.  However, by the end of
+the run, the bot was playing 3-4 points as black, leading to very different
+patterns than those seen by AGZ or AG-Master.
+
+So while we (again) created a professional level go AI, we were still below the
+level of other open-source bots (ELF and LZ), despite the fact that the
+AlphaZero approach was supposed to be equal or slightly superior.  Why?  What
+were we missing?
+
+### v11, Q=0, Sept 14- Sept 17
+
+Since we were rapidly running out of ways we were differing from the paper, we
+thought we'd test a pretty radical hypothesis, called "Q=0".  The short version
+is that, per the paper, a leaf with no visits should have the value initialized
+to '0'.  Say a board position had an average Q-value of 0.2, suggesting that it
+slightly favored black.  Suppose further that, after one move, the expected
+result of the board was not dramatically different, i.e., it would evaluate to
+near 0.2 for most reasonable moves.  If it were white to play, picking the leaf
+with the value closest to white's goal (-1) would mean search would prefer to
+choose any unvisited leaf (i.e., leaves still with their initialized value of
+0).  This would result in search visiting all legal moves before returning to
+the 'reasonable' variaitions.  The net result would mean a huge spread of
+explored moves for the losing side, and a very diluted search.
+
+Conversely, if it were black to play, search would prefer to only pick visited
+leaves, as unvisited leaves would have a value of 0, while any reasonable first
+move would have a value presumably close to 0.2, which is closer to black's goal
+(+1).  The result here is that search would basically only explore a single move for the
+winning side.
+
+The results would be policy examples that are very flat or diffuse for the side that
+loses more, and very sharp for the side that wins more.
+
+We had run all of our previous versions assuming that instead of Q=0, we should
+initialize leaves to the Q of their parent, aka 'Q=parent'.  This seems reasonable:  both sides
+would look for moves that represented improvements from a given position, and
+the UCB algorithm could widen or narrow the search as needed.
+
+But what if we were wrong?  What if exhaustively checking all moves for the
+losing side and essentially one-hot focusing on the moves for the winning side
+was an intentional choice?  It's worth pointing out that this was one of the
+first points of contention found by computer-go researchers between the release
+of the second paper and before the release of the third.  You can see some
+inscrutable replies and a lot of head scratching on the [venerable computer-go
+mailing list here](http://computer-go.org/pipermail/computer-go/2017-December/010550.html).
+Even with a direct reply from a main author, opinions were still divided as to
+what it meant.
+
+So, we set Q=0 and ran V11.  Our expectation was that it would fail quickly in
+obvious ways and we could put this speculation to bed.  We were half-right...
+
+After a few hundred models, where strength did not increase as quickly as with
+Q=parent, the resign-rate false-positive began to swing wildly out of control.
+It seemed that as a side began to win more than 50% of its games, search began
+to greatly favor its policy, and the losing side was basically always left with
+a handicap of having a massive number of its moves 'diluted.'  Continuing from
+our previous example... black would be able to spread out its reads quicker than
+white would be able to focus on a single useful line, essentially leaving one
+side at a disadvantage.  
+
+Compounding the problem, our pipeline architecture meant that the
+'false-positive' resign rate appeared as a lagging indicator: a new model would be
+released, the TPU workers would all start playing with it immediately, and the
+90% of games with resign enabled would finish before the 10% of holdout games
+that could be measured to set the threshold... So we were right that this failed
+quickly.
+
+Where we were wrong was that this would put the theory to bed.  Arguing against
+Q=0 was the fact that it was clearly unstable, has problems with the AZ method,
+and intuitively seemed to massively disadvantage one side.  Arguing for it was
+the fact that it was actually what was published, that there was a plausible
+explanation for the imbalance, and that the pipeline could be improved or
+tweaked to only play the resign-holdout games first.  But most interestingly was
+that, despite the very different behavior of selfplay and the different dynamics
+showing on tensorboard, the performance of the models on the professional player
+validation set was not awful!  It still improved, and it improved fairly well --
+although slower than it improved with Q=parent.
+
+So perhaps with a better pipeline and tighter controls on the resign threshold,
+this would ultimately lead to better exploration and a better model, but in the
+meantime it looked far more unstable.  We stopped the run after 3 days.
+
+### v12, vlosses 2
+
+With Q=0 checked off our list, the next question mark for us was "virtual
+losses".  In brief, virtual losses provide a way for GPUs to more efficiently do
+tree search by selecting multiple leaves.  Simply running search repeatedly will
+almost always result in the same leaf being chosen, so to fill a 'batch' of
+leaves, chosen leaves are given a 'virtual loss', encouraging search to pick a
+different variation to explore the next time down the tree.  Once the batch is
+full, the GPU can efficiently evaluate them all, the 'virtual losses' are
+reverted and the real results from the value network are propagated up the tree.
+The number of simultaneous nodes would be the batch size, and we set it via the
+'vlosses' parameter.  Our previous runs all used vlosses=8.  We had
+only one sentence from the second paper to guide us: "We use virtual loss to
+ensure each thread evaluates different nodes" (from Methods, "Search Algorithm",
+*Backup*)
+
+
+
+In particular, the cost of running a neural network is greatly amortized by the
+highly parallel nature of GPUs and TPUs.  E.g., the time taken to evaluate one
+node might be nearly the same as the cost of evaluating two nodes, as the
+overhead of transferring data to/from the GPU/TPU is incurred regardless of how
+much data is sent.
+
+For TPUs, which really shine with high batch sizes, virtual losses seemed like
+a necessity.  But how would they affect reinforcement learning?  On the plus
+side, virtual losses acted almost like increased noise, encouraging exploration
+of moves that the network might not have chosen in favor of a single main line.
+On the minus side, MCTS' mathematically ideal batch size was 1: Evaluating many
+sub-optimal moves might distort the averages, particularly in the case of long,
+unbranching sequences with a sharp horizon effect, i.e., ladders.  Both v9 and
+v10, while reaching professional strength, would still struggle with ladders.
+
+In a ladder sequence, only one node in the MCTS tree would read the ladder,
+while the rest of the batch would need to pick non-ladder moves.  It's
+conceivable that the averaging done by MCTS would essentially encourage the
+models to avoid sharp, narrow paths with high expected value in favor of flatter paths with a less dramatic outcome.  We figured we'd test this by setting batch size to 2, doubling the number of games played at once (to achieve roughly the same throughput), and run again.
+
+Early results are not dramatically stronger.  Qualitatively, we have not seen
+the model explore the knight's move approach to the 4-4 hardly at all, instead
+immediately converging to the 3-4 openings as black followed by an immediate
+invasion of the 3-3 point.
+
+Having learned from our previous runs, we postponed our final rate cut until
+step 800k or so, and with it we also increased our window size to 1M (assuming
+that the lower rate of change between models would lead to a smaller diversity
+of of selfplay game examples).
+
+One other minor tweak was to stop training on moves after move #400 after we had
+reached a reasonable strength.  The "logic" here is similar to v10's explanation
+re: the 10% resign disable games.  if the resign disable games run, on average,
+2x or 3x longer, then the examples taken from them are almost always past the
+point when the outcome is well understood.  So forcibly drawing the training
+examples from the first 400 moves should mostly rid us of those pointless
+examples without dramatically distorting the ratio of opening/middle/endgame
+examples seen by the network.
+
+
+This run is ongoing...
