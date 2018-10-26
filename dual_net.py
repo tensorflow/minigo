@@ -20,6 +20,7 @@ move prediction and score estimation.
 
 from absl import flags
 import functools
+import logging
 import os.path
 import sys
 
@@ -144,7 +145,8 @@ class DualNetwork():
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
             params = FLAGS.flag_values_dict()
-            # Tpu inference is supported on C++ only
+            logging.info('TPU inference is supported on C++ only. '
+                         'DualNetwork will ignore use_tpu=True')
             params['use_tpu'] = False
             estimator_spec = model_fn(features, labels,
                                       tf.estimator.ModeKeys.PREDICT,
@@ -202,7 +204,7 @@ def model_fn(features, labels, mode, params):
             'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
             'value_tensor': [BATCH_SIZE]
         mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
-        params: A dictionary
+        params: A dictionary (Typically derived from the FLAGS object.)
     Returns: tf.estimator.EstimatorSpec with props
         mode: same as mode arg
         predictions: dict of tensors
