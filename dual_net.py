@@ -20,6 +20,7 @@ move prediction and score estimation.
 
 from absl import flags
 import functools
+import logging
 import os.path
 import sys
 
@@ -143,8 +144,13 @@ class DualNetwork():
     def initialize_graph(self):
         with self.sess.graph.as_default():
             features, labels = get_inference_input()
+            params = FLAGS.flag_values_dict()
+            logging.info('TPU inference is supported on C++ only. '
+                         'DualNetwork will ignore use_tpu=True')
+            params['use_tpu'] = False
             estimator_spec = model_fn(features, labels,
-                                      tf.estimator.ModeKeys.PREDICT)
+                                      tf.estimator.ModeKeys.PREDICT,
+                                      params=params)
             self.inference_input = features
             self.inference_output = estimator_spec.predictions
             if self.save_file is not None:
@@ -189,7 +195,7 @@ def get_inference_input():
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
 
-def model_fn(features, labels, mode, params=None):
+def model_fn(features, labels, mode, params):
     '''
     Args:
         features: tensor with shape
@@ -198,7 +204,7 @@ def model_fn(features, labels, mode, params=None):
             'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
             'value_tensor': [BATCH_SIZE]
         mode: a tf.estimator.ModeKeys (batchnorm params update for TRAIN only)
-        params: (Ignored; needed for compat with TPUEstimator)
+        params: A dictionary (Typically derived from the FLAGS object.)
     Returns: tf.estimator.EstimatorSpec with props
         mode: same as mode arg
         predictions: dict of tensors
@@ -212,38 +218,38 @@ def model_fn(features, labels, mode, params=None):
     '''
 
     policy_output, value_output, logits = model_inference_fn(
-        features, mode == tf.estimator.ModeKeys.TRAIN)
+        features, mode == tf.estimator.ModeKeys.TRAIN, params)
 
     # train ops
     policy_cost = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=logits, labels=tf.stop_gradient(labels['pi_tensor'])))
 
-    value_cost = FLAGS.value_cost_weight * tf.reduce_mean(
+    value_cost = params['value_cost_weight'] * tf.reduce_mean(
         tf.square(value_output - labels['value_tensor']))
 
     reg_vars = [v for v in tf.trainable_variables()
                 if 'bias' not in v.name and 'beta' not in v.name]
-    l2_cost = FLAGS.l2_strength * \
+    l2_cost = params['l2_strength'] * \
         tf.add_n([tf.nn.l2_loss(v) for v in reg_vars])
 
     combined_cost = policy_cost + value_cost + l2_cost
 
     global_step = tf.train.get_or_create_global_step()
     learning_rate = tf.train.piecewise_constant(
-        global_step, FLAGS.lr_boundaries, FLAGS.lr_rates)
+        global_step, params['lr_boundaries'], params['lr_rates'])
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
     # Insert quantization ops if requested
-    if FLAGS.quantize:
+    if params['quantize']:
         if mode == tf.estimator.ModeKeys.TRAIN:
             tf.contrib.quantize.create_training_graph(
-                quant_delay=FLAGS.quant_delay)
+                quant_delay=params['quant_delay'])
         else:
             tf.contrib.quantize.create_eval_graph()
 
-    optimizer = tf.train.MomentumOptimizer(learning_rate, FLAGS.sgd_momentum)
-    if FLAGS.use_tpu:
+    optimizer = tf.train.MomentumOptimizer(learning_rate, params['sgd_momentum'])
+    if params['use_tpu']:
         optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
     with tf.control_dependencies(update_ops):
         train_op = optimizer.minimize(combined_cost, global_step=global_step)
@@ -295,14 +301,14 @@ def model_fn(features, labels, mode, params=None):
         summary_writer = summary.create_file_writer(FLAGS.work_dir)
         with summary_writer.as_default(), \
                 summary.record_summaries_every_n_global_steps(
-                    FLAGS.summary_steps, eval_step):
+                    params['summary_steps'], eval_step):
             for metric_name, metric_op in metric_ops.items():
                 summary.scalar(metric_name, metric_op[1], step=eval_step)
 
         # Reset metrics occasionally so that they are mean of recent batches.
         reset_op = tf.variables_initializer(tf.local_variables("metrics"))
         cond_reset_op = tf.cond(
-            tf.equal(eval_step % FLAGS.summary_steps, tf.to_int64(1)),
+            tf.equal(eval_step % params['summary_steps'], tf.to_int64(1)),
             lambda: reset_op,
             lambda: tf.no_op())
 
@@ -337,18 +343,19 @@ def model_fn(features, labels, mode, params=None):
         eval_metrics=(eval_metrics_only_fn, metric_args),
         host_call=(host_call_fn, metric_args)
     )
-    if FLAGS.use_tpu:
+    if params['use_tpu']:
         return tpu_estimator_spec
     else:
         return tpu_estimator_spec.as_estimator_spec()
 
 
-def model_inference_fn(features, training):
+def model_inference_fn(features, training, params):
     """Builds just the inference part of the model graph.
 
     Args:
         features: input features tensor.
         training: True if the model is training.
+        params: A dictionary
 
     Returns:
         (policy_output, value_output, logits) tuple of tensors.
@@ -366,7 +373,7 @@ def model_inference_fn(features, training):
 
     my_conv2d = functools.partial(
         tf.layers.conv2d,
-        filters=FLAGS.conv_width,
+        filters=params['conv_width'],
         kernel_size=3,
         padding="same",
         data_format="channels_last",
@@ -383,27 +390,27 @@ def model_inference_fn(features, training):
 
     # the shared stack
     shared_output = initial_output
-    for _ in range(FLAGS.trunk_layers):
+    for _ in range(params['trunk_layers']):
         shared_output = my_res_layer(shared_output)
 
     # policy head
     policy_conv = my_conv2d(
-        shared_output, filters=FLAGS.policy_conv_width, kernel_size=1)
+        shared_output, filters=params['policy_conv_width'], kernel_size=1)
     policy_conv = tf.nn.relu(my_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
-        tf.reshape(policy_conv, [-1, FLAGS.policy_conv_width * go.N * go.N]),
+        tf.reshape(policy_conv, [-1, params['policy_conv_width'] * go.N * go.N]),
         go.N * go.N + 1)
 
     policy_output = tf.nn.softmax(logits, name='policy_output')
 
     # value head
     value_conv = my_conv2d(
-        shared_output, filters=FLAGS.value_conv_width, kernel_size=1)
+        shared_output, filters=params['value_conv_width'], kernel_size=1)
     value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
 
     value_fc_hidden = tf.nn.relu(tf.layers.dense(
-        tf.reshape(value_conv, [-1, FLAGS.value_conv_width * go.N * go.N]),
-        FLAGS.fc_width))
+        tf.reshape(value_conv, [-1, params['value_conv_width'] * go.N * go.N]),
+        params['fc_width']))
     value_output = tf.nn.tanh(
         tf.reshape(tf.layers.dense(value_fc_hidden, 1), [-1]),
         name='value_output')
@@ -425,7 +432,7 @@ def const_model_inference_fn(features):
             return tf.guarantee_const(
                 getter(name, *args, **kwargs), name=name + "/GuaranteeConst")
     with tf.variable_scope("", custom_getter=custom_getter):
-        return model_inference_fn(features, False)
+        return model_inference_fn(features, False, FLAGS.flag_values_dict())
 
 
 def get_estimator():
@@ -442,7 +449,8 @@ def _get_nontpu_estimator():
     return tf.estimator.Estimator(
         model_fn,
         model_dir=FLAGS.work_dir,
-        config=run_config)
+        config=run_config,
+        params=FLAGS.flag_values_dict())
 
 
 def _get_tpu_estimator():
@@ -469,7 +477,8 @@ def _get_tpu_estimator():
         model_fn=model_fn,
         config=run_config,
         train_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores,
-        eval_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores)
+        eval_batch_size=FLAGS.train_batch_size * FLAGS.num_tpu_cores,
+        params=FLAGS.flag_values_dict())
 
 
 def bootstrap():
@@ -485,7 +494,8 @@ def bootstrap():
     sess = tf.Session(graph=tf.Graph())
     with sess.graph.as_default():
         features, labels = get_inference_input()
-        model_fn(features, labels, tf.estimator.ModeKeys.PREDICT)
+        model_fn(features, labels, tf.estimator.ModeKeys.PREDICT,
+                 params=FLAGS.flag_values_dict())
         sess.run(tf.global_variables_initializer())
         tf.train.Saver().save(sess, save_file)
 
@@ -499,7 +509,8 @@ def export_model(model_path):
     Args:
         model_path: The path (can be a gs:// path) to export model to
     """
-    estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.work_dir)
+    estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.work_dir,
+                                       params=FLAGS.flag_values_dict())
     latest_checkpoint = estimator.latest_checkpoint()
     all_checkpoint_files = tf.gfile.Glob(latest_checkpoint + '*')
     for filename in all_checkpoint_files:
