@@ -1,8 +1,11 @@
 """Read Minigo game examples from a Bigtable.
 """
 
+import collections
+import numpy as np
 import os
 import struct
+import time
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 import tensorflow as tf
@@ -32,10 +35,10 @@ def get_latest_game_number():
     in the `table_state` row only.
     """
     table_state = _bt_table.read_row(
-        'table_state',
+        b'table_state',
         filter_=row_filters.ColumnRangeFilter(
             'metadata', b'game_counter', b'game_counter'))
-    value = table_state.cells['metadata'][b'game_counter'][0].value
+    value = table_state.cell_value('metadata', b'game_counter')
     return struct.unpack('>q', value)[0]
 
 
@@ -45,22 +48,62 @@ def get_game_range_row_names(game_begin, game_end):
     Sample row name:
       g_0000000001_m001
 
-    To capture the range of all moves in the two given games,
-    the end row will need to go up to g_00..(N+1).
-
     Args:
       game_begin:  an integer of the beginning game number.
-      game_end:  an integer of the ending game number, inclusive.
+      game_end:  an integer of the ending game number, exclusive.
 
     Returns:
       The two string row numbers to pass to Bigtable as the row range.
     """
     row_fmt = 'g_{:0>10}_'
-    return row_fmt.format(game_begin), row_fmt.format(game_end + 1)
+    return row_fmt.format(game_begin), row_fmt.format(game_end)
+
+
+def make_single_array(ds, batch_size=8*1024):
+    batches = []
+    with tf.Session() as sess:
+        ds = ds.batch(batch_size)
+        iterator = ds.make_initializable_iterator()
+        sess.run(iterator.initializer)
+        get_next = iterator.get_next()
+        try:
+            while True:
+                batches.append(sess.run(get_next))
+        except tf.errors.OutOfRangeError:
+            pass
+    return np.concatenate(batches)
+
+
+def get_moves_from_games(start_game, end_game, moves, shuffle,
+                         column_family, column):
+    start_row, end_row = get_game_range_row_names(start_game, end_game)
+    # NOTE:  Choose a probability high enough to guarantee at least the
+    # required number of moves, by using a slightly lower estimate
+    # of the total moves, then trimming the result.
+    total_moves = count_moves_in_game_range(start_game, end_game)
+    probability = moves / (total_moves * 0.99)
+    utils.dbg('Row range: %s - %s; total moves: %d; probability %.3f' % (
+        start_row, end_row, total_moves, probability))
+    shards = 8
+    ds = _tf_table.parallel_scan_range(start_row, end_row,
+                                       probability=probability,
+                                       num_parallel_scans=shards,
+                                       columns=[(column_family, column)])
+    if shuffle:
+        rds = tf.data.Dataset.from_tensor_slices(
+            tf.random_shuffle(tf.range(0, shards, dtype=tf.int64)))
+        ds = rds.apply(
+            tf.contrib.data.parallel_interleave(
+                lambda x: ds.shard(shards, x),
+                cycle_length=shards, block_length=1024))
+        ds = ds.shuffle(shards * 1024 * 2)
+    ds = ds.take(moves)
+    return ds
 
 
 def get_unparsed_moves_from_last_n_games(n,
                                          moves=2**21,
+                                         shuffle=True,
                                          column_family='tfexample',
                                          column='example'):
     """Get a dataset of serialized TFExamples from the last N games.
@@ -71,6 +114,7 @@ def get_unparsed_moves_from_last_n_games(n,
         from those N games.
       column_family:  name of the column family containing move examples.
       column:  name of the column containing move examples.
+      shuffle:  if True, shuffle the selected move examples.
 
     Returns:
       A dataset containing no more than `moves` examples, sampled
@@ -82,24 +126,74 @@ def get_unparsed_moves_from_last_n_games(n,
         raise ValueError('Cannot find a latest game in the table')
 
     start = int(max(0, latest_game - n))
-    start_row, end_row = get_game_range_row_names(start, latest_game)
-    # NOTE:  Choose a probability high enough to guarantee at least the
-    # required number of moves, by using a low estimate of the number
-    # of moves per game.  Some experiments show that it's right around
-    # 250 moves/game on average, so 100 is a conservative lower bound.
-    estimate = 100
-    probability = moves / (n * estimate)
-    utils.dbg('Row range: %s - %s; probability %.3f' % (
-        start_row, end_row, probability))
-    ds = _tf_table.parallel_scan_range(start_row, end_row,
-                                       probability=probability,
-                                       columns=[(column_family, column)])
-    # Clip the dataset to the desired number of moves, counting on
-    # the fact that the probability chosen will produce at least the
-    # number of moves required.
-    # TODO: Randomize ordering if it isn't already.
-    ds = ds.take(moves)
+    ds = get_moves_from_games(start, latest_game, moves, shuffle,
+                              column_family, column)
     return ds.map(lambda row_name, s: s)
+
+
+def histogram_move_keys_by_game(sess, ds, batch_size=8*1024):
+    """Given dataset of key names, return histogram of moves/game."""
+    ds = ds.batch(batch_size)
+    iterator = ds.make_initializable_iterator()
+    sess.run(iterator.initializer)
+    get_next = iterator.get_next()
+    h = collections.defaultdict(int)
+    try:
+        while True:
+            bresult = sess.run(
+                tf.reduce_join(get_next,
+                               separator='\n'))
+            result = str(bresult, 'utf-8')
+            for line in result.splitlines():
+                g = line.split('_m_')[0]
+                h[g] += 1
+    except tf.errors.OutOfRangeError:
+        pass
+    # NOTE:  Cannot be truly sure the count is right till the end.
+    return h
+
+
+def write_move_counts(sess, h):
+    def gen():
+        for k, v in h.items():
+            vs = str(v)
+            yield (k.replace('g_', 'ct_') + '_%d' % v, vs)
+            yield (k + '_m_000', vs)
+    mc = tf.data.Dataset.from_generator(gen, (tf.string, tf.string))
+    wr_op = _tf_table.write(mc, column_families=['metadata'], columns=['move_count'])
+    sess.run(wr_op)
+
+
+def update_move_count_in_games(start_game, end_game, interval=1000):
+    """Used to update the move_count cell for older games.
+
+    move_count cells will be updated in both g_<game_id>_m_000 rows
+    and ct_<game_id>_<move_count> rows.
+    """
+    for g in range(start_game, end_game, interval):
+        with tf.Session() as sess:
+            g_range = get_game_range_row_names(g, g + interval)
+            print('Range:', g_range)
+            start_time = time.time()
+            ds = _tf_table.keys_by_range_dataset(*g_range)
+            h = histogram_move_keys_by_game(sess, ds)
+            write_move_counts(sess, h)
+            end_time = time.time()
+            elapsed = end_time - start_time
+            print('  games/sec:', len(h)/elapsed)
+
+
+def count_moves_in_game_range(game_begin, game_end):
+    """Use the ct_ rows for rapid move summary.
+    """
+    row_fmt = 'ct_{:0>10}_'
+    start_row = row_fmt.format(game_begin)
+    end_row = row_fmt.format(game_end)
+    rows = _bt_table.read_rows(start_row, end_row,
+                               filter_=row_filters.ColumnRangeFilter(
+                                   'metadata', b'move_count', b'move_count'))
+    moves = sum([int(r.cell_value('metadata', b'move_count')) for r in rows])
+    return moves
 
 
 def count_elements_in_dataset(ds, batch_size=1*1024, parallel_batch=8):
@@ -125,6 +219,7 @@ def count_elements_in_dataset(ds, batch_size=1*1024, parallel_batch=8):
         iterator = dsc.make_initializable_iterator()
         sess.run(iterator.initializer)
         get_next = iterator.get_next()
+        counted = 0
         try:
             while True:
                 # The numbers in the tensors are 0-based indicies,

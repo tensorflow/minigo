@@ -44,22 +44,38 @@ namespace minigo {
 namespace tf_utils {
 
 const char kGameRowFormat[] = "g_%010d";
-const char kGameAndMoveFormat[] = "%s_m_%03d";
+const char kPrefixAndMoveFormat[] = "%s_m_%03d";
+
+using google::cloud::bigtable::BulkMutation;
 
 // Fetches the tensorflow Examples from a MctsPlayer.
 // Linked from tf_utils.cc
 std::vector<tensorflow::Example> MakeExamples(const MctsPlayer& player);
 
+void UpdateMoveCountForGame(BulkMutation& game_batch,
+                            const std::string& game_prefix, int move_count) {
+  auto zero_row = absl::StrFormat(kPrefixAndMoveFormat, game_prefix, 0);
+  auto move_count_str = absl::StrCat(move_count);
+  auto count_row =
+      absl::StrCat("ct_", game_prefix.substr(2), "_", move_count_str);
+  google::cloud::bigtable::SingleRowMutation zero_row_mut(zero_row);
+  zero_row_mut.emplace_back(SetCell("metadata", "move_count", move_count_str));
+  game_batch.emplace_back(std::move(zero_row_mut));
+  google::cloud::bigtable::SingleRowMutation count_row_mut(count_row);
+  count_row_mut.emplace_back(SetCell("metadata", "move_count", move_count_str));
+  game_batch.emplace_back(std::move(count_row_mut));
+}
+
 // Writes a list of tensorflow Example protos to a series of Bigtable rows.
 void WriteTfExamples(Table& table, const std::string& row_prefix,
                      const std::vector<tensorflow::Example>& examples) {
-  google::cloud::bigtable::BulkMutation game_batch;
+  BulkMutation game_batch;
   int move_number = 0;
   for (const auto& example : examples) {
     std::string data;
     example.SerializeToString(&data);
     auto row_name =
-        absl::StrFormat(kGameAndMoveFormat, row_prefix, move_number);
+        absl::StrFormat(kPrefixAndMoveFormat, row_prefix, move_number);
     google::cloud::bigtable::SingleRowMutation row_mutation(row_name);
     row_mutation.emplace_back(SetCell("tfexample", "example", data));
     row_mutation.emplace_back(
@@ -67,6 +83,7 @@ void WriteTfExamples(Table& table, const std::string& row_prefix,
     game_batch.emplace_back(std::move(row_mutation));
     move_number++;
   }
+  UpdateMoveCountForGame(game_batch, row_prefix, move_number);
   table.BulkApply(std::move(game_batch));
 }
 
@@ -144,7 +161,7 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
     return;
   }
 
-  google::cloud::bigtable::BulkMutation game_batch;
+  BulkMutation game_batch;
   auto start_time = absl::Now();
   int changes = 0;
   for (const auto& path : paths) {
@@ -166,7 +183,7 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
     game_id[game_id.rfind('/')] = '-';
     game_id.erase(0, game_id.rfind('/') + 1);
 
-    auto zero_row = absl::StrFormat(kGameAndMoveFormat, row_prefix, 0);
+    auto zero_row = absl::StrFormat(kPrefixAndMoveFormat, row_prefix, 0);
     google::cloud::bigtable::SingleRowMutation zero_row_mutation(zero_row);
     zero_row_mutation.emplace_back(SetCell("metadata", "game_id", game_id));
     game_batch.emplace_back(std::move(zero_row_mutation));
@@ -175,7 +192,7 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
     int move_number = 0;
     while (reader.ReadRecord(&data).ok()) {
       auto row_name =
-          absl::StrFormat(kGameAndMoveFormat, row_prefix, move_number);
+          absl::StrFormat(kPrefixAndMoveFormat, row_prefix, move_number);
       google::cloud::bigtable::SingleRowMutation row_mutation(row_name);
       row_mutation.emplace_back(SetCell("tfexample", "example", data));
       row_mutation.emplace_back(
@@ -184,6 +201,7 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
       move_number++;
       changes++;
     }
+    UpdateMoveCountForGame(game_batch, row_prefix, move_number);
     game_counter++;
   }
 
