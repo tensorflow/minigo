@@ -23,7 +23,8 @@ make buildv2
 And then run the tests.
 
 ```shell
-docker run --rm gcr.io/minigo-testing/minigo-prow-harness-v2:latest --repo=github.com/tensorflow/minigo --job=tf-minigo-presubmit
+docker run --rm gcr.io/minigo-testing/minigo-prow-harness-v2:latest \
+  --repo=github.com/tensorflow/minigo --job=tf-minigo-presubmit --scenario=execute -- ./test.sh
 ```
 
 ## Components
@@ -42,7 +43,7 @@ docker run --rm gcr.io/minigo-testing/minigo-prow-harness-v2:latest --repo=githu
 Minigo has some configuration directly in Prow to make all this jazz work:
 
 - **Test configuration**. This configures the specific test-suites that are run on prow
-  https://github.com/kubernetes/test-infra/blob/master/prow/config.yaml
+  https://github.com/kubernetes/test-infra/blob/master/config/jobs/tensorflow/minigo/minigo.yaml
 
 - **Test UI Configuration**: What shows up in testgrid, the Prow test-ui?
   https://github.com/kubernetes/test-infra/blob/master/testgrid/config.yaml
