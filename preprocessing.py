@@ -106,6 +106,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
         shuffle_records: whether to shuffle the order of files read
         shuffle_examples: whether to shuffle the tf.Examples
         shuffle_buffer_size: how big of a buffer to fill before shuffling.
+        interleave: iwhether to interleave examples from multiple tf_records
         filter_amount: what fraction of records to keep
     Returns:
         a tf dataset of batched tensors
