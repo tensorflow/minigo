@@ -96,7 +96,7 @@ def batch_parse_tf_example(batch_size, example_batch):
 
 def read_tf_records(batch_size, tf_records, num_repeats=1,
                     shuffle_records=True, shuffle_examples=True,
-                    shuffle_buffer_size=None, sloppy_interleave=True,
+                    shuffle_buffer_size=None, interleave=True,
                     filter_amount=1.0):
     '''
     Args:
@@ -119,25 +119,24 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
     record_list = tf.data.Dataset.from_tensor_slices(tf_records)
 
     # compression_type here must agree with write_tf_examples
-    # cycle_length = how many tfrecord files are read in parallel
-    # block_length = how many tf.Examples are read from each file before
-    #   moving to the next file
-    # The idea is to shuffle both the order of the files being read,
-    # and the examples being read from the files.
-    if sloppy_interleave:
+    map_func = functools.partial(
+        tf.data.TFRecordDataset,
+        buffer_size=8 * 1024 * 1024,
+        compression_type='ZLIB')
+
+    if interleave:
+        # cycle_length = how many tfrecord files are read in parallel
+        # The idea is to shuffle both the order of the files being read,
+        # and the examples being read from the files.
         dataset = record_list.apply(tf.contrib.data.parallel_interleave(
-            functools.partial(tf.data.TFRecordDataset,
-                              buffer_size=8 * 1024 * 1024,
-                              compression_type='ZLIB'),
-            cycle_length=64, sloppy=True))
+            map_func, cycle_length=64, sloppy=True))
     else:
-        dataset = record_list.interleave(lambda x:
-                                         tf.data.TFRecordDataset(
-                                             x, compression_type='ZLIB'),
-                                         cycle_length=64, block_length=16)
+        dataset = record_list.flat_map(map_func)
+
     if filter_amount < 1.0:
-        dataset = dataset.filter(lambda x: tf.less(
-            tf.random_uniform([1]), filter_amount)[0])
+        dataset = dataset.filter(
+            lambda _: tf.random_uniform([]) < filter_amount)
+
     dataset = dataset.repeat(num_repeats)
     if shuffle_examples:
         dataset = dataset.shuffle(buffer_size=shuffle_buffer_size)
@@ -194,7 +193,8 @@ def get_input_tensors(batch_size, tf_records, num_repeats=1,
         shuffle_records=shuffle_records,
         shuffle_examples=shuffle_examples,
         shuffle_buffer_size=shuffle_buffer_size,
-        filter_amount=filter_amount)
+        filter_amount=filter_amount,
+        interleave=True)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
     dataset = dataset.map(
         functools.partial(batch_parse_tf_example, batch_size))
@@ -205,17 +205,20 @@ def get_input_tensors(batch_size, tf_records, num_repeats=1,
 
 
 def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
-                          shuffle_records=True, shuffle_examples=True,
-                          shuffle_buffer_size=1024,
                           filter_amount=1, random_rotation=True):
+    # TPUs trains on sequential golden chunks to simplify preprocessing and
+    # reproducibility.
+    assert len(tf_records) < 101, "Use example_buffer to build a golden_chunk"
+
     dataset = read_tf_records(
         batch_size,
         tf_records,
         num_repeats=num_repeats,
-        shuffle_records=shuffle_records,
-        shuffle_examples=shuffle_examples,
-        shuffle_buffer_size=shuffle_buffer_size,
-        filter_amount=filter_amount)
+        shuffle_records=False,
+        shuffle_examples=False,
+        shuffle_buffer_size=None,
+        filter_amount=filter_amount,
+        interleave=False)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
     dataset = dataset.map(
         functools.partial(batch_parse_tf_example, batch_size))

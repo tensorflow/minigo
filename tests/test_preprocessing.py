@@ -64,8 +64,7 @@ class TestPreprocessing(test_utils.MiniGoUnitTest):
 
     def extract_tpu_data(self, tf_record, random_rotation=False):
         dataset = preprocessing.get_tpu_input_tensors(
-            1, [tf_record], num_repeats=1, shuffle_records=False,
-            shuffle_examples=False, filter_amount=1,
+            1, [tf_record], num_repeats=1, filter_amount=1,
             random_rotation=random_rotation)
         pos_tensor, label_tensors = dataset.make_one_shot_iterator().get_next()
         return self.get_data_tensors(pos_tensor, label_tensors)
