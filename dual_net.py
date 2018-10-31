@@ -22,11 +22,7 @@ from absl import flags
 import functools
 import logging
 import os.path
-import sys
 
-import fire
-from tqdm import tqdm
-import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import summary
 from tensorflow.contrib.tpu.python.tpu import tpu_config

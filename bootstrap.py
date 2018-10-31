@@ -28,6 +28,9 @@ import utils
 flags.DEFINE_string('export_path', None,
                     'Where to export the model after training.')
 
+flags.DEFINE_bool('create_bootstrap', True,
+                  'Whether to create a bootstrap model before exporting')
+
 flags.declare_key_flag('work_dir')
 
 FLAGS = flags.FLAGS
@@ -36,7 +39,8 @@ FLAGS = flags.FLAGS
 def main(unused_argv):
     """Bootstrap random weights."""
     utils.ensure_dir_exists(os.path.dirname(FLAGS.export_path))
-    dual_net.bootstrap()
+    if FLAGS.create_bootstrap:
+        dual_net.bootstrap()
     dual_net.export_model(FLAGS.export_path)
 
 if __name__ == '__main__':
