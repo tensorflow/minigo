@@ -71,7 +71,7 @@ bool GetModTime(const std::string& path, uint64_t* mtime_usec) {
 
 bool ListDir(const std::string& directory, std::vector<std::string>* files) {
   DIR* dirp = opendir(directory.c_str());
-  if (directory == nullptr) {
+  if (dirp == nullptr) {
     std::cerr << "Could not open directory " << directory << std::endl;
     return false;
   }
