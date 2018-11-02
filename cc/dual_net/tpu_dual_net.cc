@@ -51,8 +51,8 @@ TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
   TF_CHECK_OK(session_->Create(graph_def));
 
   for (int i = 0; i < num_replicas_; ++i) {
-    output_names_.push_back(absl::StrCat("tpu_policy_output_", i));
-    output_names_.push_back(absl::StrCat("tpu_value_output_", i));
+    output_names_.push_back(absl::StrCat("policy_output_", i));
+    output_names_.push_back(absl::StrCat("value_output_", i));
   }
 }
 
@@ -114,7 +114,7 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
   inputs_.clear();
   for (int i = 0; i < num_replicas_; ++i) {
     inputs_.emplace_back(
-        absl::StrCat("tpu_pos_tensor_", i),
+        absl::StrCat("pos_tensor_", i),
         Tensor(DT_FLOAT, TensorShape({static_cast<int>(capacity), kN, kN,
                                       kNumStoneFeatures})));
   }
@@ -142,7 +142,7 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
   int num_replicas = 0;
   for (const auto& node : graph_def.node()) {
     absl::string_view name = node.name();
-    if (absl::ConsumePrefix(&name, "tpu_pos_tensor_")) {
+    if (absl::ConsumePrefix(&name, "pos_tensor_")) {
       int replica;
       MG_CHECK(absl::SimpleAtoi(name, &replica));
       num_replicas = std::max(num_replicas, replica + 1);
