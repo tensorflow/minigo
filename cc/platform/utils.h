@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_PLATFORM_H_
-#define CC_PLATFORM_H_
+#ifndef CC_PLATFORM_UTILS_H_
+#define CC_PLATFORM_UTILS_H_
 
 namespace minigo {
 
@@ -22,4 +22,4 @@ int GetNumLogicalCpus();
 
 }  // namespace minigo
 
-#endif  // CC_PLATFORM_H_
+#endif  // CC_PLATFORM_UTILS_H_
