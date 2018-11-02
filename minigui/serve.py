@@ -26,7 +26,9 @@ from flask_socketio import SocketIO
 import functools
 import json
 import logging
+import select
 import subprocess
+import threading
 
 flags.DEFINE_string("model", None, "Model path.")
 
@@ -108,27 +110,46 @@ def _open_pipes():
 token = ""
 echo_streams = True
 p = None
+stderr_done_semaphore = threading.Semaphore(0)
 
 
-def std_bg_thread(stream):
+def process_line(stream_name, line):
     global token
     global echo_streams
 
-    for line in p.__getattribute__(stream):
+    if echo_streams:
+        sys.stdout.write(line)
+        if "GTP engine ready" in line:
+            echo_streams = False
+
+    if line[-1] == "\n":
+        line = line[:-1]
+
+    if line.startswith("= __NEW_TOKEN__ "):
+        token = line.split(" ", 3)[2]
+    socketio.send(json.dumps({stream_name: line, "token": token}),
+                  namespace="/minigui", json=True)
+
+
+def stderr_thread():
+    for line in p.stderr:
         line = line.decode()
-        if echo_streams:
-            sys.stdout.write(line)
-            if "GTP engine ready" in line:
-                echo_streams = False
+        if line == "__GTP_CMD_DONE__\n":
+            stderr_done_semaphore.release()
+            continue
+        process_line('stderr', line)
+    print("stderr thread died")
 
-        if line[-1] == "\n":
-            line = line[:-1]
 
-        if line.startswith("= __NEW_TOKEN__ "):
-            token = line.split(" ", 3)[2]
-        socketio.send(json.dumps({stream: line, "token": token}),
-                      namespace="/minigui", json=True)
-    print(stream, "bg_thread died")
+def stdout_thread():
+    for line in p.stdout:
+        line = line.decode()
+        if line[0] == '=' or line[0] == '?':
+            # We just read the result of a GTP command, Wait for all lines
+            # written to stderr while processing that command to be read.
+            stderr_done_semaphore.acquire()
+        process_line('stdout', line)
+    print("stdout thread died")
 
 
 @socketio.on("gtpcmd", namespace="/minigui")
@@ -150,11 +171,8 @@ def index():
 def main(unused_argv):
     global p
     p = _open_pipes()
-    socketio.start_background_task(
-        target=functools.partial(std_bg_thread, "stderr"))
-    socketio.start_background_task(
-        target=functools.partial(std_bg_thread, "stdout"))
-
+    socketio.start_background_task(stderr_thread)
+    socketio.start_background_task(stdout_thread)
     socketio.run(app, port=FLAGS.port, host=FLAGS.host)
 
 

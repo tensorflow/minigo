@@ -107,10 +107,10 @@ Coord MctsNode::GetMostVisitedMove() const {
   // Find the set of moves with the largest N.
   inline_vector<Coord, kNumMoves> moves;
   moves.push_back(0);
-  int best_N = child_N(0);
-  for (int i = 1; i < kNumMoves; ++i) {
+  int best_N = -1;
+  for (int i = 0; i < kNumMoves; ++i) {
     int cn = child_N(i);
-    if (cn > best_N) {
+    if (cn > best_N && children.contains(i)) {
       moves.clear();
       moves.push_back(i);
       best_N = cn;
@@ -118,6 +118,8 @@ Coord MctsNode::GetMostVisitedMove() const {
       moves.push_back(i);
     }
   }
+
+  MG_CHECK(!moves.empty());
 
   // If there's only one move with the largest N, we're done.
   if (moves.size() == 1) {

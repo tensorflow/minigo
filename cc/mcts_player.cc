@@ -107,6 +107,10 @@ void MctsPlayer::InitializeGame(const Position& position) {
 
 void MctsPlayer::NewGame() {
   game_root_ = MctsNode(&dummy_stats_, {&bv_, &gv_, Color::kBlack});
+  ResetRoot();
+}
+
+void MctsPlayer::ResetRoot() {
   root_ = &game_root_;
   history_.clear();
 }

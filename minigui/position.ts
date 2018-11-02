@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Color, Move, Nullable, Point, otherColor} from './base'
+import {Color, Move, Nullable, Point, movesEqual, otherColor, stonesEqual} from './base'
 import {emptyBoard} from './util'
 
 namespace Annotation {
@@ -53,12 +53,21 @@ class Position {
   }
 
   addChild(move: Move, stones: Color[]) {
-    this.children.forEach((child) => {
-      if (child.lastMove == move) {
-        throw new Error(`Position already has child ${move}`);
+    // If the position already has a child with the given move, verify that the
+    // stones are equal and return the existing child.
+    for (let child of this.children) {
+      if (child.lastMove == null) {
+        throw new Error('Child node shouldn\'t have a null lastMove');
       }
-    });
+      if (movesEqual(child.lastMove, move)) {
+        if (!stonesEqual(stones, child.stones)) {
+          throw new Error(`Position has child ${move} with different stones`);
+        }
+        return child;
+      }
+    }
 
+    // Create a new child.
     let child = new Position(
       this, this.moveNum + 1, stones, move, otherColor(this.toPlay));
     this.children.push(child);

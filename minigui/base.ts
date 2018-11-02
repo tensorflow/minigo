@@ -27,6 +27,19 @@ function otherColor(color: Color) {
   return color == Color.White ? Color.Black : Color.White;
 }
 
+function stonesEqual(a: Color[], b: Color[]) {
+  if (a.length != b.length) {
+    throw new Error(
+      `Expected arrays of equal length, got lengths ${a.length} & ${b.length}`);
+  }
+  for (let i = 0; i < a.length; ++i) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 enum BoardSize {
   Nine = 9,
   Nineteen = 19,
@@ -58,6 +71,25 @@ interface Point {
 
 type Move = Point | 'pass' | 'resign';
 
+function toKgs(move: Move) {
+  if (move == 'pass' || move == 'resign') {
+    return move;
+  }
+  let row = N - move.row;
+  let col = COL_LABELS[move.col];
+  return `${col}${row}`;
+}
+
+function movesEqual(a: Move, b: Move) {
+  if (a == 'pass' || a == 'resign') {
+    return a == b;
+  }
+  if (b == 'pass' || b == 'resign') {
+    return false;
+  }
+  return a.row == b.row && a.col == b.col;
+}
+
 type Nullable<T> = T | null;
 
 export {
@@ -69,6 +101,9 @@ export {
   N,
   Nullable,
   Point,
+  movesEqual,
   otherColor,
   setBoardSize,
+  stonesEqual,
+  toKgs,
 }

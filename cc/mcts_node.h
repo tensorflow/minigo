@@ -143,7 +143,7 @@ class MctsNode {
   std::array<bool, kNumMoves> legal_moves;
 
   // Map from move to resulting MctsNode.
-  absl::flat_hash_map<uint64_t, std::unique_ptr<MctsNode>> children;
+  absl::flat_hash_map<Coord, std::unique_ptr<MctsNode>> children;
 
   bool is_expanded = false;
 

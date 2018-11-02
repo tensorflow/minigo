@@ -58,9 +58,13 @@ class KioskApp extends App {
   }
 
   protected onGameState(msg: GameStateMsg) {
-    super.onGameState(msg);
+    if (msg.lastMove != null) {
+      this.activePosition = this.activePosition.addChild(
+          msg.lastMove, msg.stones);
+    }
     this.log.scroll();
     this.winrateGraph.setWinrate(msg.moveNum, msg.q);
+    this.updateBoards(msg);
 
     if (this.gameOver) {
       window.setTimeout(() => { this.newGame(); }, 3000);

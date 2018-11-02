@@ -5,8 +5,6 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
         constructor(parent) {
             this.points = new Array();
             this.minPoints = 10;
-            this.selectedMove = null;
-            this.moveChangedCallback = null;
             if (typeof (parent) == 'string') {
                 parent = util_1.getElement(parent);
             }
@@ -17,12 +15,6 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             window.addEventListener('resize', () => {
                 this.resizeCanvas();
                 this.draw();
-            });
-            canvas.addEventListener('mousemove', (e) => {
-                this.onMouseMove(e.offsetX, e.offsetY);
-            });
-            canvas.addEventListener('mouseleave', () => {
-                this.onMouseLeave();
             });
             this.draw();
         }
@@ -49,9 +41,6 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
         setWinrate(move, winrate) {
             this.points[move] = [move, winrate];
             this.draw();
-        }
-        onMoveChanged(callback) {
-            this.moveChangedCallback = callback;
         }
         draw() {
             let pr = util_1.pixelRatio();
@@ -90,15 +79,6 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             let xOfs = Math.floor(lineWidth / 2);
             ctx.translate(xOfs, 0);
             w -= xOfs;
-            if (this.selectedMove !== null) {
-                let x = Math.round(w * this.selectedMove / xScale);
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = '#96928f';
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, h);
-                ctx.stroke();
-            }
             if (this.points.length >= 2) {
                 ctx.lineWidth = lineWidth;
                 ctx.strokeStyle = '#eee';
@@ -130,29 +110,6 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
                 txt = `W:${Math.round(-score * 100)}%`;
             }
             ctx.fillText(txt, w + 8, y);
-        }
-        onMouseMove(x, y) {
-            if (this.points.length < 2) {
-                return;
-            }
-            let pr = util_1.pixelRatio();
-            let n = Math.max(this.minPoints, this.points.length - 1);
-            let newMove = Math.round(n * (pr * x - this.marginLeft) / this.w);
-            newMove = Math.max(0, Math.min(newMove, this.points.length - 1));
-            if (newMove != this.selectedMove) {
-                this.selectedMove = newMove;
-                this.draw();
-                if (this.moveChangedCallback) {
-                    this.moveChangedCallback(this.selectedMove);
-                }
-            }
-        }
-        onMouseLeave() {
-            this.selectedMove = null;
-            this.draw();
-            if (this.moveChangedCallback) {
-                this.moveChangedCallback(this.selectedMove);
-            }
         }
     }
     exports.WinrateGraph = WinrateGraph;

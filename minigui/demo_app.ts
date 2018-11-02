@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {App, GameStateMsg, Position} from './app'
-import {COL_LABELS, Color, Move, N, Nullable} from './base'
+import {COL_LABELS, Color, Move, N, Nullable, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
 import * as lyr from './layer'
@@ -68,26 +68,10 @@ class DemoApp extends App {
       this.init(boards);
 
       this.mainBoard.onClick((p) => {
-        this.playMove(this.toPlay, p);
+        this.playMove(this.activePosition.toPlay, p);
       });
 
       this.initButtons();
-
-      this.winrateGraph.onMoveChanged((moveNum: Nullable<number>) => {
-        let position: Position = this.latestPosition;
-        if (moveNum != null) {
-          for (let p = this.rootPosition; p; p = p.children[0]) {
-            if (p.moveNum == moveNum) {
-              position = p;
-              break;
-            }
-          }
-        }
-        if (position != this.activePosition) {
-          this.activePosition = position;
-          this.updateBoards(position);
-        }
-      });
 
       // Initialize log.
       this.log.onConsoleCmd((cmd: string) => {
@@ -102,7 +86,7 @@ class DemoApp extends App {
   private initButtons() {
     getElement('pass').addEventListener('click', () => {
       if (this.mainBoard.enabled) {
-        this.playMove(this.toPlay, 'pass');
+        this.playMove(this.activePosition.toPlay, 'pass');
       }
     });
 
@@ -138,7 +122,7 @@ class DemoApp extends App {
       return;
     }
 
-    if (this.playerElems[this.toPlay].innerText == MINIGO) {
+    if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
       this.mainBoard.enabled = false;
       this.engineBusy = true;
       this.gtp.send('genmove').then((move: string) => {
@@ -151,7 +135,11 @@ class DemoApp extends App {
   }
 
   protected onGameState(msg: GameStateMsg) {
-    super.onGameState(msg);
+    if (msg.lastMove != null) {
+      this.activePosition = this.activePosition.addChild(
+          msg.lastMove, msg.stones);
+    }
+    this.updateBoards(msg);
     this.log.scroll();
     this.winrateGraph.setWinrate(msg.moveNum, msg.q);
     this.onPlayerChanged();
@@ -159,17 +147,7 @@ class DemoApp extends App {
 
   private playMove(color: Color, move: Move) {
     let colorStr = color == Color.Black ? 'b' : 'w';
-    let moveStr: string;
-    if (move == 'pass') {
-      moveStr = move;
-    } else if (move == 'resign') {
-      // TODO(tommadams): support resign moves.
-      throw new Error('resign not yet supported');
-    } else {
-      let row = N - move.row;
-      let col = COL_LABELS[move.col];
-      moveStr = `${col}${row}`;
-    }
+    let moveStr = toKgs(move);
     this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
       this.gtp.send('gamestate');
     });

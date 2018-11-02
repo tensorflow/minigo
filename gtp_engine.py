@@ -30,6 +30,8 @@ _CANONICAL_ERRORS = {
     "loadsgf": "cannot load file",
 }
 
+_GTP_CMD_DONE = "__GTP_CMD_DONE__"
+
 
 def _preprocess(msg):
     # From the spec (3.1 Preprocessing):
@@ -71,10 +73,12 @@ def _print_msg(result, msg_id, msg):
 
 
 def _print_error(msg_id, msg):
+    print(_GTP_CMD_DONE, file=sys.stderr)
     _print_msg("?", msg_id, msg)
 
 
 def _print_success(msg_id, msg):
+    print(_GTP_CMD_DONE, file=sys.stderr)
     _print_msg("=", msg_id, msg)
 
 

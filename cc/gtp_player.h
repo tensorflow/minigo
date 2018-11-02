@@ -103,6 +103,7 @@ class GtpPlayer : public MctsPlayer {
   Response HandleLoadsgf(absl::string_view cmd, CmdArgs args);
   Response HandleName(absl::string_view cmd, CmdArgs args);
   Response HandlePlay(absl::string_view cmd, CmdArgs args);
+  Response HandlePlayMultiple(absl::string_view cmd, CmdArgs args);
   Response HandlePlaysgf(absl::string_view cmd, CmdArgs args);
   Response HandlePonder(absl::string_view cmd, CmdArgs args);
   Response HandlePonderLimit(absl::string_view cmd, CmdArgs args);
@@ -113,14 +114,15 @@ class GtpPlayer : public MctsPlayer {
   // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
   Response ParseSgf(const std::string& sgf_str);
 
+  // Shared implementation used by Play and PlayMulidiple, which perform
+  // argument count validation.
+  // The first arg is the first color in the sequence of moves. Subsequent
+  // arguments are the moves, alternating between players.
+  Response PlayImpl(CmdArgs args);
+
   void ReportSearchStatus(const MctsNode* last_read);
 
   void ReportGameState() const;
-
-  // The color of the last genmove command, which under normal circumstances
-  // is the color we are playing as.
-  // Set to Color::kEmpty when the board is cleared.
-  Color last_genmove_ = Color::kEmpty;
 
   bool ponder_enabled_ = false;
   int ponder_count_ = 0;

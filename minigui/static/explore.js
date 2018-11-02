@@ -1,14 +1,11 @@
 define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./winrate_graph", "./util", "./variation_tree"], function (require, exports, app_1, base_1, board_1, lyr, log_1, winrate_graph_1, util_1, variation_tree_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    const HUMAN = 'Human';
-    const MINIGO = 'Minigo';
-    variation_tree_1.testVariationTree();
     class DemoApp extends app_1.App {
         constructor() {
             super();
-            this.playerElems = [];
             this.winrateGraph = new winrate_graph_1.WinrateGraph('winrate-graph');
+            this.variationTree = new variation_tree_1.VariationTree('tree');
             this.log = new log_1.Log('log', 'console');
             this.connect().then(() => {
                 this.mainBoard = new board_1.ClickableBoard('main-board', [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
@@ -16,7 +13,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.readsBoard = new board_1.Board('reads-board', [lyr.BoardStones]);
                 this.init([this.mainBoard, this.readsBoard]);
                 this.mainBoard.onClick((p) => {
-                    this.playMove(this.toPlay, p);
+                    this.playMove(this.activePosition.toPlay, p).then(() => {
+                        this.gtp.send('gamestate');
+                    });
                 });
                 this.initButtons();
                 this.log.onConsoleCmd((cmd) => {
@@ -24,12 +23,22 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 });
                 this.gtp.onText((line) => { this.log.log(line, 'log-cmd'); });
                 this.newGame();
+                this.variationTree.onClick((positions) => {
+                    this.gtp.send('clear_board');
+                    this.activePosition = this.rootPosition;
+                    for (let position of positions) {
+                        if (position.lastMove != null) {
+                            this.playMove(base_1.otherColor(position.toPlay), position.lastMove);
+                            this.gtp.send('gamestate');
+                        }
+                    }
+                });
             });
         }
         initButtons() {
             util_1.getElement('pass').addEventListener('click', () => {
                 if (this.mainBoard.enabled) {
-                    this.playMove(this.toPlay, 'pass');
+                    this.playMove(this.activePosition.toPlay, 'pass');
                 }
             });
             util_1.getElement('load-sgf-input').addEventListener('change', (e) => {
@@ -44,27 +53,28 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.newGame();
                     let sgf = reader.result.replace(/\n/g, '\\n');
                     this.gtp.send(`playsgf ${sgf}`).then(() => {
-                        console.log('ok!');
+                        this.variationTree.draw();
                     });
                 };
                 reader.readAsText(files[0]);
             });
         }
         newGame() {
+            this.gtp.send('prune_nodes 1');
             super.newGame();
+            this.variationTree.newGame(this.rootPosition);
+            this.gtp.send('prune_nodes 0');
             this.log.clear();
             this.winrateGraph.clear();
         }
-        onPlayerChanged() {
-            if (this.engineBusy || this.gameOver) {
-                return;
-            }
-        }
         onGameState(msg) {
-            super.onGameState(msg);
+            if (msg.lastMove != null) {
+                this.activePosition = this.activePosition.addChild(msg.lastMove, msg.stones);
+            }
+            this.updateBoards(msg);
             this.log.scroll();
             this.winrateGraph.setWinrate(msg.moveNum, msg.q);
-            this.onPlayerChanged();
+            this.variationTree.draw();
         }
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
@@ -80,9 +90,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 let col = base_1.COL_LABELS[move.col];
                 moveStr = `${col}${row}`;
             }
-            this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
-                this.gtp.send('gamestate');
-            });
+            return this.gtp.send(`play ${colorStr} ${moveStr}`);
         }
         onGameOver() {
             this.gtp.send('final_score').then((result) => {

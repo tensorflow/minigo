@@ -79,6 +79,8 @@ body {
 }
 .button:hover { opacity: 0.8; }
 
+.pointer { cursor: pointer; }
+
 .log-cmd { font-style: italic; padding-left: 12px; }
 
 .log-rb { color: red; background-color: #090706; }

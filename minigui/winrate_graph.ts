@@ -14,8 +14,6 @@
 
 import {getElement, pixelRatio} from './util'
 
-type MoveChangedCallback = (move: number | null) => void;
-
 class WinrateGraph {
   protected ctx: CanvasRenderingContext2D;
   protected points = new Array<[number, number]>();
@@ -28,8 +26,6 @@ class WinrateGraph {
 
   protected w: number;
   protected h: number;
-  protected selectedMove: number | null = null;
-  protected moveChangedCallback: MoveChangedCallback | null = null;
 
   constructor(parent: HTMLElement | string) {
     if (typeof(parent) == 'string') {
@@ -46,16 +42,8 @@ class WinrateGraph {
       this.draw();
     });
 
-    canvas.addEventListener('mousemove', (e) => {
-      this.onMouseMove(e.offsetX, e.offsetY);
-    });
-    canvas.addEventListener('mouseleave', () => {
-      this.onMouseLeave();
-    });
-
     this.draw();
   }
-
 
   private resizeCanvas() {
     let pr = pixelRatio();
@@ -84,10 +72,6 @@ class WinrateGraph {
   setWinrate(move: number, winrate: number) {
     this.points[move] = [move, winrate];
     this.draw();
-  }
-
-  onMoveChanged(callback: MoveChangedCallback) {
-    this.moveChangedCallback = callback;
   }
 
   private draw() {
@@ -145,17 +129,6 @@ class WinrateGraph {
     ctx.translate(xOfs, 0);
     w -= xOfs;
 
-    // Draw the selected move (if any).
-    if (this.selectedMove !== null) {
-      let x = Math.round(w * this.selectedMove / xScale);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = '#96928f';
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-
     // Draw the graph.
     if (this.points.length >= 2) {
       ctx.lineWidth = lineWidth;
@@ -188,31 +161,6 @@ class WinrateGraph {
       txt = `W:${Math.round(-score * 100)}%`;
     }
     ctx.fillText(txt, w + 8, y);
-  }
-
-  private onMouseMove(x: number, y: number) {
-    if (this.points.length < 2) {
-      return;
-    }
-    let pr = pixelRatio();
-    let n = Math.max(this.minPoints, this.points.length - 1);
-    let newMove = Math.round(n * (pr * x - this.marginLeft) / this.w);
-    newMove = Math.max(0, Math.min(newMove, this.points.length - 1));
-    if (newMove != this.selectedMove) {
-      this.selectedMove = newMove;
-      this.draw();
-      if (this.moveChangedCallback) {
-        this.moveChangedCallback(this.selectedMove);
-      }
-    }
-  }
-
-  private onMouseLeave() {
-    this.selectedMove = null;
-    this.draw();
-    if (this.moveChangedCallback) {
-      this.moveChangedCallback(this.selectedMove);
-    }
   }
 }
 

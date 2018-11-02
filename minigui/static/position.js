@@ -32,11 +32,17 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
             }
         }
         addChild(move, stones) {
-            this.children.forEach((child) => {
-                if (child.lastMove == move) {
-                    throw new Error(`Position already has child ${move}`);
+            for (let child of this.children) {
+                if (child.lastMove == null) {
+                    throw new Error('Child node shouldn\'t have a null lastMove');
                 }
-            });
+                if (base_1.movesEqual(child.lastMove, move)) {
+                    if (!base_1.stonesEqual(stones, child.stones)) {
+                        throw new Error(`Position has child ${move} with different stones`);
+                    }
+                    return child;
+                }
+            }
             let child = new Position(this, this.moveNum + 1, stones, move, base_1.otherColor(this.toPlay));
             this.children.push(child);
             return child;

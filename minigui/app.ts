@@ -14,26 +14,77 @@
 
 import {Annotation, Position} from './position'
 import {Socket} from './gtp_socket'
-import {Color, Move, N, Nullable, setBoardSize} from './base'
+import {Color, Move, N, Nullable, setBoardSize, toKgs} from './base'
 import {Board} from './board'
 import * as util from './util'
 
-interface SearchMsg {
+interface SearchJson {
   moveNum: number;
-  toPlay: string | Color;
-  search: string[] | Move[];
-  n: number[];
-  dq: number[];
-  pv?: string[] | Move[];
+  toPlay: string;
+  search: string[];
+  n?: number[];
+  dq?: number[];
+  pv?: string[];
 }
 
-interface GameStateMsg {
+class SearchMsg {
+  moveNum: number;
+  toPlay: Color;
+  search: Move[];
+  n: Nullable<number[]> = null;
+  dq: Nullable<number[]> = null;
+  pv: Nullable<Move[]> = null;
+
+  constructor(j: SearchJson) {
+    this.moveNum = j.moveNum;
+    this.toPlay = util.parseGtpColor(j.toPlay as string);
+    this.search = util.parseMoves(j.search as string[], N);
+    if (j.n) {
+      this.n = j.n;
+    }
+    if (j.dq) {
+      this.dq = j.dq;
+    }
+    if (j.pv) {
+      this.pv = util.parseMoves(j.pv as string[], N);
+    }
+  }
+}
+
+interface GameStateJson {
   board: string;
   toPlay: string;
   lastMove?: string;
   moveNum: number;
   q: number;
   gameOver: boolean;
+}
+
+class GameStateMsg {
+  stones: Color[] = [];
+  toPlay: Color;
+  lastMove: Nullable<Move> = null;
+  moveNum: number;
+  q: number;
+  gameOver: boolean;
+
+  constructor(j: GameStateJson) {
+    const stoneMap: {[index: string]: Color} = {
+      '.': Color.Empty,
+      'X': Color.Black,
+      'O': Color.White,
+    };
+    for (let i = 0; i < j.board.length; ++i) {
+      this.stones.push(stoneMap[j.board[i]]);
+    }
+    this.toPlay = util.parseGtpColor(j.toPlay);
+    if (j.lastMove) {
+      this.lastMove = util.parseGtpMove(j.lastMove, N);
+    }
+    this.moveNum = j.moveNum;
+    this.q = j.q;
+    this.gameOver = j.gameOver;
+  }
 }
 
 // App base class used by the different Minigui UI implementations.
@@ -47,18 +98,11 @@ abstract class App {
   // The root of the game tree, an empty board.
   protected rootPosition: Position;
 
-  // The most recent position played.
-  protected latestPosition: Position;
-
-  // The most position currently being displayed. In some modes, this is
-  // different from the latestPosition.
+  // The currently active position.
   protected activePosition: Position;
 
   // True when the backend reports that the game is over.
   protected gameOver = true;
-
-  // Whose turn is it.
-  protected toPlay = Color.Black;
 
   // List of Board views.
   private boards: Board[] = [];
@@ -66,8 +110,17 @@ abstract class App {
   protected abstract onGameOver(): void;
 
   constructor() {
-    this.gtp.onData('mg-search', this.onSearch.bind(this));
-    this.gtp.onData('mg-gamestate', this.onGameState.bind(this));
+    this.gtp.onData('mg-search', (j: SearchJson) => {
+      this.onSearch(new SearchMsg(j));
+    });
+    this.gtp.onData('mg-gamestate', (j: GameStateJson) => {
+      let msg = new GameStateMsg(j);
+      this.gameOver = msg.gameOver;
+      this.onGameState(msg);
+      if (j.gameOver) {
+        this.onGameOver();
+      }
+    });
   }
 
   protected connect() {
@@ -82,7 +135,6 @@ abstract class App {
   protected newGame() {
     this.rootPosition = new Position(
         null, 0, util.emptyBoard(), null, Color.Black)
-    this.latestPosition = this.rootPosition;
     this.activePosition = this.rootPosition;
 
     this.gtp.send('clear_board');
@@ -123,19 +175,6 @@ abstract class App {
   }
 
   protected onSearch(msg: SearchMsg) {
-    // Parse move variations.
-    msg.search = util.parseMoves(msg.search as string[], N);
-    msg.toPlay = util.parseGtpColor(msg.toPlay as string);
-    if (msg.pv) {
-      msg.pv = util.parseMoves(msg.pv as string[], N);
-    }
-
-    if (msg.moveNum != this.latestPosition.moveNum) {
-      throw new Error(
-          `Got a search msg for move ${msg.moveNum} but latest is ` +
-          `${this.latestPosition.moveNum}`);
-    }
-
     // Update the board state with contents of the search.
     // Copies the properties named in `props` that are present in `msg` into the
     // current position.
@@ -143,7 +182,7 @@ abstract class App {
     // to store any/all properties return in the SearchMsg, without having to
     // specify this property list.
     const props = ['n', 'dq', 'pv', 'search'];
-    util.partialUpdate(msg, this.latestPosition, props);
+    util.partialUpdate(msg, this.activePosition, props);
 
     // Update the boards.
     if (this.activePosition.moveNum == msg.moveNum) {
@@ -151,48 +190,12 @@ abstract class App {
     }
   }
 
-  protected onGameState(msg: GameStateMsg) {
-    // Parse the raw message.
-    let stoneMap: {[index: string]: Color} = {
-      '.': Color.Empty,
-      'X': Color.Black,
-      'O': Color.White,
-    };
-    let stones = [];
-    for (let i = 0; i < msg.board.length; ++i) {
-      stones.push(stoneMap[msg.board[i]]);
-    }
-
-    this.toPlay = util.parseGtpColor(msg.toPlay);
-    this.gameOver = msg.gameOver;
-    let lastMove = msg.lastMove ? util.parseGtpMove(msg.lastMove, N) : null;
-
-    if (lastMove == null) {
-      if (msg.moveNum != 0) {
-        throw new Error(`moveNum == ${msg.moveNum} but don't have a lastMove`);
-      }
-      stones.forEach((color) => {
-        if (color != Color.Empty) {
-          throw new Error(`board isn't empty but don't have a lastMove`);
-        }
-      });
-    } else {
-      if (msg.moveNum != this.latestPosition.moveNum + 1) {
-        throw new Error(
-            `Expected game state for move ${this.latestPosition.moveNum + 1} ` +
-            `but got ${msg.moveNum}`);
-      }
-      this.latestPosition = this.latestPosition.addChild(lastMove, stones);
-      if (this.activePosition == this.latestPosition.parent) {
-        this.activePosition = this.latestPosition;
-        this.updateBoards(this.activePosition);
-      }
-    }
-
-    if (this.gameOver) {
-      this.onGameOver();
-    }
-  }
+  protected abstract onGameState(msg: GameStateMsg): void;
+  //   if (msg.lastMove != null) {
+  //     this.activePosition = this.activePosition.addChild(msg.lastMove, msg.stones);
+  //   }
+  //   this.updateBoards(this.activePosition);
+  // }
 }
 
 export {

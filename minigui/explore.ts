@@ -13,26 +13,21 @@
 // limitations under the License.
 
 import {App, GameStateMsg, Position} from './app'
-import {COL_LABELS, Color, Move, N, Nullable} from './base'
+import {COL_LABELS, Color, Move, N, Nullable, Point, otherColor} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
 import * as lyr from './layer'
 import {Log} from './log'
 import {WinrateGraph} from './winrate_graph'
 import {getElement, toPrettyResult} from './util'
-import {VariationTree, testVariationTree} from './variation_tree'
-
-const HUMAN = 'Human';
-const MINIGO = 'Minigo';
-
-testVariationTree();
+import {VariationTree} from './variation_tree'
 
 // Demo app implementation that's shared between full and lightweight demo UIs.
 class DemoApp extends App {
   private mainBoard: ClickableBoard;
   private readsBoard: Board;
-  private playerElems: HTMLElement[] = [];
   private winrateGraph = new WinrateGraph('winrate-graph');
+  private variationTree = new VariationTree('tree');
   private log = new Log('log', 'console');
 
   constructor() {
@@ -53,8 +48,10 @@ class DemoApp extends App {
 
       this.init([this.mainBoard, this.readsBoard]);
 
-      this.mainBoard.onClick((p) => {
-        this.playMove(this.toPlay, p);
+      this.mainBoard.onClick((p: Point) => {
+        this.playMove(this.activePosition.toPlay, p).then(() => {
+          this.gtp.send('gamestate');
+        });
       });
 
       this.initButtons();
@@ -66,13 +63,24 @@ class DemoApp extends App {
 
       this.gtp.onText((line: string) => { this.log.log(line, 'log-cmd'); });
       this.newGame();
+
+      this.variationTree.onClick((positions: Position[]) => {
+        this.gtp.send('clear_board');
+        this.activePosition = this.rootPosition;
+        for (let position of positions) {
+          if (position.lastMove != null) {
+            this.playMove(otherColor(position.toPlay), position.lastMove);
+            this.gtp.send('gamestate');
+          }
+        }
+      });
     });
   }
 
   private initButtons() {
     getElement('pass').addEventListener('click', () => {
       if (this.mainBoard.enabled) {
-        this.playMove(this.toPlay, 'pass');
+        this.playMove(this.activePosition.toPlay, 'pass');
       }
     });
 
@@ -88,7 +96,7 @@ class DemoApp extends App {
         this.newGame();
         let sgf = reader.result.replace(/\n/g, '\\n');
         this.gtp.send(`playsgf ${sgf}`).then(() => {
-          console.log('ok!');
+          this.variationTree.draw();
         });
       };
       reader.readAsText(files[0]);
@@ -96,22 +104,23 @@ class DemoApp extends App {
   }
 
   protected newGame() {
+    this.gtp.send('prune_nodes 1');
     super.newGame();
+    this.variationTree.newGame(this.rootPosition);
+    this.gtp.send('prune_nodes 0');
     this.log.clear();
     this.winrateGraph.clear();
   }
 
-  private onPlayerChanged() {
-    if (this.engineBusy || this.gameOver) {
-      return;
-    }
-  }
-
   protected onGameState(msg: GameStateMsg) {
-    super.onGameState(msg);
+    if (msg.lastMove != null) {
+      this.activePosition = this.activePosition.addChild(
+          msg.lastMove, msg.stones);
+    }
+    this.updateBoards(msg);
     this.log.scroll();
     this.winrateGraph.setWinrate(msg.moveNum, msg.q);
-    this.onPlayerChanged();
+    this.variationTree.draw();
   }
 
   private playMove(color: Color, move: Move) {
@@ -127,9 +136,7 @@ class DemoApp extends App {
       let col = COL_LABELS[move.col];
       moveStr = `${col}${row}`;
     }
-    this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
-      this.gtp.send('gamestate');
-    });
+    return this.gtp.send(`play ${colorStr} ${moveStr}`);
   }
 
   protected onGameOver() {

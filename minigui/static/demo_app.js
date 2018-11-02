@@ -26,24 +26,9 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
                 }
                 this.init(boards);
                 this.mainBoard.onClick((p) => {
-                    this.playMove(this.toPlay, p);
+                    this.playMove(this.activePosition.toPlay, p);
                 });
                 this.initButtons();
-                this.winrateGraph.onMoveChanged((moveNum) => {
-                    let position = this.latestPosition;
-                    if (moveNum != null) {
-                        for (let p = this.rootPosition; p; p = p.children[0]) {
-                            if (p.moveNum == moveNum) {
-                                position = p;
-                                break;
-                            }
-                        }
-                    }
-                    if (position != this.activePosition) {
-                        this.activePosition = position;
-                        this.updateBoards(position);
-                    }
-                });
                 this.log.onConsoleCmd((cmd) => {
                     this.gtp.send(cmd).then(() => { this.log.scroll(); });
                 });
@@ -54,7 +39,7 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
         initButtons() {
             util_1.getElement('pass').addEventListener('click', () => {
                 if (this.mainBoard.enabled) {
-                    this.playMove(this.toPlay, 'pass');
+                    this.playMove(this.activePosition.toPlay, 'pass');
                 }
             });
             util_1.getElement('reset').addEventListener('click', () => {
@@ -86,7 +71,7 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
             if (this.engineBusy || this.gameOver) {
                 return;
             }
-            if (this.playerElems[this.toPlay].innerText == MINIGO) {
+            if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
                 this.mainBoard.enabled = false;
                 this.engineBusy = true;
                 this.gtp.send('genmove').then((move) => {
@@ -99,25 +84,17 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
             }
         }
         onGameState(msg) {
-            super.onGameState(msg);
+            if (msg.lastMove != null) {
+                this.activePosition = this.activePosition.addChild(msg.lastMove, msg.stones);
+            }
+            this.updateBoards(msg);
             this.log.scroll();
             this.winrateGraph.setWinrate(msg.moveNum, msg.q);
             this.onPlayerChanged();
         }
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
-            let moveStr;
-            if (move == 'pass') {
-                moveStr = move;
-            }
-            else if (move == 'resign') {
-                throw new Error('resign not yet supported');
-            }
-            else {
-                let row = base_1.N - move.row;
-                let col = base_1.COL_LABELS[move.col];
-                moveStr = `${col}${row}`;
-            }
+            let moveStr = base_1.toKgs(move);
             this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
                 this.gtp.send('gamestate');
             });

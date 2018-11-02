@@ -33,6 +33,11 @@
 
 namespace minigo {
 
+namespace {
+// String written to stderr to signify that handling a GTP command is done.
+const auto kGtpCmdDone = "__GTP_CMD_DONE__";
+}  // namespace
+
 GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
       ponder_limit_(options.ponder_limit),
@@ -51,6 +56,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("loadsgf", &GtpPlayer::HandleLoadsgf);
   RegisterCmd("name", &GtpPlayer::HandleName);
   RegisterCmd("play", &GtpPlayer::HandlePlay);
+  RegisterCmd("play_multiple", &GtpPlayer::HandlePlayMultiple);
   RegisterCmd("playsgf", &GtpPlayer::HandlePlaysgf);
   RegisterCmd("ponder", &GtpPlayer::HandlePonder);
   RegisterCmd("ponder_limit", &GtpPlayer::HandlePonderLimit);
@@ -106,7 +112,8 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   std::vector<absl::string_view> args =
       absl::StrSplit(line, absl::ByAnyChar(" \t\r\n"), absl::SkipWhitespace());
   if (args.empty()) {
-    std::cout << "=" << std::endl;
+    std::cerr << kGtpCmdDone << std::endl;
+    std::cout << "=\n\n" << std::flush;
     return true;
   }
 
@@ -115,11 +122,13 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   args.erase(args.begin());
 
   if (cmd == "quit") {
+    std::cerr << kGtpCmdDone << std::endl;
     std::cout << "=\n\n" << std::flush;
     return false;
   }
 
   auto response = DispatchCmd(cmd, args);
+  std::cerr << kGtpCmdDone << std::endl;
   std::cout << (response.ok ? "=" : "?");
   if (!response.str.empty()) {
     std::cout << " " << response.str;
@@ -231,8 +240,11 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(absl::string_view cmd,
     return response;
   }
 
-  last_genmove_ = Color::kEmpty;
-  NewGame();
+  if (options().prune_orphaned_nodes) {
+    NewGame();
+  } else {
+    ResetRoot();
+  }
 
   return Response::Ok();
 }
@@ -279,7 +291,6 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
 
   auto c = SuggestMove();
   std::cerr << root()->Describe() << std::endl;
-  last_genmove_ = root()->position.to_play();
   MG_CHECK(PlayMove(c));
 
   return Response::Ok(c.ToKgs());
@@ -374,33 +385,16 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
   if (!response.ok) {
     return response;
   }
+  return PlayImpl(args);
+}
 
-  Color color;
-  if (std::tolower(args[0][0]) == 'b') {
-    color = Color::kBlack;
-  } else if (std::tolower(args[0][0]) == 'w') {
-    color = Color::kWhite;
-  } else {
-    std::cerr << "ERRROR: expected b or w for player color, got " << args[0]
-              << std::endl;
-    return Response::Error("illegal move");
+GtpPlayer::Response GtpPlayer::HandlePlayMultiple(absl::string_view cmd,
+                                                  CmdArgs args) {
+  auto response = CheckArgsRange(cmd, 2, 0xffffffff, args);
+  if (!response.ok) {
+    return response;
   }
-  if (color != root()->position.to_play()) {
-    // TODO(tommadams): Allow out of turn moves.
-    return Response::Error("out of turn moves are not yet supported");
-  }
-
-  Coord c = Coord::FromKgs(args[1], true);
-  if (c == Coord::kInvalid) {
-    std::cerr << "ERRROR: expected KGS coord for move, got " << args[1]
-              << std::endl;
-    return Response::Error("illegal move");
-  }
-
-  if (!PlayMove(c)) {
-    return Response::Error("illegal move");
-  }
-  return Response::Ok();
+  return PlayImpl(args);
 }
 
 GtpPlayer::Response GtpPlayer::HandlePlaysgf(absl::string_view cmd,
@@ -501,7 +495,6 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   }
 
   // Clear the board before replaying sgf.
-  last_genmove_ = Color::kEmpty;
   NewGame();
 
   for (const auto& move : sgf::GetMainLineMoves(ast)) {
@@ -520,6 +513,36 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
     ReportGameState();
   }
 
+  return Response::Ok();
+}
+
+GtpPlayer::Response GtpPlayer::PlayImpl(CmdArgs args) {
+  Color color;
+  if (std::tolower(args[0][0]) == 'b') {
+    color = Color::kBlack;
+  } else if (std::tolower(args[0][0]) == 'w') {
+    color = Color::kWhite;
+  } else {
+    std::cerr << "ERRROR: expected b or w for player color, got " << args[0]
+              << std::endl;
+    return Response::Error("illegal move");
+  }
+  if (color != root()->position.to_play()) {
+    return Response::Error("out of turn moves are not yet supported");
+  }
+
+  for (size_t i = 1; i < args.size(); ++i) {
+    Coord c = Coord::FromKgs(args[1], true);
+    if (c == Coord::kInvalid) {
+      std::cerr << "ERRROR: expected KGS coord for move, got " << args[1]
+                << std::endl;
+      return Response::Error("illegal move");
+    }
+
+    if (!PlayMove(c)) {
+      return Response::Error("illegal move");
+    }
+  }
   return Response::Ok();
 }
 

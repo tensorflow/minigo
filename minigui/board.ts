@@ -260,7 +260,7 @@ class ClickableBoard extends Board {
     });
   }
 
-  onClick(cb: (p: Point) => void) {
+  onClick(cb: ClickListener) {
     this.listeners.push(cb);
   }
 
