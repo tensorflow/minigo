@@ -14,7 +14,6 @@
 
 #include "cc/dual_net/lite_dual_net.h"
 
-#include <sys/sysinfo.h>
 #include <fstream>
 #include <iostream>
 
@@ -23,6 +22,7 @@
 #include "absl/strings/string_view.h"
 #include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/platform/utils.h"
 #include "tensorflow/contrib/lite/context.h"
 #include "tensorflow/contrib/lite/interpreter.h"
 #include "tensorflow/contrib/lite/kernels/register.h"
@@ -79,7 +79,7 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
   MG_CHECK(interpreter_ != nullptr);
 
   // Let's just use all the processors we can.
-  interpreter_->SetNumThreads(get_nprocs());
+  interpreter_->SetNumThreads(GetNumLogicalCpus());
 
   const auto& inputs = interpreter_->inputs();
   MG_CHECK(inputs.size() == 1);

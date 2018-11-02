@@ -109,6 +109,7 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:check",
+        "//cc/platform:utils",
         "//cc/tensorflow:tf_lite",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
