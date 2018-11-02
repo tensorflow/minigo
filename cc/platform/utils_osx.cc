@@ -18,12 +18,11 @@
 namespace minigo {
 
 int GetNumLogicalCpus() {
- int nproc = 0;
- size_t len;
- MG_CHECK(sysctlbyname("hw.logicalcpu", &nproc, &len, nullptr, 0) == 0);
- MG_CHECK(len == sizeof(nproc));
- return nproc;
-
+  int nproc = 0;
+  size_t len;
+  MG_CHECK(sysctlbyname("hw.logicalcpu", &nproc, &len, nullptr, 0) == 0);
+  MG_CHECK(len == sizeof(nproc));
+  return nproc;
 }
 
 }  // namespace minigo
