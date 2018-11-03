@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
@@ -532,7 +533,7 @@ GtpPlayer::Response GtpPlayer::PlayImpl(CmdArgs args) {
   }
 
   for (size_t i = 1; i < args.size(); ++i) {
-    Coord c = Coord::FromKgs(args[1], true);
+    Coord c = Coord::FromKgs(args[i], true);
     if (c == Coord::kInvalid) {
       std::cerr << "ERRROR: expected KGS coord for move, got " << args[1]
                 << std::endl;
@@ -602,13 +603,18 @@ void GtpPlayer::ReportGameState() const {
     }
     oss << ch;
   }
+
   nlohmann::json j = {
+      {"id", absl::StrFormat("%p", root())},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
       {"board", oss.str()},
       {"q", root()->parent != nullptr ? root()->parent->Q() : 0},
       {"gameOver", root()->game_over()},
   };
+  if (root()->parent) {
+    j["parent"] = absl::StrFormat("%p", root()->parent);
+  }
   if (!history().empty()) {
     j["lastMove"] = history().back().c.ToKgs();
   }

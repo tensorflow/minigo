@@ -14,7 +14,10 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.init([this.mainBoard, this.readsBoard]);
                 this.mainBoard.onClick((p) => {
                     this.playMove(this.activePosition.toPlay, p).then(() => {
-                        this.gtp.send('gamestate');
+                        let parent = this.activePosition;
+                        this.gtp.send('gamestate').then(() => {
+                            this.variationTree.addChild(parent, this.activePosition);
+                        });
                     });
                 });
                 this.initButtons();
@@ -24,14 +27,18 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.gtp.onText((line) => { this.log.log(line, 'log-cmd'); });
                 this.newGame();
                 this.variationTree.onClick((positions) => {
-                    this.gtp.send('clear_board');
-                    this.activePosition = this.rootPosition;
+                    let moves = [];
                     for (let position of positions) {
                         if (position.lastMove != null) {
-                            this.playMove(base_1.otherColor(position.toPlay), position.lastMove);
-                            this.gtp.send('gamestate');
+                            moves.push(base_1.toKgs(position.lastMove));
                         }
                     }
+                    this.gtp.send('clear_board');
+                    if (moves.length > 0) {
+                        this.gtp.send(`play_multiple b ${moves.join(' ')}`);
+                    }
+                    this.gtp.send('gamestate');
+                    this.activePosition = positions[positions.length - 1];
                 });
             });
         }
@@ -68,9 +75,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.winrateGraph.clear();
         }
         onGameState(msg) {
-            if (msg.lastMove != null) {
-                this.activePosition = this.activePosition.addChild(msg.lastMove, msg.stones);
-            }
+            super.onGameState(msg);
             this.updateBoards(msg);
             this.log.scroll();
             this.winrateGraph.setWinrate(msg.moveNum, msg.q);
@@ -78,18 +83,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         }
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
-            let moveStr;
-            if (move == 'pass') {
-                moveStr = move;
-            }
-            else if (move == 'resign') {
-                throw new Error('resign not yet supported');
-            }
-            else {
-                let row = base_1.N - move.row;
-                let col = base_1.COL_LABELS[move.col];
-                moveStr = `${col}${row}`;
-            }
+            let moveStr = base_1.toKgs(move);
             return this.gtp.send(`play ${colorStr} ${moveStr}`);
         }
         onGameOver() {

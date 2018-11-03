@@ -52,6 +52,8 @@ class SearchMsg {
 }
 
 interface GameStateJson {
+  id: string;
+  parent?: string;
   board: string;
   toPlay: string;
   lastMove?: string;
@@ -67,6 +69,8 @@ class GameStateMsg {
   moveNum: number;
   q: number;
   gameOver: boolean;
+  id: string;
+  parentId: Nullable<string> = null;
 
   constructor(j: GameStateJson) {
     const stoneMap: {[index: string]: Color} = {
@@ -84,6 +88,10 @@ class GameStateMsg {
     this.moveNum = j.moveNum;
     this.q = j.q;
     this.gameOver = j.gameOver;
+    this.id = j.id;
+    if (j.parent) {
+      this.parentId = j.parent;
+    }
   }
 }
 
@@ -108,6 +116,8 @@ abstract class App {
   private boards: Board[] = [];
 
   protected abstract onGameOver(): void;
+
+  protected positionMap = new Map<string, Position>();
 
   constructor() {
     this.gtp.onData('mg-search', (j: SearchJson) => {
@@ -136,6 +146,8 @@ abstract class App {
     this.rootPosition = new Position(
         null, 0, util.emptyBoard(), null, Color.Black)
     this.activePosition = this.rootPosition;
+
+    this.positionMap.clear();
 
     this.gtp.send('clear_board');
     this.gtp.send('gamestate');
@@ -190,12 +202,35 @@ abstract class App {
     }
   }
 
-  protected abstract onGameState(msg: GameStateMsg): void;
-  //   if (msg.lastMove != null) {
-  //     this.activePosition = this.activePosition.addChild(msg.lastMove, msg.stones);
-  //   }
-  //   this.updateBoards(this.activePosition);
-  // }
+  protected onGameState(msg: GameStateMsg) {
+    let position = this.positionMap.get(msg.id);
+    if (position === undefined) {
+      // This is the first time we've seen this position.
+      if (msg.parentId == null) {
+        // The position has no parent, it must be the root.
+        position = this.rootPosition;
+        this.activePosition = position;
+      } else {
+        // The position has a parent, which must exist in the positionMap.
+        let parent = this.positionMap.get(msg.parentId);
+        if (parent === undefined) {
+          throw new Error(
+              `Can't find parent with id ${msg.parentId} for position ${msg.id}`);
+        }
+        if (msg.lastMove == null) {
+          throw new Error('lastMove isn\'t set for non-root position');
+        }
+        position = parent.addChild(msg.lastMove, msg.stones);
+      }
+      this.positionMap.set(msg.id, position);
+    }
+
+    // If this position's parent was previously active, switch to the child.
+    if (position.parent == this.activePosition ||
+        position.parent == null && this.activePosition == this.rootPosition) {
+      this.activePosition = position;
+    }
+  }
 }
 
 export {

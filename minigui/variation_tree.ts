@@ -17,13 +17,13 @@ import {getElement, pixelRatio} from './util'
 import {View} from './view'
 
 // Spacing between nodes in the tree.
-const SPACING = 16;
+const SPACE = 16;
 
 // Padding from the edge of the canvas.
-const PADDING = 8;
+const PAD = 9;
 
 // Raius of the nodes.
-const RADIUS = 2.5;
+const RADIUS = 4;
 
 interface Position {
   parent: Nullable<Position>;
@@ -31,10 +31,8 @@ interface Position {
 }
 
 class Node {
-  mainlineDepth = 0;
   children: Node[] = [];
-  constructor(public parent: Nullable<Node>,
-              public position: Position,
+  constructor(public parent: Nullable<Node>, public position: Position,
               public x: number, public y: number) {}
 }
 
@@ -46,14 +44,11 @@ interface LayoutResult {
 type ClickListener = (positions: Position[]) => void;
 
 class VariationTree extends View {
-  private rootPosition: Nullable<Position> = null;
   private rootNode: Nullable<Node> = null;
   private ctx: CanvasRenderingContext2D;
 
-  // Which node in the tree the cursor is hovering over, if any.
-  // Since we rebuild the Node tree each time, we track hovered node by its
-  // position, which is stable.
-  private hoveredPosition: Nullable<Position> = null;
+  private hoveredNode: Nullable<Node> = null;
+  private activeNode: Nullable<Node> = null;
 
   private listeners: ClickListener[] = [];
 
@@ -69,10 +64,10 @@ class VariationTree extends View {
     parent.appendChild(canvas);
 
     parent.addEventListener('mousemove', (e) => {
-      let oldActivePosition = this.hoveredPosition;
-      this.hoveredPosition = this.hitTest(e.offsetX, e.offsetY);
-      if (this.hoveredPosition != oldActivePosition) {
-        if (this.hoveredPosition != null) {
+      let oldNode = this.hoveredNode;
+      this.hoveredNode = this.hitTest(e.offsetX, e.offsetY);
+      if (this.hoveredNode != oldNode) {
+        if (this.hoveredNode != null) {
           canvas.classList.add('pointer');
         } else {
           canvas.classList.remove('pointer');
@@ -81,8 +76,9 @@ class VariationTree extends View {
     });
 
     parent.addEventListener('click', (e) => {
-      if (this.hoveredPosition != null) {
-        let p = this.hoveredPosition;
+      if (this.hoveredNode != null) {
+        this.activeNode = this.hoveredNode;
+        let p = this.hoveredNode.position;
         let positions: Position[] = [];
         while (p.parent != null) {
           positions.push(p);
@@ -93,13 +89,62 @@ class VariationTree extends View {
         for (let listener of this.listeners) {
           listener(positions);
         }
+        this.draw();
       }
     });
   }
 
   public newGame(rootPosition: Position) {
-    this.rootPosition = rootPosition;
+    this.rootNode = new Node(null, rootPosition, PAD, PAD);
+    this.activeNode = this.rootNode;
     this.resizeCanvas(1, 1, 1);
+    this.layout();
+    this.draw();
+  }
+
+  public addChild(parentPosition: Position, childPosition: Position) {
+    if (this.rootNode == null) {
+      throw new Error('Must start a game before attempting to add children');
+    }
+
+    // Find the corresponding node for parentPosition.
+    let findParent = (node: Node): Nullable<Node> => {
+      if (node.position == parentPosition) {
+        return node;
+      }
+      for (let child of node.children) {
+        let node = findParent(child);
+        if (node != null) {
+          return node;
+        }
+      }
+      return null;
+    };
+    let parentNode = findParent(this.rootNode);
+    if (parentNode == null) {
+      throw new Error('Couldn\'t find parent node');
+    }
+
+    // Add a new child node to the parent if necessary, or reuse the existing
+    // node.
+    let childNode: Nullable<Node> = null;
+    for (let child of parentNode.children) {
+      if (child.position == childPosition) {
+        childNode = child;
+        break;
+      }
+    }
+    if (childNode == null) {
+      let x = parentNode.x + SPACE * parentNode.children.length;
+      let y = parentNode.y + SPACE;
+      childNode = new Node(parentNode, childPosition, x, y);
+      parentNode.children.push(childNode);
+    }
+    if (childNode != this.activeNode) {
+      this.activeNode = childNode;
+      this.layout();
+      this.draw();
+    }
   }
 
   public onClick(cb: ClickListener) {
@@ -111,17 +156,13 @@ class VariationTree extends View {
       return null;
     }
 
-    let pr = pixelRatio();
+    let threshold = 0.4 * SPACE;
 
-    x *= pr;
-    y *= pr;
-    let threshold = 0.4 * SPACING * pr;
-
-    let traverse = (node: Node): Nullable<Position> => {
+    let traverse = (node: Node): Nullable<Node> => {
       let dx = x - node.x;
       let dy = y - node.y;
       if (dx * dx + dy * dy < threshold * threshold) {
-        return node.position;
+        return node;
       }
 
       for (let child of node.children) {
@@ -141,18 +182,14 @@ class VariationTree extends View {
     let ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    if (this.rootPosition == null) {
+    if (this.rootNode == null) {
       return;
     }
 
     let pr = pixelRatio();
 
-    this.rootNode = this.layout(this.rootPosition);
-    ctx.fillStyle = '#fff';
-    ctx.strokeStyle = '#fff';
-
-    let pad = PADDING * pr + 0.5;
-    let space = SPACING * pr;
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = pr;
 
     // Recursively draw the edges in the tree.
     let drawEdges = (node: Node) => {
@@ -160,43 +197,87 @@ class VariationTree extends View {
         return;
       }
 
-      if (node.children.length > 1) {
-        let lastChild = node.children[node.children.length - 1];
-        if (lastChild.x - space > node.x) {
-          ctx.moveTo(node.x, node.y);
-          ctx.lineTo(lastChild.x - space, node.y);
-        }
-      }
-
+      // Draw edges from parent to all children.
+      // The first child's edge is vertical.
+      // The remiaining childrens' edges slope at 45 degrees.
       for (let child of node.children) {
         let x = child.x;
         if (child != node.children[0]) {
-          x -= space;
+          x -= SPACE;
         }
-        ctx.moveTo(x, node.y);
-        ctx.lineTo(child.x, child.y);
+        ctx.moveTo(pr * x, pr * node.y);
+        ctx.lineTo(pr * child.x, pr * child.y);
         drawEdges(child);
       }
+
+      // If a node has two or more children, draw a horizontal line to
+      // connect the tops of all of the sloping edges.
+      if (node.children.length > 1) {
+        let lastChild = node.children[node.children.length - 1];
+        if (lastChild.x - SPACE > node.x) {
+          ctx.moveTo(pr * node.x, pr * node.y);
+          ctx.lineTo(pr * (lastChild.x - SPACE), pr * node.y);
+        }
+      }
+
     };
+    ctx.beginPath();
     drawEdges(this.rootNode);
     ctx.stroke();
 
-    // Recursively draw the nodes in the tree.
+    // Draw the active node in red.
     let r = RADIUS * pr;
-    let drawNodes = (node: Node) => {
+    if (this.activeNode != null) {
+      ctx.fillStyle = '#800';
+      ctx.strokeStyle = '#ff0';
       ctx.beginPath();
-      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+      ctx.arc(pr * this.activeNode.x, pr * this.activeNode.y, r, 0,
+              2 * Math.PI);
       ctx.fill();
+      ctx.stroke();
+    }
+
+    // Draw the root node in gray.
+    ctx.fillStyle = '#666';
+    ctx.strokeStyle = '#888';
+    ctx.beginPath();
+    ctx.arc(pr * this.rootNode.x, pr * this.rootNode.y, r, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.stroke();
+
+    // Recursively draw the non-root nodes.
+    // To avoid repeatedly changing the fill style between black and white,
+    // we draw in two passes: first all the black nodes, then all the white
+    // ones.
+    let drawNodes = (node: Node, draw: boolean) => {
+      if (draw && node != this.rootNode && node != this.activeNode) {
+        ctx.beginPath();
+        ctx.arc(pr * node.x, pr * node.y, r, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      }
       for (let child of node.children) {
-        drawNodes(child);
+        drawNodes(child, !draw);
       }
     };
-    drawNodes(this.rootNode);
+
+    ctx.fillStyle = '#000';
+    drawNodes(this.rootNode, false);
+
+    ctx.fillStyle = '#fff';
+    drawNodes(this.rootNode, true);
   }
 
-  private layout(rootPosition: Position) {
+  private layout() {
+    if (this.rootNode == null) {
+      return;
+    }
+
     // Right-most node at each depth in the tree.
     let rightNode: Node[] = [];
+
+    // Space required to draw the canvas.
+    let requiredWidth = PAD * 2;
 
     // We want to lay the nodes in the tree out such that the mainline of each
     // node (the chain of first children of all descendants) is a vertical line.
@@ -208,54 +289,40 @@ class VariationTree extends View {
     //  2) A newly inserted node's x coordinate is greater or equal to the x
     //     coordinate of its first child. This is enforced post-traversal.
     let traverse = (node: Node, depth: number) => {
+      // Tell the compiler that node.parent is guaranteed to be non-null.
+      let parent = node.parent as Node;
+
       // Satisfy constraint 1. In order to make the layout less cramped, we
       // actually check both the current depth and the next depth.
+      node.x = parent.x;
       for (let i = 0; i < 2 && depth + i < rightNode.length; ++i) {
-        node.x = Math.max(node.x, rightNode[depth + i].x + 1);
+        node.x = Math.max(node.x, rightNode[depth + i].x + SPACE);
       }
       rightNode[depth] = node;
 
-      for (let childPosition of node.position.children) {
-        let childNode = new Node(node, childPosition, node.x, depth + 1);
-        node.children.push(childNode);
-        traverse(childNode, depth + 1);
+      for (let child of node.children) {
+        traverse(child, depth + 1);
       }
 
       // Satisfy constraint 2.
-      if (node.parent && node == node.parent.children[0]) {
-        node.parent.x = Math.max(node.parent.x, node.x);
+      if (node == parent.children[0]) {
+        parent.x = Math.max(parent.x, node.x);
       }
+      requiredWidth = Math.max(requiredWidth, PAD + node.x);
     };
 
-    let rootNode = new Node(null, rootPosition, 0, 0);
-    traverse(rootNode, 0);
-
-    // For clarity, the traverse function above set the node (x, y) positions
-    // to lie on the unit grid. We'll transform those coordinates to the actual
-    // canvas coordinates now.
-
-    let pr = pixelRatio();
-    let pad = PADDING * pr + 0.5;
-    let space = SPACING * pr;
-
-    let requiredWidth = pad * 2;
-    let reposition = (node: Node) => {
-      node.x = pad + space * node.x;
-      node.y = pad + space * node.y;
-      requiredWidth = Math.max(requiredWidth, pad + node.x);
-      for (let child of node.children) {
-        reposition(child);
-      }
-    };
-    reposition(rootNode);
-
-    let requiredHeight = pad * 2 + rightNode.length * space;
-    if (requiredWidth > this.ctx.canvas.width ||
-        requiredHeight > this.ctx.canvas.height) {
-      this.resizeCanvas(requiredWidth, requiredHeight, pr);
+    // Traverse the root node's children: the root node doesn't need laying
+    // out and this guarantees that all traversed nodes have parents.
+    for (let child of this.rootNode.children) {
+      traverse(child, 1);
     }
 
-    return rootNode;
+    let requiredHeight = PAD * 2 + (rightNode.length - 1) * SPACE;
+    let pr = pixelRatio();
+    if (requiredWidth * pr > this.ctx.canvas.width ||
+        requiredHeight * pr > this.ctx.canvas.height) {
+      this.resizeCanvas(requiredWidth, requiredHeight, pr);
+    }
   }
 
   private resizeCanvas(width: number, height: number, pixelRatio: number) {
