@@ -59,7 +59,7 @@ function emptyBoard(): Color[] {
 
 function partialUpdate(src: any, dst: any, propNames: string[]) {
   for (let name of propNames) {
-    if (name in src) {
+    if (src[name] != null) {
       dst[name] = src[name];
     }
   }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App, GameStateMsg, Position} from './app'
+import {App, Position, SearchMsg} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, Point, otherColor, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
@@ -30,6 +30,9 @@ class DemoApp extends App {
   private variationTree = new VariationTree('tree');
   private log = new Log('log', 'console');
 
+  private pvLayer: lyr.Layer;
+  private bestMovesLayer: lyr.BestMoves;
+
   constructor() {
     super();
 
@@ -42,13 +45,17 @@ class DemoApp extends App {
         [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
       this.mainBoard.enabled = true;
 
+      this.pvLayer = this.mainBoard.getLayer(2);
+
       this.readsBoard = new Board(
         'reads-board',
-        [lyr.BoardStones]);
+        [lyr.BoardStones, lyr.BestMoves]);
+      this.bestMovesLayer = this.readsBoard.getLayer(1) as lyr.BestMoves;
 
       this.init([this.mainBoard, this.readsBoard]);
 
       this.mainBoard.onClick((p: Point) => {
+        this.bestMovesLayer.clear();
         this.playMove(this.activePosition.toPlay, p).then(() => {
           let parent = this.activePosition;
           this.gtp.send('gamestate').then(() => {
@@ -91,6 +98,15 @@ class DemoApp extends App {
       }
     });
 
+    getElement('toggle-pv').addEventListener('click', (e: any) => {
+      this.pvLayer.hidden = !this.pvLayer.hidden;
+      if (this.pvLayer.hidden) {
+        e.target.innerText = 'Show PV';
+      } else {
+        e.target.innerText = 'Hide PV';
+      }
+    });
+
     getElement('load-sgf-input').addEventListener('change', (e: any) => {
       let files: File[] = Array.prototype.slice.call(e.target.files);
       if (files.length != 1) {
@@ -119,15 +135,14 @@ class DemoApp extends App {
     this.winrateGraph.clear();
   }
 
-  protected onGameState(msg: GameStateMsg) {
-    // REMOVE GAME_STATE_MSG
-    // APP CONVERTS FROM GameStateJson TO POSITION DIRECTLY
-    // NEED TO CALL VARIATION_TREE.ADD_CHILD HERE
-    super.onGameState(msg);
-    this.updateBoards(msg);
+  protected onPosition(position: Position) {
+    super.onPosition(position);
+    this.updateBoards(position);
     this.log.scroll();
-    this.winrateGraph.setWinrate(msg.moveNum, msg.q);
-    this.variationTree.draw();
+    this.winrateGraph.setWinrate(position.moveNum, position.q);
+    if (position.parent != null) {
+      this.variationTree.addChild(position.parent, position);
+    }
   }
 
   private playMove(color: Color, move: Move) {

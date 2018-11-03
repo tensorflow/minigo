@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {Annotation} from './position'
-import {BoardSize, COL_LABELS, Color, otherColor, Coord, Point, Move, N} from './base'
+import {BoardSize, COL_LABELS, Color, otherColor, Coord, Point, Move, N, Nullable} from './base'
 import {Board} from './board'
 import {pixelRatio} from './util'
 
@@ -28,9 +28,21 @@ interface DataObj {
   [key: string]: any;
 }
 
-type DataProp<T> = T | undefined | null;
+type DataProp<T> = T | undefined;
 
 abstract class Layer {
+  private _hidden = false;
+
+  get hidden() {
+    return this._hidden;
+  }
+  set hidden(x: boolean) {
+    if (x != this._hidden) {
+      this._hidden = x;
+      this.board.draw();
+    }
+  }
+
   protected boardToCanvas: (row: number, col: number) => Coord;
 
   constructor(public board: Board) {
@@ -51,16 +63,16 @@ abstract class StaticLayer extends Layer {
 }
 
 abstract class DataLayer extends Layer {
-  constructor(board: Board, private dataPropName: string) {
+  constructor(board: Board) {
     super(board);
   }
 
-  protected getData<T>(dataObj: any): DataProp<T> {
-    let prop: any = dataObj[this.dataPropName];
+  protected getData<T>(obj: any, propName: string): DataProp<T> {
+    let prop: any = obj[propName];
     if (prop === undefined) {
       return undefined;
     }
-    return prop as T | null;
+    return prop as T;
   }
 }
 
@@ -68,7 +80,7 @@ class Grid extends StaticLayer {
   private style = '#864';
 
   draw() {
-    let starPointRadius = Math.min(4, Math.max(this.board.stoneRadius / 10, 2.5));
+    let starPointRadius = Math.min(4, Math.max(this.board.stoneRadius / 5, 2.5));
     let ctx = this.board.ctx;
     let pr = pixelRatio();
 
@@ -105,7 +117,7 @@ class Label extends StaticLayer {
   draw() {
     let ctx = this.board.ctx;
 
-    let textHeight = Math.floor(0.3 * this.board.stoneRadius);
+    let textHeight = Math.floor(0.6 * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
     ctx.fillStyle = '#9d7c4d';
 
@@ -145,7 +157,7 @@ class Caption extends StaticLayer {
   draw() {
     let ctx = this.board.ctx;
 
-    let textHeight = Math.floor(0.4 * this.board.stoneRadius);
+    let textHeight = Math.floor(0.8 * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
     ctx.fillStyle = '#9d7c4d';
     ctx.textAlign = 'center';
@@ -156,15 +168,15 @@ class Caption extends StaticLayer {
 }
 
 class HeatMap extends DataLayer {
-  private colors: Float32Array[] | null = null;
+  private colors: Nullable<Float32Array[]> = null;
 
-  constructor(board: Board, dataPropName: string,
+  constructor(board: Board, private dataPropName: string,
               private colorizeFn: (src: number[]) => Float32Array[]) {
-    super(board, dataPropName);
+    super(board);
   }
 
   update(dataObj: DataObj) {
-    let data = this.getData<number[] | null>(dataObj);
+    let data = this.getData<Nullable<number[]>>(dataObj, this.dataPropName);
     if (data === undefined) {
       return false;
     }
@@ -201,8 +213,8 @@ abstract class StoneBaseLayer extends DataLayer {
   protected blackStones: Point[] = [];
   protected whiteStones: Point[] = [];
 
-  constructor(board: Board, dataPropName: string, protected alpha: number) {
-    super(board, dataPropName);
+  constructor(board: Board, protected alpha: number) {
+    super(board);
   }
 
   draw() {
@@ -212,12 +224,12 @@ abstract class StoneBaseLayer extends DataLayer {
 }
 
 class BoardStones extends StoneBaseLayer {
-  constructor(board: Board, dataPropName = 'stones', alpha = 1) {
-    super(board, dataPropName, alpha);
+  constructor(board: Board) {
+    super(board, 1);
   }
 
   update(dataObj: DataObj) {
-    let stones = this.getData<Color[]>(dataObj);
+    let stones = this.getData<Color[]>(dataObj, 'stones');
     if (stones === undefined) {
       return false;
     }
@@ -250,12 +262,12 @@ class Variation extends StoneBaseLayer {
   private blackLabels: VariationLabel[] = [];
   private whiteLabels: VariationLabel[] = [];
 
-  constructor(board: Board, dataPropName: string, alpha = 0.4) {
-    super(board, dataPropName, alpha);
+  constructor(board: Board, private dataPropName: string, alpha = 0.4) {
+    super(board, alpha);
   }
 
   update(dataObj: DataObj) {
-    let variation = this.getData<Move[]>(dataObj);
+    let variation = this.getData<Move[]>(dataObj, this.dataPropName);
     if (variation === undefined) {
       return false;
     }
@@ -319,7 +331,7 @@ class Variation extends StoneBaseLayer {
 
     let ctx = this.board.ctx;
 
-    let textHeight = Math.floor(0.5 * this.board.stoneRadius);
+    let textHeight = Math.floor(this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -341,12 +353,12 @@ class Variation extends StoneBaseLayer {
 class Annotations extends DataLayer {
   private annotations: Annotation[] = [];
 
-  constructor(board: Board, dataPropName = 'annotations') {
-    super(board, dataPropName);
+  constructor(board: Board, private dataPropName = 'annotations') {
+    super(board);
   }
 
   update(dataObj: DataObj) {
-    let annotations = this.getData<Annotation[]>(dataObj);
+    let annotations = this.getData<Annotation[]>(dataObj, this.dataPropName);
     if (annotations === undefined) {
       return false;
     }
@@ -367,7 +379,7 @@ class Annotations extends DataLayer {
         case Annotation.Shape.Dot:
           ctx.fillStyle = annotation.color;
           ctx.beginPath();
-          ctx.arc(c.x, c.y, 0.08 * sr, 0, 2 * Math.PI);
+          ctx.arc(c.x, c.y, 0.16 * sr, 0, 2 * Math.PI);
           ctx.fill();
           break;
 
@@ -376,15 +388,141 @@ class Annotations extends DataLayer {
           ctx.lineCap = 'round';
           ctx.strokeStyle = annotation.color;
           ctx.beginPath();
-          ctx.moveTo(c.x, c.y - 0.35 * sr);
-          ctx.lineTo(c.x - 0.3 * sr, c.y + 0.21 * sr);
-          ctx.lineTo(c.x + 0.3 * sr, c.y + 0.21 * sr);
-          ctx.lineTo(c.x, c.y - 0.35 * sr);
+          ctx.moveTo(c.x, c.y - 0.7 * sr);
+          ctx.lineTo(c.x - 0.6 * sr, c.y + 0.42 * sr);
+          ctx.lineTo(c.x + 0.6 * sr, c.y + 0.42 * sr);
+          ctx.lineTo(c.x, c.y - 0.7 * sr);
           ctx.stroke();
           break;
       }
     }
   }
+}
+
+class NextMove {
+  public p: Point;
+  constructor(idx: number, public n: number, public q: number,
+              public alpha: number) {
+    this.p = {
+      row: Math.floor(idx / N),
+      col: idx % N,
+    };
+  }
+}
+
+class BestMoves extends DataLayer {
+  private nextMoves: NextMove[] = [];
+  private logNSum = 0;
+
+  constructor(board: Board) {
+    super(board);
+  }
+
+  update(dataObj: DataObj) {
+    let childN = this.getData<number[]>(dataObj, 'n');
+    let childQ = this.getData<number[]>(dataObj, 'childQ');
+    if (childN == null || childQ == null) {
+      return false;
+    }
+
+    this.nextMoves = [];
+
+    // Build a list of indices into childN & childQ sorted in descending N
+    // then descending Q.
+    let indices = [];
+    for (let i = 0; i < N * N; ++i) {
+      indices.push(i);
+    }
+    indices.sort((a: number, b: number) => {
+      let n = childN as number[];
+      let q = childQ as number[];
+      if (n[b] != n[a]) {
+        return n[b] - n[a];
+      }
+      return q[b] - q[a];
+    });
+
+    // We haven't done any reads yet.
+    let maxN = childN[indices[0]];
+    if (maxN == 0) {
+      return true;
+    }
+
+    let logMaxN = Math.log(maxN);
+
+    // Build the list of suggested next moves.
+    // Limit the maximum number of suggests to 8.
+    let idx = indices[0];
+    for (let i = 0; i < 8; ++i) {
+      let idx = indices[i];
+      let n = childN[idx];
+      if (n == 0) {
+        break;
+      }
+      let q = childQ[idx] / 10;
+      let alpha = Math.log(n) / logMaxN;
+      alpha *= alpha;
+      // Emphasize the most visted move by reducing the opacity of all other
+      // moves slightly.
+      if (i > 0) {
+        alpha *= 0.75;
+      }
+      // If the last few moves were only rarely visited, don't show them to
+      // reduce visual clutter.
+      if (i > 4 && alpha < 0.1) {
+        break;
+      }
+      this.nextMoves.push(new NextMove(idx, n, q, alpha));
+    }
+
+    return true;
+  }
+
+  clear() {
+    this.nextMoves = [];
+  }
+
+  draw() {
+    if (this.nextMoves.length == 0) {
+      return;
+    }
+
+    let ctx = this.board.ctx;
+    let pr = pixelRatio();
+
+    let stoneRgb = this.board.toPlay == Color.Black ? 0 : 255;
+    let textRgb = 255 - stoneRgb;
+
+    for (let nextMove of this.nextMoves) {
+      ctx.fillStyle =
+          `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${nextMove.alpha})`;
+      let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
+      ctx.beginPath();
+      ctx.arc(c.x + 0.5, c.y + 0.5, this.board.stoneRadius, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    let textHeight = Math.floor(0.8 * this.board.stoneRadius);
+    ctx.font = `${textHeight}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    //ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = `rgb(${textRgb}, ${textRgb}, ${textRgb})`;
+    for (let nextMove of this.nextMoves) {
+      let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
+      // ctx.fillText(this.formatN(nextMove.n), c.x, c.y);
+      ctx.fillText(nextMove.q.toFixed(1), c.x, c.y);
+    }
+  }
+
+  // formatN(n: number) {
+  //   if (n < 1000) {
+  //     return n.toString();
+  //   }
+  //   n /= 1000;
+  //   let places = Math.max(0, 2 - Math.floor(Math.log10(n)));
+  //   return n.toFixed(places) + 'k';
+  // }
 }
 
 export {
@@ -397,5 +535,6 @@ export {
   HeatMap,
   Label,
   Layer,
+  BestMoves,
   Variation,
 }

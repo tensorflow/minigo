@@ -68,17 +68,35 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
 
 void GtpPlayer::Run() {
   std::cerr << "GTP engine ready" << std::endl;
-  std::string line;
+  std::atomic<bool> running(true);
   std::ios::sync_with_stdio(false);
-  while (!std::cin.eof()) {
-    if (MaybePonder()) {
+  stdin_thread_ = std::thread([this, &running]() {
+    std::string line;
+    while (std::cin) {
+      std::getline(std::cin, line);
+      stdin_queue_.Push(line);
+    }
+    running = false;
+  });
+
+  while (running) {
+    std::string line;
+    if (stdin_queue_.TryPop(&line)) {
+      if (!HandleCmd(line)) {
+        break;
+      }
       continue;
     }
-    std::getline(std::cin, line);
-    if (!HandleCmd(line)) {
-      break;
+
+    if (!MaybePonder()) {
+      if (stdin_queue_.PopWithTimeout(&line, absl::Seconds(1))) {
+        if (!HandleCmd(line)) {
+          break;
+        }
+      }
     }
   }
+  stdin_thread_.join();
 }
 
 Coord GtpPlayer::SuggestMove() {
@@ -93,14 +111,12 @@ void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
 }
 
 bool GtpPlayer::MaybePonder() {
-  bool should_ponder = ponder_enabled_ && ponder_count_ < ponder_limit_ &&
-                       std::cin.rdbuf()->in_avail() == 0;
-  if (!should_ponder) {
+  if (!ponder_enabled_ || ponder_count_ >= ponder_limit_) {
     ponder_count_ = 0;
     return false;
   }
 
-  if (ponder_count_ == 0) {
+  if (ponder_count_++ == 0) {
     std::cerr << "pondering..." << std::endl;
   }
 
@@ -551,11 +567,18 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   const auto& pos = root()->position;
 
   nlohmann::json j = {
+      {"id", absl::StrFormat("%p", root())},
       {"moveNum", pos.n()},
       {"toPlay", pos.to_play() == Color::kBlack ? "B" : "W"},
+      {"q", root()->Q()},
   };
 
-  auto& search = j["search"];
+  auto& childQ = j["childQ"];
+  for (int i = 0; i < kNumMoves; ++i) {
+    childQ.push_back(static_cast<int>(root()->child_Q(i) * 1000));
+  }
+
+  auto& search = j["search"] = nlohmann::json::array();
   std::vector<const MctsNode*> path;
   for (const auto* node = last_read; node != root(); node = node->parent) {
     path.push_back(node);

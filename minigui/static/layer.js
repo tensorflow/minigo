@@ -11,7 +11,17 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     class Layer {
         constructor(board) {
             this.board = board;
+            this._hidden = false;
             this.boardToCanvas = board.boardToCanvas.bind(board);
+        }
+        get hidden() {
+            return this._hidden;
+        }
+        set hidden(x) {
+            if (x != this._hidden) {
+                this._hidden = x;
+                this.board.draw();
+            }
         }
     }
     exports.Layer = Layer;
@@ -21,12 +31,11 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     class DataLayer extends Layer {
-        constructor(board, dataPropName) {
+        constructor(board) {
             super(board);
-            this.dataPropName = dataPropName;
         }
-        getData(dataObj) {
-            let prop = dataObj[this.dataPropName];
+        getData(obj, propName) {
+            let prop = obj[propName];
             if (prop === undefined) {
                 return undefined;
             }
@@ -39,7 +48,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             this.style = '#864';
         }
         draw() {
-            let starPointRadius = Math.min(4, Math.max(this.board.stoneRadius / 10, 2.5));
+            let starPointRadius = Math.min(4, Math.max(this.board.stoneRadius / 5, 2.5));
             let ctx = this.board.ctx;
             let pr = util_1.pixelRatio();
             ctx.strokeStyle = this.style;
@@ -71,7 +80,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     class Label extends StaticLayer {
         draw() {
             let ctx = this.board.ctx;
-            let textHeight = Math.floor(0.3 * this.board.stoneRadius);
+            let textHeight = Math.floor(0.6 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.fillStyle = '#9d7c4d';
             ctx.textAlign = 'center';
@@ -106,7 +115,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
         draw() {
             let ctx = this.board.ctx;
-            let textHeight = Math.floor(0.4 * this.board.stoneRadius);
+            let textHeight = Math.floor(0.8 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.fillStyle = '#9d7c4d';
             ctx.textAlign = 'center';
@@ -118,12 +127,13 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     exports.Caption = Caption;
     class HeatMap extends DataLayer {
         constructor(board, dataPropName, colorizeFn) {
-            super(board, dataPropName);
+            super(board);
+            this.dataPropName = dataPropName;
             this.colorizeFn = colorizeFn;
             this.colors = null;
         }
         update(dataObj) {
-            let data = this.getData(dataObj);
+            let data = this.getData(dataObj, this.dataPropName);
             if (data === undefined) {
                 return false;
             }
@@ -155,8 +165,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.HeatMap = HeatMap;
     class StoneBaseLayer extends DataLayer {
-        constructor(board, dataPropName, alpha) {
-            super(board, dataPropName);
+        constructor(board, alpha) {
+            super(board);
             this.alpha = alpha;
             this.blackStones = [];
             this.whiteStones = [];
@@ -167,11 +177,11 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     class BoardStones extends StoneBaseLayer {
-        constructor(board, dataPropName = 'stones', alpha = 1) {
-            super(board, dataPropName, alpha);
+        constructor(board) {
+            super(board, 1);
         }
         update(dataObj) {
-            let stones = this.getData(dataObj);
+            let stones = this.getData(dataObj, 'stones');
             if (stones === undefined) {
                 return false;
             }
@@ -197,12 +207,13 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     exports.BoardStones = BoardStones;
     class Variation extends StoneBaseLayer {
         constructor(board, dataPropName, alpha = 0.4) {
-            super(board, dataPropName, alpha);
+            super(board, alpha);
+            this.dataPropName = dataPropName;
             this.blackLabels = [];
             this.whiteLabels = [];
         }
         update(dataObj) {
-            let variation = this.getData(dataObj);
+            let variation = this.getData(dataObj, this.dataPropName);
             if (variation === undefined) {
                 return false;
             }
@@ -250,7 +261,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         draw() {
             super.draw();
             let ctx = this.board.ctx;
-            let textHeight = Math.floor(0.5 * this.board.stoneRadius);
+            let textHeight = Math.floor(this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -269,11 +280,12 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     exports.Variation = Variation;
     class Annotations extends DataLayer {
         constructor(board, dataPropName = 'annotations') {
-            super(board, dataPropName);
+            super(board);
+            this.dataPropName = dataPropName;
             this.annotations = [];
         }
         update(dataObj) {
-            let annotations = this.getData(dataObj);
+            let annotations = this.getData(dataObj, this.dataPropName);
             if (annotations === undefined) {
                 return false;
             }
@@ -292,7 +304,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                     case position_1.Annotation.Shape.Dot:
                         ctx.fillStyle = annotation.color;
                         ctx.beginPath();
-                        ctx.arc(c.x, c.y, 0.08 * sr, 0, 2 * Math.PI);
+                        ctx.arc(c.x, c.y, 0.16 * sr, 0, 2 * Math.PI);
                         ctx.fill();
                         break;
                     case position_1.Annotation.Shape.Triangle:
@@ -300,10 +312,10 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                         ctx.lineCap = 'round';
                         ctx.strokeStyle = annotation.color;
                         ctx.beginPath();
-                        ctx.moveTo(c.x, c.y - 0.35 * sr);
-                        ctx.lineTo(c.x - 0.3 * sr, c.y + 0.21 * sr);
-                        ctx.lineTo(c.x + 0.3 * sr, c.y + 0.21 * sr);
-                        ctx.lineTo(c.x, c.y - 0.35 * sr);
+                        ctx.moveTo(c.x, c.y - 0.7 * sr);
+                        ctx.lineTo(c.x - 0.6 * sr, c.y + 0.42 * sr);
+                        ctx.lineTo(c.x + 0.6 * sr, c.y + 0.42 * sr);
+                        ctx.lineTo(c.x, c.y - 0.7 * sr);
                         ctx.stroke();
                         break;
                 }
@@ -311,5 +323,97 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Annotations = Annotations;
+    class NextMove {
+        constructor(idx, n, q, alpha) {
+            this.n = n;
+            this.q = q;
+            this.alpha = alpha;
+            this.p = {
+                row: Math.floor(idx / base_1.N),
+                col: idx % base_1.N,
+            };
+        }
+    }
+    class BestMoves extends DataLayer {
+        constructor(board) {
+            super(board);
+            this.nextMoves = [];
+            this.logNSum = 0;
+        }
+        update(dataObj) {
+            let childN = this.getData(dataObj, 'n');
+            let childQ = this.getData(dataObj, 'childQ');
+            if (childN == null || childQ == null) {
+                return false;
+            }
+            this.nextMoves = [];
+            let indices = [];
+            for (let i = 0; i < base_1.N * base_1.N; ++i) {
+                indices.push(i);
+            }
+            indices.sort((a, b) => {
+                let n = childN;
+                let q = childQ;
+                if (n[b] != n[a]) {
+                    return n[b] - n[a];
+                }
+                return q[b] - q[a];
+            });
+            let maxN = childN[indices[0]];
+            if (maxN == 0) {
+                return true;
+            }
+            let logMaxN = Math.log(maxN);
+            let idx = indices[0];
+            for (let i = 0; i < 8; ++i) {
+                let idx = indices[i];
+                let n = childN[idx];
+                if (n == 0) {
+                    break;
+                }
+                let q = childQ[idx] / 10;
+                let alpha = Math.log(n) / logMaxN;
+                alpha *= alpha;
+                if (i > 0) {
+                    alpha *= 0.75;
+                }
+                if (i > 4 && alpha < 0.1) {
+                    break;
+                }
+                this.nextMoves.push(new NextMove(idx, n, q, alpha));
+            }
+            return true;
+        }
+        clear() {
+            this.nextMoves = [];
+        }
+        draw() {
+            if (this.nextMoves.length == 0) {
+                return;
+            }
+            let ctx = this.board.ctx;
+            let pr = util_1.pixelRatio();
+            let stoneRgb = this.board.toPlay == base_1.Color.Black ? 0 : 255;
+            let textRgb = 255 - stoneRgb;
+            for (let nextMove of this.nextMoves) {
+                ctx.fillStyle =
+                    `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${nextMove.alpha})`;
+                let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
+                ctx.beginPath();
+                ctx.arc(c.x + 0.5, c.y + 0.5, this.board.stoneRadius, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            let textHeight = Math.floor(0.8 * this.board.stoneRadius);
+            ctx.font = `${textHeight}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = `rgb(${textRgb}, ${textRgb}, ${textRgb})`;
+            for (let nextMove of this.nextMoves) {
+                let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
+                ctx.fillText(nextMove.q.toFixed(1), c.x, c.y);
+            }
+        }
+    }
+    exports.BestMoves = BestMoves;
 });
 //# sourceMappingURL=layer.js.map

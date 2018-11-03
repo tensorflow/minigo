@@ -80,12 +80,11 @@ function toKgs(move: Move) {
   return `${col}${row}`;
 }
 
-function movesEqual(a: Move, b: Move) {
-  if (a == 'pass' || a == 'resign') {
+function movesEqual(a: Nullable<Move>, b: Nullable<Move>) {
+  if (a == null || b == null ||
+      a == 'pass' || b == 'pass' ||
+      a == 'resign' || b == 'resign') {
     return a == b;
-  }
-  if (b == 'pass' || b == 'resign') {
-    return false;
   }
   return a.row == b.row && a.col == b.col;
 }

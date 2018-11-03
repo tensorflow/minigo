@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App, GameStateMsg, Position} from './app'
+import {App, Position} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
@@ -134,14 +134,10 @@ class DemoApp extends App {
     }
   }
 
-  protected onGameState(msg: GameStateMsg) {
-    if (msg.lastMove != null) {
-      this.activePosition = this.activePosition.addChild(
-          msg.lastMove, msg.stones);
-    }
-    this.updateBoards(msg);
+  protected onPosition(position: Position) {
+    this.updateBoards(position);
     this.log.scroll();
-    this.winrateGraph.setWinrate(msg.moveNum, msg.q);
+    this.winrateGraph.setWinrate(position.moveNum, position.q);
     this.onPlayerChanged();
   }
 

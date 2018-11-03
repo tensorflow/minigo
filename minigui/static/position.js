@@ -11,10 +11,11 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
     })(Annotation || (Annotation = {}));
     exports.Annotation = Annotation;
     class Position {
-        constructor(parent, moveNum, stones, lastMove, toPlay) {
+        constructor(parent, moveNum, stones, q, lastMove, toPlay) {
             this.parent = parent;
             this.moveNum = moveNum;
             this.stones = stones;
+            this.q = q;
             this.lastMove = lastMove;
             this.toPlay = toPlay;
             this.search = [];
@@ -22,6 +23,7 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
             this.n = null;
             this.dq = null;
             this.annotations = [];
+            this.childQ = null;
             this.children = [];
             if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
                 this.annotations.push({
@@ -31,7 +33,7 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
                 });
             }
         }
-        addChild(move, stones) {
+        addChild(move, stones, q) {
             for (let child of this.children) {
                 if (child.lastMove == null) {
                     throw new Error('Child node shouldn\'t have a null lastMove');
@@ -43,7 +45,7 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
                     return child;
                 }
             }
-            let child = new Position(this, this.moveNum + 1, stones, move, base_1.otherColor(this.toPlay));
+            let child = new Position(this, this.moveNum + 1, stones, q, move, base_1.otherColor(this.toPlay));
             this.children.push(child);
             return child;
         }

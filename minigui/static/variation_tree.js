@@ -193,7 +193,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             if (this.rootNode == null) {
                 return;
             }
-            let rightNode = [];
+            let rightNode = [this.rootNode];
             let requiredWidth = PAD * 2;
             let traverse = (node, depth) => {
                 let parent = node.parent;

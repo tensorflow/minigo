@@ -14,31 +14,37 @@
 
 import {Annotation, Position} from './position'
 import {Socket} from './gtp_socket'
-import {Color, Move, N, Nullable, setBoardSize, toKgs} from './base'
+import {Color, Move, N, Nullable, movesEqual, setBoardSize, stonesEqual, toKgs} from './base'
 import {Board} from './board'
 import * as util from './util'
 
 interface SearchJson {
+  id: string;
   moveNum: number;
   toPlay: string;
   search: string[];
   n?: number[];
   dq?: number[];
   pv?: string[];
+  childQ: number[];
 }
 
 class SearchMsg {
+  id: string;
   moveNum: number;
   toPlay: Color;
   search: Move[];
   n: Nullable<number[]> = null;
   dq: Nullable<number[]> = null;
   pv: Nullable<Move[]> = null;
+  childQ: number[];
 
   constructor(j: SearchJson) {
+    this.id = j.id;
     this.moveNum = j.moveNum;
     this.toPlay = util.parseGtpColor(j.toPlay as string);
     this.search = util.parseMoves(j.search as string[], N);
+    this.childQ = j.childQ;
     if (j.n) {
       this.n = j.n;
     }
@@ -62,39 +68,6 @@ interface GameStateJson {
   gameOver: boolean;
 }
 
-class GameStateMsg {
-  stones: Color[] = [];
-  toPlay: Color;
-  lastMove: Nullable<Move> = null;
-  moveNum: number;
-  q: number;
-  gameOver: boolean;
-  id: string;
-  parentId: Nullable<string> = null;
-
-  constructor(j: GameStateJson) {
-    const stoneMap: {[index: string]: Color} = {
-      '.': Color.Empty,
-      'X': Color.Black,
-      'O': Color.White,
-    };
-    for (let i = 0; i < j.board.length; ++i) {
-      this.stones.push(stoneMap[j.board[i]]);
-    }
-    this.toPlay = util.parseGtpColor(j.toPlay);
-    if (j.lastMove) {
-      this.lastMove = util.parseGtpMove(j.lastMove, N);
-    }
-    this.moveNum = j.moveNum;
-    this.q = j.q;
-    this.gameOver = j.gameOver;
-    this.id = j.id;
-    if (j.parent) {
-      this.parentId = j.parent;
-    }
-  }
-}
-
 // App base class used by the different Minigui UI implementations.
 abstract class App {
   // WebSocket connection to the Miniui backend server.
@@ -115,18 +88,18 @@ abstract class App {
   // List of Board views.
   private boards: Board[] = [];
 
-  protected abstract onGameOver(): void;
-
   protected positionMap = new Map<string, Position>();
+
+  protected abstract onGameOver(): void;
 
   constructor() {
     this.gtp.onData('mg-search', (j: SearchJson) => {
       this.onSearch(new SearchMsg(j));
     });
     this.gtp.onData('mg-gamestate', (j: GameStateJson) => {
-      let msg = new GameStateMsg(j);
-      this.gameOver = msg.gameOver;
-      this.onGameState(msg);
+      let position = this.parseGameState(j);
+      this.gameOver = j.gameOver;
+      this.onPosition(position);
       if (j.gameOver) {
         this.onGameOver();
       }
@@ -144,7 +117,7 @@ abstract class App {
 
   protected newGame() {
     this.rootPosition = new Position(
-        null, 0, util.emptyBoard(), null, Color.Black)
+        null, 0, util.emptyBoard(), 0, null, Color.Black)
     this.activePosition = this.rootPosition;
 
     this.positionMap.clear();
@@ -193,43 +166,92 @@ abstract class App {
     // TODO(tommadams): It would be more flexible to allow the position
     // to store any/all properties return in the SearchMsg, without having to
     // specify this property list.
-    const props = ['n', 'dq', 'pv', 'search'];
-    util.partialUpdate(msg, this.activePosition, props);
+    let position = this.positionMap.get(msg.id);
+    if (!position) {
+      // Ignore search messages for positions we don't know about.
+      // This can happen when refreshing the page, for example.
+      return;
+    }
+    const props = ['n', 'dq', 'pv', 'search', 'childQ'];
+    util.partialUpdate(msg, position, props);
 
-    // Update the boards.
-    if (this.activePosition.moveNum == msg.moveNum) {
-      this.updateBoards(msg);
+    if (position == this.activePosition) {
+      this.updateBoards(position);
     }
   }
 
-  protected onGameState(msg: GameStateMsg) {
-    let position = this.positionMap.get(msg.id);
-    if (position === undefined) {
-      // This is the first time we've seen this position.
-      if (msg.parentId == null) {
-        // The position has no parent, it must be the root.
-        position = this.rootPosition;
-        this.activePosition = position;
-      } else {
-        // The position has a parent, which must exist in the positionMap.
-        let parent = this.positionMap.get(msg.parentId);
-        if (parent === undefined) {
-          throw new Error(
-              `Can't find parent with id ${msg.parentId} for position ${msg.id}`);
-        }
-        if (msg.lastMove == null) {
-          throw new Error('lastMove isn\'t set for non-root position');
-        }
-        position = parent.addChild(msg.lastMove, msg.stones);
-      }
-      this.positionMap.set(msg.id, position);
-    }
-
+  protected onPosition(position: Position) {
     // If this position's parent was previously active, switch to the child.
     if (position.parent == this.activePosition ||
         position.parent == null && this.activePosition == this.rootPosition) {
       this.activePosition = position;
     }
+  }
+
+  private parseGameState(j: GameStateJson) {
+    // Parse parts of the JSON object that need it.
+    const stoneMap: {[index: string]: Color} = {
+      '.': Color.Empty,
+      'X': Color.Black,
+      'O': Color.White,
+    };
+    let stones = [];
+    for (let i = 0; i < j.board.length; ++i) {
+      stones.push(stoneMap[j.board[i]]);
+    }
+    let toPlay = util.parseGtpColor(j.toPlay);
+
+    let lastMove: Nullable<Move> = null;
+    if (j.lastMove) {
+      lastMove = util.parseGtpMove(j.lastMove, N);
+    }
+
+    let position = this.positionMap.get(j.id);
+    if (position !== undefined) {
+      // We've already seen this position, verify that the JSON matches
+      // what we have.
+      if (position.toPlay != toPlay) {
+        throw new Error('toPlay doesn\'t match');
+      }
+      if (!movesEqual(position.lastMove, lastMove)) {
+        throw new Error('lastMove doesn\'t match');
+      }
+      if (!stonesEqual(position.stones, stones)) {
+        throw new Error('stones don\'t match');
+      }
+      if (j.parent !== undefined) {
+        if (position.parent != this.positionMap.get(j.parent)) {
+          throw new Error('parents don\'t match');
+        }
+      }
+      return position;
+    }
+
+    if (j.parent === undefined) {
+      // No parent, this must be the root.
+      if (lastMove != null) {
+        throw new Error('lastMove mustn\'t be set for root position');
+      }
+      position = this.rootPosition;
+    } else {
+      // The position has a parent, which must exist in the positionMap.
+      let parent = this.positionMap.get(j.parent);
+      if (parent === undefined) {
+        throw new Error(
+            `Can't find parent with id ${j.parent} for position ${j.id}`);
+      }
+      if (lastMove == null) {
+        throw new Error('lastMove must be set for non-root position');
+      }
+      position = parent.addChild(lastMove, stones, j.q);
+    }
+
+    if (position.toPlay != toPlay) {
+      throw new Error(`expected ${position.toPlay}, got ${toPlay}`);
+    }
+
+    this.positionMap.set(j.id, position);
+    return position;
   }
 }
 
@@ -237,5 +259,4 @@ export {
   App,
   Position,
   SearchMsg,
-  GameStateMsg,
 }

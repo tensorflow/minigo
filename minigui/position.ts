@@ -34,6 +34,7 @@ class Position {
   n: Nullable<number[]> = null;
   dq: Nullable<number[]> = null;
   annotations: Annotation[] = [];
+  childQ: Nullable<number[]> = null;
 
   // children[0] is the main line. Subsequent children are variations.
   children: Position[] = [];
@@ -41,6 +42,7 @@ class Position {
   constructor(public parent: Nullable<Position>,
               public moveNum: number,
               public stones: Color[],
+              public q: number,
               public lastMove: Nullable<Move>,
               public toPlay: Color) {
     if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
@@ -52,7 +54,7 @@ class Position {
     }
   }
 
-  addChild(move: Move, stones: Color[]) {
+  addChild(move: Move, stones: Color[], q: number) {
     // If the position already has a child with the given move, verify that the
     // stones are equal and return the existing child.
     for (let child of this.children) {
@@ -69,7 +71,7 @@ class Position {
 
     // Create a new child.
     let child = new Position(
-      this, this.moveNum + 1, stones, move, otherColor(this.toPlay));
+      this, this.moveNum + 1, stones, q, move, otherColor(this.toPlay));
     this.children.push(child);
     return child;
   }

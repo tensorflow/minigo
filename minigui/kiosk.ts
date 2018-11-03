@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App, GameStateMsg} from './app'
+import {App} from './app'
 import {Board} from './board'
 import {heatMapN, heatMapDq} from './heat_map'
 import * as lyr from './layer'
 import {Log} from './log'
+import {Position} from './position'
 import {toPrettyResult} from './util'
 import {WinrateGraph} from './winrate_graph'
 
@@ -57,14 +58,10 @@ class KioskApp extends App {
     this.winrateGraph.clear();
   }
 
-  protected onGameState(msg: GameStateMsg) {
-    if (msg.lastMove != null) {
-      this.activePosition = this.activePosition.addChild(
-          msg.lastMove, msg.stones);
-    }
+  protected onPosition(position: Position) {
     this.log.scroll();
-    this.winrateGraph.setWinrate(msg.moveNum, msg.q);
-    this.updateBoards(msg);
+    this.winrateGraph.setWinrate(position.moveNum, position.q);
+    this.updateBoards(position);
 
     if (this.gameOver) {
       window.setTimeout(() => { this.newGame(); }, 3000);

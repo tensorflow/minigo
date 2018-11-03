@@ -10,9 +10,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.connect().then(() => {
                 this.mainBoard = new board_1.ClickableBoard('main-board', [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
                 this.mainBoard.enabled = true;
-                this.readsBoard = new board_1.Board('reads-board', [lyr.BoardStones]);
+                this.pvLayer = this.mainBoard.getLayer(2);
+                this.readsBoard = new board_1.Board('reads-board', [lyr.BoardStones, lyr.BestMoves]);
+                this.bestMovesLayer = this.readsBoard.getLayer(1);
                 this.init([this.mainBoard, this.readsBoard]);
                 this.mainBoard.onClick((p) => {
+                    this.bestMovesLayer.clear();
                     this.playMove(this.activePosition.toPlay, p).then(() => {
                         let parent = this.activePosition;
                         this.gtp.send('gamestate').then(() => {
@@ -48,6 +51,15 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.playMove(this.activePosition.toPlay, 'pass');
                 }
             });
+            util_1.getElement('toggle-pv').addEventListener('click', (e) => {
+                this.pvLayer.hidden = !this.pvLayer.hidden;
+                if (this.pvLayer.hidden) {
+                    e.target.innerText = 'Show PV';
+                }
+                else {
+                    e.target.innerText = 'Hide PV';
+                }
+            });
             util_1.getElement('load-sgf-input').addEventListener('change', (e) => {
                 let files = Array.prototype.slice.call(e.target.files);
                 if (files.length != 1) {
@@ -74,12 +86,14 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.log.clear();
             this.winrateGraph.clear();
         }
-        onGameState(msg) {
-            super.onGameState(msg);
-            this.updateBoards(msg);
+        onPosition(position) {
+            super.onPosition(position);
+            this.updateBoards(position);
             this.log.scroll();
-            this.winrateGraph.setWinrate(msg.moveNum, msg.q);
-            this.variationTree.draw();
+            this.winrateGraph.setWinrate(position.moveNum, position.q);
+            if (position.parent != null) {
+                this.variationTree.addChild(position.parent, position);
+            }
         }
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';

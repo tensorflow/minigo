@@ -59,6 +59,7 @@ minigo_cc_library(
         ":base",
         ":mcts",
         ":sgf",
+        "//cc:thread_safe_queue",
         "//cc/dual_net",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",

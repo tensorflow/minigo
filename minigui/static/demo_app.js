@@ -83,13 +83,10 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
                 this.mainBoard.enabled = true;
             }
         }
-        onGameState(msg) {
-            if (msg.lastMove != null) {
-                this.activePosition = this.activePosition.addChild(msg.lastMove, msg.stones);
-            }
-            this.updateBoards(msg);
+        onPosition(position) {
+            this.updateBoards(position);
             this.log.scroll();
-            this.winrateGraph.setWinrate(msg.moveNum, msg.q);
+            this.winrateGraph.setWinrate(position.moveNum, position.q);
             this.onPlayerChanged();
         }
         playMove(color, move) {

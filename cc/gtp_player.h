@@ -18,6 +18,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -29,6 +30,7 @@
 #include "cc/color.h"
 #include "cc/dual_net/dual_net.h"
 #include "cc/mcts_player.h"
+#include "cc/thread_safe_queue.h"
 
 namespace minigo {
 
@@ -134,6 +136,9 @@ class GtpPlayer : public MctsPlayer {
   absl::flat_hash_map<std::string, CmdHandler> cmd_handlers_;
 
   std::vector<Coord> last_principal_variation_sent_;
+
+  ThreadSafeQueue<std::string> stdin_queue_;
+  std::thread stdin_thread_;
 };
 
 }  // namespace minigo

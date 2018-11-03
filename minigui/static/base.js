@@ -58,11 +58,10 @@ define(["require", "exports"], function (require, exports) {
     }
     exports.toKgs = toKgs;
     function movesEqual(a, b) {
-        if (a == 'pass' || a == 'resign') {
+        if (a == null || b == null ||
+            a == 'pass' || b == 'pass' ||
+            a == 'resign' || b == 'resign') {
             return a == b;
-        }
-        if (b == 'pass' || b == 'resign') {
-            return false;
         }
         return a.row == b.row && a.col == b.col;
     }

@@ -36,7 +36,7 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             canvas.style.height = `${parent.offsetHeight}px`;
             this.pointW = this.ctx.canvas.width / (base_1.N + 1);
             this.pointH = this.ctx.canvas.height / (base_1.N + 1);
-            this.stoneRadius = Math.min(this.pointW, this.pointH);
+            this.stoneRadius = Math.min(this.pointW, this.pointH) / 2;
         }
         addLayers(descs) {
             for (let desc of descs) {
@@ -52,6 +52,9 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
                 }
                 this.layers.push(layer);
             }
+        }
+        getLayer(idx) {
+            return this.layers[idx + 1];
         }
         update(state) {
             if (state.toPlay !== undefined) {
@@ -73,7 +76,9 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             ctx.fillStyle = this.backgroundColor;
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             for (let layer of this.layers) {
-                layer.draw();
+                if (!layer.hidden) {
+                    layer.draw();
+                }
             }
         }
         getStone(p) {
@@ -121,7 +126,7 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
                 ctx.shadowColor = `rgba(0, 0, 0, ${color == base_1.Color.Black ? 0.4 : 0.3})`;
             }
             ctx.fillStyle = this.stoneFill(color, alpha);
-            let r = 0.48 * this.stoneRadius;
+            let r = 0.96 * this.stoneRadius;
             for (let p of ps) {
                 let c = this.boardToCanvas(p.row, p.col);
                 ctx.beginPath();
@@ -137,14 +142,14 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
         stoneFill(color, alpha) {
             let grad;
             if (color == base_1.Color.Black) {
-                let ofs = -0.25 * this.stoneRadius;
-                grad = this.ctx.createRadialGradient(ofs, ofs, 0, ofs, ofs, this.stoneRadius);
+                let ofs = -0.5 * this.stoneRadius;
+                grad = this.ctx.createRadialGradient(ofs, ofs, 0, ofs, ofs, 2 * this.stoneRadius);
                 grad.addColorStop(0, `rgba(68, 68, 68, ${alpha})`);
                 grad.addColorStop(1, `rgba(16, 16, 16, ${alpha})`);
             }
             else if (color == base_1.Color.White) {
-                let ofs = -0.1 * this.stoneRadius;
-                grad = this.ctx.createRadialGradient(ofs, ofs, 0, ofs, ofs, 0.6 * this.stoneRadius);
+                let ofs = -0.2 * this.stoneRadius;
+                grad = this.ctx.createRadialGradient(ofs, ofs, 0, ofs, ofs, 1.2 * this.stoneRadius);
                 grad.addColorStop(0.4, `rgba(255, 255, 255, ${alpha})`);
                 grad.addColorStop(1, `rgba(204, 204, 204, ${alpha})`);
             }

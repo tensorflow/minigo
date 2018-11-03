@@ -7,9 +7,11 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.n = null;
             this.dq = null;
             this.pv = null;
+            this.id = j.id;
             this.moveNum = j.moveNum;
             this.toPlay = util.parseGtpColor(j.toPlay);
             this.search = util.parseMoves(j.search, base_1.N);
+            this.childQ = j.childQ;
             if (j.n) {
                 this.n = j.n;
             }
@@ -22,33 +24,6 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
         }
     }
     exports.SearchMsg = SearchMsg;
-    class GameStateMsg {
-        constructor(j) {
-            this.stones = [];
-            this.lastMove = null;
-            this.parentId = null;
-            const stoneMap = {
-                '.': base_1.Color.Empty,
-                'X': base_1.Color.Black,
-                'O': base_1.Color.White,
-            };
-            for (let i = 0; i < j.board.length; ++i) {
-                this.stones.push(stoneMap[j.board[i]]);
-            }
-            this.toPlay = util.parseGtpColor(j.toPlay);
-            if (j.lastMove) {
-                this.lastMove = util.parseGtpMove(j.lastMove, base_1.N);
-            }
-            this.moveNum = j.moveNum;
-            this.q = j.q;
-            this.gameOver = j.gameOver;
-            this.id = j.id;
-            if (j.parent) {
-                this.parentId = j.parent;
-            }
-        }
-    }
-    exports.GameStateMsg = GameStateMsg;
     class App {
         constructor() {
             this.gtp = new gtp_socket_1.Socket();
@@ -60,9 +35,9 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                 this.onSearch(new SearchMsg(j));
             });
             this.gtp.onData('mg-gamestate', (j) => {
-                let msg = new GameStateMsg(j);
-                this.gameOver = msg.gameOver;
-                this.onGameState(msg);
+                let position = this.parseGameState(j);
+                this.gameOver = j.gameOver;
+                this.onPosition(position);
                 if (j.gameOver) {
                     this.onGameOver();
                 }
@@ -76,7 +51,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.boards = boards;
         }
         newGame() {
-            this.rootPosition = new position_1.Position(null, 0, util.emptyBoard(), null, base_1.Color.Black);
+            this.rootPosition = new position_1.Position(null, 0, util.emptyBoard(), 0, null, base_1.Color.Black);
             this.activePosition = this.rootPosition;
             this.positionMap.clear();
             this.gtp.send('clear_board');
@@ -103,35 +78,76 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             }
         }
         onSearch(msg) {
-            const props = ['n', 'dq', 'pv', 'search'];
-            util.partialUpdate(msg, this.activePosition, props);
-            if (this.activePosition.moveNum == msg.moveNum) {
-                this.updateBoards(msg);
+            let position = this.positionMap.get(msg.id);
+            if (!position) {
+                return;
+            }
+            const props = ['n', 'dq', 'pv', 'search', 'childQ'];
+            util.partialUpdate(msg, position, props);
+            if (position == this.activePosition) {
+                this.updateBoards(position);
             }
         }
-        onGameState(msg) {
-            let position = this.positionMap.get(msg.id);
-            if (position === undefined) {
-                if (msg.parentId == null) {
-                    position = this.rootPosition;
-                    this.activePosition = position;
-                }
-                else {
-                    let parent = this.positionMap.get(msg.parentId);
-                    if (parent === undefined) {
-                        throw new Error(`Can't find parent with id ${msg.parentId} for position ${msg.id}`);
-                    }
-                    if (msg.lastMove == null) {
-                        throw new Error('lastMove isn\'t set for non-root position');
-                    }
-                    position = parent.addChild(msg.lastMove, msg.stones);
-                }
-                this.positionMap.set(msg.id, position);
-            }
+        onPosition(position) {
             if (position.parent == this.activePosition ||
                 position.parent == null && this.activePosition == this.rootPosition) {
                 this.activePosition = position;
             }
+        }
+        parseGameState(j) {
+            const stoneMap = {
+                '.': base_1.Color.Empty,
+                'X': base_1.Color.Black,
+                'O': base_1.Color.White,
+            };
+            let stones = [];
+            for (let i = 0; i < j.board.length; ++i) {
+                stones.push(stoneMap[j.board[i]]);
+            }
+            let toPlay = util.parseGtpColor(j.toPlay);
+            let lastMove = null;
+            if (j.lastMove) {
+                lastMove = util.parseGtpMove(j.lastMove, base_1.N);
+            }
+            let position = this.positionMap.get(j.id);
+            if (position !== undefined) {
+                if (position.toPlay != toPlay) {
+                    throw new Error('toPlay doesn\'t match');
+                }
+                if (!base_1.movesEqual(position.lastMove, lastMove)) {
+                    throw new Error('lastMove doesn\'t match');
+                }
+                if (!base_1.stonesEqual(position.stones, stones)) {
+                    throw new Error('stones don\'t match');
+                }
+                if (j.parent !== undefined) {
+                    if (position.parent != this.positionMap.get(j.parent)) {
+                        throw new Error('parents don\'t match');
+                    }
+                }
+                return position;
+            }
+            if (j.parent === undefined) {
+                if (lastMove != null) {
+                    throw new Error('lastMove mustn\'t be set for root position');
+                }
+                position = this.rootPosition;
+            }
+            else {
+                let parent = this.positionMap.get(j.parent);
+                if (parent === undefined) {
+                    throw new Error(`Can't find parent with id ${j.parent} for position ${j.id}`);
+                }
+                if (lastMove == null) {
+                    throw new Error('lastMove must be set for non-root position');
+                }
+                position = parent.addChild(lastMove, stones, j.q);
+            }
+            if (position.toPlay != toPlay) {
+                throw new Error(`expected ${position.toPlay}, got ${toPlay}`);
+            }
+            this.positionMap.set(j.id, position);
+            return position;
         }
     }
     exports.App = App;

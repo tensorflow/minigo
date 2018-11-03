@@ -21,13 +21,10 @@ define(["require", "exports", "./app", "./board", "./heat_map", "./layer", "./lo
             this.log.clear();
             this.winrateGraph.clear();
         }
-        onGameState(msg) {
-            if (msg.lastMove != null) {
-                this.activePosition = this.activePosition.addChild(msg.lastMove, msg.stones);
-            }
+        onPosition(position) {
             this.log.scroll();
-            this.winrateGraph.setWinrate(msg.moveNum, msg.q);
-            this.updateBoards(msg);
+            this.winrateGraph.setWinrate(position.moveNum, position.q);
+            this.updateBoards(position);
             if (this.gameOver) {
                 window.setTimeout(() => { this.newGame(); }, 3000);
             }

@@ -274,7 +274,7 @@ class VariationTree extends View {
     }
 
     // Right-most node at each depth in the tree.
-    let rightNode: Node[] = [];
+    let rightNode: Node[] = [this.rootNode];
 
     // Space required to draw the canvas.
     let requiredWidth = PAD * 2;

@@ -46,7 +46,7 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
     exports.emptyBoard = emptyBoard;
     function partialUpdate(src, dst, propNames) {
         for (let name of propNames) {
-            if (name in src) {
+            if (src[name] != null) {
                 dst[name] = src[name];
             }
         }
