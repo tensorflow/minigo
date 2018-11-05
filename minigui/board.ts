@@ -183,7 +183,7 @@ class Board extends View {
     for (let p of ps) {
       let c = this.boardToCanvas(p.row, p.col);
       ctx.beginPath();
-      ctx.translate(c.x, c.y);
+      ctx.translate(c.x + 0.5, c.y + 0.5);
       ctx.arc(0, 0, r, 0, 2 * Math.PI);
       ctx.fill();
       ctx.setTransform(1, 0, 0, 1, 0, 0);

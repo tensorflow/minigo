@@ -1,4 +1,4 @@
-define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./layer", "./log", "./winrate_graph", "./util"], function (require, exports, app_1, base_1, board_1, heat_map_1, lyr, log_1, winrate_graph_1, util_1) {
+define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./layer", "./log", "./util", "./winrate_graph"], function (require, exports, app_1, base_1, board_1, heat_map_1, lyr, log_1, util_1, winrate_graph_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     const HUMAN = 'Human';

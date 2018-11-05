@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App, Position} from './app'
+import {App} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
 import * as lyr from './layer'
 import {Log} from './log'
-import {WinrateGraph} from './winrate_graph'
+import {Position} from './position'
 import {getElement, toPrettyResult} from './util'
+import {WinrateGraph} from './winrate_graph'
 
 const HUMAN = 'Human';
 const MINIGO = 'Minigo';

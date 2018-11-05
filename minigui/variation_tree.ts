@@ -31,9 +31,18 @@ interface Position {
 }
 
 class Node {
+  isMainline: boolean;
   children: Node[] = [];
   constructor(public parent: Nullable<Node>, public position: Position,
-              public x: number, public y: number) {}
+              public x: number, public y: number) {
+    if (parent == null) {
+      // Root node.
+      this.isMainline = true;
+    } else {
+      this.isMainline = parent.isMainline && parent.children.length == 0;
+      parent.children.push(this);
+    }
+  }
 }
 
 interface LayoutResult {
@@ -102,31 +111,19 @@ class VariationTree extends View {
     this.draw();
   }
 
+  public setActive(position: Position) {
+    this.activeNode = this.lookupNode(position);
+    this.draw();
+  }
+
   public addChild(parentPosition: Position, childPosition: Position) {
     if (this.rootNode == null) {
       throw new Error('Must start a game before attempting to add children');
     }
 
-    // Find the corresponding node for parentPosition.
-    let findParent = (node: Node): Nullable<Node> => {
-      if (node.position == parentPosition) {
-        return node;
-      }
-      for (let child of node.children) {
-        let node = findParent(child);
-        if (node != null) {
-          return node;
-        }
-      }
-      return null;
-    };
-    let parentNode = findParent(this.rootNode);
-    if (parentNode == null) {
-      throw new Error('Couldn\'t find parent node');
-    }
-
     // Add a new child node to the parent if necessary, or reuse the existing
     // node.
+    let parentNode = this.lookupNode(parentPosition);
     let childNode: Nullable<Node> = null;
     for (let child of parentNode.children) {
       if (child.position == childPosition) {
@@ -138,7 +135,6 @@ class VariationTree extends View {
       let x = parentNode.x + SPACE * parentNode.children.length;
       let y = parentNode.y + SPACE;
       childNode = new Node(parentNode, childPosition, x, y);
-      parentNode.children.push(childNode);
     }
     if (childNode != this.activeNode) {
       this.activeNode = childNode;
@@ -149,6 +145,26 @@ class VariationTree extends View {
 
   public onClick(cb: ClickListener) {
     this.listeners.push(cb);
+  }
+
+  private lookupNode(position: Position) {
+    let impl = (node: Node): Nullable<Node> => {
+      if (node.position == position) {
+        return node;
+      }
+      for (let child of node.children) {
+        let node = impl(child);
+        if (node != null) {
+          return node;
+        }
+      }
+      return null;
+    }
+    let node = this.rootNode != null ? impl(this.rootNode) : null;
+    if (node == null) {
+      throw new Error('Couldn\'t find node');
+    }
+    return node;
   }
 
   private hitTest(x: number, y: number) {
@@ -188,31 +204,32 @@ class VariationTree extends View {
 
     let pr = pixelRatio();
 
-    ctx.strokeStyle = '#888';
     ctx.lineWidth = pr;
 
     // Recursively draw the edges in the tree.
-    let drawEdges = (node: Node) => {
+    let drawEdges = (node: Node, drawMainline: boolean) => {
       if (node.children.length == 0) {
         return;
       }
 
       // Draw edges from parent to all children.
       // The first child's edge is vertical.
-      // The remiaining childrens' edges slope at 45 degrees.
+      // The remaining childrens' edges slope at 45 degrees.
       for (let child of node.children) {
         let x = child.x;
         if (child != node.children[0]) {
           x -= SPACE;
         }
-        ctx.moveTo(pr * x, pr * node.y);
-        ctx.lineTo(pr * child.x, pr * child.y);
-        drawEdges(child);
+        if (drawMainline == child.isMainline) {
+          ctx.moveTo(pr * x, pr * node.y);
+          ctx.lineTo(pr * child.x, pr * child.y);
+        }
+        drawEdges(child, drawMainline);
       }
 
       // If a node has two or more children, draw a horizontal line to
       // connect the tops of all of the sloping edges.
-      if (node.children.length > 1) {
+      if (node.children.length > 1 && !drawMainline) {
         let lastChild = node.children[node.children.length - 1];
         if (lastChild.x - SPACE > node.x) {
           ctx.moveTo(pr * node.x, pr * node.y);
@@ -222,7 +239,13 @@ class VariationTree extends View {
 
     };
     ctx.beginPath();
-    drawEdges(this.rootNode);
+    ctx.strokeStyle = '#fff';
+    drawEdges(this.rootNode, true);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#888';
+    drawEdges(this.rootNode, false);
     ctx.stroke();
 
     // Draw the active node in red.

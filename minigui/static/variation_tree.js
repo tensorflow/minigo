@@ -11,6 +11,13 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             this.x = x;
             this.y = y;
             this.children = [];
+            if (parent == null) {
+                this.isMainline = true;
+            }
+            else {
+                this.isMainline = parent.isMainline && parent.children.length == 0;
+                parent.children.push(this);
+            }
         }
     }
     class VariationTree extends view_1.View {
@@ -62,26 +69,15 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             this.layout();
             this.draw();
         }
+        setActive(position) {
+            this.activeNode = this.lookupNode(position);
+            this.draw();
+        }
         addChild(parentPosition, childPosition) {
             if (this.rootNode == null) {
                 throw new Error('Must start a game before attempting to add children');
             }
-            let findParent = (node) => {
-                if (node.position == parentPosition) {
-                    return node;
-                }
-                for (let child of node.children) {
-                    let node = findParent(child);
-                    if (node != null) {
-                        return node;
-                    }
-                }
-                return null;
-            };
-            let parentNode = findParent(this.rootNode);
-            if (parentNode == null) {
-                throw new Error('Couldn\'t find parent node');
-            }
+            let parentNode = this.lookupNode(parentPosition);
             let childNode = null;
             for (let child of parentNode.children) {
                 if (child.position == childPosition) {
@@ -93,7 +89,6 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 let x = parentNode.x + SPACE * parentNode.children.length;
                 let y = parentNode.y + SPACE;
                 childNode = new Node(parentNode, childPosition, x, y);
-                parentNode.children.push(childNode);
             }
             if (childNode != this.activeNode) {
                 this.activeNode = childNode;
@@ -103,6 +98,25 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
         }
         onClick(cb) {
             this.listeners.push(cb);
+        }
+        lookupNode(position) {
+            let impl = (node) => {
+                if (node.position == position) {
+                    return node;
+                }
+                for (let child of node.children) {
+                    let node = impl(child);
+                    if (node != null) {
+                        return node;
+                    }
+                }
+                return null;
+            };
+            let node = this.rootNode != null ? impl(this.rootNode) : null;
+            if (node == null) {
+                throw new Error('Couldn\'t find node');
+            }
+            return node;
         }
         hitTest(x, y) {
             if (this.rootNode == null) {
@@ -132,9 +146,8 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 return;
             }
             let pr = util_1.pixelRatio();
-            ctx.strokeStyle = '#888';
             ctx.lineWidth = pr;
-            let drawEdges = (node) => {
+            let drawEdges = (node, drawMainline) => {
                 if (node.children.length == 0) {
                     return;
                 }
@@ -143,11 +156,13 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                     if (child != node.children[0]) {
                         x -= SPACE;
                     }
-                    ctx.moveTo(pr * x, pr * node.y);
-                    ctx.lineTo(pr * child.x, pr * child.y);
-                    drawEdges(child);
+                    if (drawMainline == child.isMainline) {
+                        ctx.moveTo(pr * x, pr * node.y);
+                        ctx.lineTo(pr * child.x, pr * child.y);
+                    }
+                    drawEdges(child, drawMainline);
                 }
-                if (node.children.length > 1) {
+                if (node.children.length > 1 && !drawMainline) {
                     let lastChild = node.children[node.children.length - 1];
                     if (lastChild.x - SPACE > node.x) {
                         ctx.moveTo(pr * node.x, pr * node.y);
@@ -156,7 +171,12 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 }
             };
             ctx.beginPath();
-            drawEdges(this.rootNode);
+            ctx.strokeStyle = '#fff';
+            drawEdges(this.rootNode, true);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.strokeStyle = '#888';
+            drawEdges(this.rootNode, false);
             ctx.stroke();
             let r = RADIUS * pr;
             if (this.activeNode != null) {

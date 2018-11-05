@@ -29,6 +29,7 @@ interface Annotation {
 }
 
 class Position {
+  moveNum: number;
   search: Move[] = [];
   pv: Move[] = [];
   n: Nullable<number[]> = null;
@@ -40,11 +41,12 @@ class Position {
   children: Position[] = [];
 
   constructor(public parent: Nullable<Position>,
-              public moveNum: number,
               public stones: Color[],
               public q: number,
               public lastMove: Nullable<Move>,
-              public toPlay: Color) {
+              public toPlay: Color,
+              public isMainline: boolean) {
+    this.moveNum = parent != null ? parent.moveNum + 1 : 0;
     if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
       this.annotations.push({
         p: lastMove,
@@ -70,8 +72,9 @@ class Position {
     }
 
     // Create a new child.
+    let isMainline = this.isMainline && this.children.length == 0;
     let child = new Position(
-      this, this.moveNum + 1, stones, q, move, otherColor(this.toPlay));
+      this, stones, q, move, otherColor(this.toPlay), isMainline);
     this.children.push(child);
     return child;
   }

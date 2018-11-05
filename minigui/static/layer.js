@@ -377,7 +377,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 if (i > 0) {
                     alpha *= 0.75;
                 }
-                if (i > 4 && alpha < 0.1) {
+                if (i >= 4 && alpha < 0.1) {
                     break;
                 }
                 this.nextMoves.push(new NextMove(idx, n, q, alpha));
@@ -403,14 +403,16 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 ctx.arc(c.x + 0.5, c.y + 0.5, this.board.stoneRadius, 0, 2 * Math.PI);
                 ctx.fill();
             }
-            let textHeight = Math.floor(0.8 * this.board.stoneRadius);
+            let textHeight = Math.floor(this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = `rgb(${textRgb}, ${textRgb}, ${textRgb})`;
+            ctx.fillStyle = `rgba(${textRgb}, ${textRgb}, ${textRgb}, 0.8)`;
+            let scoreScale = this.board.toPlay == base_1.Color.Black ? 1 : -1;
             for (let nextMove of this.nextMoves) {
                 let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
-                ctx.fillText(nextMove.q.toFixed(1), c.x, c.y);
+                let winRate = (scoreScale * nextMove.q + 100) / 2;
+                ctx.fillText(winRate.toFixed(1), c.x, c.y);
             }
         }
     }

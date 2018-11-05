@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "target": "es6",
+        "target": "ESNEXT",
         "module": "system",
         "noImplicitAny": true,
         "noImplicitThis": true,

@@ -1,4 +1,4 @@
-define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./winrate_graph", "./util", "./variation_tree"], function (require, exports, app_1, base_1, board_1, lyr, log_1, winrate_graph_1, util_1, variation_tree_1) {
+define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./util", "./variation_tree", "./winrate_graph"], function (require, exports, app_1, base_1, board_1, lyr, log_1, util_1, variation_tree_1, winrate_graph_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class DemoApp extends app_1.App {
@@ -15,11 +15,14 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.bestMovesLayer = this.readsBoard.getLayer(1);
                 this.init([this.mainBoard, this.readsBoard]);
                 this.mainBoard.onClick((p) => {
+                    this.mainBoard.enabled = false;
                     this.bestMovesLayer.clear();
                     this.playMove(this.activePosition.toPlay, p).then(() => {
                         let parent = this.activePosition;
                         this.gtp.send('gamestate').then(() => {
                             this.variationTree.addChild(parent, this.activePosition);
+                        }).finally(() => {
+                            this.mainBoard.enabled = true;
                         });
                     });
                 });
@@ -46,11 +49,6 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             });
         }
         initButtons() {
-            util_1.getElement('pass').addEventListener('click', () => {
-                if (this.mainBoard.enabled) {
-                    this.playMove(this.activePosition.toPlay, 'pass');
-                }
-            });
             util_1.getElement('toggle-pv').addEventListener('click', (e) => {
                 this.pvLayer.hidden = !this.pvLayer.hidden;
                 if (this.pvLayer.hidden) {
@@ -77,17 +75,33 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 };
                 reader.readAsText(files[0]);
             });
+            util_1.getElement('main-line').addEventListener('click', () => {
+                let position = this.activePosition;
+                while (position != this.rootPosition &&
+                    !position.isMainline && position.parent != null) {
+                    position = position.parent;
+                }
+                if (position != this.activePosition) {
+                    this.activePosition = position;
+                    this.variationTree.setActive(this.activePosition);
+                    this.updateBoards(this.activePosition);
+                }
+            });
         }
         newGame() {
             this.gtp.send('prune_nodes 1');
             super.newGame();
+            this.bestMovesLayer.clear();
             this.variationTree.newGame(this.rootPosition);
             this.gtp.send('prune_nodes 0');
             this.log.clear();
             this.winrateGraph.clear();
         }
         onPosition(position) {
-            super.onPosition(position);
+            if (position.parent == this.activePosition) {
+                this.activePosition = position;
+                this.bestMovesLayer.clear();
+            }
             this.updateBoards(position);
             this.log.scroll();
             this.winrateGraph.setWinrate(position.moveNum, position.q);

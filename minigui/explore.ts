@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App, Position, SearchMsg} from './app'
+import {App} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, Point, otherColor, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
 import * as lyr from './layer'
 import {Log} from './log'
-import {WinrateGraph} from './winrate_graph'
+import {Position} from './position'
 import {getElement, toPrettyResult} from './util'
 import {VariationTree} from './variation_tree'
+import {WinrateGraph} from './winrate_graph'
 
 // Demo app implementation that's shared between full and lightweight demo UIs.
 class DemoApp extends App {
@@ -55,11 +56,14 @@ class DemoApp extends App {
       this.init([this.mainBoard, this.readsBoard]);
 
       this.mainBoard.onClick((p: Point) => {
+        this.mainBoard.enabled = false;
         this.bestMovesLayer.clear();
         this.playMove(this.activePosition.toPlay, p).then(() => {
           let parent = this.activePosition;
           this.gtp.send('gamestate').then(() => {
             this.variationTree.addChild(parent, this.activePosition);
+          }).finally(() => {
+            this.mainBoard.enabled = true;
           });
         });
       });
@@ -92,12 +96,6 @@ class DemoApp extends App {
   }
 
   private initButtons() {
-    getElement('pass').addEventListener('click', () => {
-      if (this.mainBoard.enabled) {
-        this.playMove(this.activePosition.toPlay, 'pass');
-      }
-    });
-
     getElement('toggle-pv').addEventListener('click', (e: any) => {
       this.pvLayer.hidden = !this.pvLayer.hidden;
       if (this.pvLayer.hidden) {
@@ -124,11 +122,25 @@ class DemoApp extends App {
       };
       reader.readAsText(files[0]);
     });
+
+    getElement('main-line').addEventListener('click', () => {
+      let position = this.activePosition;
+      while (position != this.rootPosition &&
+             !position.isMainline && position.parent != null) {
+        position = position.parent;
+      }
+      if (position != this.activePosition) {
+        this.activePosition = position;
+        this.variationTree.setActive(this.activePosition);
+        this.updateBoards(this.activePosition);
+      }
+    });
   }
 
   protected newGame() {
     this.gtp.send('prune_nodes 1');
     super.newGame();
+    this.bestMovesLayer.clear();
     this.variationTree.newGame(this.rootPosition);
     this.gtp.send('prune_nodes 0');
     this.log.clear();
@@ -136,7 +148,10 @@ class DemoApp extends App {
   }
 
   protected onPosition(position: Position) {
-    super.onPosition(position);
+    if (position.parent == this.activePosition) {
+      this.activePosition = position;
+      this.bestMovesLayer.clear();
+    }
     this.updateBoards(position);
     this.log.scroll();
     this.winrateGraph.setWinrate(position.moveNum, position.q);

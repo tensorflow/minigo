@@ -92,6 +92,8 @@ abstract class App {
 
   protected abstract onGameOver(): void;
 
+  protected abstract onPosition(position: Position): void;
+
   constructor() {
     this.gtp.onData('mg-search', (j: SearchJson) => {
       this.onSearch(new SearchMsg(j));
@@ -117,7 +119,7 @@ abstract class App {
 
   protected newGame() {
     this.rootPosition = new Position(
-        null, 0, util.emptyBoard(), 0, null, Color.Black)
+        null, util.emptyBoard(), 0, null, Color.Black, true)
     this.activePosition = this.rootPosition;
 
     this.positionMap.clear();
@@ -177,14 +179,6 @@ abstract class App {
 
     if (position == this.activePosition) {
       this.updateBoards(position);
-    }
-  }
-
-  protected onPosition(position: Position) {
-    // If this position's parent was previously active, switch to the child.
-    if (position.parent == this.activePosition ||
-        position.parent == null && this.activePosition == this.rootPosition) {
-      this.activePosition = position;
     }
   }
 
@@ -257,6 +251,4 @@ abstract class App {
 
 export {
   App,
-  Position,
-  SearchMsg,
 }

@@ -1,7 +1,6 @@
 define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"], function (require, exports, position_1, gtp_socket_1, base_1, util) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.Position = position_1.Position;
     class SearchMsg {
         constructor(j) {
             this.n = null;
@@ -23,7 +22,6 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             }
         }
     }
-    exports.SearchMsg = SearchMsg;
     class App {
         constructor() {
             this.gtp = new gtp_socket_1.Socket();
@@ -51,7 +49,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.boards = boards;
         }
         newGame() {
-            this.rootPosition = new position_1.Position(null, 0, util.emptyBoard(), 0, null, base_1.Color.Black);
+            this.rootPosition = new position_1.Position(null, util.emptyBoard(), 0, null, base_1.Color.Black, true);
             this.activePosition = this.rootPosition;
             this.positionMap.clear();
             this.gtp.send('clear_board');
@@ -86,12 +84,6 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             util.partialUpdate(msg, position, props);
             if (position == this.activePosition) {
                 this.updateBoards(position);
-            }
-        }
-        onPosition(position) {
-            if (position.parent == this.activePosition ||
-                position.parent == null && this.activePosition == this.rootPosition) {
-                this.activePosition = position;
             }
         }
         parseGameState(j) {
