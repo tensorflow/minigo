@@ -81,7 +81,7 @@ class ExampleBuffer():
         """ games is a list of .tfrecord.zz game records. """
         games.sort(key=os.path.basename)
         # A couple extra in case parsing fails
-        max_games = (self.max_size / self.sampling_frac / 200) + 480
+        max_games = int(self.max_size / self.sampling_frac / 200) + 480
         if len(games) > max_games:
             games = games[-max_games:]
 
