@@ -20,31 +20,25 @@
 # NOTE! If this file changes/moves, please change
 # https://github.com/kubernetes/test-infra/blob/master/config/jobs/tensorflow/minigo/minigo.yaml
 
-# Ensure we're running from this directory to ensure PYTHONPATH is set
-# correctly.
-cd "$(dirname "$0")"
+clang-format -style=file -output-replacements-xml \
+  $(bazel info workspace)/cc/{.,dual_net,file}/*.{cc,h} | \
+  grep -c "<replacement " >/dev/null
+if [ $? -ne 1 ]; then
+  echo >&2 "---------------------------------------------"
+  echo >&2 "clang-format check did not pass successfully!"
+  exit 1
+fi
 
-lint_fail=0
-python3 -m pylint *.py || {
-  lint_fail=1
-  echo >&2 "--------------------------------------"
-  echo >&2 "Py linting did not pass successfully!"
-}
-
-PYTHONPATH= BOARD_SIZE=9 python3 tests/run_tests.py || {
+bazel test //cc:all --test_output=errors --compilation_mode=dbg --define=board_size=9 || {
   echo >&2 "--------------------------------------"
   echo >&2 "The tests did not pass successfully!"
   exit 1
 }
 
-BOARD_SIZE=9 python3 rl_loop/local_integration_test.py || {
+bazel test //cc:all --test_output=errors --compilation_mode=dbg || {
   echo >&2 "--------------------------------------"
-  echo >&2 "Integration test did not pass successfully!"
+  echo >&2 "The tests did not pass successfully!"
   exit 1
 }
-
-if [ "${lint_fail}" -eq "1" ]; then
-  exit 1
-fi
 
 echo >&2 "All tests passed!"
