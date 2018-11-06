@@ -296,6 +296,8 @@ class Variation extends StoneBaseLayer {
 
   clear() {
     super.clear();
+    this.blackLabels = [];
+    this.whiteLabels = [];
     this.childVariation = null;
   }
 

@@ -237,6 +237,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
         clear() {
             super.clear();
+            this.blackLabels = [];
+            this.whiteLabels = [];
             this.childVariation = null;
         }
         update(dataObj) {

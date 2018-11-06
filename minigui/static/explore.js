@@ -20,24 +20,14 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.ctx.canvas.addEventListener('mousemove', (e) => {
                 let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
                 if (p != null) {
-                    if (this.getStone(p) != base_1.Color.Empty ||
-                        !this.qLayer.hasPoint(p)) {
+                    if (this.getStone(p) != base_1.Color.Empty || !this.qLayer.hasPoint(p)) {
                         p = null;
                     }
                 }
-                if (base_1.movesEqual(p, this.variationLayer.childVariation)) {
-                    return;
-                }
-                this.variationLayer.clear();
-                this.variationLayer.show = p != null;
-                this.qLayer.show = p == null;
-                if (p != null) {
-                    this.gtp.send(`variation ${base_1.toKgs(p)}`);
-                }
-                else {
-                    this.gtp.send('variation');
-                }
-                this.variationLayer.childVariation = p;
+                this.showVariation(p);
+            });
+            this.ctx.canvas.addEventListener('mouseleave', () => {
+                this.showVariation(null);
             });
             this.onClick((p) => {
                 this.variationLayer.clear();
@@ -64,6 +54,21 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.draw();
             }
         }
+        showVariation(p) {
+            if (base_1.movesEqual(p, this.variationLayer.childVariation)) {
+                return;
+            }
+            this.variationLayer.clear();
+            this.variationLayer.show = p != null;
+            this.qLayer.show = p == null;
+            if (p != null) {
+                this.gtp.send(`variation ${base_1.toKgs(p)}`);
+            }
+            else {
+                this.gtp.send('variation');
+            }
+            this.variationLayer.childVariation = p;
+        }
     }
     class ExploreApp extends app_1.App {
         constructor() {
@@ -71,6 +76,8 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.winrateGraph = new winrate_graph_1.WinrateGraph('winrate-graph');
             this.variationTree = new variation_tree_1.VariationTree('tree');
             this.log = new log_1.Log('log', 'console');
+            this.showSearch = true;
+            this.showConsole = false;
             this.connect().then(() => {
                 this.board = new ExploreBoard('main-board', this.gtp);
                 this.board.onClick((p) => {
@@ -105,16 +112,26 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.gtp.send('gamestate');
                     this.activePosition = positions[positions.length - 1];
                 });
+                window.addEventListener('keypress', (e) => {
+                    if (e.key == '`') {
+                        this.showConsole = !this.showConsole;
+                        let log = util_1.getElement('log-container');
+                        log.style.top = this.showConsole ? '0' : '-40vh';
+                        e.preventDefault();
+                        return false;
+                    }
+                });
             });
         }
         initButtons() {
             util_1.getElement('toggle-pv').addEventListener('click', (e) => {
-                this.board.showSearch = !this.board.showSearch;
-                if (!this.board.showSearch) {
-                    e.target.innerText = 'Show search';
+                this.showSearch = !this.showSearch;
+                this.board.showSearch = this.showSearch;
+                if (this.showSearch) {
+                    e.target.innerText = 'Hide search';
                 }
                 else {
-                    e.target.innerText = 'Hide search';
+                    e.target.innerText = 'Show search';
                 }
             });
             util_1.getElement('load-sgf-input').addEventListener('change', (e) => {
@@ -128,9 +145,11 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.newGame();
                     let sgf = reader.result.replace(/\n/g, '\\n');
                     this.board.enabled = false;
+                    this.board.showSearch = false;
                     this.gtp.send('ponder 0');
                     this.gtp.send(`playsgf ${sgf}`).finally(() => {
                         this.board.enabled = true;
+                        this.board.showSearch = this.showSearch;
                         this.gtp.send('ponder 1');
                     });
                 };

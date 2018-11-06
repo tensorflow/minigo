@@ -63,26 +63,15 @@ class ExploreBoard extends ClickableBoard {
     this.ctx.canvas.addEventListener('mousemove', (e) => {
       let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
       if (p != null) {
-        if (this.getStone(p) != Color.Empty ||
-            !this.qLayer.hasPoint(p)) {
+        if (this.getStone(p) != Color.Empty || !this.qLayer.hasPoint(p)) {
           p = null;
         }
       }
+      this.showVariation(p);
+    });
 
-      if (movesEqual(p, this.variationLayer.childVariation)) {
-        return;
-      }
-
-      this.variationLayer.clear();
-      this.variationLayer.show = p != null;
-      this.qLayer.show = p == null;
-
-      if (p != null) {
-        this.gtp.send(`variation ${toKgs(p)}`);
-      } else {
-        this.gtp.send('variation');
-      }
-      this.variationLayer.childVariation = p;
+    this.ctx.canvas.addEventListener('mouseleave', () => {
+      this.showVariation(null);
     });
 
     this.onClick((p: Point) => {
@@ -93,6 +82,23 @@ class ExploreBoard extends ClickableBoard {
       this.gtp.send('variation');
     });
   }
+
+  private showVariation(p: Nullable<Point>) {
+    if (movesEqual(p, this.variationLayer.childVariation)) {
+      return;
+    }
+
+    this.variationLayer.clear();
+    this.variationLayer.show = p != null;
+    this.qLayer.show = p == null;
+
+    if (p != null) {
+      this.gtp.send(`variation ${toKgs(p)}`);
+    } else {
+      this.gtp.send('variation');
+    }
+    this.variationLayer.childVariation = p;
+  }
 }
 
 // Demo app implementation that's shared between full and lightweight demo UIs.
@@ -101,6 +107,8 @@ class ExploreApp extends App {
   private winrateGraph = new WinrateGraph('winrate-graph');
   private variationTree = new VariationTree('tree');
   private log = new Log('log', 'console');
+  private showSearch = true;
+  private showConsole = false;
 
   constructor() {
     super();
@@ -145,16 +153,27 @@ class ExploreApp extends App {
         this.gtp.send('gamestate');
         this.activePosition = positions[positions.length - 1];
       });
+
+      window.addEventListener('keypress', (e: KeyboardEvent) => {
+        if (e.key == '`') {
+          this.showConsole = !this.showConsole;
+          let log = getElement('log-container');
+          log.style.top = this.showConsole ? '0' : '-40vh';
+          e.preventDefault();
+          return false;
+        }
+      });
     });
   }
 
   private initButtons() {
     getElement('toggle-pv').addEventListener('click', (e: any) => {
-      this.board.showSearch = !this.board.showSearch;
-      if (!this.board.showSearch) {
-        e.target.innerText = 'Show search';
-      } else {
+      this.showSearch = !this.showSearch;
+      this.board.showSearch = this.showSearch;
+      if (this.showSearch) {
         e.target.innerText = 'Hide search';
+      } else {
+        e.target.innerText = 'Show search';
       }
     });
 
@@ -170,9 +189,11 @@ class ExploreApp extends App {
         let sgf = reader.result.replace(/\n/g, '\\n');
 
         this.board.enabled = false;
+        this.board.showSearch = false;
         this.gtp.send('ponder 0');
         this.gtp.send(`playsgf ${sgf}`).finally(() => {
           this.board.enabled = true;
+          this.board.showSearch = this.showSearch;
           this.gtp.send('ponder 1');
         });
       };
