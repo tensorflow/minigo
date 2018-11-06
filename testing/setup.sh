@@ -21,4 +21,5 @@
 # https://github.com/kubernetes/test-infra/blob/master/config/jobs/tensorflow/minigo/minigo.yaml
 
 # Copy prebuilt TensorFlow from image.
-rsync -ahv /app/cc/tensorflow/ ./cc/tensorflow/
+rsync -ah /app/cc/tensorflow/ ./cc/tensorflow/
+
