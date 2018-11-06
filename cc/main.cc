@@ -612,7 +612,8 @@ class Evaluator {
                 << format_wins(model.white_wins) << std::endl;
     };
 
-    std::cerr << format_name("Wins") << "        Total         Black         White" << std::endl;
+    std::cerr << format_name("Wins")
+              << "        Total         Black         White" << std::endl;
     print_result(*prev_model);
     print_result(*cur_model);
     std::cerr << format_name("") << "              "
