@@ -259,6 +259,7 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
 class SelfPlayer {
  public:
   void Run() {
+    auto start_time = absl::Now();
     {
       absl::MutexLock lock(&mutex_);
       dual_net_factory_ = NewDualNetFactory(FLAGS_model, FLAGS_parallel_games);
@@ -269,6 +270,9 @@ class SelfPlayer {
     for (auto& t : threads_) {
       t.join();
     }
+    std::cerr << "Played " << FLAGS_parallel_games << " games, total time "
+              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
+              << std::endl;
   }
 
  private:
@@ -593,32 +597,27 @@ class Evaluator {
               << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
               << std::endl;
 
-    auto print_name = [](const std::string& name) {
-      if (name.size() > 20) {
-        std::cerr << absl::StreamFormat("%.20s...", name);
-      } else {
-        std::cerr << absl::StreamFormat("%-20s", name);
-      }
+    auto name_length =
+        std::max(prev_model->name.size(), cur_model->name.size());
+    auto format_name = [&](const std::string& name) {
+      return absl::StrFormat("%-*s", name_length, name);
     };
-    auto print_wins = [&](int wins) {
-      std::cerr << absl::StreamFormat("   %3d %3.2f%%", wins,
-                                      wins * 100.0f / num_games);
+    auto format_wins = [&](int wins) {
+      return absl::StrFormat(" %5d %6.2f%%", wins, wins * 100.0f / num_games);
     };
     auto print_result = [&](const Model& model) {
-      print_name(model.name);
-      print_wins(model.black_wins + model.white_wins);
-      print_wins(model.black_wins);
-      print_wins(model.white_wins);
-      std::cerr << std::endl;
+      std::cerr << format_name(model.name)
+                << format_wins(model.black_wins + model.white_wins)
+                << format_wins(model.black_wins)
+                << format_wins(model.white_wins) << std::endl;
     };
 
-    std::cerr << "wins                        total         black         white"
-              << std::endl;
+    std::cerr << format_name("Wins") << "        Total         Black         White" << std::endl;
     print_result(*prev_model);
     print_result(*cur_model);
-    std::cerr << "                                  ";
-    print_wins(prev_model->black_wins + cur_model->black_wins);
-    print_wins(prev_model->white_wins + cur_model->white_wins);
+    std::cerr << format_name("") << "              "
+              << format_wins(prev_model->black_wins + cur_model->black_wins)
+              << format_wins(prev_model->white_wins + cur_model->white_wins);
     std::cerr << std::endl;
   }
 
@@ -798,13 +797,11 @@ void Puzzle() {
   for (auto& thread : threads) {
     thread.join();
   }
-  std::cerr << "All threads stopped, total time "
-            << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-            << std::endl;
 
-  std::cerr << absl::StreamFormat("Solved %d of %d puzzles (%3.1f%%).", result,
-                                  puzzles.size(),
-                                  result * 100.0f / puzzles.size())
+  std::cerr << absl::StreamFormat(
+                   "Solved %d of %d puzzles (%3.1f%%), total time %f sec.",
+                   result, puzzles.size(), result * 100.0f / puzzles.size(),
+                   absl::ToDoubleSeconds(absl::Now() - start_time))
             << std::endl;
 }
 

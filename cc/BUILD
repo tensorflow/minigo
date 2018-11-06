@@ -391,6 +391,7 @@ minigo_cc_test(
 minigo_cc_binary(
     name = "main",
     srcs = ["main.cc"],
+    visibility = ["//visibility:public"],
     deps = [
         ":base",
         ":check",
