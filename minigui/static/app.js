@@ -3,13 +3,16 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
     Object.defineProperty(exports, "__esModule", { value: true });
     class SearchMsg {
         constructor(j) {
+            this.search = null;
             this.n = null;
             this.dq = null;
             this.pv = null;
             this.id = j.id;
             this.moveNum = j.moveNum;
-            this.toPlay = util.parseGtpColor(j.toPlay);
-            this.search = util.parseMoves(j.search, base_1.N);
+            this.toPlay = util.parseColor(j.toPlay);
+            if (j.search) {
+                this.search = util.parseMoves(j.search);
+            }
             this.childQ = j.childQ;
             if (j.n) {
                 this.n = j.n;
@@ -18,7 +21,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                 this.dq = j.dq;
             }
             if (j.pv) {
-                this.pv = util.parseMoves(j.pv, base_1.N);
+                this.pv = util.parseMoves(j.pv);
             }
         }
     }
@@ -96,10 +99,10 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             for (let i = 0; i < j.board.length; ++i) {
                 stones.push(stoneMap[j.board[i]]);
             }
-            let toPlay = util.parseGtpColor(j.toPlay);
+            let toPlay = util.parseColor(j.toPlay);
             let lastMove = null;
             if (j.lastMove) {
-                lastMove = util.parseGtpMove(j.lastMove, base_1.N);
+                lastMove = util.parseMove(j.lastMove);
             }
             let position = this.positionMap.get(j.id);
             if (position !== undefined) {

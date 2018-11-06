@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <utility>
 
 #include "absl/strings/str_cat.h"
@@ -64,13 +65,17 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("prune_nodes", &GtpPlayer::HandlePruneNodes);
   RegisterCmd("readouts", &GtpPlayer::HandleReadouts);
   RegisterCmd("report_search_interval", &GtpPlayer::HandleReportSearchInterval);
+  RegisterCmd("variation", &GtpPlayer::HandleVariation);
 }
 
 void GtpPlayer::Run() {
   std::cerr << "GTP engine ready" << std::endl;
+
+  // Start a background thread that pushes lines read from stdin into the
+  // thread safe stdin_queue_. This allows us to ponder when there's nothing
+  // to read from stdin.
   std::atomic<bool> running(true);
-  std::ios::sync_with_stdio(false);
-  stdin_thread_ = std::thread([this, &running]() {
+  std::thread stdin_thread([this, &running]() {
     std::string line;
     while (std::cin) {
       std::getline(std::cin, line);
@@ -81,6 +86,8 @@ void GtpPlayer::Run() {
 
   while (running) {
     std::string line;
+
+    // If there's a command waiting on stdin, process it.
     if (stdin_queue_.TryPop(&line)) {
       if (!HandleCmd(line)) {
         break;
@@ -88,7 +95,11 @@ void GtpPlayer::Run() {
       continue;
     }
 
+    // Otherwise, ponder if enabled.
     if (!MaybePonder()) {
+      // If pondering isn't enabled, try and pop a command from stdin with a
+      // short timeout. The timeout gives us a chance to break out of the loop
+      // when stdin is closed with ctrl-C.
       if (stdin_queue_.PopWithTimeout(&line, absl::Seconds(1))) {
         if (!HandleCmd(line)) {
           break;
@@ -96,7 +107,8 @@ void GtpPlayer::Run() {
       }
     }
   }
-  stdin_thread_.join();
+
+  stdin_thread.join();
 }
 
 Coord GtpPlayer::SuggestMove() {
@@ -504,6 +516,31 @@ GtpPlayer::Response GtpPlayer::HandleReportSearchInterval(absl::string_view cmd,
   return Response::Ok();
 }
 
+GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
+                                               CmdArgs args) {
+  auto response = CheckArgsRange(cmd, 0, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  if (args.size() == 0) {
+    child_variation_ = Coord::kInvalid;
+  } else {
+    Coord c = Coord::FromKgs(args[0], true);
+    if (c == Coord::kInvalid) {
+      std::cerr << "ERRROR: expected KGS coord for move, got " << args[0]
+                << std::endl;
+      return Response::Error("illegal move");
+    }
+    if (c != child_variation_) {
+      child_variation_ = c;
+      ReportSearchStatus(nullptr);
+    }
+  }
+
+  return Response::Ok();
+}
+
 GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   sgf::Ast ast;
   if (!ast.Parse(sgf_str)) {
@@ -551,7 +588,7 @@ GtpPlayer::Response GtpPlayer::PlayImpl(CmdArgs args) {
   for (size_t i = 1; i < args.size(); ++i) {
     Coord c = Coord::FromKgs(args[i], true);
     if (c == Coord::kInvalid) {
-      std::cerr << "ERRROR: expected KGS coord for move, got " << args[1]
+      std::cerr << "ERRROR: expected KGS coord for move, got " << args[i]
                 << std::endl;
       return Response::Error("illegal move");
     }
@@ -578,19 +615,21 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
     childQ.push_back(static_cast<int>(root()->child_Q(i) * 1000));
   }
 
-  auto& search = j["search"] = nlohmann::json::array();
-  std::vector<const MctsNode*> path;
-  for (const auto* node = last_read; node != root(); node = node->parent) {
-    path.push_back(node);
-  }
-  for (auto it = path.rbegin(); it != path.rend(); ++it) {
-    search.push_back((*it)->move.ToKgs());
+  if (last_read != nullptr) {
+    auto& search = j["search"] = nlohmann::json::array();
+    std::vector<const MctsNode*> path;
+    for (const auto* node = last_read; node != root(); node = node->parent) {
+      path.push_back(node);
+    }
+    for (auto it = path.rbegin(); it != path.rend(); ++it) {
+      search.push_back((*it)->move.ToKgs());
+    }
   }
 
-  auto& qs = j["dq"];
+  auto& dqs = j["dq"];
   for (int i = 0; i < kNumMoves; ++i) {
     float dq = root()->child_Q(i) - root()->Q();
-    qs.push_back(static_cast<int>(std::round(dq * 100)));
+    dqs.push_back(static_cast<int>(std::round(dq * 100)));
   }
 
   auto& ns = j["n"];
@@ -598,10 +637,22 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
     ns.push_back(static_cast<int>(edge.N));
   }
 
+  std::vector<Coord> principal_variation;
+  if (child_variation_ == Coord::kInvalid) {
+    principal_variation = root()->MostVisitedPath();
+  } else {
+    auto it = root()->children.find(child_variation_);
+    if (it != root()->children.end()) {
+      principal_variation = it->second->MostVisitedPath();
+    }
+  }
+
   // Only report the principal variation when it changes.
-  auto principal_variation = root()->MostVisitedPath();
   if (principal_variation != last_principal_variation_sent_) {
     auto& pv = j["pv"];
+    if (child_variation_ != Coord::kInvalid) {
+      pv.push_back(child_variation_.ToKgs());
+    }
     for (Coord c : principal_variation) {
       pv.push_back(c.ToKgs());
     }

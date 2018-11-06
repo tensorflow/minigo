@@ -3,10 +3,11 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.COL_LABELS = base_1.COL_LABELS;
     class Board extends view_1.View {
-        constructor(parent, layerDescs) {
+        constructor(parent, layers) {
             super();
             this.toPlay = base_1.Color.Black;
             this.stones = [];
+            this.layers = [];
             if (typeof (parent) == 'string') {
                 parent = util_1.getElement(parent);
             }
@@ -23,8 +24,8 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
                 this.draw();
             });
             this.resizeCanvas();
-            this.layers = [new layer_1.Grid(this)];
-            this.addLayers(layerDescs);
+            this.addLayer(new layer_1.Grid());
+            this.addLayers(layers);
         }
         resizeCanvas() {
             let pr = util_1.pixelRatio();
@@ -38,23 +39,19 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             this.pointH = this.ctx.canvas.height / (base_1.N + 1);
             this.stoneRadius = Math.min(this.pointW, this.pointH) / 2;
         }
-        addLayers(descs) {
-            for (let desc of descs) {
-                let layer;
-                if (Array.isArray(desc)) {
-                    let ctor = desc[0];
-                    let args = desc.slice(1);
-                    layer = new ctor(this, ...args);
-                }
-                else {
-                    let ctor = desc;
-                    layer = new ctor(this);
-                }
-                this.layers.push(layer);
+        clear() {
+            for (let layer of this.layers) {
+                layer.clear();
             }
         }
-        getLayer(idx) {
-            return this.layers[idx + 1];
+        addLayer(layer) {
+            this.layers.push(layer);
+            layer.addToBoard(this);
+        }
+        addLayers(layers) {
+            for (let layer of layers) {
+                this.addLayer(layer);
+            }
         }
         update(state) {
             if (state.toPlay !== undefined) {
@@ -76,7 +73,7 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             ctx.fillStyle = this.backgroundColor;
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             for (let layer of this.layers) {
-                if (!layer.hidden) {
+                if (layer.show) {
                     layer.draw();
                 }
             }
@@ -163,10 +160,10 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
     class ClickableBoard extends Board {
         constructor(parent, layerDescs) {
             super(parent, layerDescs);
-            this.listeners = [];
             this.enabled = false;
+            this.listeners = [];
             this.ctx.canvas.addEventListener('mousemove', (e) => {
-                let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.4);
+                let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
                 if (p != null && this.getStone(p) != base_1.Color.Empty) {
                     p = null;
                 }

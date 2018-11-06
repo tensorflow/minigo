@@ -111,8 +111,8 @@ class WinrateGraph {
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(0, h);
-    ctx.moveTo(0, 0.5 * h);
-    ctx.lineTo(w, 0.5 * h);
+    ctx.moveTo(0, Math.floor(0.5 * h));
+    ctx.lineTo(w, Math.floor(0.5 * h));
     ctx.stroke();
 
     // Draw the Y axis labels.
@@ -123,7 +123,7 @@ class WinrateGraph {
     ctx.fillText('B', -0.5 * this.textHeight, Math.round(0.05 * h));
     ctx.fillText('W', -0.5 * this.textHeight, Math.round(0.95 * h));
 
-    // Offset the start of the X axis by the widh of the vertical axis.
+    // Offset the start of the X axis by the width of the vertical axis.
     // It looks nicer that way.
     let xOfs = Math.floor(lineWidth / 2);
     ctx.translate(xOfs, 0);
@@ -131,7 +131,7 @@ class WinrateGraph {
 
     // Draw the graph.
     if (this.points.length >= 2) {
-      ctx.lineWidth = lineWidth;
+      ctx.lineWidth = 1;
       ctx.strokeStyle = '#eee';
       ctx.beginPath();
       let [x, y] = this.points[0];

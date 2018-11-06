@@ -246,6 +246,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             canvas.height = height * pixelRatio;
             canvas.style.width = `${width}px`;
             canvas.style.height = `${height}px`;
+            this.ctx.translate(0.5, 0.5);
         }
     }
     exports.VariationTree = VariationTree;

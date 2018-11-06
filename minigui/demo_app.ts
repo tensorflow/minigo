@@ -39,31 +39,36 @@ class DemoApp extends App {
       // Create boards for each of the elements in the UI.
       // The extra board views aren't available in the lightweight UI, so we
       // must check if the HTML elements exist.
-      this.mainBoard = new ClickableBoard(
-        'main-board',
-        [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
+      this.mainBoard = new ClickableBoard('main-board', [
+          new lyr.Label(),
+          new lyr.BoardStones(),
+          new lyr.Variation('pv'),
+          new lyr.Annotations()]);
 
       let boards: Board[] = [this.mainBoard];
 
       let searchElem = getElement('search-board');
       if (searchElem) {
-        boards.push(new Board(
-            searchElem,
-            [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]));
+        boards.push(new Board(searchElem, [
+            new lyr.Caption('search'),
+            new lyr.BoardStones(),
+            new lyr.Variation('search')]));
       }
 
       let nElem = getElement('n-board');
       if (nElem) {
-        boards.push(new Board(
-          nElem,
-          [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heatMapN], lyr.BoardStones]));
+        boards.push(new Board(nElem, [
+            new lyr.Caption('N'),
+            new lyr.HeatMap('n', heatMapN),
+            new lyr.BoardStones()]));
       }
 
       let dqElem = getElement('dq-board');
       if (dqElem) {
-        boards.push(new Board(
-          'dq-board',
-          [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heatMapDq], lyr.BoardStones]));
+        boards.push(new Board('dq-board', [
+            new lyr.Caption('ΔQ'),
+            new lyr.HeatMap('dq', heatMapDq),
+            new lyr.BoardStones()]));
       }
 
       this.init(boards);

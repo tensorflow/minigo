@@ -29,21 +29,26 @@ class KioskApp extends App {
     super();
 
     this.connect().then(() => {
-      let mainBoard = new Board(
-        'main-board',
-        [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
+      let mainBoard = new Board('main-board', [
+          new lyr.Label(),
+          new lyr.BoardStones(),
+          new lyr.Variation('pv'),
+          new lyr.Annotations()]);
 
-      let searchBoard = new Board(
-        'search-board',
-        [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]);
+      let searchBoard = new Board('search-board', [
+          new lyr.Caption('search'),
+          new lyr.BoardStones(),
+          new lyr.Variation('search')]);
 
-      let nBoard = new Board(
-        'n-board',
-        [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heatMapN], lyr.BoardStones]);
+      let nBoard = new Board('n-board', [
+          new lyr.Caption('N'),
+          new lyr.HeatMap('n', heatMapN),
+          new lyr.BoardStones()]);
 
-      let dqBoard = new Board(
-        'dq-board',
-        [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heatMapDq], lyr.BoardStones]);
+      let dqBoard = new Board('dq-board', [
+          new lyr.Caption('ΔQ'),
+          new lyr.HeatMap('dq', heatMapDq),
+          new lyr.BoardStones()]);
 
       this.init([mainBoard, searchBoard, nBoard, dqBoard]);
 

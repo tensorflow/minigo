@@ -9,12 +9,12 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
         return document.querySelector(selector);
     }
     exports.querySelector = querySelector;
-    function parseGtpColor(color) {
+    function parseColor(color) {
         let c = color[0].toLowerCase();
         return c == 'b' ? base_1.Color.Black : base_1.Color.White;
     }
-    exports.parseGtpColor = parseGtpColor;
-    function parseGtpMove(gtpCoord, size) {
+    exports.parseColor = parseColor;
+    function parseMove(gtpCoord) {
         if (gtpCoord == 'pass' || gtpCoord == 'resign') {
             return gtpCoord;
         }
@@ -22,16 +22,16 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
         if (col >= 8) {
             --col;
         }
-        let row = size - parseInt(gtpCoord.slice(1), 10);
+        let row = base_1.N - parseInt(gtpCoord.slice(1), 10);
         return { row: row, col: col };
     }
-    exports.parseGtpMove = parseGtpMove;
-    function parseMoves(moves, size) {
-        let variation = [];
-        for (let move of moves) {
-            variation.push(parseGtpMove(move, size));
+    exports.parseMove = parseMove;
+    function parseMoves(moveStrs) {
+        let moves = [];
+        for (let str of moveStrs) {
+            moves.push(parseMove(str));
         }
-        return variation;
+        return moves;
     }
     exports.parseMoves = parseMoves;
     function pixelRatio() {

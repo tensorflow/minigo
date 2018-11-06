@@ -103,7 +103,7 @@ class VariationTree extends View {
     });
   }
 
-  public newGame(rootPosition: Position) {
+  newGame(rootPosition: Position) {
     this.rootNode = new Node(null, rootPosition, PAD, PAD);
     this.activeNode = this.rootNode;
     this.resizeCanvas(1, 1, 1);
@@ -111,12 +111,12 @@ class VariationTree extends View {
     this.draw();
   }
 
-  public setActive(position: Position) {
+  setActive(position: Position) {
     this.activeNode = this.lookupNode(position);
     this.draw();
   }
 
-  public addChild(parentPosition: Position, childPosition: Position) {
+  addChild(parentPosition: Position, childPosition: Position) {
     if (this.rootNode == null) {
       throw new Error('Must start a game before attempting to add children');
     }
@@ -143,7 +143,7 @@ class VariationTree extends View {
     }
   }
 
-  public onClick(cb: ClickListener) {
+  onClick(cb: ClickListener) {
     this.listeners.push(cb);
   }
 
@@ -194,7 +194,7 @@ class VariationTree extends View {
     return traverse(this.rootNode);
   }
 
-  public drawImpl() {
+  drawImpl() {
     let ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -354,6 +354,7 @@ class VariationTree extends View {
     canvas.height = height * pixelRatio;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    this.ctx.translate(0.5, 0.5);
   }
 }
 

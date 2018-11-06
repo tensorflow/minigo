@@ -67,8 +67,8 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(0, h);
-            ctx.moveTo(0, 0.5 * h);
-            ctx.lineTo(w, 0.5 * h);
+            ctx.moveTo(0, Math.floor(0.5 * h));
+            ctx.lineTo(w, Math.floor(0.5 * h));
             ctx.stroke();
             ctx.font = `${this.textHeight}px sans-serif`;
             ctx.fillStyle = '#96928f';
@@ -80,7 +80,7 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             ctx.translate(xOfs, 0);
             w -= xOfs;
             if (this.points.length >= 2) {
-                ctx.lineWidth = lineWidth;
+                ctx.lineWidth = 1;
                 ctx.strokeStyle = '#eee';
                 ctx.beginPath();
                 let [x, y] = this.points[0];

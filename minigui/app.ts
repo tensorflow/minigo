@@ -22,7 +22,7 @@ interface SearchJson {
   id: string;
   moveNum: number;
   toPlay: string;
-  search: string[];
+  search?: string[];
   n?: number[];
   dq?: number[];
   pv?: string[];
@@ -33,7 +33,7 @@ class SearchMsg {
   id: string;
   moveNum: number;
   toPlay: Color;
-  search: Move[];
+  search: Nullable<Move[]> = null;
   n: Nullable<number[]> = null;
   dq: Nullable<number[]> = null;
   pv: Nullable<Move[]> = null;
@@ -42,8 +42,10 @@ class SearchMsg {
   constructor(j: SearchJson) {
     this.id = j.id;
     this.moveNum = j.moveNum;
-    this.toPlay = util.parseGtpColor(j.toPlay as string);
-    this.search = util.parseMoves(j.search as string[], N);
+    this.toPlay = util.parseColor(j.toPlay);
+    if (j.search) {
+      this.search = util.parseMoves(j.search);
+    }
     this.childQ = j.childQ;
     if (j.n) {
       this.n = j.n;
@@ -52,7 +54,7 @@ class SearchMsg {
       this.dq = j.dq;
     }
     if (j.pv) {
-      this.pv = util.parseMoves(j.pv as string[], N);
+      this.pv = util.parseMoves(j.pv as string[]);
     }
   }
 }
@@ -193,11 +195,11 @@ abstract class App {
     for (let i = 0; i < j.board.length; ++i) {
       stones.push(stoneMap[j.board[i]]);
     }
-    let toPlay = util.parseGtpColor(j.toPlay);
+    let toPlay = util.parseColor(j.toPlay);
 
     let lastMove: Nullable<Move> = null;
     if (j.lastMove) {
-      lastMove = util.parseGtpMove(j.lastMove, N);
+      lastMove = util.parseMove(j.lastMove);
     }
 
     let position = this.positionMap.get(j.id);

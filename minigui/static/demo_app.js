@@ -10,19 +10,36 @@ define(["require", "exports", "./app", "./base", "./board", "./heat_map", "./lay
             this.winrateGraph = new winrate_graph_1.WinrateGraph('winrate-graph');
             this.log = new log_1.Log('log', 'console');
             this.connect().then(() => {
-                this.mainBoard = new board_1.ClickableBoard('main-board', [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
+                this.mainBoard = new board_1.ClickableBoard('main-board', [
+                    new lyr.Label(),
+                    new lyr.BoardStones(),
+                    new lyr.Variation('pv'),
+                    new lyr.Annotations()
+                ]);
                 let boards = [this.mainBoard];
                 let searchElem = util_1.getElement('search-board');
                 if (searchElem) {
-                    boards.push(new board_1.Board(searchElem, [[lyr.Caption, 'search'], lyr.BoardStones, [lyr.Variation, 'search']]));
+                    boards.push(new board_1.Board(searchElem, [
+                        new lyr.Caption('search'),
+                        new lyr.BoardStones(),
+                        new lyr.Variation('search')
+                    ]));
                 }
                 let nElem = util_1.getElement('n-board');
                 if (nElem) {
-                    boards.push(new board_1.Board(nElem, [[lyr.Caption, 'N'], [lyr.HeatMap, 'n', heat_map_1.heatMapN], lyr.BoardStones]));
+                    boards.push(new board_1.Board(nElem, [
+                        new lyr.Caption('N'),
+                        new lyr.HeatMap('n', heat_map_1.heatMapN),
+                        new lyr.BoardStones()
+                    ]));
                 }
                 let dqElem = util_1.getElement('dq-board');
                 if (dqElem) {
-                    boards.push(new board_1.Board('dq-board', [[lyr.Caption, 'ΔQ'], [lyr.HeatMap, 'dq', heat_map_1.heatMapDq], lyr.BoardStones]));
+                    boards.push(new board_1.Board('dq-board', [
+                        new lyr.Caption('ΔQ'),
+                        new lyr.HeatMap('dq', heat_map_1.heatMapDq),
+                        new lyr.BoardStones()
+                    ]));
                 }
                 this.init(boards);
                 this.mainBoard.onClick((p) => {

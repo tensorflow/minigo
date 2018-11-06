@@ -29,9 +29,9 @@ class Board extends View {
   stoneRadius: number;
   elem: HTMLElement;
 
-  private layers: Layer[];
+  protected layers: Layer[] = [];
 
-  constructor(parent: HTMLElement | string, layerDescs: any[]) {
+  constructor(parent: HTMLElement | string, layers: Layer[]) {
     super();
 
     if (typeof(parent) == 'string') {
@@ -55,8 +55,8 @@ class Board extends View {
     });
     this.resizeCanvas();
 
-    this.layers = [new Grid(this)];
-    this.addLayers(layerDescs);
+    this.addLayer(new Grid());
+    this.addLayers(layers);
   }
 
   private resizeCanvas() {
@@ -72,23 +72,21 @@ class Board extends View {
     this.stoneRadius = Math.min(this.pointW, this.pointH) / 2;
   }
 
-  addLayers(descs: any[]) {
-    for (let desc of descs) {
-      let layer: Layer;
-      if (Array.isArray(desc)) {
-        let ctor = desc[0];
-        let args = desc.slice(1);
-        layer = new ctor(this, ...args);
-      } else {
-        let ctor = desc;
-        layer = new ctor(this);
-      }
-      this.layers.push(layer);
+  clear() {
+    for (let layer of this.layers) {
+      layer.clear();
     }
   }
 
-  getLayer(idx: number) {
-    return this.layers[idx + 1];
+  addLayer(layer: Layer) {
+    this.layers.push(layer);
+    layer.addToBoard(this);
+  }
+
+  addLayers(layers: Layer[]) {
+    for (let layer of layers) {
+      this.addLayer(layer);
+    }
   }
 
   // Update the board's layers from the given state object.
@@ -116,7 +114,7 @@ class Board extends View {
     ctx.fillStyle = this.backgroundColor;
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     for (let layer of this.layers) {
-      if (!layer.hidden) {
+      if (layer.show) {
         layer.draw();
       }
     }
@@ -218,16 +216,16 @@ class Board extends View {
 type ClickListener = (p: Point) => void;
 
 class ClickableBoard extends Board {
+  enabled = false;
   protected p: Point | null;
   protected listeners: ClickListener[] = [];
-  public enabled = false;
 
   constructor(parent: HTMLElement | string, layerDescs: any[]) {
     super(parent, layerDescs);
 
     this.ctx.canvas.addEventListener('mousemove', (e) => {
       // Find the point on the board being hovered over.
-      let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.4);
+      let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
 
       // Clear the hovered point if there's already a stone on the board there.
       if (p != null && this.getStone(p) != Color.Empty) {

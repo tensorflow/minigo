@@ -22,12 +22,12 @@ function querySelector(selector: string) {
   return document.querySelector(selector) as HTMLElement;
 }
 
-function parseGtpColor(color: string) {
+function parseColor(color: string) {
   let c = color[0].toLowerCase();
   return c == 'b' ? Color.Black : Color.White;
 }
 
-function parseGtpMove(gtpCoord: string, size: BoardSize): Move {
+function parseMove(gtpCoord: string): Move {
   if (gtpCoord == 'pass' || gtpCoord == 'resign') {
     return gtpCoord;
   }
@@ -35,16 +35,16 @@ function parseGtpMove(gtpCoord: string, size: BoardSize): Move {
   if (col >= 8) {
     --col;
   }
-  let row = size - parseInt(gtpCoord.slice(1), 10);
+  let row = N - parseInt(gtpCoord.slice(1), 10);
   return {row: row, col: col};
 }
 
-function parseMoves(moves: string[], size: BoardSize): Move[] {
-  let variation: Move[] = [];
-  for (let move of moves) {
-    variation.push(parseGtpMove(move, size));
+function parseMoves(moveStrs: string[]): Move[] {
+  let moves: Move[] = [];
+  for (let str of moveStrs) {
+    moves.push(parseMove(str));
   }
-  return variation;
+  return moves;
 }
 
 function pixelRatio() {
@@ -86,8 +86,8 @@ function toPrettyResult(result: string) {
 export {
   emptyBoard,
   getElement,
-  parseGtpColor,
-  parseGtpMove,
+  parseColor,
+  parseMove,
   parseMoves,
   partialUpdate,
   pixelRatio,

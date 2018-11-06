@@ -18,7 +18,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -112,6 +111,7 @@ class GtpPlayer : public MctsPlayer {
   Response HandlePruneNodes(absl::string_view cmd, CmdArgs args);
   Response HandleReadouts(absl::string_view cmd, CmdArgs args);
   Response HandleReportSearchInterval(absl::string_view cmd, CmdArgs args);
+  Response HandleVariation(absl::string_view cmd, CmdArgs args);
 
   // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
   Response ParseSgf(const std::string& sgf_str);
@@ -126,6 +126,8 @@ class GtpPlayer : public MctsPlayer {
 
   void ReportGameState() const;
 
+  std::vector<Coord> GetPrincipalVariation();
+
   bool ponder_enabled_ = false;
   int ponder_count_ = 0;
   int ponder_limit_ = 0;
@@ -135,10 +137,15 @@ class GtpPlayer : public MctsPlayer {
 
   absl::flat_hash_map<std::string, CmdHandler> cmd_handlers_;
 
+  // Controls which variation is reported during tree search.
+  // If child_variation_ == Coord::kInvalid, the principle variation from the
+  // root is reported. Otherwise, the principle variation of the
+  // corresponding child of the root is reported.
+  Coord child_variation_ = Coord::kInvalid;
+
   std::vector<Coord> last_principal_variation_sent_;
 
   ThreadSafeQueue<std::string> stdin_queue_;
-  std::thread stdin_thread_;
 };
 
 }  // namespace minigo

@@ -9,31 +9,31 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             [15, 3], [15, 9], [15, 15]],
     };
     class Layer {
-        constructor(board) {
-            this.board = board;
-            this._hidden = false;
-            this.boardToCanvas = board.boardToCanvas.bind(board);
+        constructor() {
+            this._show = true;
         }
-        get hidden() {
-            return this._hidden;
+        get show() {
+            return this._show;
         }
-        set hidden(x) {
-            if (x != this._hidden) {
-                this._hidden = x;
+        set show(x) {
+            if (x != this._show) {
+                this._show = x;
                 this.board.draw();
             }
+        }
+        addToBoard(board) {
+            this.board = board;
+            this.boardToCanvas = board.boardToCanvas.bind(board);
         }
     }
     exports.Layer = Layer;
     class StaticLayer extends Layer {
+        clear() { }
         update(dataObj) {
             return false;
         }
     }
     class DataLayer extends Layer {
-        constructor(board) {
-            super(board);
-        }
         getData(obj, propName) {
             let prop = obj[propName];
             if (prop === undefined) {
@@ -109,8 +109,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.Label = Label;
     class Caption extends StaticLayer {
-        constructor(board, caption) {
-            super(board);
+        constructor(caption) {
+            super();
             this.caption = caption;
         }
         draw() {
@@ -126,11 +126,17 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.Caption = Caption;
     class HeatMap extends DataLayer {
-        constructor(board, dataPropName, colorizeFn) {
-            super(board);
+        constructor(dataPropName, colorizeFn) {
+            super();
             this.dataPropName = dataPropName;
             this.colorizeFn = colorizeFn;
             this.colors = null;
+        }
+        clear() {
+            if (this.colors) {
+                this.colors = null;
+                this.board.draw();
+            }
         }
         update(dataObj) {
             let data = this.getData(dataObj, this.dataPropName);
@@ -165,11 +171,18 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.HeatMap = HeatMap;
     class StoneBaseLayer extends DataLayer {
-        constructor(board, alpha) {
-            super(board);
+        constructor(alpha) {
+            super();
             this.alpha = alpha;
             this.blackStones = [];
             this.whiteStones = [];
+        }
+        clear() {
+            if (this.blackStones.length > 0 || this.whiteStones.length > 0) {
+                this.blackStones = [];
+                this.whiteStones = [];
+                this.board.draw();
+            }
         }
         draw() {
             this.board.drawStones(this.blackStones, base_1.Color.Black, this.alpha);
@@ -177,8 +190,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     class BoardStones extends StoneBaseLayer {
-        constructor(board) {
-            super(board, 1);
+        constructor() {
+            super(1);
         }
         update(dataObj) {
             let stones = this.getData(dataObj, 'stones');
@@ -206,24 +219,45 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.BoardStones = BoardStones;
     class Variation extends StoneBaseLayer {
-        constructor(board, dataPropName, alpha = 0.4) {
-            super(board, alpha);
+        constructor(dataPropName, alpha = 0.4) {
+            super(alpha);
             this.dataPropName = dataPropName;
+            this._childVariation = null;
             this.blackLabels = [];
             this.whiteLabels = [];
+        }
+        get childVariation() {
+            return this._childVariation;
+        }
+        set childVariation(p) {
+            if (!base_1.movesEqual(p, this._childVariation)) {
+                this._childVariation = p;
+                this.board.draw();
+            }
+        }
+        clear() {
+            super.clear();
+            this.childVariation = null;
         }
         update(dataObj) {
             let variation = this.getData(dataObj, this.dataPropName);
             if (variation === undefined) {
                 return false;
             }
+            this.parseVariation(variation);
+            return true;
+        }
+        parseVariation(variation) {
             let toPlay = this.board.toPlay;
             this.blackStones = [];
             this.whiteStones = [];
             this.blackLabels = [];
             this.whiteLabels = [];
-            if (variation == null) {
-                return true;
+            if (variation == null || variation.length == 0) {
+                return;
+            }
+            if (!base_1.movesEqual(variation[0], this.childVariation)) {
+                return;
             }
             let playedCount = new Uint16Array(base_1.N * base_1.N);
             let firstPlayed = [];
@@ -256,7 +290,6 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                     firstPlayed[idx].s += '*';
                 }
             }
-            return true;
         }
         draw() {
             super.draw();
@@ -279,10 +312,16 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.Variation = Variation;
     class Annotations extends DataLayer {
-        constructor(board, dataPropName = 'annotations') {
-            super(board);
+        constructor(dataPropName = 'annotations') {
+            super();
             this.dataPropName = dataPropName;
             this.annotations = [];
+        }
+        clear() {
+            if (this.annotations.length > 0) {
+                this.annotations = [];
+                this.board.draw();
+            }
         }
         update(dataObj) {
             let annotations = this.getData(dataObj, this.dataPropName);
@@ -334,11 +373,24 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             };
         }
     }
-    class BestMoves extends DataLayer {
-        constructor(board) {
-            super(board);
+    class Q extends DataLayer {
+        constructor() {
+            super(...arguments);
             this.nextMoves = [];
-            this.logNSum = 0;
+        }
+        hasPoint(p) {
+            for (let move of this.nextMoves) {
+                if (base_1.movesEqual(p, move.p)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        clear() {
+            if (this.nextMoves.length > 0) {
+                this.nextMoves = [];
+                this.board.draw();
+            }
         }
         update(dataObj) {
             let childN = this.getData(dataObj, 'n');
@@ -363,9 +415,13 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             if (maxN == 0) {
                 return true;
             }
+            let sumN = 0;
+            for (let n of childN) {
+                sumN += n;
+            }
             let logMaxN = Math.log(maxN);
             let idx = indices[0];
-            for (let i = 0; i < 8; ++i) {
+            for (let i = 0; i < indices.length; ++i) {
                 let idx = indices[i];
                 let n = childN[idx];
                 if (n == 0) {
@@ -374,18 +430,12 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 let q = childQ[idx] / 10;
                 let alpha = Math.log(n) / logMaxN;
                 alpha *= alpha;
-                if (i > 0) {
-                    alpha *= 0.75;
-                }
-                if (i >= 4 && alpha < 0.1) {
+                if (n < sumN / 100) {
                     break;
                 }
                 this.nextMoves.push(new NextMove(idx, n, q, alpha));
             }
             return true;
-        }
-        clear() {
-            this.nextMoves = [];
         }
         draw() {
             if (this.nextMoves.length == 0) {
@@ -403,7 +453,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 ctx.arc(c.x + 0.5, c.y + 0.5, this.board.stoneRadius, 0, 2 * Math.PI);
                 ctx.fill();
             }
-            let textHeight = Math.floor(this.board.stoneRadius);
+            let textHeight = Math.floor(0.8 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -416,6 +466,6 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             }
         }
     }
-    exports.BestMoves = BestMoves;
+    exports.Q = Q;
 });
 //# sourceMappingURL=layer.js.map

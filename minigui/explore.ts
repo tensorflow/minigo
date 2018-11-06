@@ -13,69 +13,122 @@
 // limitations under the License.
 
 import {App} from './app'
-import {COL_LABELS, Color, Move, N, Nullable, Point, otherColor, toKgs} from './base'
+import {COL_LABELS, Color, Move, N, Nullable, Point, movesEqual, otherColor, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
+import {Socket} from './gtp_socket'
 import * as lyr from './layer'
 import {Log} from './log'
 import {Position} from './position'
-import {getElement, toPrettyResult} from './util'
+import {getElement, parseMove, toPrettyResult} from './util'
 import {VariationTree} from './variation_tree'
 import {WinrateGraph} from './winrate_graph'
 
+class ExploreBoard extends ClickableBoard {
+  private _showSearch = false;
+  get showSearch() {
+    return this._showSearch;
+  }
+  set showSearch(x: boolean) {
+    if (x != this._showSearch) {
+      this._showSearch = x;
+      if (x) {
+        this.variationLayer.show = false;
+        this.qLayer.show = true;
+      } else {
+        this.variationLayer.show = false;
+        this.qLayer.show = false;
+      }
+      this.draw();
+    }
+  }
+
+  private qLayer: lyr.Q;
+  private variationLayer: lyr.Variation;
+
+  constructor(parentId: string, private gtp: Socket) {
+    super(parentId, []);
+
+    this.qLayer = new lyr.Q();
+    this.variationLayer = new lyr.Variation('pv');
+    this.addLayers([
+        new lyr.Label(),
+        new lyr.BoardStones(),
+        this.qLayer,
+        this.variationLayer,
+        new lyr.Annotations()]);
+    this.variationLayer.show = false;
+    this.enabled = true;
+
+    this.ctx.canvas.addEventListener('mousemove', (e) => {
+      let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
+      if (p != null) {
+        if (this.getStone(p) != Color.Empty ||
+            !this.qLayer.hasPoint(p)) {
+          p = null;
+        }
+      }
+
+      if (movesEqual(p, this.variationLayer.childVariation)) {
+        return;
+      }
+
+      this.variationLayer.clear();
+      this.variationLayer.show = p != null;
+      this.qLayer.show = p == null;
+
+      if (p != null) {
+        this.gtp.send(`variation ${toKgs(p)}`);
+      } else {
+        this.gtp.send('variation');
+      }
+      this.variationLayer.childVariation = p;
+    });
+
+    this.onClick((p: Point) => {
+      this.variationLayer.clear();
+      this.variationLayer.show = false;
+      this.qLayer.clear();
+      this.qLayer.show = true;
+      this.gtp.send('variation');
+    });
+  }
+}
+
 // Demo app implementation that's shared between full and lightweight demo UIs.
-class DemoApp extends App {
-  private mainBoard: ClickableBoard;
-  private readsBoard: Board;
+class ExploreApp extends App {
+  private board: ExploreBoard;
   private winrateGraph = new WinrateGraph('winrate-graph');
   private variationTree = new VariationTree('tree');
   private log = new Log('log', 'console');
-
-  private pvLayer: lyr.Layer;
-  private bestMovesLayer: lyr.BestMoves;
 
   constructor() {
     super();
 
     this.connect().then(() => {
-      // Create boards for each of the elements in the UI.
-      // The extra board views aren't available in the lightweight UI, so we
-      // must check if the HTML elements exist.
-      this.mainBoard = new ClickableBoard(
-        'main-board',
-        [lyr.Label, lyr.BoardStones, [lyr.Variation, 'pv'], lyr.Annotations]);
-      this.mainBoard.enabled = true;
+      this.board = new ExploreBoard('main-board', this.gtp);
 
-      this.pvLayer = this.mainBoard.getLayer(2);
-
-      this.readsBoard = new Board(
-        'reads-board',
-        [lyr.BoardStones, lyr.BestMoves]);
-      this.bestMovesLayer = this.readsBoard.getLayer(1) as lyr.BestMoves;
-
-      this.init([this.mainBoard, this.readsBoard]);
-
-      this.mainBoard.onClick((p: Point) => {
-        this.mainBoard.enabled = false;
-        this.bestMovesLayer.clear();
+      this.board.onClick((p: Point) => {
         this.playMove(this.activePosition.toPlay, p).then(() => {
           let parent = this.activePosition;
+          this.board.enabled = false;
           this.gtp.send('gamestate').then(() => {
             this.variationTree.addChild(parent, this.activePosition);
           }).finally(() => {
-            this.mainBoard.enabled = true;
+            this.board.enabled = true;
           });
         });
       });
 
+      this.init([this.board]);
       this.initButtons();
 
       // Initialize log.
       this.log.onConsoleCmd((cmd: string) => {
         this.gtp.send(cmd).then(() => { this.log.scroll(); });
       });
-
       this.gtp.onText((line: string) => { this.log.log(line, 'log-cmd'); });
+
       this.newGame();
 
       this.variationTree.onClick((positions: Position[]) => {
@@ -97,27 +150,30 @@ class DemoApp extends App {
 
   private initButtons() {
     getElement('toggle-pv').addEventListener('click', (e: any) => {
-      this.pvLayer.hidden = !this.pvLayer.hidden;
-      if (this.pvLayer.hidden) {
-        e.target.innerText = 'Show PV';
+      this.board.showSearch = !this.board.showSearch;
+      if (!this.board.showSearch) {
+        e.target.innerText = 'Show search';
       } else {
-        e.target.innerText = 'Hide PV';
+        e.target.innerText = 'Hide search';
       }
     });
 
     getElement('load-sgf-input').addEventListener('change', (e: any) => {
       let files: File[] = Array.prototype.slice.call(e.target.files);
       if (files.length != 1) {
-        let names: string[] = [];
-        files.forEach((f) => { names.push(`"${f.name}"`); });
-        throw new Error(`Expected one file, got [${names.join(', ')}]`);
+        return;
       }
       let reader = new FileReader();
       reader.onload = () => {
+        this.board.clear();
         this.newGame();
         let sgf = reader.result.replace(/\n/g, '\\n');
-        this.gtp.send(`playsgf ${sgf}`).then(() => {
-          this.variationTree.draw();
+
+        this.board.enabled = false;
+        this.gtp.send('ponder 0');
+        this.gtp.send(`playsgf ${sgf}`).finally(() => {
+          this.board.enabled = true;
+          this.gtp.send('ponder 1');
         });
       };
       reader.readAsText(files[0]);
@@ -140,9 +196,8 @@ class DemoApp extends App {
   protected newGame() {
     this.gtp.send('prune_nodes 1');
     super.newGame();
-    this.bestMovesLayer.clear();
-    this.variationTree.newGame(this.rootPosition);
     this.gtp.send('prune_nodes 0');
+    this.variationTree.newGame(this.rootPosition);
     this.log.clear();
     this.winrateGraph.clear();
   }
@@ -150,7 +205,6 @@ class DemoApp extends App {
   protected onPosition(position: Position) {
     if (position.parent == this.activePosition) {
       this.activePosition = position;
-      this.bestMovesLayer.clear();
     }
     this.updateBoards(position);
     this.log.scroll();
@@ -174,4 +228,4 @@ class DemoApp extends App {
   }
 }
 
-new DemoApp();
+new ExploreApp();

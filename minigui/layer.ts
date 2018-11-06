@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {Annotation} from './position'
-import {BoardSize, COL_LABELS, Color, otherColor, Coord, Point, Move, N, Nullable} from './base'
+import {BoardSize, COL_LABELS, Color, Coord, Point, Move, N, Nullable, movesEqual, otherColor} from './base'
 import {Board} from './board'
 import {pixelRatio} from './util'
 
@@ -31,23 +31,27 @@ interface DataObj {
 type DataProp<T> = T | undefined;
 
 abstract class Layer {
-  private _hidden = false;
+  private _show = true;
 
-  get hidden() {
-    return this._hidden;
+  get show() {
+    return this._show;
   }
-  set hidden(x: boolean) {
-    if (x != this._hidden) {
-      this._hidden = x;
+  set show(x: boolean) {
+    if (x != this._show) {
+      this._show = x;
       this.board.draw();
     }
   }
 
+  board: Board;
   protected boardToCanvas: (row: number, col: number) => Coord;
 
-  constructor(public board: Board) {
+  addToBoard(board: Board) {
+    this.board = board;
     this.boardToCanvas = board.boardToCanvas.bind(board);
   }
+
+  abstract clear(): void;
 
   // Returns true if dataObj contained updated data for the layer and it should
   // be redrawn.
@@ -57,16 +61,14 @@ abstract class Layer {
 }
 
 abstract class StaticLayer extends Layer {
+  clear() {}
+
   update(dataObj: DataObj) {
     return false;
   }
 }
 
 abstract class DataLayer extends Layer {
-  constructor(board: Board) {
-    super(board);
-  }
-
   protected getData<T>(obj: any, propName: string): DataProp<T> {
     let prop: any = obj[propName];
     if (prop === undefined) {
@@ -150,8 +152,8 @@ class Label extends StaticLayer {
 }
 
 class Caption extends StaticLayer {
-  constructor(board: Board, public caption: string) {
-    super(board);
+  constructor(public caption: string) {
+    super();
   }
 
   draw() {
@@ -170,9 +172,16 @@ class Caption extends StaticLayer {
 class HeatMap extends DataLayer {
   private colors: Nullable<Float32Array[]> = null;
 
-  constructor(board: Board, private dataPropName: string,
-              private colorizeFn: (src: number[]) => Float32Array[]) {
-    super(board);
+  constructor(private dataPropName: string,
+      private colorizeFn: (src: number[] | Float32Array) => Float32Array[]) {
+    super();
+  }
+
+  clear() {
+    if (this.colors) {
+      this.colors = null;
+      this.board.draw();
+    }
   }
 
   update(dataObj: DataObj) {
@@ -213,8 +222,16 @@ abstract class StoneBaseLayer extends DataLayer {
   protected blackStones: Point[] = [];
   protected whiteStones: Point[] = [];
 
-  constructor(board: Board, protected alpha: number) {
-    super(board);
+  constructor(protected alpha: number) {
+    super();
+  }
+
+  clear() {
+    if (this.blackStones.length > 0 || this.whiteStones.length > 0) {
+      this.blackStones = [];
+      this.whiteStones = [];
+      this.board.draw();
+    }
   }
 
   draw() {
@@ -224,8 +241,8 @@ abstract class StoneBaseLayer extends DataLayer {
 }
 
 class BoardStones extends StoneBaseLayer {
-  constructor(board: Board) {
-    super(board, 1);
+  constructor() {
+    super(1);
   }
 
   update(dataObj: DataObj) {
@@ -259,11 +276,27 @@ interface VariationLabel {
 }
 
 class Variation extends StoneBaseLayer {
+  private _childVariation: Nullable<Move> = null;
+  get childVariation() {
+    return this._childVariation;
+  }
+  set childVariation(p: Nullable<Move>) {
+    if (!movesEqual(p, this._childVariation)) {
+      this._childVariation = p;
+      this.board.draw();
+    }
+  }
+
   private blackLabels: VariationLabel[] = [];
   private whiteLabels: VariationLabel[] = [];
 
-  constructor(board: Board, private dataPropName: string, alpha = 0.4) {
-    super(board, alpha);
+  constructor(private dataPropName: string, alpha = 0.4) {
+    super(alpha);
+  }
+
+  clear() {
+    super.clear();
+    this.childVariation = null;
   }
 
   update(dataObj: DataObj) {
@@ -272,19 +305,29 @@ class Variation extends StoneBaseLayer {
       return false;
     }
 
+    this.parseVariation(variation);
+
+    // We assume here that every update contains a new variation.
+    // The search variation will by definition be different every time and
+    // the engine only sends a principle variation when it changes, so this is
+    // currently a safe assumption.
+    // TODO(tommadams): return false if the varation was previously empty.
+    return true;
+  }
+
+  protected parseVariation(variation: Nullable<Move[]>) {
     let toPlay = this.board.toPlay;
     this.blackStones = [];
     this.whiteStones = [];
     this.blackLabels = [];
     this.whiteLabels = [];
 
-    if (variation == null) {
-      // We assume here that every update contains a new variation.
-      // The search variation will by definition be different every time and
-      // the engine only sends a principle variation when it changes, so this is
-      // currently a safe assumption.
-      // TODO(tommadams): return false if the varation was previously empty.
-      return true;
+    if (variation == null || variation.length == 0) {
+      return;
+    }
+
+    if (!movesEqual(variation[0], this.childVariation)) {
+      return;
     }
 
     // The playedCount array keeps track of the number of times each point on
@@ -322,8 +365,6 @@ class Variation extends StoneBaseLayer {
         firstPlayed[idx].s += '*';
       }
     }
-
-    return true;
   }
 
   draw() {
@@ -340,7 +381,7 @@ class Variation extends StoneBaseLayer {
     this.drawLabels(this.whiteLabels, '#000');
   }
 
-  private drawLabels(labels: VariationLabel[], style: string) {
+  protected drawLabels(labels: VariationLabel[], style: string) {
     let ctx = this.board.ctx;
     ctx.fillStyle = style;
     for (let label of labels) {
@@ -353,8 +394,15 @@ class Variation extends StoneBaseLayer {
 class Annotations extends DataLayer {
   private annotations: Annotation[] = [];
 
-  constructor(board: Board, private dataPropName = 'annotations') {
-    super(board);
+  constructor(private dataPropName = 'annotations') {
+    super();
+  }
+
+  clear() {
+    if (this.annotations.length > 0) {
+      this.annotations = [];
+      this.board.draw();
+    }
   }
 
   update(dataObj: DataObj) {
@@ -400,7 +448,7 @@ class Annotations extends DataLayer {
 }
 
 class NextMove {
-  public p: Point;
+  p: Point;
   constructor(idx: number, public n: number, public q: number,
               public alpha: number) {
     this.p = {
@@ -410,12 +458,23 @@ class NextMove {
   }
 }
 
-class BestMoves extends DataLayer {
+class Q extends DataLayer {
   private nextMoves: NextMove[] = [];
-  private logNSum = 0;
 
-  constructor(board: Board) {
-    super(board);
+  hasPoint(p: Point) {
+    for (let move of this.nextMoves) {
+      if (movesEqual(p, move.p)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  clear() {
+    if (this.nextMoves.length > 0) {
+      this.nextMoves = [];
+      this.board.draw();
+    }
   }
 
   update(dataObj: DataObj) {
@@ -448,12 +507,17 @@ class BestMoves extends DataLayer {
       return true;
     }
 
+    let sumN = 0;
+    for (let n of childN) {
+      sumN += n;
+    }
+
     let logMaxN = Math.log(maxN);
 
     // Build the list of suggested next moves.
-    // Limit the maximum number of suggests to 8.
+    // Limit the maximum number of suggestions to 9.
     let idx = indices[0];
-    for (let i = 0; i < 8; ++i) {
+    for (let i = 0; i < indices.length; ++i) {
       let idx = indices[i];
       let n = childN[idx];
       if (n == 0) {
@@ -462,24 +526,13 @@ class BestMoves extends DataLayer {
       let q = childQ[idx] / 10;
       let alpha = Math.log(n) / logMaxN;
       alpha *= alpha;
-      // Emphasize the most visted move by reducing the opacity of all other
-      // moves slightly.
-      if (i > 0) {
-        alpha *= 0.75;
-      }
-      // If the last few moves were only rarely visited, don't show them to
-      // reduce visual clutter.
-      if (i >= 4 && alpha < 0.1) {
+      if (n < sumN / 100) {
         break;
       }
       this.nextMoves.push(new NextMove(idx, n, q, alpha));
     }
 
     return true;
-  }
-
-  clear() {
-    this.nextMoves = [];
   }
 
   draw() {
@@ -502,7 +555,7 @@ class BestMoves extends DataLayer {
       ctx.fill();
     }
 
-    let textHeight = Math.floor(this.board.stoneRadius);
+    let textHeight = Math.floor(0.8 * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -514,15 +567,6 @@ class BestMoves extends DataLayer {
       ctx.fillText(winRate.toFixed(1), c.x, c.y);
     }
   }
-
-  // formatN(n: number) {
-  //   if (n < 1000) {
-  //     return n.toString();
-  //   }
-  //   n /= 1000;
-  //   let places = Math.max(0, 2 - Math.floor(Math.log10(n)));
-  //   return n.toFixed(places) + 'k';
-  // }
 }
 
 export {
@@ -535,6 +579,6 @@ export {
   HeatMap,
   Label,
   Layer,
-  BestMoves,
+  Q,
   Variation,
 }
