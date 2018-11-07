@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {BoardSize, COL_LABELS, Color, Coord, Move, N, Nullable, Point} from './base'
+import {DataObj, Grid, Layer} from './layer'
+import {Position, rootPosition} from './position'
 import {getElement, pixelRatio} from './util'
 import {View} from './view'
-import {DataObj, Grid, Layer} from './layer'
-import {BoardSize, COL_LABELS, Color, Coord, Move, N, Nullable, Point} from './base'
-import {Annotation} from './position'
 
 class Board extends View {
-  toPlay = Color.Black;
   stones: Color[] = [];
   ctx: CanvasRenderingContext2D;
 
@@ -28,6 +27,7 @@ class Board extends View {
   pointH: number;
   stoneRadius: number;
   elem: HTMLElement;
+  position: Position = rootPosition;
 
   protected layers: Layer[] = [];
 
@@ -93,16 +93,11 @@ class Board extends View {
   // Board layers that are derived from DataLayer will look in the state object
   // for a named property. If that property exists, the layer will update its
   // internal state from it.
-  update(state: any) {
-    if (state.toPlay !== undefined) {
-      this.toPlay = state.toPlay as Color;
-    }
-    if (state.stones !== undefined) {
-      this.stones = state.stones as Color[];
-    }
+  setPosition(position: Position) {
+    this.position = position;
     let anything_changed = false;
     for (let layer of this.layers) {
-      if (layer.update(state)) {
+      if (layer.update(position)) {
         anything_changed = true;
       }
     }
@@ -273,7 +268,7 @@ class ClickableBoard extends Board {
     let p = this.enabled ? this.p : null;
     this.ctx.canvas.style.cursor = p ? 'pointer' : null;
     if (p) {
-      this.drawStones([p], this.toPlay, 0.6);
+      this.drawStones([p], this.position.toPlay, 0.6);
     }
   }
 }

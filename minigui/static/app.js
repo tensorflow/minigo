@@ -72,9 +72,9 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             }
             this.updateBoards(this.activePosition);
         }
-        updateBoards(state) {
+        updateBoards(position) {
             for (let board of this.boards) {
-                if (board.update(state)) {
+                if (board.setPosition(position)) {
                     board.draw();
                 }
             }

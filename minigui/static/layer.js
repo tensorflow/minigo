@@ -250,7 +250,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             return true;
         }
         parseVariation(variation) {
-            let toPlay = this.board.toPlay;
+            let toPlay = this.board.position.toPlay;
             this.blackStones = [];
             this.whiteStones = [];
             this.blackLabels = [];
@@ -314,10 +314,9 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.Variation = Variation;
     class Annotations extends DataLayer {
-        constructor(dataPropName = 'annotations', filter = null) {
+        constructor(dataPropName = 'annotations') {
             super();
             this.dataPropName = dataPropName;
-            this.filter = filter;
             this.annotations = new Map();
         }
         clear() {
@@ -336,9 +335,6 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 return true;
             }
             for (let annotation of annotations) {
-                if (this.filter != null && this.filter.indexOf(annotation.shape) == -1) {
-                    continue;
-                }
                 let byShape = this.annotations.get(annotation.shape);
                 if (byShape === undefined) {
                     byShape = [];
@@ -367,33 +363,6 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                             ctx.fill();
                         }
                         break;
-                    case position_1.Annotation.Shape.DashedCircle: {
-                        let circum = 2 * Math.PI * sr;
-                        let numDashes = 9 * Math.round(circum / 9);
-                        let dashLen = 4 * circum / numDashes;
-                        let spaceLen = 5 * circum / numDashes;
-                        ctx.setLineDash([dashLen, spaceLen]);
-                        for (let i = 0;; ++i) {
-                            let anyDrawn = false;
-                            for (let annotation of annotations) {
-                                if (i < annotation.colors.length) {
-                                    let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
-                                    let w = 1 + 2 * (annotation.colors.length - i - 1);
-                                    ctx.lineWidth = w * pr;
-                                    ctx.strokeStyle = annotation.colors[i];
-                                    ctx.beginPath();
-                                    ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
-                                    ctx.stroke();
-                                    anyDrawn = true;
-                                }
-                            }
-                            if (!anyDrawn) {
-                                break;
-                            }
-                        }
-                        ctx.setLineDash([]);
-                        break;
-                    }
                 }
             });
         }
@@ -480,7 +449,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             }
             let ctx = this.board.ctx;
             let pr = util_1.pixelRatio();
-            let stoneRgb = this.board.toPlay == base_1.Color.Black ? 0 : 255;
+            let stoneRgb = this.board.position.toPlay == base_1.Color.Black ? 0 : 255;
             let textRgb = 255 - stoneRgb;
             for (let nextMove of this.nextMoves) {
                 ctx.fillStyle =
@@ -495,7 +464,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = `rgba(${textRgb}, ${textRgb}, ${textRgb}, 0.8)`;
-            let scoreScale = this.board.toPlay == base_1.Color.Black ? 1 : -1;
+            let scoreScale = this.board.position.toPlay == base_1.Color.Black ? 1 : -1;
             for (let nextMove of this.nextMoves) {
                 let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
                 let winRate = (scoreScale * nextMove.q + 100) / 2;

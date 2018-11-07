@@ -18,8 +18,6 @@ import {emptyBoard} from './util'
 namespace Annotation {
   export enum Shape {
     Dot,
-    Triangle,
-    DashedCircle,
   }
 }
 
@@ -78,25 +76,15 @@ class Position {
     let child = new Position(
       id, this, stones, q, move, otherColor(this.toPlay), isMainline);
     this.children.push(child);
-
-    if (move != 'pass' && move != 'resign') {
-      let colors: string[];
-      if (this.toPlay == Color.Black) {
-        colors = ['#000', '#fff'];
-      } else {
-        colors = ['#fff', '#000'];
-      }
-      this.annotations.push({
-        p: move,
-        shape: Annotation.Shape.DashedCircle,
-        colors: colors,
-      });
-    }
     return child;
   }
 }
 
+let rootPosition = new Position(
+    'root', null, emptyBoard(), 0, null, Color.Black, true);
+
 export {
   Annotation,
   Position,
+  rootPosition,
 };

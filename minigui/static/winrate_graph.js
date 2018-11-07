@@ -1,8 +1,9 @@
-define(["require", "exports", "./util"], function (require, exports, util_1) {
+define(["require", "exports", "./util", "./view"], function (require, exports, util_1, view_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    class WinrateGraph {
+    class WinrateGraph extends view_1.View {
         constructor(parent) {
+            super();
             this.points = new Array();
             this.minPoints = 10;
             if (typeof (parent) == 'string') {
@@ -35,14 +36,14 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             this.textHeight = 0.06 * this.h;
         }
         clear() {
-            this.points = [];
+            this.points = [[0, 0]];
             this.draw();
         }
         setWinrate(move, winrate) {
             this.points[move] = [move, winrate];
             this.draw();
         }
-        draw() {
+        drawImpl() {
             let pr = util_1.pixelRatio();
             let ctx = this.ctx;
             let w = this.w;

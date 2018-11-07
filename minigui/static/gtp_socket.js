@@ -72,7 +72,7 @@ define(["require", "exports"], function (require, exports) {
                 return this.send(cmd);
             }
             this.cmdQueue[this.cmdQueue.length - 1].reject('send one');
-            this.cmdQueue = this.cmdQueue.slice(1);
+            this.cmdQueue.length -= 1;
             return this.send(cmd);
         }
         newSession() {

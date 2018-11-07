@@ -626,6 +626,7 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
 
   std::function<void(const sgf::MoveTree&, MctsNode*)> impl =
       [&](const sgf::MoveTree& src, MctsNode* dst) {
+        std::cerr << "### " << src.move.c << std::endl;
         MG_CHECK(src.move.color == dst->position.to_play());
         auto* dst_child = dst->MaybeAddChild(src.move.c);
         ProcessLeaves({&dst_child, 1}, false);
@@ -639,6 +640,7 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   for (const auto& tree : sgf::GetMoveTrees(ast)) {
     impl(*tree, root());
   }
+  std::cerr << "### DONE" << std::endl;
 
   return Response::Ok();
 }

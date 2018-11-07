@@ -132,7 +132,7 @@ class Socket {
     // The last command in the queue matches this one: reject it and replace
     // it with ours.
     this.cmdQueue[this.cmdQueue.length - 1].reject('send one');
-    this.cmdQueue = this.cmdQueue.slice(1);
+    this.cmdQueue.length -= 1;
     return this.send(cmd);
   }
 

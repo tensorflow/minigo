@@ -20,7 +20,7 @@ import {Socket} from './gtp_socket'
 import * as lyr from './layer'
 import {Log} from './log'
 import {Annotation, Position} from './position'
-import {getElement, parseMove, toPrettyResult} from './util'
+import {getElement, parseMove, pixelRatio, toPrettyResult} from './util'
 import {VariationTree} from './variation_tree'
 import {WinrateGraph} from './winrate_graph'
 
@@ -43,12 +43,24 @@ class ExploreBoard extends ClickableBoard {
     }
   }
 
+  private _showNext = true;
   get showNext() {
-    return this.nextLayer.show;;
+    return this._showNext;
   }
   set showNext(x: boolean) {
-    if (x != this.nextLayer.show) {
-      this.nextLayer.show = x;
+    if (x != this._showNext) {
+      this._showNext = x;
+      this.draw();
+    }
+  }
+
+  private _highlightedVariation: Nullable<Position> = null;
+  get highlightedVariation() {
+    return this._highlightedVariation;
+  }
+  set highlightedVariation(x: Nullable<Position>) {
+    if (x != this._highlightedVariation) {
+      this._highlightedVariation = x;
       this.draw();
     }
   }
@@ -62,15 +74,12 @@ class ExploreBoard extends ClickableBoard {
 
     this.qLayer = new lyr.Q();
     this.variationLayer = new lyr.Variation('pv');
-    this.nextLayer = new lyr.Annotations(
-        'annotations', [Annotation.Shape.DashedCircle]);
     this.addLayers([
         new lyr.Label(),
         new lyr.BoardStones(),
         this.qLayer,
         this.variationLayer,
-        this.nextLayer,
-        new lyr.Annotations('annotations', [Annotation.Shape.Dot])]);
+        new lyr.Annotations('annotations')]);
     this.variationLayer.show = false;
     this.enabled = true;
 
@@ -101,6 +110,58 @@ class ExploreBoard extends ClickableBoard {
       this.qLayer.clear();
       this.qLayer.show = true;
     });
+  }
+
+  drawImpl() {
+    super.drawImpl();
+
+    let sr = this.stoneRadius;
+    let pr = pixelRatio();
+
+    // Calculate a dash pattern that's close to [4, 5] (a four pixel
+    // dash followed by a five pixel space) but also whose length
+    // divides the circle's circumference exactly. This avoids the final
+    // dash or space on the arc being a different size than all the rest.
+    // I wish things like this didn't bother me as much as they do.
+    let circum = 2 * Math.PI * sr;
+    let numDashes = 9 * Math.round(circum / 9);
+    let dashLen = 4 * circum / numDashes;
+    let spaceLen = 5 * circum / numDashes;
+
+    let colors: string[];
+    if (this.position.toPlay == Color.Black) {
+      colors = ['#000', '#fff'];
+    } else {
+      colors = ['#fff', '#000'];
+    }
+
+    let ctx = this.ctx;
+    let lineDash = [dashLen, spaceLen];
+    ctx.lineCap = 'round';
+    ctx.setLineDash(lineDash);
+    for (let pass = 0; pass < 2; ++pass) {
+      ctx.strokeStyle = colors[pass];
+      ctx.lineWidth = (3 - pass * 2) * pr;
+      for (let child of this.position.children) {
+        let move = child.lastMove;
+        if (move == null || move == 'pass' || move == 'resign') {
+          continue;
+        }
+
+        if (child == this.highlightedVariation) {
+          ctx.setLineDash([]);
+        }
+        let c = this.boardToCanvas(move.row, move.col);
+        ctx.beginPath();
+        ctx.moveTo(c.x + 0.5 + sr, c.y + 0.5);
+        ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
+        ctx.stroke();
+        if (child == this.highlightedVariation) {
+          ctx.setLineDash(lineDash);
+        }
+      }
+    }
+    ctx.setLineDash([]);
   }
 
   private showVariation(p: Nullable<Point>) {
@@ -159,6 +220,9 @@ class ExploreApp extends App {
 
       this.variationTree.onClick((position: Position) => {
         this.selectPosition(position);
+      });
+      this.variationTree.onHover((position: Nullable<Position>) => {
+        this.board.highlightedVariation = position;
       });
     });
   }
@@ -254,7 +318,9 @@ class ExploreApp extends App {
         this.board.enabled = false;
         this.board.showSearch = false;
         this.gtp.send('ponder 0');
-        this.gtp.send(`playsgf ${sgf}`).finally(() => {
+        this.gtp.send(`playsgf ${sgf}`).then(() => {
+          this.selectPosition(this.rootPosition);
+        }).finally(() => {
           this.board.enabled = true;
           this.board.showSearch = this.showSearch;
           this.gtp.send('ponder 1');
@@ -330,7 +396,9 @@ class ExploreApp extends App {
           this.moveElem.blur();
         }
       }
-      this.gtp.sendOne(`select_position ${position.id}`).catch(() => {});
+      this.gtp.sendOne(`select_position ${position.id}`).catch(() => {
+        console.log('discarding select_position');
+      });
     }
   }
 
@@ -364,12 +432,10 @@ class ExploreApp extends App {
   }
 
   protected onPosition(position: Position) {
-    this.activePosition = position;
-    this.updateBoards(position);
-    this.winrateGraph.setWinrate(position.moveNum, position.q);
     if (position.parent != null) {
       this.variationTree.addChild(position.parent, position);
     }
+    this.selectPosition(position);
   }
 
   private playMove(color: Color, move: Move) {

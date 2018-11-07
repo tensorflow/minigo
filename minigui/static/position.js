@@ -1,4 +1,4 @@
-define(["require", "exports", "./base"], function (require, exports, base_1) {
+define(["require", "exports", "./base", "./util"], function (require, exports, base_1, util_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var Annotation;
@@ -6,8 +6,6 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
         let Shape;
         (function (Shape) {
             Shape[Shape["Dot"] = 0] = "Dot";
-            Shape[Shape["Triangle"] = 1] = "Triangle";
-            Shape[Shape["DashedCircle"] = 2] = "DashedCircle";
         })(Shape = Annotation.Shape || (Annotation.Shape = {}));
     })(Annotation || (Annotation = {}));
     exports.Annotation = Annotation;
@@ -51,23 +49,11 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
             let isMainline = this.isMainline && this.children.length == 0;
             let child = new Position(id, this, stones, q, move, base_1.otherColor(this.toPlay), isMainline);
             this.children.push(child);
-            if (move != 'pass' && move != 'resign') {
-                let colors;
-                if (this.toPlay == base_1.Color.Black) {
-                    colors = ['#000', '#fff'];
-                }
-                else {
-                    colors = ['#fff', '#000'];
-                }
-                this.annotations.push({
-                    p: move,
-                    shape: Annotation.Shape.DashedCircle,
-                    colors: colors,
-                });
-            }
             return child;
         }
     }
     exports.Position = Position;
+    let rootPosition = new Position('root', null, util_1.emptyBoard(), 0, null, base_1.Color.Black, true);
+    exports.rootPosition = rootPosition;
 });
 //# sourceMappingURL=position.js.map

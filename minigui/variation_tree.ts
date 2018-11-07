@@ -51,6 +51,7 @@ interface LayoutResult {
 }
 
 type ClickListener = (position: Position) => void;
+type HoverListener = (position: Nullable<Position>) => void;
 
 class VariationTree extends View {
   private rootNode: Nullable<Node> = null;
@@ -59,7 +60,26 @@ class VariationTree extends View {
   private hoveredNode: Nullable<Node> = null;
   private activeNode: Nullable<Node> = null;
 
-  private listeners: ClickListener[] = [];
+  private clickListeners: ClickListener[] = [];
+  private hoverListeners: HoverListener[] = [];
+
+  // Size of the canvas (ignoring the device's pixel ratio).
+  private width = 0;
+  private height = 0;
+
+  // Maximum x and y coordinate of tree nodes.
+  private maxX = 0;
+  private maxY = 0;
+
+  // Scroll offset for rendering the tree.
+  private scrollX = 0;
+  private scrollY = 0;
+
+  // It's 2018 and MouseEvent.movementX and MouseEvent.movementY is still not
+  // supported by all browsers, so we must calculate the movement deltas
+  // ourselves... *sigh*
+  private mouseX = 0;
+  private mouseY = 0;
 
   constructor(parent: HTMLElement | string) {
     super();
@@ -70,8 +90,8 @@ class VariationTree extends View {
 
     let canvas = document.createElement('canvas');
     this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-    this.resizeCanvas(1, 1, 1);
     parent.appendChild(canvas);
+    this.resizeCanvas();
 
     parent.addEventListener('mousemove', (e) => {
       let oldNode = this.hoveredNode;
@@ -82,22 +102,53 @@ class VariationTree extends View {
         } else {
           canvas.classList.remove('pointer');
         }
+        for (let listener of this.hoverListeners) {
+          listener(this.hoveredNode ? this.hoveredNode.position : null);
+        }
       }
+    });
+
+    parent.addEventListener('mousedown', (e) => {
+      this.mouseX = e.screenX;
+      this.mouseY = e.screenY;
+      let moveHandler = (e: MouseEvent) => {
+        this.scrollX += this.mouseX - e.screenX;
+        this.scrollY += this.mouseY - e.screenY;
+        this.scrollX = Math.min(this.scrollX, this.maxX + PAD - this.width);
+        this.scrollY = Math.min(this.scrollY, this.maxY + PAD - this.height);
+        this.scrollX = Math.max(this.scrollX, 0);
+        this.scrollY = Math.max(this.scrollY, 0);
+        this.mouseX = e.screenX;
+        this.mouseY = e.screenY;
+        this.draw();
+        e.preventDefault();
+        return false;
+      };
+      let upHandler = (e: MouseEvent) => {
+        window.removeEventListener('mousemove', moveHandler);
+        window.removeEventListener('mouseup', upHandler);
+      };
+      window.addEventListener('mousemove', moveHandler);
+      window.addEventListener('mouseup', upHandler);
     });
 
     parent.addEventListener('click', (e) => {
       if (this.hoveredNode != null) {
-        for (let listener of this.listeners) {
+        for (let listener of this.clickListeners) {
           listener(this.hoveredNode.position);
         }
       }
+    });
+
+    parent.addEventListener('resize', () => {
+      this.resizeCanvas();
+      this.draw();
     });
   }
 
   newGame(rootPosition: Position) {
     this.rootNode = new Node(null, rootPosition, PAD, PAD);
     this.activeNode = this.rootNode;
-    this.resizeCanvas(1, 1, 1);
     this.layout();
     this.draw();
   }
@@ -105,6 +156,7 @@ class VariationTree extends View {
   setActive(position: Position) {
     if (this.activeNode != null && this.activeNode.position != position) {
       this.activeNode = this.lookupNode(position);
+      this.scrollIntoViw();
       this.draw();
     }
   }
@@ -128,16 +180,16 @@ class VariationTree extends View {
       let x = parentNode.x + SPACE * parentNode.children.length;
       let y = parentNode.y + SPACE;
       childNode = new Node(parentNode, childPosition, x, y);
-    }
-    if (childNode != this.activeNode) {
-      this.activeNode = childNode;
       this.layout();
-      this.draw();
     }
   }
 
   onClick(cb: ClickListener) {
-    this.listeners.push(cb);
+    this.clickListeners.push(cb);
+  }
+
+  onHover(cb: HoverListener) {
+    this.hoverListeners.push(cb);
   }
 
   private lookupNode(position: Position) {
@@ -165,6 +217,9 @@ class VariationTree extends View {
       return null;
     }
 
+    x += this.scrollX;
+    y += this.scrollY;
+
     let threshold = 0.4 * SPACE;
 
     let traverse = (node: Node): Nullable<Node> => {
@@ -187,6 +242,7 @@ class VariationTree extends View {
     return traverse(this.rootNode);
   }
 
+  // TODO(tommadams): Don't draw parts of the tree that are out of view.
   drawImpl() {
     let ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -196,6 +252,9 @@ class VariationTree extends View {
     }
 
     let pr = pixelRatio();
+
+    ctx.save();
+    ctx.translate(0.5 - this.scrollX, 0.5 - this.scrollY);
 
     ctx.lineWidth = pr;
 
@@ -279,18 +338,35 @@ class VariationTree extends View {
       ctx.fill();
       ctx.stroke();
     }
+
+    ctx.restore();
+  }
+
+  private scrollIntoViw() {
+    if (this.activeNode == null) {
+      return;
+    }
+    if (this.activeNode.x - this.scrollX > this.width - PAD) {
+      this.scrollX = this.activeNode.x - this.width + PAD;
+    } else if (this.activeNode.x - this.scrollX < PAD) {
+      this.scrollX = this.activeNode.x - PAD;
+    }
+    if (this.activeNode.y - this.scrollY > this.height - PAD) {
+      this.scrollY = this.activeNode.y - this.height + PAD;
+    } else if (this.activeNode.y - this.scrollY < PAD) {
+      this.scrollY = this.activeNode.y - PAD;
+    }
   }
 
   private layout() {
+    this.maxX = 0;
+    this.maxY = 0;
     if (this.rootNode == null) {
       return;
     }
 
     // Right-most node at each depth in the tree.
     let rightNode: Node[] = [this.rootNode];
-
-    // Space required to draw the canvas.
-    let requiredWidth = PAD * 2;
 
     // We want to lay the nodes in the tree out such that the mainline of each
     // node (the chain of first children of all descendants) is a vertical line.
@@ -321,7 +397,9 @@ class VariationTree extends View {
       if (node == parent.children[0]) {
         parent.x = Math.max(parent.x, node.x);
       }
-      requiredWidth = Math.max(requiredWidth, PAD + node.x);
+
+      this.maxX = Math.max(this.maxX, node.x);
+      this.maxY = Math.max(this.maxY, node.y);
     };
 
     // Traverse the root node's children: the root node doesn't need laying
@@ -329,22 +407,18 @@ class VariationTree extends View {
     for (let child of this.rootNode.children) {
       traverse(child, 1);
     }
-
-    let requiredHeight = PAD * 2 + (rightNode.length - 1) * SPACE;
-    let pr = pixelRatio();
-    if (requiredWidth * pr > this.ctx.canvas.width ||
-        requiredHeight * pr > this.ctx.canvas.height) {
-      this.resizeCanvas(requiredWidth, requiredHeight, pr);
-    }
   }
 
-  private resizeCanvas(width: number, height: number, pixelRatio: number) {
+  private resizeCanvas() {
+    let pr = pixelRatio();
     let canvas = this.ctx.canvas;
-    canvas.width = width * pixelRatio;
-    canvas.height = height * pixelRatio;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    this.ctx.translate(0.5, 0.5);
+    let parent = canvas.parentElement as HTMLElement;
+    this.width = parent.offsetWidth;
+    this.height = parent.offsetHeight;
+    canvas.width = pr * this.width;
+    canvas.height = pr * this.height;
+    canvas.style.width = `${this.width}px`;
+    canvas.style.height = `${this.height}px`;
   }
 }
 

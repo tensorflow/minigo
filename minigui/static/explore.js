@@ -1,4 +1,4 @@
-define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./position", "./util", "./variation_tree", "./winrate_graph"], function (require, exports, app_1, base_1, board_1, lyr, log_1, position_1, util_1, variation_tree_1, winrate_graph_1) {
+define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./util", "./variation_tree", "./winrate_graph"], function (require, exports, app_1, base_1, board_1, lyr, log_1, util_1, variation_tree_1, winrate_graph_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ExploreBoard extends board_1.ClickableBoard {
@@ -6,16 +6,16 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             super(parentId, []);
             this.gtp = gtp;
             this._showSearch = true;
+            this._showNext = true;
+            this._highlightedVariation = null;
             this.qLayer = new lyr.Q();
             this.variationLayer = new lyr.Variation('pv');
-            this.nextLayer = new lyr.Annotations('annotations', [position_1.Annotation.Shape.DashedCircle]);
             this.addLayers([
                 new lyr.Label(),
                 new lyr.BoardStones(),
                 this.qLayer,
                 this.variationLayer,
-                this.nextLayer,
-                new lyr.Annotations('annotations', [position_1.Annotation.Shape.Dot])
+                new lyr.Annotations('annotations')
             ]);
             this.variationLayer.show = false;
             this.enabled = true;
@@ -63,14 +63,64 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             }
         }
         get showNext() {
-            return this.nextLayer.show;
-            ;
+            return this._showNext;
         }
         set showNext(x) {
-            if (x != this.nextLayer.show) {
-                this.nextLayer.show = x;
+            if (x != this._showNext) {
+                this._showNext = x;
                 this.draw();
             }
+        }
+        get highlightedVariation() {
+            return this._highlightedVariation;
+        }
+        set highlightedVariation(x) {
+            if (x != this._highlightedVariation) {
+                this._highlightedVariation = x;
+                this.draw();
+            }
+        }
+        drawImpl() {
+            super.drawImpl();
+            let sr = this.stoneRadius;
+            let pr = util_1.pixelRatio();
+            let circum = 2 * Math.PI * sr;
+            let numDashes = 9 * Math.round(circum / 9);
+            let dashLen = 4 * circum / numDashes;
+            let spaceLen = 5 * circum / numDashes;
+            let colors;
+            if (this.position.toPlay == base_1.Color.Black) {
+                colors = ['#000', '#fff'];
+            }
+            else {
+                colors = ['#fff', '#000'];
+            }
+            let ctx = this.ctx;
+            let lineDash = [dashLen, spaceLen];
+            ctx.lineCap = 'round';
+            ctx.setLineDash(lineDash);
+            for (let pass = 0; pass < 2; ++pass) {
+                ctx.strokeStyle = colors[pass];
+                ctx.lineWidth = (3 - pass * 2) * pr;
+                for (let child of this.position.children) {
+                    let move = child.lastMove;
+                    if (move == null || move == 'pass' || move == 'resign') {
+                        continue;
+                    }
+                    if (child == this.highlightedVariation) {
+                        ctx.setLineDash([]);
+                    }
+                    let c = this.boardToCanvas(move.row, move.col);
+                    ctx.beginPath();
+                    ctx.moveTo(c.x + 0.5 + sr, c.y + 0.5);
+                    ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
+                    ctx.stroke();
+                    if (child == this.highlightedVariation) {
+                        ctx.setLineDash(lineDash);
+                    }
+                }
+            }
+            ctx.setLineDash([]);
         }
         showVariation(p) {
             if (base_1.movesEqual(p, this.variationLayer.childVariation)) {
@@ -117,6 +167,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.newGame();
                 this.variationTree.onClick((position) => {
                     this.selectPosition(position);
+                });
+                this.variationTree.onHover((position) => {
+                    this.board.highlightedVariation = position;
                 });
             });
         }
@@ -199,7 +252,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.board.enabled = false;
                     this.board.showSearch = false;
                     this.gtp.send('ponder 0');
-                    this.gtp.send(`playsgf ${sgf}`).finally(() => {
+                    this.gtp.send(`playsgf ${sgf}`).then(() => {
+                        this.selectPosition(this.rootPosition);
+                    }).finally(() => {
                         this.board.enabled = true;
                         this.board.showSearch = this.showSearch;
                         this.gtp.send('ponder 1');
@@ -262,7 +317,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         this.moveElem.blur();
                     }
                 }
-                this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
+                this.gtp.sendOne(`select_position ${position.id}`).catch(() => {
+                    console.log('discarding select_position');
+                });
             }
         }
         newGame() {
@@ -292,12 +349,10 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             return numReads.toFixed(places) + 'k';
         }
         onPosition(position) {
-            this.activePosition = position;
-            this.updateBoards(position);
-            this.winrateGraph.setWinrate(position.moveNum, position.q);
             if (position.parent != null) {
                 this.variationTree.addChild(position.parent, position);
             }
+            this.selectPosition(position);
         }
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';

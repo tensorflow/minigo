@@ -1,12 +1,12 @@
-define(["require", "exports", "./util", "./view", "./layer", "./base"], function (require, exports, util_1, view_1, layer_1, base_1) {
+define(["require", "exports", "./base", "./layer", "./position", "./util", "./view"], function (require, exports, base_1, layer_1, position_1, util_1, view_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.COL_LABELS = base_1.COL_LABELS;
     class Board extends view_1.View {
         constructor(parent, layers) {
             super();
-            this.toPlay = base_1.Color.Black;
             this.stones = [];
+            this.position = position_1.rootPosition;
             this.layers = [];
             if (typeof (parent) == 'string') {
                 parent = util_1.getElement(parent);
@@ -53,16 +53,11 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
                 this.addLayer(layer);
             }
         }
-        update(state) {
-            if (state.toPlay !== undefined) {
-                this.toPlay = state.toPlay;
-            }
-            if (state.stones !== undefined) {
-                this.stones = state.stones;
-            }
+        setPosition(position) {
+            this.position = position;
             let anything_changed = false;
             for (let layer of this.layers) {
-                if (layer.update(state)) {
+                if (layer.update(position)) {
                     anything_changed = true;
                 }
             }
@@ -204,7 +199,7 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             let p = this.enabled ? this.p : null;
             this.ctx.canvas.style.cursor = p ? 'pointer' : null;
             if (p) {
-                this.drawStones([p], this.toPlay, 0.6);
+                this.drawStones([p], this.position.toPlay, 0.6);
             }
         }
     }

@@ -13,8 +13,9 @@
 // limitations under the License.
 
 import {getElement, pixelRatio} from './util'
+import {View} from './view'
 
-class WinrateGraph {
+class WinrateGraph extends View {
   protected ctx: CanvasRenderingContext2D;
   protected points = new Array<[number, number]>();
   protected marginTop: number;
@@ -28,6 +29,7 @@ class WinrateGraph {
   protected h: number;
 
   constructor(parent: HTMLElement | string) {
+    super();
     if (typeof(parent) == 'string') {
       parent = getElement(parent);
     }
@@ -64,7 +66,7 @@ class WinrateGraph {
   }
 
   clear() {
-    this.points = [];
+    this.points = [[0, 0]];
     this.draw();
   }
 
@@ -74,7 +76,7 @@ class WinrateGraph {
     this.draw();
   }
 
-  private draw() {
+  drawImpl() {
     let pr = pixelRatio();
     let ctx = this.ctx;
     let w = this.w;

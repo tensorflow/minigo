@@ -155,9 +155,9 @@ abstract class App {
   // specific property. If the state object contains a matching property, the
   // layer will update its copy of the state and signal that the board should
   // be redrawn (by their update method returning true).
-  protected updateBoards(state: any) {
+  protected updateBoards(position: Position) {
     for (let board of this.boards) {
-      if (board.update(state)) {
+      if (board.setPosition(position)) {
         board.draw();
       }
     }
