@@ -17,9 +17,10 @@ import {getElement, querySelector} from './util';
 
 type CmdHandler = (cmd: string) => void;
 
+// TODO(tommadams): Rename to Console.
 class Log {
-  private logElem: HTMLElement;
-  private consoleElem: Nullable<HTMLElement> = null;
+  logElem: HTMLElement;
+  consoleElem: Nullable<HTMLElement> = null;
   private cmdHandler: Nullable<CmdHandler> = null;
 
   constructor(logElemId: string, consoleElemId: Nullable<string> = null) {

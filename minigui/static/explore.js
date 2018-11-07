@@ -97,14 +97,14 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.showSearch = true;
             this.showNext = true;
             this.showConsole = false;
-            this.pendingSelectPosition = null;
+            this.moveElem = util_1.getElement('move');
             this.connect().then(() => {
                 this.board = new ExploreBoard('main-board', this.gtp);
                 this.board.onClick((p) => {
                     this.playMove(this.activePosition.toPlay, p);
                 });
                 this.init([this.board]);
-                this.initButtons();
+                this.initEventListeners();
                 this.log.onConsoleCmd((cmd) => {
                     this.gtp.send(cmd).then(() => { this.log.scroll(); });
                 });
@@ -118,71 +118,76 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.variationTree.onClick((position) => {
                     this.selectPosition(position);
                 });
-                window.addEventListener('keydown', (e) => {
-                    if (e.key == 'Escape') {
-                        this.showConsole = !this.showConsole;
-                        let containerElem = util_1.getElement('log-container');
-                        containerElem.style.top = this.showConsole ? '0' : '-40vh';
-                        if (this.showConsole) {
-                            this.log.focus();
-                            this.log.scroll();
-                        }
-                        else {
-                            this.log.blur();
-                        }
-                        e.preventDefault();
-                        return false;
-                    }
-                    if (this.log.hasFocus) {
-                        return;
-                    }
-                    switch (e.key) {
-                        case 'ArrowUp':
-                        case 'ArrowLeft':
-                            this.selectPrevPosition();
-                            break;
-                        case 'ArrowRight':
-                        case 'ArrowDown':
-                            this.selectNextPosition();
-                            break;
-                    }
-                });
-                window.addEventListener('wheel', (e) => {
-                    if (this.showConsole) {
-                        return;
-                    }
-                    if (e.deltaY < 0) {
-                        this.selectPrevPosition();
-                    }
-                    else if (e.deltaY > 0) {
-                        this.selectNextPosition();
-                    }
-                });
             });
         }
-        initButtons() {
-            util_1.getElement('toggle-search').addEventListener('click', (e) => {
+        initEventListeners() {
+            window.addEventListener('keydown', (e) => {
+                if (e.key == 'Escape') {
+                    this.showConsole = !this.showConsole;
+                    let containerElem = util_1.getElement('log-container');
+                    containerElem.style.top = this.showConsole ? '0' : '-40vh';
+                    if (this.showConsole) {
+                        this.log.focus();
+                        this.log.scroll();
+                    }
+                    else {
+                        this.log.blur();
+                    }
+                    e.preventDefault();
+                    return false;
+                }
+                for (let elem of [this.log.consoleElem, this.moveElem]) {
+                    if (document.activeElement == elem) {
+                        return;
+                    }
+                }
+                switch (e.key) {
+                    case 'ArrowUp':
+                    case 'ArrowLeft':
+                        this.selectPrevPosition();
+                        break;
+                    case 'ArrowRight':
+                    case 'ArrowDown':
+                        this.selectNextPosition();
+                        break;
+                }
+            });
+            window.addEventListener('wheel', (e) => {
+                if (this.showConsole) {
+                    return;
+                }
+                if (e.deltaY < 0) {
+                    this.selectPrevPosition();
+                }
+                else if (e.deltaY > 0) {
+                    this.selectNextPosition();
+                }
+            });
+            let searchElem = util_1.getElement('toggle-search');
+            searchElem.addEventListener('click', () => {
                 this.showSearch = !this.showSearch;
                 this.board.showSearch = this.showSearch;
                 if (this.showSearch) {
-                    e.target.innerText = 'Hide search';
+                    searchElem.innerText = 'Hide search';
                 }
                 else {
-                    e.target.innerText = 'Show search';
+                    searchElem.innerText = 'Show search';
                 }
             });
-            util_1.getElement('toggle-variation').addEventListener('click', (e) => {
+            let variationElem = util_1.getElement('toggle-variation');
+            variationElem.addEventListener('click', () => {
                 this.showNext = !this.showNext;
                 this.board.showNext = this.showNext;
                 if (this.showNext) {
-                    e.target.innerText = 'Hide variation';
+                    variationElem.innerText = 'Hide variation';
                 }
                 else {
-                    e.target.innerText = 'Show variation';
+                    variationElem.innerText = 'Show variation';
                 }
             });
-            util_1.getElement('load-sgf-input').addEventListener('change', (e) => {
-                let files = Array.prototype.slice.call(e.target.files);
+            let loadSgfElem = util_1.getElement('load-sgf-input');
+            loadSgfElem.addEventListener('change', () => {
+                let files = Array.prototype.slice.call(loadSgfElem.files);
                 if (files.length != 1) {
                     return;
                 }
@@ -202,16 +207,32 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 };
                 reader.readAsText(files[0]);
             });
-            util_1.getElement('main-line').addEventListener('click', () => {
+            let mainLineElem = util_1.getElement('main-line');
+            mainLineElem.addEventListener('click', () => {
                 let position = this.activePosition;
                 while (position != this.rootPosition &&
                     !position.isMainline && position.parent != null) {
                     position = position.parent;
                 }
-                if (position != this.activePosition) {
-                    this.activePosition = position;
-                    this.variationTree.setActive(this.activePosition);
-                    this.updateBoards(this.activePosition);
+                this.selectPosition(position);
+            });
+            this.moveElem.addEventListener('keypress', (e) => {
+                if (e.key < '0' || e.key > '9') {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+            this.moveElem.addEventListener('input', () => {
+                let moveNum = parseInt(this.moveElem.innerText);
+                if (isNaN(moveNum)) {
+                    return;
+                }
+                let position = this.rootPosition;
+                while (position.moveNum != moveNum && position.children.length > 0) {
+                    position = position.children[0];
+                }
+                if (position.moveNum == moveNum) {
+                    this.selectPosition(position);
                 }
             });
         }
@@ -229,11 +250,20 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             }
         }
         selectPosition(position) {
-            this.activePosition = position;
-            this.updateBoards(position);
-            this.winrateGraph.setWinrate(position.moveNum, position.q);
-            this.variationTree.setActive(position);
-            this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
+            if (position != this.activePosition) {
+                this.activePosition = position;
+                this.updateBoards(position);
+                this.winrateGraph.setWinrate(position.moveNum, position.q);
+                this.variationTree.setActive(position);
+                let moveNumStr = position.moveNum.toString();
+                if (this.moveElem.innerText != moveNumStr) {
+                    this.moveElem.innerText = moveNumStr;
+                    if (document.activeElement == this.moveElem) {
+                        this.moveElem.blur();
+                    }
+                }
+                this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
+            }
         }
         newGame() {
             this.gtp.send('prune_nodes 1');
@@ -242,6 +272,24 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.variationTree.newGame(this.rootPosition);
             this.log.clear();
             this.winrateGraph.clear();
+        }
+        onSearch(msg) {
+            super.onSearch(msg);
+            if (msg.n != null) {
+                let nSum = 0;
+                for (let n of msg.n) {
+                    nSum += n;
+                }
+                util_1.getElement('reads').innerText = this.formatNumReads(nSum);
+            }
+        }
+        formatNumReads(numReads) {
+            if (numReads < 1000) {
+                return numReads.toString();
+            }
+            numReads /= 1000;
+            let places = Math.max(0, 2 - Math.floor(Math.log10(numReads)));
+            return numReads.toFixed(places) + 'k';
         }
         onPosition(position) {
             this.activePosition = position;

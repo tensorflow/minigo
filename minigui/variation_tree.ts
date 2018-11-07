@@ -70,6 +70,7 @@ class VariationTree extends View {
 
     let canvas = document.createElement('canvas');
     this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+    this.resizeCanvas(1, 1, 1);
     parent.appendChild(canvas);
 
     parent.addEventListener('mousemove', (e) => {

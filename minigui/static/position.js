@@ -32,7 +32,7 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
                 this.annotations.push({
                     p: lastMove,
                     shape: Annotation.Shape.Dot,
-                    color: '#ef6c02',
+                    colors: ['#ef6c02'],
                 });
             }
         }
@@ -52,11 +52,17 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
             let child = new Position(id, this, stones, q, move, base_1.otherColor(this.toPlay), isMainline);
             this.children.push(child);
             if (move != 'pass' && move != 'resign') {
-                let color;
+                let colors;
+                if (this.toPlay == base_1.Color.Black) {
+                    colors = ['#000', '#fff'];
+                }
+                else {
+                    colors = ['#fff', '#000'];
+                }
                 this.annotations.push({
                     p: move,
                     shape: Annotation.Shape.DashedCircle,
-                    color: this.toPlay == base_1.Color.Black ? '#000' : '#fff',
+                    colors: colors,
                 });
             }
             return child;

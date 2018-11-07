@@ -25,6 +25,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             }
         }
     }
+    exports.SearchMsg = SearchMsg;
     class App {
         constructor() {
             this.gtp = new gtp_socket_1.Socket();

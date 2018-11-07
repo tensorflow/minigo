@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App} from './app'
+import {App, SearchMsg} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, Point, movesEqual, otherColor, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
@@ -130,8 +130,7 @@ class ExploreApp extends App {
   private showSearch = true;
   private showNext = true;
   private showConsole = false;
-
-  private pendingSelectPosition: Nullable<Position> = null;
+  private moveElem = getElement('move');
 
   constructor() {
     super();
@@ -143,7 +142,7 @@ class ExploreApp extends App {
       });
 
       this.init([this.board]);
-      this.initButtons();
+      this.initEventListeners();
 
       // Initialize log.
       this.log.onConsoleCmd((cmd: string) => {
@@ -161,78 +160,88 @@ class ExploreApp extends App {
       this.variationTree.onClick((position: Position) => {
         this.selectPosition(position);
       });
-
-      window.addEventListener('keydown', (e: KeyboardEvent) => {
-        // Toggle the console.
-        if (e.key == 'Escape') {
-          this.showConsole = !this.showConsole;
-          let containerElem = getElement('log-container');
-          containerElem.style.top = this.showConsole ? '0' : '-40vh';
-          if (this.showConsole) {
-            this.log.focus();
-            this.log.scroll();
-          } else {
-            this.log.blur();
-          }
-          e.preventDefault();
-          return false;
-        }
-
-        // Don't do any special key handling if the console has focus.
-        if (this.log.hasFocus) {
-          return;
-        }
-
-        switch (e.key) {
-          case 'ArrowUp':
-          case 'ArrowLeft':
-            this.selectPrevPosition();
-            break;
-
-          case 'ArrowRight':
-          case 'ArrowDown':
-            this.selectNextPosition();
-            break;
-        }
-      });
-
-      window.addEventListener('wheel', (e: WheelEvent) => {
-        if (this.showConsole) {
-          return;
-        }
-
-        if (e.deltaY < 0) {
-          this.selectPrevPosition();
-        } else if (e.deltaY > 0) {
-          this.selectNextPosition();
-        }
-      });
     });
   }
 
-  private initButtons() {
-    getElement('toggle-search').addEventListener('click', (e: any) => {
+  private initEventListeners() {
+    // Global keyboard events.
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      // Toggle the console.
+      if (e.key == 'Escape') {
+        this.showConsole = !this.showConsole;
+        let containerElem = getElement('log-container');
+        containerElem.style.top = this.showConsole ? '0' : '-40vh';
+        if (this.showConsole) {
+          this.log.focus();
+          this.log.scroll();
+        } else {
+          this.log.blur();
+        }
+        e.preventDefault();
+        return false;
+      }
+
+      // Don't do any special key handling if any text inputs have focus.
+      for (let elem of [this.log.consoleElem, this.moveElem]) {
+        if (document.activeElement == elem) {
+          return;
+        }
+      }
+
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'ArrowLeft':
+          this.selectPrevPosition();
+          break;
+
+        case 'ArrowRight':
+        case 'ArrowDown':
+          this.selectNextPosition();
+          break;
+      }
+    });
+
+    // Mouse wheel.
+    window.addEventListener('wheel', (e: WheelEvent) => {
+      if (this.showConsole) {
+        return;
+      }
+
+      if (e.deltaY < 0) {
+        this.selectPrevPosition();
+      } else if (e.deltaY > 0) {
+        this.selectNextPosition();
+      }
+    });
+
+    // Toggle search display.
+    let searchElem = getElement('toggle-search');
+    searchElem.addEventListener('click', () => {
       this.showSearch = !this.showSearch;
       this.board.showSearch = this.showSearch;
       if (this.showSearch) {
-        e.target.innerText = 'Hide search';
+        searchElem.innerText = 'Hide search';
       } else {
-        e.target.innerText = 'Show search';
+        searchElem.innerText = 'Show search';
       }
     });
 
-    getElement('toggle-variation').addEventListener('click', (e: any) => {
+    // Toggle variation display.
+    let variationElem = getElement('toggle-variation');
+    variationElem.addEventListener('click', () => {
       this.showNext = !this.showNext;
       this.board.showNext = this.showNext;
       if (this.showNext) {
-        e.target.innerText = 'Hide variation';
+        variationElem.innerText = 'Hide variation';
       } else {
-        e.target.innerText = 'Show variation';
+        variationElem.innerText = 'Show variation';
       }
     });
 
-    getElement('load-sgf-input').addEventListener('change', (e: any) => {
-      let files: File[] = Array.prototype.slice.call(e.target.files);
+    // Load an SGF file.
+    let loadSgfElem = getElement('load-sgf-input') as HTMLInputElement;
+    loadSgfElem.addEventListener('change', () => {
+      let files: File[] = Array.prototype.slice.call(loadSgfElem.files);
       if (files.length != 1) {
         return;
       }
@@ -254,16 +263,36 @@ class ExploreApp extends App {
       reader.readAsText(files[0]);
     });
 
-    getElement('main-line').addEventListener('click', () => {
+    // Return to main line.
+    let mainLineElem = getElement('main-line');
+    mainLineElem.addEventListener('click', () => {
       let position = this.activePosition;
       while (position != this.rootPosition &&
              !position.isMainline && position.parent != null) {
         position = position.parent;
       }
-      if (position != this.activePosition) {
-        this.activePosition = position;
-        this.variationTree.setActive(this.activePosition);
-        this.updateBoards(this.activePosition);
+      this.selectPosition(position);
+    });
+
+    // Set move number.
+    this.moveElem.addEventListener('keypress', (e: KeyboardEvent) => {
+      // Prevent non-numeric characters being input.
+      if (e.key < '0' || e.key > '9') {
+        e.preventDefault();
+        return false;
+      }
+    });
+    this.moveElem.addEventListener('input', () => {
+      let moveNum = parseInt(this.moveElem.innerText);
+      if (isNaN(moveNum)) {
+        return;
+      }
+      let position = this.rootPosition;
+      while (position.moveNum != moveNum && position.children.length > 0) {
+        position = position.children[0];
+      }
+      if (position.moveNum == moveNum) {
+        this.selectPosition(position);
       }
     });
   }
@@ -284,11 +313,25 @@ class ExploreApp extends App {
   }
 
   protected selectPosition(position: Position) {
-    this.activePosition = position;
-    this.updateBoards(position);
-    this.winrateGraph.setWinrate(position.moveNum, position.q);
-    this.variationTree.setActive(position);
-    this.gtp.sendOne(`select_position ${position.id}`).catch(() => {});
+    if (position != this.activePosition) {
+      this.activePosition = position;
+      this.updateBoards(position);
+      this.winrateGraph.setWinrate(position.moveNum, position.q);
+      this.variationTree.setActive(position);
+      let moveNumStr = position.moveNum.toString();
+      if (this.moveElem.innerText != moveNumStr) {
+        this.moveElem.innerText = moveNumStr;
+        // If the user changes the current move using the scroll wheel while the
+        // move element text field has focus, setting the innerText will mess up
+        // the caret position. We'll just remove focus from the text field to
+        // work around this. The UX is actually pretty good and this is waaay
+        // easier than the "correct" solution.
+        if (document.activeElement == this.moveElem) {
+          this.moveElem.blur();
+        }
+      }
+      this.gtp.sendOne(`select_position ${position.id}`).catch(() => {});
+    }
   }
 
   protected newGame() {
@@ -298,6 +341,26 @@ class ExploreApp extends App {
     this.variationTree.newGame(this.rootPosition);
     this.log.clear();
     this.winrateGraph.clear();
+  }
+
+  protected onSearch(msg: SearchMsg) {
+    super.onSearch(msg);
+    if (msg.n != null) {
+      let nSum = 0;
+      for (let n of msg.n) {
+        nSum += n;
+      }
+      getElement('reads').innerText = this.formatNumReads(nSum);
+    }
+  }
+
+  protected formatNumReads(numReads: number) {
+     if (numReads < 1000) {
+       return numReads.toString();
+     }
+     numReads /= 1000;
+     let places = Math.max(0, 2 - Math.floor(Math.log10(numReads)));
+     return numReads.toFixed(places) + 'k';
   }
 
   protected onPosition(position: Position) {

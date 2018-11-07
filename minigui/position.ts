@@ -26,7 +26,7 @@ namespace Annotation {
 interface Annotation {
   p: Point;
   shape: Annotation.Shape;
-  color: string;
+  colors: string[];
 }
 
 class Position {
@@ -53,7 +53,7 @@ class Position {
       this.annotations.push({
         p: lastMove,
         shape: Annotation.Shape.Dot,
-        color: '#ef6c02',
+        colors: ['#ef6c02'],
       });
     }
   }
@@ -80,11 +80,16 @@ class Position {
     this.children.push(child);
 
     if (move != 'pass' && move != 'resign') {
-      let color: string;
+      let colors: string[];
+      if (this.toPlay == Color.Black) {
+        colors = ['#000', '#fff'];
+      } else {
+        colors = ['#fff', '#000'];
+      }
       this.annotations.push({
         p: move,
         shape: Annotation.Shape.DashedCircle,
-        color: this.toPlay == Color.Black ? '#000' : '#fff',
+        colors: colors,
       });
     }
     return child;

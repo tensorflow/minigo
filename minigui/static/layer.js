@@ -353,6 +353,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 return;
             }
             let sr = this.board.stoneRadius;
+            let pr = util_1.pixelRatio();
             let ctx = this.board.ctx;
             ctx.lineCap = 'round';
             this.annotations.forEach((annotations, shape) => {
@@ -360,23 +361,10 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                     case position_1.Annotation.Shape.Dot:
                         for (let annotation of annotations) {
                             let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
-                            ctx.fillStyle = annotation.color;
+                            ctx.fillStyle = annotation.colors[0];
                             ctx.beginPath();
                             ctx.arc(c.x + 0.5, c.y + 0.5, 0.16 * sr, 0, 2 * Math.PI);
                             ctx.fill();
-                        }
-                        break;
-                    case position_1.Annotation.Shape.Triangle:
-                        ctx.lineWidth = 3 * util_1.pixelRatio();
-                        for (let annotation of annotations) {
-                            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
-                            ctx.strokeStyle = annotation.color;
-                            ctx.beginPath();
-                            ctx.moveTo(c.x, c.y - 0.7 * sr);
-                            ctx.lineTo(c.x - 0.6 * sr, c.y + 0.42 * sr);
-                            ctx.lineTo(c.x + 0.6 * sr, c.y + 0.42 * sr);
-                            ctx.lineTo(c.x, c.y - 0.7 * sr);
-                            ctx.stroke();
                         }
                         break;
                     case position_1.Annotation.Shape.DashedCircle: {
@@ -384,14 +372,24 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                         let numDashes = 9 * Math.round(circum / 9);
                         let dashLen = 4 * circum / numDashes;
                         let spaceLen = 5 * circum / numDashes;
-                        ctx.lineWidth = 1 * util_1.pixelRatio();
                         ctx.setLineDash([dashLen, spaceLen]);
-                        for (let annotation of annotations) {
-                            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
-                            ctx.strokeStyle = annotation.color;
-                            ctx.beginPath();
-                            ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
-                            ctx.stroke();
+                        for (let i = 0;; ++i) {
+                            let anyDrawn = false;
+                            for (let annotation of annotations) {
+                                if (i < annotation.colors.length) {
+                                    let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+                                    let w = 1 + 2 * (annotation.colors.length - i - 1);
+                                    ctx.lineWidth = w * pr;
+                                    ctx.strokeStyle = annotation.colors[i];
+                                    ctx.beginPath();
+                                    ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
+                                    ctx.stroke();
+                                    anyDrawn = true;
+                                }
+                            }
+                            if (!anyDrawn) {
+                                break;
+                            }
                         }
                         ctx.setLineDash([]);
                         break;

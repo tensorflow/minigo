@@ -32,6 +32,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             }
             let canvas = document.createElement('canvas');
             this.ctx = canvas.getContext('2d');
+            this.resizeCanvas(1, 1, 1);
             parent.appendChild(canvas);
             parent.addEventListener('mousemove', (e) => {
                 let oldNode = this.hoveredNode;

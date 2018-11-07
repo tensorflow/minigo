@@ -253,4 +253,5 @@ abstract class App {
 
 export {
   App,
+  SearchMsg,
 }

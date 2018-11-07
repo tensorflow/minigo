@@ -557,7 +557,7 @@ GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
     MG_CHECK(PlayMove(move));
   }
 
-  return Response::Ok(std::string(args[0]));
+  return Response::Ok();
 }
 
 GtpPlayer::Response GtpPlayer::HandleUndo(absl::string_view cmd, CmdArgs args) {
