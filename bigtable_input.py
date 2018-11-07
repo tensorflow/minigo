@@ -134,19 +134,15 @@ def get_unparsed_moves_from_last_n_games(n,
 def histogram_move_keys_by_game(sess, ds, batch_size=8*1024):
     """Given dataset of key names, return histogram of moves/game."""
     ds = ds.batch(batch_size)
+    # Turns 'g_0000001234_m_133' into 'g_0000001234'
+    ds = ds.map(lambda x: tf.strings.substr(x, 0, 12))
     iterator = ds.make_initializable_iterator()
     sess.run(iterator.initializer)
     get_next = iterator.get_next()
-    h = collections.defaultdict(int)
+    h = collections.Counter()
     try:
         while True:
-            bresult = sess.run(
-                tf.reduce_join(get_next,
-                               separator='\n'))
-            result = str(bresult, 'utf-8')
-            for line in result.splitlines():
-                g = line.split('_m_')[0]
-                h[g] += 1
+            h.update(sess.run(get_next))
     except tf.errors.OutOfRangeError:
         pass
     # NOTE:  Cannot be truly sure the count is right till the end.
@@ -154,8 +150,17 @@ def histogram_move_keys_by_game(sess, ds, batch_size=8*1024):
 
 
 def write_move_counts(sess, h):
+    """Add move counts from the given histogram to the table.
+
+    Args:
+      sess:  TF session to use for doing a Bigtable write.
+      h:  a dictionary keyed by game row prefix ("g_0023561") whose values
+         are the move counts for each game.
+    """
     def gen():
         for k, v in h.items():
+            # The keys in the histogram may be of type 'bytes'
+            k = str(k, 'utf-8')
             vs = str(v)
             yield (k.replace('g_', 'ct_') + '_%d' % v, vs)
             yield (k + '_m_000', vs)
