@@ -52,7 +52,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.boards = boards;
         }
         newGame() {
-            this.rootPosition = new position_1.Position(null, util.emptyBoard(), 0, null, base_1.Color.Black, true);
+            this.rootPosition = new position_1.Position('root', null, util.emptyBoard(), 0, null, base_1.Color.Black, true);
             this.activePosition = this.rootPosition;
             this.positionMap.clear();
             this.gtp.send('clear_board');
@@ -136,7 +136,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                 if (lastMove == null) {
                     throw new Error('lastMove must be set for non-root position');
                 }
-                position = parent.addChild(lastMove, stones, j.q);
+                position = parent.addChild(j.id, lastMove, stones, j.q);
             }
             if (position.toPlay != toPlay) {
                 throw new Error(`expected ${position.toPlay}, got ${toPlay}`);

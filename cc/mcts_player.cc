@@ -115,6 +115,16 @@ void MctsPlayer::ResetRoot() {
   history_.clear();
 }
 
+bool MctsPlayer::UndoMove() {
+  if (root_ == &game_root_) {
+    return false;
+  }
+  root_ = root_->parent;
+  game_over_ = false;
+  history_.pop_back();
+  return true;
+}
+
 Coord MctsPlayer::SuggestMove() {
   auto start = absl::Now();
 

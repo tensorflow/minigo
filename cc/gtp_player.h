@@ -111,7 +111,10 @@ class GtpPlayer : public MctsPlayer {
   Response HandlePruneNodes(absl::string_view cmd, CmdArgs args);
   Response HandleReadouts(absl::string_view cmd, CmdArgs args);
   Response HandleReportSearchInterval(absl::string_view cmd, CmdArgs args);
+  Response HandleSelectPosition(absl::string_view cmd, CmdArgs args);
+  Response HandleUndo(absl::string_view cmd, CmdArgs args);
   Response HandleVariation(absl::string_view cmd, CmdArgs args);
+  Response HandleVerbosity(absl::string_view cmd, CmdArgs args);
 
   // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
   Response ParseSgf(const std::string& sgf_str);
@@ -124,9 +127,9 @@ class GtpPlayer : public MctsPlayer {
 
   void ReportSearchStatus(const MctsNode* last_read);
 
-  void ReportGameState() const;
+  void ReportGameState();
 
-  std::vector<Coord> GetPrincipalVariation();
+  std::string NodeId(MctsNode* node);
 
   bool ponder_enabled_ = false;
   int ponder_count_ = 0;
@@ -144,6 +147,9 @@ class GtpPlayer : public MctsPlayer {
   Coord child_variation_ = Coord::kInvalid;
 
   std::vector<Coord> last_principal_variation_sent_;
+
+  // The nodes we've informed the front end about.
+  absl::flat_hash_map<std::string, MctsNode*> game_nodes_;
 
   ThreadSafeQueue<std::string> stdin_queue_;
 };

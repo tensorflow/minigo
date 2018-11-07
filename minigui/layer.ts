@@ -394,15 +394,16 @@ class Variation extends StoneBaseLayer {
 }
 
 class Annotations extends DataLayer {
-  private annotations: Annotation[] = [];
+  private annotations = new Map<Annotation.Shape, Annotation[]>();
 
-  constructor(private dataPropName = 'annotations') {
+  constructor(private dataPropName = 'annotations',
+              private filter: Nullable<Annotation.Shape[]> = null) {
     super();
   }
 
   clear() {
-    if (this.annotations.length > 0) {
-      this.annotations = [];
+    if (this.annotations.size > 0) {
+      this.annotations.clear();
       this.board.draw();
     }
   }
@@ -412,40 +413,73 @@ class Annotations extends DataLayer {
     if (annotations === undefined) {
       return false;
     }
-    this.annotations = annotations != null ? annotations : [];
+    this.annotations.clear();
+    if (annotations == null) {
+      return true;
+    }
+    for (let annotation of annotations) {
+      if (this.filter != null && this.filter.indexOf(annotation.shape) == -1) {
+        continue;
+      }
+      let byShape = this.annotations.get(annotation.shape);
+      if (byShape === undefined) {
+        byShape = [];
+        this.annotations.set(annotation.shape, byShape);
+      }
+      byShape.push(annotation);
+    }
     return true;
   }
 
   draw() {
-    if (this.annotations == null || this.annotations.length == 0) {
+    if (this.annotations.size == 0) {
       return;
     }
 
+    let sr = this.board.stoneRadius;
+
     let ctx = this.board.ctx;
-    for (let annotation of this.annotations) {
-      let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
-      let sr = this.board.stoneRadius;
-      switch (annotation.shape) {
+    ctx.lineCap = 'round';
+    this.annotations.forEach((annotations: Annotation[], shape: Annotation.Shape) => {
+      switch (shape) {
         case Annotation.Shape.Dot:
-          ctx.fillStyle = annotation.color;
-          ctx.beginPath();
-          ctx.arc(c.x, c.y, 0.16 * sr, 0, 2 * Math.PI);
-          ctx.fill();
+          for (let annotation of annotations) {
+            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+            ctx.fillStyle = annotation.color;
+            ctx.beginPath();
+            ctx.arc(c.x + 0.5, c.y + 0.5, 0.16 * sr, 0, 2 * Math.PI);
+            ctx.fill();
+          }
           break;
 
         case Annotation.Shape.Triangle:
           ctx.lineWidth = 3 * pixelRatio();
-          ctx.lineCap = 'round';
-          ctx.strokeStyle = annotation.color;
-          ctx.beginPath();
-          ctx.moveTo(c.x, c.y - 0.7 * sr);
-          ctx.lineTo(c.x - 0.6 * sr, c.y + 0.42 * sr);
-          ctx.lineTo(c.x + 0.6 * sr, c.y + 0.42 * sr);
-          ctx.lineTo(c.x, c.y - 0.7 * sr);
-          ctx.stroke();
+          for (let annotation of annotations) {
+            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+            ctx.strokeStyle = annotation.color;
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y - 0.7 * sr);
+            ctx.lineTo(c.x - 0.6 * sr, c.y + 0.42 * sr);
+            ctx.lineTo(c.x + 0.6 * sr, c.y + 0.42 * sr);
+            ctx.lineTo(c.x, c.y - 0.7 * sr);
+            ctx.stroke();
+          }
+          break;
+
+        case Annotation.Shape.DashedCircle:
+          ctx.lineWidth = 1 * pixelRatio();
+          ctx.setLineDash([4, 5]);
+          for (let annotation of annotations) {
+            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+            ctx.strokeStyle = annotation.color;
+            ctx.beginPath();
+            ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
           break;
       }
-    }
+    });
   }
 }
 

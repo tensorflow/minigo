@@ -22,6 +22,13 @@ type CmdHandler = (result: string, ok: boolean) => void;
 type DataHandler = (obj: any) => void;
 type ConnectCallback = () => void;
 
+function trimText(str: string, len: number) {
+  if (str.length > len) {
+    return `${str.substr(0, len - 3)}...`;
+  }
+  return str;
+}
+
 // The GtpSocket serializes all calls to send so that only one call is ever
 // outstanding at a time. This isn't strictly necessary, but it makes reading
 // the debug logs easier because we don't end up with request and result logs
@@ -123,7 +130,7 @@ class Socket {
   private cmdHandler(line: string) {
     let {cmd, resolve, reject} = this.cmdQueue[0];
 
-    this.textHandler(`${cmd} ${line}`);
+    this.textHandler(`${trimText(cmd, 1024)} ${trimText(line, 1024)}`);
 
     if (line[0] == '=' || line[0] == '?') {
       // This line contains the response from a GTP command; pop the command off
@@ -172,7 +179,7 @@ class Socket {
   private sendNext() {
     let {cmd} = this.cmdQueue[0];
     if (this.textHandler) {
-      this.textHandler(`${cmd}`);
+      this.textHandler(trimText(cmd, 1024));
     }
     this.sock.emit('gtpcmd', {data: cmd});
   }

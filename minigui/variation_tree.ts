@@ -17,13 +17,13 @@ import {getElement, pixelRatio} from './util'
 import {View} from './view'
 
 // Spacing between nodes in the tree.
-const SPACE = 16;
+const SPACE = 19;
 
 // Padding from the edge of the canvas.
-const PAD = 9;
+const PAD = 11;
 
 // Raius of the nodes.
-const RADIUS = 4;
+const RADIUS = 5;
 
 interface Position {
   parent: Nullable<Position>;
@@ -112,8 +112,10 @@ class VariationTree extends View {
   }
 
   setActive(position: Position) {
-    this.activeNode = this.lookupNode(position);
-    this.draw();
+    if (this.activeNode != null && this.activeNode.position == position) {
+      this.activeNode = this.lookupNode(position);
+      this.draw();
+    }
   }
 
   addChild(parentPosition: Position, childPosition: Position) {

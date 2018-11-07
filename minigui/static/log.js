@@ -3,17 +3,19 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
     Object.defineProperty(exports, "__esModule", { value: true });
     class Log {
         constructor(logElemId, consoleElemId = null) {
+            this.consoleElem = null;
             this.cmdHandler = null;
             this.logElem = util_1.getElement(logElemId);
             if (consoleElemId) {
                 this.consoleElem = util_1.getElement(consoleElemId);
                 this.consoleElem.addEventListener('keypress', (e) => {
+                    let elem = this.consoleElem;
                     if (e.keyCode == 13) {
-                        let cmd = this.consoleElem.innerText.trim();
+                        let cmd = elem.innerText.trim();
                         if (cmd != '' && this.cmdHandler) {
                             this.cmdHandler(cmd);
                         }
-                        this.consoleElem.innerHTML = '';
+                        elem.innerHTML = '';
                         e.preventDefault();
                         return false;
                     }
@@ -47,6 +49,14 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
         }
         onConsoleCmd(cmdHandler) {
             this.cmdHandler = cmdHandler;
+        }
+        get hasFocus() {
+            return this.consoleElem && document.activeElement == this.consoleElem;
+        }
+        blur() {
+            if (this.consoleElem) {
+                this.consoleElem.blur();
+            }
         }
     }
     exports.Log = Log;

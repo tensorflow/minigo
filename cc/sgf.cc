@@ -191,6 +191,39 @@ class Parser {
   std::string* error_;
 };
 
+void GetMoveTreeImpl(const Ast::Tree& tree,
+                     std::vector<std::unique_ptr<MoveTree>>* dst) {
+  const auto* src = &tree;
+  const Ast::Property* prop;
+
+  // Extract all the nodes out of this tree.
+  for (const auto& node : src->nodes) {
+    Move move;
+    if ((prop = node.FindProperty("B")) != nullptr) {
+      move.color = Color::kBlack;
+    } else if ((prop = node.FindProperty("W")) != nullptr) {
+      move.color = Color::kWhite;
+    } else {
+      continue;
+    }
+    // TODO(tommadams): Change this to a LOG(FATAL) once we get glog
+    // integrated.
+    if (prop->values.empty()) {
+      std::cerr << "Skipping node " << node.ToString() << " because property "
+                << prop->ToString() << " has no values";
+      continue;
+    }
+    move.c = Coord::FromSgf(prop->values[0]);
+
+    dst->push_back(absl::make_unique<MoveTree>(move));
+    dst = &(dst->back()->children);
+  }
+
+  for (const auto& src_child : src->children) {
+    GetMoveTreeImpl(src_child, dst);
+  }
+}
+
 }  // namespace
 
 std::string Ast::Property::ToString() const {
@@ -285,7 +318,7 @@ std::vector<Move> GetMainLineMoves(const Ast::Tree& tree) {
         continue;
       }
       move.c = Coord::FromSgf(prop->values[0]);
-      moves.push_back(std::move(move));
+      moves.push_back(move);
     }
 
     // If the tree has no children, we're done.
@@ -298,6 +331,14 @@ std::vector<Move> GetMainLineMoves(const Ast::Tree& tree) {
   }
 
   return moves;
+}
+
+std::vector<std::unique_ptr<MoveTree>> GetMoveTrees(const Ast& ast) {
+  std::vector<std::unique_ptr<MoveTree>> dst;
+  for (const auto& tree : ast.trees()) {
+    GetMoveTreeImpl(tree, &dst);
+  }
+  return dst;
 }
 
 std::ostream& operator<<(std::ostream& os, const MoveWithComment& move) {

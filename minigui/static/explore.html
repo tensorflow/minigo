@@ -32,7 +32,7 @@
       .main-board-pad { height: 100%; width: 90vh; padding: 3vh; }
       .winrate-graph { width: 40vh; height: 24vh; }
       .log-container {
-        background-color: rgba(0, 0, 0, 0.5);
+        background-color: rgba(0, 0, 0, 0.75);
         position: absolute;
         left: 0;
         top: -40vh;
@@ -65,9 +65,10 @@
 
   <body>
     <div class="minigui"
-         data-gtp-report_search_interval="250"
          data-gtp-ponder="1"
-         data-gtp-ponder_limit="100000">
+         data-gtp-ponder_limit="100000"
+         data-gtp-report_search_interval="250"
+         data-gtp-verbosity="0">
 
       <div class="main-board-pad board"><div id="main-board"></div></div>
 
@@ -75,7 +76,9 @@
 
       <div class="fs-0" style="display:flex; flex-direction:column">
         <div class="fs-0" style="display:flex">
-          <div id="toggle-pv" class="button">Hide search</div>
+          <div id="toggle-search" class="button">Hide search</div>
+          <div class="sp-3vh"></div>
+          <div id="toggle-variation" class="button">Hide next</div>
           <div class="sp-3vh"></div>
           <label class="button">Load SGF
             <input id="load-sgf-input" type="file" accept=".sgf">

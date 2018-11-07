@@ -175,6 +175,10 @@ class MctsPlayer {
   // This is used to rewind the game during review.
   void ResetRoot();
 
+  // Moves the root_ node up to its parent, popping the last move off the game
+  // history but preserving the game tree.
+  bool UndoMove();
+
   // Returns the list of nodes that TreeSearch performed inference on.
   // The contents of the returned Span is valid until the next call TreeSearch.
   virtual absl::Span<MctsNode* const> TreeSearch();

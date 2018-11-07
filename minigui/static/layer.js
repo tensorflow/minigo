@@ -314,14 +314,15 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.Variation = Variation;
     class Annotations extends DataLayer {
-        constructor(dataPropName = 'annotations') {
+        constructor(dataPropName = 'annotations', filter = null) {
             super();
             this.dataPropName = dataPropName;
-            this.annotations = [];
+            this.filter = filter;
+            this.annotations = new Map();
         }
         clear() {
-            if (this.annotations.length > 0) {
-                this.annotations = [];
+            if (this.annotations.size > 0) {
+                this.annotations.clear();
                 this.board.draw();
             }
         }
@@ -330,37 +331,68 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             if (annotations === undefined) {
                 return false;
             }
-            this.annotations = annotations != null ? annotations : [];
+            this.annotations.clear();
+            if (annotations == null) {
+                return true;
+            }
+            for (let annotation of annotations) {
+                if (this.filter != null && this.filter.indexOf(annotation.shape) == -1) {
+                    continue;
+                }
+                let byShape = this.annotations.get(annotation.shape);
+                if (byShape === undefined) {
+                    byShape = [];
+                    this.annotations.set(annotation.shape, byShape);
+                }
+                byShape.push(annotation);
+            }
             return true;
         }
         draw() {
-            if (this.annotations == null || this.annotations.length == 0) {
+            if (this.annotations.size == 0) {
                 return;
             }
+            let sr = this.board.stoneRadius;
             let ctx = this.board.ctx;
-            for (let annotation of this.annotations) {
-                let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
-                let sr = this.board.stoneRadius;
-                switch (annotation.shape) {
+            ctx.lineCap = 'round';
+            this.annotations.forEach((annotations, shape) => {
+                switch (shape) {
                     case position_1.Annotation.Shape.Dot:
-                        ctx.fillStyle = annotation.color;
-                        ctx.beginPath();
-                        ctx.arc(c.x, c.y, 0.16 * sr, 0, 2 * Math.PI);
-                        ctx.fill();
+                        for (let annotation of annotations) {
+                            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+                            ctx.fillStyle = annotation.color;
+                            ctx.beginPath();
+                            ctx.arc(c.x + 0.5, c.y + 0.5, 0.16 * sr, 0, 2 * Math.PI);
+                            ctx.fill();
+                        }
                         break;
                     case position_1.Annotation.Shape.Triangle:
                         ctx.lineWidth = 3 * util_1.pixelRatio();
-                        ctx.lineCap = 'round';
-                        ctx.strokeStyle = annotation.color;
-                        ctx.beginPath();
-                        ctx.moveTo(c.x, c.y - 0.7 * sr);
-                        ctx.lineTo(c.x - 0.6 * sr, c.y + 0.42 * sr);
-                        ctx.lineTo(c.x + 0.6 * sr, c.y + 0.42 * sr);
-                        ctx.lineTo(c.x, c.y - 0.7 * sr);
-                        ctx.stroke();
+                        for (let annotation of annotations) {
+                            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+                            ctx.strokeStyle = annotation.color;
+                            ctx.beginPath();
+                            ctx.moveTo(c.x, c.y - 0.7 * sr);
+                            ctx.lineTo(c.x - 0.6 * sr, c.y + 0.42 * sr);
+                            ctx.lineTo(c.x + 0.6 * sr, c.y + 0.42 * sr);
+                            ctx.lineTo(c.x, c.y - 0.7 * sr);
+                            ctx.stroke();
+                        }
+                        break;
+                    case position_1.Annotation.Shape.DashedCircle:
+                        ctx.lineWidth = 1 * util_1.pixelRatio();
+                        ctx.setLineDash([4, 5]);
+                        for (let annotation of annotations) {
+                            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+                            ctx.strokeStyle = annotation.color;
+                            ctx.beginPath();
+                            ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
+                            ctx.stroke();
+                        }
+                        ctx.setLineDash([]);
                         break;
                 }
-            }
+            });
         }
     }
     exports.Annotations = Annotations;

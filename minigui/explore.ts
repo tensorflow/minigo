@@ -19,13 +19,13 @@ import {heatMapDq, heatMapN} from './heat_map'
 import {Socket} from './gtp_socket'
 import * as lyr from './layer'
 import {Log} from './log'
-import {Position} from './position'
+import {Annotation, Position} from './position'
 import {getElement, parseMove, toPrettyResult} from './util'
 import {VariationTree} from './variation_tree'
 import {WinrateGraph} from './winrate_graph'
 
 class ExploreBoard extends ClickableBoard {
-  private _showSearch = false;
+  private _showSearch = true;
   get showSearch() {
     return this._showSearch;
   }
@@ -43,20 +43,34 @@ class ExploreBoard extends ClickableBoard {
     }
   }
 
+  get showNext() {
+    return this.nextLayer.show;;
+  }
+  set showNext(x: boolean) {
+    if (x != this.nextLayer.show) {
+      this.nextLayer.show = x;
+      this.draw();
+    }
+  }
+
   private qLayer: lyr.Q;
   private variationLayer: lyr.Variation;
+  private nextLayer: lyr.Annotations;
 
   constructor(parentId: string, private gtp: Socket) {
     super(parentId, []);
 
     this.qLayer = new lyr.Q();
     this.variationLayer = new lyr.Variation('pv');
+    this.nextLayer = new lyr.Annotations(
+        'annotations', [Annotation.Shape.DashedCircle]);
     this.addLayers([
         new lyr.Label(),
         new lyr.BoardStones(),
         this.qLayer,
         this.variationLayer,
-        new lyr.Annotations()]);
+        this.nextLayer,
+        new lyr.Annotations('annotations', [Annotation.Shape.Dot])]);
     this.variationLayer.show = false;
     this.enabled = true;
 
@@ -75,11 +89,13 @@ class ExploreBoard extends ClickableBoard {
     });
 
     this.onClick((p: Point) => {
+      if (this.variationLayer.childVariation != null) {
+        this.gtp.send('variation');
+      }
       this.variationLayer.clear();
       this.variationLayer.show = false;
       this.qLayer.clear();
       this.qLayer.show = true;
-      this.gtp.send('variation');
     });
   }
 
@@ -108,24 +124,18 @@ class ExploreApp extends App {
   private variationTree = new VariationTree('tree');
   private log = new Log('log', 'console');
   private showSearch = true;
+  private showNext = true;
   private showConsole = false;
+
+  private pendingSelectPosition: Nullable<Position> = null;
 
   constructor() {
     super();
-
     this.connect().then(() => {
       this.board = new ExploreBoard('main-board', this.gtp);
 
       this.board.onClick((p: Point) => {
-        this.playMove(this.activePosition.toPlay, p).then(() => {
-          let parent = this.activePosition;
-          this.board.enabled = false;
-          this.gtp.send('gamestate').then(() => {
-            this.variationTree.addChild(parent, this.activePosition);
-          }).finally(() => {
-            this.board.enabled = true;
-          });
-        });
+        this.playMove(this.activePosition.toPlay, p);
       });
 
       this.init([this.board]);
@@ -135,7 +145,12 @@ class ExploreApp extends App {
       this.log.onConsoleCmd((cmd: string) => {
         this.gtp.send(cmd).then(() => { this.log.scroll(); });
       });
-      this.gtp.onText((line: string) => { this.log.log(line, 'log-cmd'); });
+      this.gtp.onText((line: string) => {
+        this.log.log(line, 'log-cmd');
+        if (this.showConsole) {
+          this.log.scroll();
+        }
+      });
 
       this.newGame();
 
@@ -154,26 +169,67 @@ class ExploreApp extends App {
         this.activePosition = positions[positions.length - 1];
       });
 
-      window.addEventListener('keypress', (e: KeyboardEvent) => {
-        if (e.key == '`') {
+      window.addEventListener('keydown', (e: KeyboardEvent) => {
+        // Toggle the console.
+        if (e.key == 'Escape') {
           this.showConsole = !this.showConsole;
-          let log = getElement('log-container');
-          log.style.top = this.showConsole ? '0' : '-40vh';
+          let containerElem = getElement('log-container');
+          containerElem.style.top = this.showConsole ? '0' : '-40vh';
+          if (this.showConsole) {
+            this.log.scroll();
+          } else {
+            this.log.blur();
+          }
           e.preventDefault();
           return false;
+        }
+
+        // Don't do any special key handling if the console has focus.
+        if (this.log.hasFocus) {
+          return;
+        }
+
+        switch (e.key) {
+          case 'ArrowUp':
+          case 'ArrowLeft':
+            this.selectPrevPosition();
+            break;
+
+          case 'ArrowRight':
+          case 'ArrowDown':
+            this.selectNextPosition();
+            break;
+        }
+      });
+
+      window.addEventListener('wheel', (e: WheelEvent) => {
+        if (e.deltaY < 0) {
+          this.selectPrevPosition();
+        } else if (e.deltaY > 0) {
+          this.selectNextPosition();
         }
       });
     });
   }
 
   private initButtons() {
-    getElement('toggle-pv').addEventListener('click', (e: any) => {
+    getElement('toggle-search').addEventListener('click', (e: any) => {
       this.showSearch = !this.showSearch;
       this.board.showSearch = this.showSearch;
       if (this.showSearch) {
         e.target.innerText = 'Hide search';
       } else {
         e.target.innerText = 'Show search';
+      }
+    });
+
+    getElement('toggle-variation').addEventListener('click', (e: any) => {
+      this.showNext = !this.showNext;
+      this.board.showNext = this.showNext;
+      if (this.showNext) {
+        e.target.innerText = 'Hide variation';
+      } else {
+        e.target.innerText = 'Show variation';
       }
     });
 
@@ -214,6 +270,44 @@ class ExploreApp extends App {
     });
   }
 
+  protected selectNextPosition() {
+    if (this.activePosition.children.length > 0) {
+      this.selectPosition(this.activePosition.children[0]);
+    }
+  }
+
+  protected selectPrevPosition() {
+    if (this.activePosition.parent != null) {
+      this.selectPosition(this.activePosition.parent);
+    }
+  }
+
+  protected selectPosition(position: Position) {
+    this.activePosition = position;
+    this.updateBoards(position);
+    this.winrateGraph.setWinrate(position.moveNum, position.q);
+    if (position.parent != null) {
+      this.variationTree.addChild(position.parent, position);
+    }
+
+    let impl = (position: Position) => {
+      if (this.pendingSelectPosition == null) {
+        this.gtp.send(`select_position ${position.id}`).then((id: string) => {
+          if (this.pendingSelectPosition == null) {
+            throw new Error('pending select position is null');
+          }
+          if (id != this.pendingSelectPosition.id) {
+            impl(this.pendingSelectPosition);
+          } else {
+            this.pendingSelectPosition = null;
+          }
+        });
+      }
+      this.pendingSelectPosition = position;
+    };
+    impl(position);
+  }
+
   protected newGame() {
     this.gtp.send('prune_nodes 1');
     super.newGame();
@@ -224,11 +318,8 @@ class ExploreApp extends App {
   }
 
   protected onPosition(position: Position) {
-    if (position.parent == this.activePosition) {
-      this.activePosition = position;
-    }
+    this.activePosition = position;
     this.updateBoards(position);
-    this.log.scroll();
     this.winrateGraph.setWinrate(position.moveNum, position.q);
     if (position.parent != null) {
       this.variationTree.addChild(position.parent, position);
@@ -238,7 +329,12 @@ class ExploreApp extends App {
   private playMove(color: Color, move: Move) {
     let colorStr = color == Color.Black ? 'b' : 'w';
     let moveStr = toKgs(move);
-    return this.gtp.send(`play ${colorStr} ${moveStr}`);
+    this.board.enabled = false;
+    this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
+      this.gtp.send('gamestate');
+    }).finally(() => {
+      this.board.enabled = true;
+    });
   }
 
   protected onGameOver() {

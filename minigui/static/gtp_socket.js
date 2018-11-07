@@ -1,6 +1,12 @@
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    function trimText(str, len) {
+        if (str.length > len) {
+            return `${str.substr(0, len - 3)}...`;
+        }
+        return str;
+    }
     class Socket {
         constructor() {
             this.sock = null;
@@ -65,7 +71,7 @@ define(["require", "exports"], function (require, exports) {
         }
         cmdHandler(line) {
             let { cmd, resolve, reject } = this.cmdQueue[0];
-            this.textHandler(`${cmd} ${line}`);
+            this.textHandler(`${trimText(cmd, 1024)} ${trimText(line, 1024)}`);
             if (line[0] == '=' || line[0] == '?') {
                 this.cmdQueue = this.cmdQueue.slice(1);
                 if (this.cmdQueue.length > 0) {
@@ -109,7 +115,7 @@ define(["require", "exports"], function (require, exports) {
         sendNext() {
             let { cmd } = this.cmdQueue[0];
             if (this.textHandler) {
-                this.textHandler(`${cmd}`);
+                this.textHandler(trimText(cmd, 1024));
             }
             this.sock.emit('gtpcmd', { data: cmd });
         }

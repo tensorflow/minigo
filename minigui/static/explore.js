@@ -1,19 +1,21 @@
-define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./util", "./variation_tree", "./winrate_graph"], function (require, exports, app_1, base_1, board_1, lyr, log_1, util_1, variation_tree_1, winrate_graph_1) {
+define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./position", "./util", "./variation_tree", "./winrate_graph"], function (require, exports, app_1, base_1, board_1, lyr, log_1, position_1, util_1, variation_tree_1, winrate_graph_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ExploreBoard extends board_1.ClickableBoard {
         constructor(parentId, gtp) {
             super(parentId, []);
             this.gtp = gtp;
-            this._showSearch = false;
+            this._showSearch = true;
             this.qLayer = new lyr.Q();
             this.variationLayer = new lyr.Variation('pv');
+            this.nextLayer = new lyr.Annotations('annotations', [position_1.Annotation.Shape.DashedCircle]);
             this.addLayers([
                 new lyr.Label(),
                 new lyr.BoardStones(),
                 this.qLayer,
                 this.variationLayer,
-                new lyr.Annotations()
+                this.nextLayer,
+                new lyr.Annotations('annotations', [position_1.Annotation.Shape.Dot])
             ]);
             this.variationLayer.show = false;
             this.enabled = true;
@@ -30,11 +32,13 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.showVariation(null);
             });
             this.onClick((p) => {
+                if (this.variationLayer.childVariation != null) {
+                    this.gtp.send('variation');
+                }
                 this.variationLayer.clear();
                 this.variationLayer.show = false;
                 this.qLayer.clear();
                 this.qLayer.show = true;
-                this.gtp.send('variation');
             });
         }
         get showSearch() {
@@ -51,6 +55,16 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.variationLayer.show = false;
                     this.qLayer.show = false;
                 }
+                this.draw();
+            }
+        }
+        get showNext() {
+            return this.nextLayer.show;
+            ;
+        }
+        set showNext(x) {
+            if (x != this.nextLayer.show) {
+                this.nextLayer.show = x;
                 this.draw();
             }
         }
@@ -77,26 +91,25 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.variationTree = new variation_tree_1.VariationTree('tree');
             this.log = new log_1.Log('log', 'console');
             this.showSearch = true;
+            this.showNext = true;
             this.showConsole = false;
+            this.pendingSelectPosition = null;
             this.connect().then(() => {
                 this.board = new ExploreBoard('main-board', this.gtp);
                 this.board.onClick((p) => {
-                    this.playMove(this.activePosition.toPlay, p).then(() => {
-                        let parent = this.activePosition;
-                        this.board.enabled = false;
-                        this.gtp.send('gamestate').then(() => {
-                            this.variationTree.addChild(parent, this.activePosition);
-                        }).finally(() => {
-                            this.board.enabled = true;
-                        });
-                    });
+                    this.playMove(this.activePosition.toPlay, p);
                 });
                 this.init([this.board]);
                 this.initButtons();
                 this.log.onConsoleCmd((cmd) => {
                     this.gtp.send(cmd).then(() => { this.log.scroll(); });
                 });
-                this.gtp.onText((line) => { this.log.log(line, 'log-cmd'); });
+                this.gtp.onText((line) => {
+                    this.log.log(line, 'log-cmd');
+                    if (this.showConsole) {
+                        this.log.scroll();
+                    }
+                });
                 this.newGame();
                 this.variationTree.onClick((positions) => {
                     let moves = [];
@@ -112,19 +125,46 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.gtp.send('gamestate');
                     this.activePosition = positions[positions.length - 1];
                 });
-                window.addEventListener('keypress', (e) => {
-                    if (e.key == '`') {
+                window.addEventListener('keydown', (e) => {
+                    if (e.key == 'Escape') {
                         this.showConsole = !this.showConsole;
-                        let log = util_1.getElement('log-container');
-                        log.style.top = this.showConsole ? '0' : '-40vh';
+                        let containerElem = util_1.getElement('log-container');
+                        containerElem.style.top = this.showConsole ? '0' : '-40vh';
+                        if (this.showConsole) {
+                            this.log.scroll();
+                        }
+                        else {
+                            this.log.blur();
+                        }
                         e.preventDefault();
                         return false;
+                    }
+                    if (this.log.hasFocus) {
+                        return;
+                    }
+                    switch (e.key) {
+                        case 'ArrowUp':
+                        case 'ArrowLeft':
+                            this.selectPrevPosition();
+                            break;
+                        case 'ArrowRight':
+                        case 'ArrowDown':
+                            this.selectNextPosition();
+                            break;
+                    }
+                });
+                window.addEventListener('wheel', (e) => {
+                    if (e.deltaY < 0) {
+                        this.selectPrevPosition();
+                    }
+                    else if (e.deltaY > 0) {
+                        this.selectNextPosition();
                     }
                 });
             });
         }
         initButtons() {
-            util_1.getElement('toggle-pv').addEventListener('click', (e) => {
+            util_1.getElement('toggle-search').addEventListener('click', (e) => {
                 this.showSearch = !this.showSearch;
                 this.board.showSearch = this.showSearch;
                 if (this.showSearch) {
@@ -132,6 +172,16 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
                 else {
                     e.target.innerText = 'Show search';
+                }
+            });
+            util_1.getElement('toggle-variation').addEventListener('click', (e) => {
+                this.showNext = !this.showNext;
+                this.board.showNext = this.showNext;
+                if (this.showNext) {
+                    e.target.innerText = 'Hide variation';
+                }
+                else {
+                    e.target.innerText = 'Show variation';
                 }
             });
             util_1.getElement('load-sgf-input').addEventListener('change', (e) => {
@@ -168,6 +218,41 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
             });
         }
+        selectNextPosition() {
+            if (this.activePosition.children.length > 0) {
+                this.selectPosition(this.activePosition.children[0]);
+            }
+        }
+        selectPrevPosition() {
+            if (this.activePosition.parent != null) {
+                this.selectPosition(this.activePosition.parent);
+            }
+        }
+        selectPosition(position) {
+            this.activePosition = position;
+            this.updateBoards(position);
+            this.winrateGraph.setWinrate(position.moveNum, position.q);
+            if (position.parent != null) {
+                this.variationTree.addChild(position.parent, position);
+            }
+            let impl = (position) => {
+                if (this.pendingSelectPosition == null) {
+                    this.gtp.send(`select_position ${position.id}`).then((id) => {
+                        if (this.pendingSelectPosition == null) {
+                            throw new Error('pending select position is null');
+                        }
+                        if (id != this.pendingSelectPosition.id) {
+                            impl(this.pendingSelectPosition);
+                        }
+                        else {
+                            this.pendingSelectPosition = null;
+                        }
+                    });
+                }
+                this.pendingSelectPosition = position;
+            };
+            impl(position);
+        }
         newGame() {
             this.gtp.send('prune_nodes 1');
             super.newGame();
@@ -177,11 +262,8 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.winrateGraph.clear();
         }
         onPosition(position) {
-            if (position.parent == this.activePosition) {
-                this.activePosition = position;
-            }
+            this.activePosition = position;
             this.updateBoards(position);
-            this.log.scroll();
             this.winrateGraph.setWinrate(position.moveNum, position.q);
             if (position.parent != null) {
                 this.variationTree.addChild(position.parent, position);
@@ -190,7 +272,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
             let moveStr = base_1.toKgs(move);
-            return this.gtp.send(`play ${colorStr} ${moveStr}`);
+            this.board.enabled = false;
+            this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
+                this.gtp.send('gamestate');
+            }).finally(() => {
+                this.board.enabled = true;
+            });
         }
         onGameOver() {
             this.gtp.send('final_score').then((result) => {

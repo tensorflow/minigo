@@ -121,7 +121,7 @@ abstract class App {
 
   protected newGame() {
     this.rootPosition = new Position(
-        null, util.emptyBoard(), 0, null, Color.Black, true)
+        'root', null, util.emptyBoard(), 0, null, Color.Black, true)
     this.activePosition = this.rootPosition;
 
     this.positionMap.clear();
@@ -239,7 +239,7 @@ abstract class App {
       if (lastMove == null) {
         throw new Error('lastMove must be set for non-root position');
       }
-      position = parent.addChild(lastMove, stones, j.q);
+      position = parent.addChild(j.id, lastMove, stones, j.q);
     }
 
     if (position.toPlay != toPlay) {

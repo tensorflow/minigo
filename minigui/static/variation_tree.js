@@ -1,9 +1,9 @@
 define(["require", "exports", "./util", "./view"], function (require, exports, util_1, view_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    const SPACE = 16;
-    const PAD = 9;
-    const RADIUS = 4;
+    const SPACE = 19;
+    const PAD = 11;
+    const RADIUS = 5;
     class Node {
         constructor(parent, position, x, y) {
             this.parent = parent;
@@ -70,8 +70,10 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             this.draw();
         }
         setActive(position) {
-            this.activeNode = this.lookupNode(position);
-            this.draw();
+            if (this.activeNode != null && this.activeNode.position == position) {
+                this.activeNode = this.lookupNode(position);
+                this.draw();
+            }
         }
         addChild(parentPosition, childPosition) {
             if (this.rootNode == null) {

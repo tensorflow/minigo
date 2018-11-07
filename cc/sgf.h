@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "cc/color.h"
@@ -97,6 +98,13 @@ struct MoveWithComment {
 
 std::ostream& operator<<(std::ostream& ios, const MoveWithComment& move);
 
+// A node in the parsed game tree.
+struct MoveTree {
+  explicit MoveTree(Move move) : move(move) {}
+  const Move move;
+  std::vector<std::unique_ptr<MoveTree>> children;
+};
+
 struct CreateSgfOptions {
   std::string black_name = kProgramIdentifier;
   std::string white_name = kProgramIdentifier;
@@ -110,8 +118,11 @@ struct CreateSgfOptions {
 std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                             const CreateSgfOptions& options);
 
-// Extracts the main line series of moves from a SGF AST tree.
+// Extracts the main line series of moves from an SGF AST tree.
 std::vector<Move> GetMainLineMoves(const Ast::Tree& tree);
+
+// Extracts the complete game trees from an SGF AST.
+std::vector<std::unique_ptr<MoveTree>> GetMoveTrees(const Ast& ast);
 
 // Extracts the main line series of moves from the first tree in an SGF file.
 // Returns an empty vector if the AST has no trees.

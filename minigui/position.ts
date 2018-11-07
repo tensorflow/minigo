@@ -19,6 +19,7 @@ namespace Annotation {
   export enum Shape {
     Dot,
     Triangle,
+    DashedCircle,
   }
 }
 
@@ -40,7 +41,8 @@ class Position {
   // children[0] is the main line. Subsequent children are variations.
   children: Position[] = [];
 
-  constructor(public parent: Nullable<Position>,
+  constructor(public id: string,
+              public parent: Nullable<Position>,
               public stones: Color[],
               public q: number,
               public lastMove: Nullable<Move>,
@@ -56,7 +58,7 @@ class Position {
     }
   }
 
-  addChild(move: Move, stones: Color[], q: number) {
+  addChild(id: string, move: Move, stones: Color[], q: number) {
     // If the position already has a child with the given move, verify that the
     // stones are equal and return the existing child.
     for (let child of this.children) {
@@ -74,8 +76,17 @@ class Position {
     // Create a new child.
     let isMainline = this.isMainline && this.children.length == 0;
     let child = new Position(
-      this, stones, q, move, otherColor(this.toPlay), isMainline);
+      id, this, stones, q, move, otherColor(this.toPlay), isMainline);
     this.children.push(child);
+
+    if (move != 'pass' && move != 'resign') {
+      let color: string;
+      this.annotations.push({
+        p: move,
+        shape: Annotation.Shape.DashedCircle,
+        color: this.toPlay == Color.Black ? '#000' : '#fff',
+      });
+    }
     return child;
   }
 }

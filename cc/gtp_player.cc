@@ -18,6 +18,7 @@
 #include <cctype>
 #include <cmath>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -65,7 +66,10 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("prune_nodes", &GtpPlayer::HandlePruneNodes);
   RegisterCmd("readouts", &GtpPlayer::HandleReadouts);
   RegisterCmd("report_search_interval", &GtpPlayer::HandleReportSearchInterval);
+  RegisterCmd("select_position", &GtpPlayer::HandleSelectPosition);
+  RegisterCmd("undo", &GtpPlayer::HandleUndo);
   RegisterCmd("variation", &GtpPlayer::HandleVariation);
+  RegisterCmd("verbosity", &GtpPlayer::HandleVerbosity);
 }
 
 void GtpPlayer::Run() {
@@ -270,6 +274,7 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(absl::string_view cmd,
   }
 
   if (options().prune_orphaned_nodes) {
+    game_nodes_.clear();
     NewGame();
   } else {
     ResetRoot();
@@ -516,6 +521,56 @@ GtpPlayer::Response GtpPlayer::HandleReportSearchInterval(absl::string_view cmd,
   return Response::Ok();
 }
 
+GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
+                                                    CmdArgs args) {
+  auto response = CheckArgsExact(cmd, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  if (args[0] == "root") {
+    ResetRoot();
+    return Response::Ok(std::string(args[0]));
+  }
+
+  auto it = game_nodes_.find(args[0]);
+  if (it == game_nodes_.end()) {
+    return Response::Error("position id not found");
+  }
+
+  auto* node = it->second;
+
+  // Build the sequence of moves the will end up at the requested position.
+  std::vector<Coord> moves;
+  while (node->parent != nullptr) {
+    moves.push_back(node->move);
+    node = node->parent;
+  }
+  std::reverse(moves.begin(), moves.end());
+
+  // Rewind to the start & play the sequence of moves.
+  ResetRoot();
+  for (const auto& move : moves) {
+    MG_CHECK(PlayMove(move));
+  }
+  std::cerr << "### " << NodeId(root()) << std::endl;
+
+  return Response::Ok(std::string(args[0]));
+}
+
+GtpPlayer::Response GtpPlayer::HandleUndo(absl::string_view cmd, CmdArgs args) {
+  auto response = CheckArgsExact(cmd, 0, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  if (!UndoMove()) {
+    return Response::Error("cannot undo");
+  }
+
+  return Response::Ok();
+}
+
 GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
                                                CmdArgs args) {
   auto response = CheckArgsRange(cmd, 0, 1, args);
@@ -541,6 +596,22 @@ GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
   return Response::Ok();
 }
 
+GtpPlayer::Response GtpPlayer::HandleVerbosity(absl::string_view cmd,
+                                               CmdArgs args) {
+  auto response = CheckArgsRange(cmd, 0, 1, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  int x;
+  if (!absl::SimpleAtoi(args[0], &x)) {
+    return Response::Error("bad verbosity");
+  }
+  mutable_options()->verbose = x != 0;
+
+  return Response::Ok();
+}
+
 GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   sgf::Ast ast;
   if (!ast.Parse(sgf_str)) {
@@ -551,20 +622,20 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   // Clear the board before replaying sgf.
   NewGame();
 
-  for (const auto& move : sgf::GetMainLineMoves(ast)) {
-    if (!root()->legal_moves[move.c]) {
-      return Response::Error("illegal move");
-    }
-
-    // Perform a single inference for each move with random symmetry disabled so
-    // that the same model will produce the same result every time we load the
-    // same SGF.
-    // TODO(tommadams): Only do this when running in Minigui.
-    auto* leaf = root()->MaybeAddChild(move.c);
-    ProcessLeaves({&leaf, 1}, false);
-
-    MG_CHECK(PlayMove(move.c));
-    ReportGameState();
+  std::function<void(const sgf::MoveTree&, MctsNode*)> impl =
+      [&](const sgf::MoveTree& src, MctsNode* dst) {
+        MG_CHECK(src.move.color == dst->position.to_play());
+        auto* dst_child = dst->MaybeAddChild(src.move.c);
+        ProcessLeaves({&dst_child, 1}, false);
+        MG_CHECK(PlayMove(src.move.c));
+        ReportGameState();
+        for (const auto& src_child : src.children) {
+          impl(*src_child, dst_child);
+        }
+        UndoMove();
+      };
+  for (const auto& tree : sgf::GetMoveTrees(ast)) {
+    impl(*tree, root());
   }
 
   return Response::Ok();
@@ -604,7 +675,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   const auto& pos = root()->position;
 
   nlohmann::json j = {
-      {"id", absl::StrFormat("%p", root())},
+      {"id", NodeId(root())},
       {"moveNum", pos.n()},
       {"toPlay", pos.to_play() == Color::kBlack ? "B" : "W"},
       {"q", root()->Q()},
@@ -662,7 +733,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   std::cerr << "mg-search:" << j.dump() << std::endl;
 }
 
-void GtpPlayer::ReportGameState() const {
+void GtpPlayer::ReportGameState() {
   const auto& position = root()->position;
 
   std::ostringstream oss;
@@ -679,7 +750,7 @@ void GtpPlayer::ReportGameState() const {
   }
 
   nlohmann::json j = {
-      {"id", absl::StrFormat("%p", root())},
+      {"id", NodeId(root())},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
       {"board", oss.str()},
@@ -687,13 +758,19 @@ void GtpPlayer::ReportGameState() const {
       {"gameOver", root()->game_over()},
   };
   if (root()->parent) {
-    j["parent"] = absl::StrFormat("%p", root()->parent);
+    j["parent"] = NodeId(root()->parent);
   }
   if (!history().empty()) {
     j["lastMove"] = history().back().c.ToKgs();
   }
 
   std::cerr << "mg-gamestate: " << j.dump() << std::endl;
+}
+
+std::string GtpPlayer::NodeId(MctsNode* node) {
+  auto id = absl::StrFormat("%p", node);
+  game_nodes_.emplace(id, node);
+  return id;
 }
 
 }  // namespace minigo
