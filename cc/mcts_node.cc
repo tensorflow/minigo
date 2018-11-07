@@ -106,15 +106,14 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
 Coord MctsNode::GetMostVisitedMove() const {
   // Find the set of moves with the largest N.
   inline_vector<Coord, kNumMoves> moves;
-  moves.push_back(0);
   int best_N = -1;
   for (int i = 0; i < kNumMoves; ++i) {
     int cn = child_N(i);
-    if (cn > best_N && children.contains(i)) {
-      moves.clear();
-      moves.push_back(i);
-      best_N = cn;
-    } else if (cn == best_N) {
+    if (cn >= best_N && children.contains(i)) {
+      if (cn > best_N) {
+        moves.clear();
+        best_N = cn;
+      }
       moves.push_back(i);
     }
   }

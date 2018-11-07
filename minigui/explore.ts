@@ -75,17 +75,21 @@ class ExploreBoard extends ClickableBoard {
     this.enabled = true;
 
     this.ctx.canvas.addEventListener('mousemove', (e) => {
-      let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
-      if (p != null) {
-        if (this.getStone(p) != Color.Empty || !this.qLayer.hasPoint(p)) {
-          p = null;
+      if (this.showSearch) {
+        let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
+        if (p != null) {
+          if (this.getStone(p) != Color.Empty || !this.qLayer.hasPoint(p)) {
+            p = null;
+          }
         }
+        this.showVariation(p);
       }
-      this.showVariation(p);
     });
 
     this.ctx.canvas.addEventListener('mouseleave', () => {
-      this.showVariation(null);
+      if (this.showSearch) {
+        this.showVariation(null);
+      }
     });
 
     this.onClick((p: Point) => {
@@ -154,19 +158,8 @@ class ExploreApp extends App {
 
       this.newGame();
 
-      this.variationTree.onClick((positions: Position[]) => {
-        let moves = [];
-        for (let position of positions) {
-          if (position.lastMove != null) {
-            moves.push(toKgs(position.lastMove));
-          }
-        }
-        this.gtp.send('clear_board');
-        if (moves.length > 0) {
-          this.gtp.send(`play_multiple b ${moves.join(' ')}`);
-        }
-        this.gtp.send('gamestate');
-        this.activePosition = positions[positions.length - 1];
+      this.variationTree.onClick((position: Position) => {
+        this.selectPosition(position);
       });
 
       window.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -176,6 +169,7 @@ class ExploreApp extends App {
           let containerElem = getElement('log-container');
           containerElem.style.top = this.showConsole ? '0' : '-40vh';
           if (this.showConsole) {
+            this.log.focus();
             this.log.scroll();
           } else {
             this.log.blur();
@@ -203,6 +197,10 @@ class ExploreApp extends App {
       });
 
       window.addEventListener('wheel', (e: WheelEvent) => {
+        if (this.showConsole) {
+          return;
+        }
+
         if (e.deltaY < 0) {
           this.selectPrevPosition();
         } else if (e.deltaY > 0) {
@@ -278,7 +276,10 @@ class ExploreApp extends App {
 
   protected selectPrevPosition() {
     if (this.activePosition.parent != null) {
-      this.selectPosition(this.activePosition.parent);
+      let p = this.activePosition.parent;
+      for (let i = 0; i < 10; ++i) {
+        this.selectPosition(p);
+      }
     }
   }
 
@@ -286,26 +287,8 @@ class ExploreApp extends App {
     this.activePosition = position;
     this.updateBoards(position);
     this.winrateGraph.setWinrate(position.moveNum, position.q);
-    if (position.parent != null) {
-      this.variationTree.addChild(position.parent, position);
-    }
-
-    let impl = (position: Position) => {
-      if (this.pendingSelectPosition == null) {
-        this.gtp.send(`select_position ${position.id}`).then((id: string) => {
-          if (this.pendingSelectPosition == null) {
-            throw new Error('pending select position is null');
-          }
-          if (id != this.pendingSelectPosition.id) {
-            impl(this.pendingSelectPosition);
-          } else {
-            this.pendingSelectPosition = null;
-          }
-        });
-      }
-      this.pendingSelectPosition = position;
-    };
-    impl(position);
+    this.variationTree.setActive(position);
+    this.gtp.sendOne(`select_position ${position.id}`).catch(() => {});
   }
 
   protected newGame() {

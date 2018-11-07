@@ -20,16 +20,20 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.variationLayer.show = false;
             this.enabled = true;
             this.ctx.canvas.addEventListener('mousemove', (e) => {
-                let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
-                if (p != null) {
-                    if (this.getStone(p) != base_1.Color.Empty || !this.qLayer.hasPoint(p)) {
-                        p = null;
+                if (this.showSearch) {
+                    let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
+                    if (p != null) {
+                        if (this.getStone(p) != base_1.Color.Empty || !this.qLayer.hasPoint(p)) {
+                            p = null;
+                        }
                     }
+                    this.showVariation(p);
                 }
-                this.showVariation(p);
             });
             this.ctx.canvas.addEventListener('mouseleave', () => {
-                this.showVariation(null);
+                if (this.showSearch) {
+                    this.showVariation(null);
+                }
             });
             this.onClick((p) => {
                 if (this.variationLayer.childVariation != null) {
@@ -111,19 +115,8 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     }
                 });
                 this.newGame();
-                this.variationTree.onClick((positions) => {
-                    let moves = [];
-                    for (let position of positions) {
-                        if (position.lastMove != null) {
-                            moves.push(base_1.toKgs(position.lastMove));
-                        }
-                    }
-                    this.gtp.send('clear_board');
-                    if (moves.length > 0) {
-                        this.gtp.send(`play_multiple b ${moves.join(' ')}`);
-                    }
-                    this.gtp.send('gamestate');
-                    this.activePosition = positions[positions.length - 1];
+                this.variationTree.onClick((position) => {
+                    this.selectPosition(position);
                 });
                 window.addEventListener('keydown', (e) => {
                     if (e.key == 'Escape') {
@@ -131,6 +124,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         let containerElem = util_1.getElement('log-container');
                         containerElem.style.top = this.showConsole ? '0' : '-40vh';
                         if (this.showConsole) {
+                            this.log.focus();
                             this.log.scroll();
                         }
                         else {
@@ -154,6 +148,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     }
                 });
                 window.addEventListener('wheel', (e) => {
+                    if (this.showConsole) {
+                        return;
+                    }
                     if (e.deltaY < 0) {
                         this.selectPrevPosition();
                     }
@@ -225,33 +222,18 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         }
         selectPrevPosition() {
             if (this.activePosition.parent != null) {
-                this.selectPosition(this.activePosition.parent);
+                let p = this.activePosition.parent;
+                for (let i = 0; i < 10; ++i) {
+                    this.selectPosition(p);
+                }
             }
         }
         selectPosition(position) {
             this.activePosition = position;
             this.updateBoards(position);
             this.winrateGraph.setWinrate(position.moveNum, position.q);
-            if (position.parent != null) {
-                this.variationTree.addChild(position.parent, position);
-            }
-            let impl = (position) => {
-                if (this.pendingSelectPosition == null) {
-                    this.gtp.send(`select_position ${position.id}`).then((id) => {
-                        if (this.pendingSelectPosition == null) {
-                            throw new Error('pending select position is null');
-                        }
-                        if (id != this.pendingSelectPosition.id) {
-                            impl(this.pendingSelectPosition);
-                        }
-                        else {
-                            this.pendingSelectPosition = null;
-                        }
-                    });
-                }
-                this.pendingSelectPosition = position;
-            };
-            impl(position);
+            this.variationTree.setActive(position);
+            this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
         }
         newGame() {
             this.gtp.send('prune_nodes 1');

@@ -466,9 +466,19 @@ class Annotations extends DataLayer {
           }
           break;
 
-        case Annotation.Shape.DashedCircle:
+        case Annotation.Shape.DashedCircle: {
+          // Calculate a dash pattern that's close to [4, 5] (a four pixel
+          // dash followed by a five pixel space) but also whose length
+          // divides the circle's circumference exactly. This avoids the final
+          // dash or space on the arc being a different size than all the rest.
+          // I wish things like this didn't bother me as much as they do.
+          let circum = 2 * Math.PI * sr;
+          let numDashes = 9 * Math.round(circum / 9);
+          let dashLen = 4 * circum / numDashes;
+          let spaceLen = 5 * circum / numDashes;
+
           ctx.lineWidth = 1 * pixelRatio();
-          ctx.setLineDash([4, 5]);
+          ctx.setLineDash([dashLen, spaceLen]);
           for (let annotation of annotations) {
             let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
             ctx.strokeStyle = annotation.color;
@@ -478,6 +488,7 @@ class Annotations extends DataLayer {
           }
           ctx.setLineDash([]);
           break;
+        }
       }
     });
   }

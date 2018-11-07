@@ -63,6 +63,18 @@ define(["require", "exports"], function (require, exports) {
                 }
             });
         }
+        sendOne(cmd) {
+            if (this.cmdQueue.length <= 1) {
+                return this.send(cmd);
+            }
+            let lastCmd = this.cmdQueue[this.cmdQueue.length - 1].cmd;
+            if (cmd.split(' ', 1)[0] != lastCmd.split(' ', 1)[0]) {
+                return this.send(cmd);
+            }
+            this.cmdQueue[this.cmdQueue.length - 1].reject('send one');
+            this.cmdQueue = this.cmdQueue.slice(1);
+            return this.send(cmd);
+        }
         newSession() {
             this.cmdQueue = [];
             let token = `session-id-${Date.now()}`;

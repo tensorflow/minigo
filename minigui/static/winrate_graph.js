@@ -53,7 +53,7 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.lineWidth = 1 * pr;
+            ctx.lineWidth = pr;
             ctx.strokeStyle = '#56504b';
             ctx.beginPath();
             ctx.moveTo(0, Math.round(0.95 * h));
@@ -80,7 +80,7 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             ctx.translate(xOfs, 0);
             w -= xOfs;
             if (this.points.length >= 2) {
-                ctx.lineWidth = 1;
+                ctx.lineWidth = pr;
                 ctx.strokeStyle = '#eee';
                 ctx.beginPath();
                 let [x, y] = this.points[0];

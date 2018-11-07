@@ -102,8 +102,8 @@ class Socket {
     this.dataHandlers.push({prefix: prefix + ':', handler: handler});
   }
 
-  // Sends a GTP command, invoking the optional handler when the command is
-  // complete.
+  // Sends a GTP command, returning a promise that is resolved when the
+  // command succeeds or is rejected if the command fails.
   send(cmd: string) {
     return new Promise((resolve, reject) => {
       this.cmdQueue.push({cmd: cmd, resolve: resolve, reject: reject});
@@ -111,6 +111,29 @@ class Socket {
         this.sendNext();
       }
     });
+  }
+
+  // Like send(cmd), but if the last call to sendOne is for the same GTP
+  // command (different arguments are allowed) and that command has not yet
+  // been sent, the pending command is rejected and replaced with this one.
+  sendOne(cmd: string) {
+    // Either the queue is empty (in which case we must just send) or there's
+    // a single command currently being executed (which we must let finish).
+    if (this.cmdQueue.length <= 1) {
+      return this.send(cmd);
+    }
+
+    // If the last command in the queue doesn't match this one: just send.
+    let lastCmd = this.cmdQueue[this.cmdQueue.length - 1].cmd;
+    if (cmd.split(' ', 1)[0] != lastCmd.split(' ', 1)[0]) {
+      return this.send(cmd);
+    }
+
+    // The last command in the queue matches this one: reject it and replace
+    // it with ours.
+    this.cmdQueue[this.cmdQueue.length - 1].reject('send one');
+    this.cmdQueue = this.cmdQueue.slice(1);
+    return this.send(cmd);
   }
 
   newSession() {

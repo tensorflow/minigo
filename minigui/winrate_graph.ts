@@ -94,7 +94,7 @@ class WinrateGraph {
     ctx.lineJoin = 'round';
 
     // Draw the resign threshold lines.
-    ctx.lineWidth = 1 * pr;
+    ctx.lineWidth = pr;
     ctx.strokeStyle = '#56504b';
     ctx.beginPath();
     ctx.moveTo(0, Math.round(0.95 * h));
@@ -131,7 +131,7 @@ class WinrateGraph {
 
     // Draw the graph.
     if (this.points.length >= 2) {
-      ctx.lineWidth = 1;
+      ctx.lineWidth = pr;
       ctx.strokeStyle = '#eee';
       ctx.beginPath();
       let [x, y] = this.points[0];

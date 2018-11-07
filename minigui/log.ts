@@ -79,6 +79,12 @@ class Log {
     return this.consoleElem && document.activeElement == this.consoleElem;
   }
 
+  focus() {
+    if (this.consoleElem) {
+      this.consoleElem.focus();
+    }
+  }
+
   blur() {
     if (this.consoleElem) {
       this.consoleElem.blur();

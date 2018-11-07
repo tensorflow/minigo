@@ -47,18 +47,9 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             });
             parent.addEventListener('click', (e) => {
                 if (this.hoveredNode != null) {
-                    this.activeNode = this.hoveredNode;
-                    let p = this.hoveredNode.position;
-                    let positions = [];
-                    while (p.parent != null) {
-                        positions.push(p);
-                        p = p.parent;
-                    }
-                    positions.reverse();
                     for (let listener of this.listeners) {
-                        listener(positions);
+                        listener(this.hoveredNode.position);
                     }
-                    this.draw();
                 }
             });
         }
@@ -70,7 +61,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             this.draw();
         }
         setActive(position) {
-            if (this.activeNode != null && this.activeNode.position == position) {
+            if (this.activeNode != null && this.activeNode.position != position) {
                 this.activeNode = this.lookupNode(position);
                 this.draw();
             }
@@ -172,14 +163,12 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                     }
                 }
             };
-            ctx.beginPath();
-            ctx.strokeStyle = '#fff';
-            drawEdges(this.rootNode, true);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.strokeStyle = '#888';
-            drawEdges(this.rootNode, false);
-            ctx.stroke();
+            for (let style of ['#fff', '#888']) {
+                ctx.beginPath();
+                ctx.strokeStyle = style;
+                drawEdges(this.rootNode, style == '#fff');
+                ctx.stroke();
+            }
             let r = RADIUS * pr;
             if (this.activeNode != null) {
                 ctx.fillStyle = '#800';
@@ -189,27 +178,30 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 ctx.fill();
                 ctx.stroke();
             }
-            ctx.fillStyle = '#666';
             ctx.strokeStyle = '#888';
-            ctx.beginPath();
-            ctx.arc(pr * this.rootNode.x, pr * this.rootNode.y, r, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.stroke();
+            if (this.activeNode != this.rootNode) {
+                ctx.fillStyle = '#666';
+                ctx.beginPath();
+                ctx.arc(pr * this.rootNode.x, pr * this.rootNode.y, r, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
             let drawNodes = (node, draw) => {
                 if (draw && node != this.rootNode && node != this.activeNode) {
-                    ctx.beginPath();
+                    ctx.moveTo(pr * node.x + r, pr * node.y);
                     ctx.arc(pr * node.x, pr * node.y, r, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
                 }
                 for (let child of node.children) {
                     drawNodes(child, !draw);
                 }
             };
-            ctx.fillStyle = '#000';
-            drawNodes(this.rootNode, false);
-            ctx.fillStyle = '#fff';
-            drawNodes(this.rootNode, true);
+            for (let style of ['#000', '#fff']) {
+                ctx.fillStyle = style;
+                ctx.beginPath();
+                drawNodes(this.rootNode, style != '#000');
+                ctx.fill();
+                ctx.stroke();
+            }
         }
         layout() {
             if (this.rootNode == null) {

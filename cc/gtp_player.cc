@@ -59,7 +59,10 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("loadsgf", &GtpPlayer::HandleLoadsgf);
   RegisterCmd("name", &GtpPlayer::HandleName);
   RegisterCmd("play", &GtpPlayer::HandlePlay);
+
+  // TODO(tommadams): Remove PlayMultiple support, we don't need it any more
   RegisterCmd("play_multiple", &GtpPlayer::HandlePlayMultiple);
+
   RegisterCmd("playsgf", &GtpPlayer::HandlePlaysgf);
   RegisterCmd("ponder", &GtpPlayer::HandlePonder);
   RegisterCmd("ponder_limit", &GtpPlayer::HandlePonderLimit);
@@ -553,7 +556,6 @@ GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
   for (const auto& move : moves) {
     MG_CHECK(PlayMove(move));
   }
-  std::cerr << "### " << NodeId(root()) << std::endl;
 
   return Response::Ok(std::string(args[0]));
 }

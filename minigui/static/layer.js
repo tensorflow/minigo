@@ -379,9 +379,13 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                             ctx.stroke();
                         }
                         break;
-                    case position_1.Annotation.Shape.DashedCircle:
+                    case position_1.Annotation.Shape.DashedCircle: {
+                        let circum = 2 * Math.PI * sr;
+                        let numDashes = 9 * Math.round(circum / 9);
+                        let dashLen = 4 * circum / numDashes;
+                        let spaceLen = 5 * circum / numDashes;
                         ctx.lineWidth = 1 * util_1.pixelRatio();
-                        ctx.setLineDash([4, 5]);
+                        ctx.setLineDash([dashLen, spaceLen]);
                         for (let annotation of annotations) {
                             let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
                             ctx.strokeStyle = annotation.color;
@@ -391,6 +395,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                         }
                         ctx.setLineDash([]);
                         break;
+                    }
                 }
             });
         }

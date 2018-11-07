@@ -37,7 +37,7 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
             canvas.style.height = `${parent.offsetHeight}px`;
             this.pointW = this.ctx.canvas.width / (base_1.N + 1);
             this.pointH = this.ctx.canvas.height / (base_1.N + 1);
-            this.stoneRadius = Math.min(this.pointW, this.pointH) / 2;
+            this.stoneRadius = 0.96 * Math.min(this.pointW, this.pointH) / 2;
         }
         clear() {
             for (let layer of this.layers) {
@@ -123,7 +123,7 @@ define(["require", "exports", "./util", "./view", "./layer", "./base"], function
                 ctx.shadowColor = `rgba(0, 0, 0, ${color == base_1.Color.Black ? 0.4 : 0.3})`;
             }
             ctx.fillStyle = this.stoneFill(color, alpha);
-            let r = 0.96 * this.stoneRadius;
+            let r = this.stoneRadius;
             for (let p of ps) {
                 let c = this.boardToCanvas(p.row, p.col);
                 ctx.beginPath();

@@ -53,6 +53,11 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
         get hasFocus() {
             return this.consoleElem && document.activeElement == this.consoleElem;
         }
+        focus() {
+            if (this.consoleElem) {
+                this.consoleElem.focus();
+            }
+        }
         blur() {
             if (this.consoleElem) {
                 this.consoleElem.blur();

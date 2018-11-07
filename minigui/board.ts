@@ -69,7 +69,7 @@ class Board extends View {
     canvas.style.height = `${parent.offsetHeight}px`;
     this.pointW = this.ctx.canvas.width / (N + 1);
     this.pointH = this.ctx.canvas.height / (N + 1);
-    this.stoneRadius = Math.min(this.pointW, this.pointH) / 2;
+    this.stoneRadius = 0.96 * Math.min(this.pointW, this.pointH) / 2;
   }
 
   clear() {
@@ -177,7 +177,7 @@ class Board extends View {
 
     ctx.fillStyle = this.stoneFill(color, alpha);
 
-    let r = 0.96 * this.stoneRadius;
+    let r = this.stoneRadius;
     for (let p of ps) {
       let c = this.boardToCanvas(p.row, p.col);
       ctx.beginPath();

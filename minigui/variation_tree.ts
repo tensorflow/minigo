@@ -50,7 +50,7 @@ interface LayoutResult {
   rootNode: Node;
 }
 
-type ClickListener = (positions: Position[]) => void;
+type ClickListener = (position: Position) => void;
 
 class VariationTree extends View {
   private rootNode: Nullable<Node> = null;
@@ -86,19 +86,9 @@ class VariationTree extends View {
 
     parent.addEventListener('click', (e) => {
       if (this.hoveredNode != null) {
-        this.activeNode = this.hoveredNode;
-        let p = this.hoveredNode.position;
-        let positions: Position[] = [];
-        while (p.parent != null) {
-          positions.push(p);
-          p = p.parent;
-        }
-        positions.reverse();
-
         for (let listener of this.listeners) {
-          listener(positions);
+          listener(this.hoveredNode.position);
         }
-        this.draw();
       }
     });
   }
@@ -112,7 +102,7 @@ class VariationTree extends View {
   }
 
   setActive(position: Position) {
-    if (this.activeNode != null && this.activeNode.position == position) {
+    if (this.activeNode != null && this.activeNode.position != position) {
       this.activeNode = this.lookupNode(position);
       this.draw();
     }
@@ -238,17 +228,13 @@ class VariationTree extends View {
           ctx.lineTo(pr * (lastChild.x - SPACE), pr * node.y);
         }
       }
-
     };
-    ctx.beginPath();
-    ctx.strokeStyle = '#fff';
-    drawEdges(this.rootNode, true);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.strokeStyle = '#888';
-    drawEdges(this.rootNode, false);
-    ctx.stroke();
+    for (let style of ['#fff', '#888']) {
+      ctx.beginPath();
+      ctx.strokeStyle = style;
+      drawEdges(this.rootNode, style == '#fff');
+      ctx.stroke();
+    }
 
     // Draw the active node in red.
     let r = RADIUS * pr;
@@ -263,12 +249,14 @@ class VariationTree extends View {
     }
 
     // Draw the root node in gray.
-    ctx.fillStyle = '#666';
     ctx.strokeStyle = '#888';
-    ctx.beginPath();
-    ctx.arc(pr * this.rootNode.x, pr * this.rootNode.y, r, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.stroke();
+    if (this.activeNode != this.rootNode) {
+      ctx.fillStyle = '#666';
+      ctx.beginPath();
+      ctx.arc(pr * this.rootNode.x, pr * this.rootNode.y, r, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    }
 
     // Recursively draw the non-root nodes.
     // To avoid repeatedly changing the fill style between black and white,
@@ -276,21 +264,20 @@ class VariationTree extends View {
     // ones.
     let drawNodes = (node: Node, draw: boolean) => {
       if (draw && node != this.rootNode && node != this.activeNode) {
-        ctx.beginPath();
+        ctx.moveTo(pr * node.x + r, pr * node.y);
         ctx.arc(pr * node.x, pr * node.y, r, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.stroke();
       }
       for (let child of node.children) {
         drawNodes(child, !draw);
       }
     };
-
-    ctx.fillStyle = '#000';
-    drawNodes(this.rootNode, false);
-
-    ctx.fillStyle = '#fff';
-    drawNodes(this.rootNode, true);
+    for (let style of ['#000', '#fff']) {
+      ctx.fillStyle = style;
+      ctx.beginPath();
+      drawNodes(this.rootNode, style != '#000');
+      ctx.fill();
+      ctx.stroke();
+    }
   }
 
   private layout() {
