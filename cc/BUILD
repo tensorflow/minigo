@@ -55,10 +55,13 @@ cc_library(
 
 cc_library(
     name = "cuda",
-    deps = [
-        "@local_config_cuda//:cuda_headers",
-        "@local_config_cuda//:cudart",
-    ],
+    deps = select({
+        "//cc/config:enable_gpu": [
+            "@local_config_cuda//:cuda_headers",
+            "@local_config_cuda//:cudart",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library(
