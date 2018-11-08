@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {BoardSize, COL_LABELS, Color, Coord, Move, N, Nullable, Point} from './base'
-import {DataObj, Grid, Layer} from './layer'
+import {Grid, Layer} from './layer'
 import {Position, rootPosition} from './position'
 import {getElement, pixelRatio} from './util'
 import {View} from './view'

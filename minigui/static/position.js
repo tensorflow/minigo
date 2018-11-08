@@ -18,11 +18,12 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             this.lastMove = lastMove;
             this.toPlay = toPlay;
             this.isMainline = isMainline;
+            this.n = 0;
             this.search = [];
             this.pv = [];
-            this.n = null;
             this.dq = null;
             this.annotations = [];
+            this.childN = null;
             this.childQ = null;
             this.children = [];
             this.moveNum = parent != null ? parent.moveNum + 1 : 0;

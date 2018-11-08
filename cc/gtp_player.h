@@ -131,7 +131,7 @@ class GtpPlayer : public MctsPlayer {
 
   // Calculates a unique id for the given node and adds it to the game_nodes_
   // map.
-  std::string NodeId(MctsNode* node);
+  std::string RegisterNode(MctsNode* node);
 
   bool ponder_enabled_ = false;
   int ponder_count_ = 0;

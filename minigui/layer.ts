@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Annotation} from './position'
+import {Position, Annotation} from './position'
 import {BoardSize, COL_LABELS, Color, Coord, Point, Move, N, Nullable, movesEqual, otherColor} from './base'
 import {Board} from './board'
 import {pixelRatio} from './util'
@@ -23,12 +23,6 @@ const STAR_POINTS = {
                          [9, 3], [9, 9], [9, 15],
                          [15, 3], [15, 9], [15, 15]],
 };
-
-interface DataObj {
-  [key: string]: any;
-}
-
-type DataProp<T> = T | undefined;
 
 abstract class Layer {
   private _show = true;
@@ -53,9 +47,9 @@ abstract class Layer {
 
   abstract clear(): void;
 
-  // Returns true if dataObj contained updated data for the layer and it should
+  // Returns true if position contained updated data for the layer and it should
   // be redrawn.
-  abstract update(dataObj: DataObj): boolean;
+  abstract update(position: Position): boolean;
 
   abstract draw(): void;
 }
@@ -63,18 +57,8 @@ abstract class Layer {
 abstract class StaticLayer extends Layer {
   clear() {}
 
-  update(dataObj: DataObj) {
+  update(position: Position) {
     return false;
-  }
-}
-
-abstract class DataLayer extends Layer {
-  protected getData<T>(obj: any, propName: string): DataProp<T> {
-    let prop: any = obj[propName];
-    if (prop === undefined) {
-      return undefined;
-    }
-    return prop as T;
   }
 }
 
@@ -169,7 +153,7 @@ class Caption extends StaticLayer {
   }
 }
 
-class HeatMap extends DataLayer {
+class HeatMap extends Layer {
   private colors: Nullable<Float32Array[]> = null;
 
   constructor(private dataPropName: string,
@@ -184,7 +168,7 @@ class HeatMap extends DataLayer {
     }
   }
 
-  update(dataObj: DataObj) {
+  update(position: Position) {
     let data = this.getData<Nullable<number[]>>(dataObj, this.dataPropName);
     if (data === undefined) {
       return false;
@@ -218,7 +202,7 @@ class HeatMap extends DataLayer {
   }
 }
 
-abstract class StoneBaseLayer extends DataLayer {
+abstract class StoneBaseLayer extends Layer {
   protected blackStones: Point[] = [];
   protected whiteStones: Point[] = [];
 
@@ -245,24 +229,17 @@ class BoardStones extends StoneBaseLayer {
     super(1);
   }
 
-  update(dataObj: DataObj) {
-    let stones = this.getData<Color[]>(dataObj, 'stones');
-    if (stones === undefined) {
-      return false;
-    }
-
+  update(position: Position) {
     this.blackStones = [];
     this.whiteStones = [];
-    if (stones != null) {
-      let i = 0;
-      for (let row = 0; row < N; ++row) {
-        for (let col = 0; col < N; ++col) {
-          let color = stones[i++];
-          if (color == Color.Black) {
-            this.blackStones.push({row: row, col: col});
-          } else if (color == Color.White) {
-            this.whiteStones.push({row: row, col: col});
-          }
+    let i = 0;
+    for (let row = 0; row < N; ++row) {
+      for (let col = 0; col < N; ++col) {
+        let color = position.stones[i++];
+        if (color == Color.Black) {
+          this.blackStones.push({row: row, col: col});
+        } else if (color == Color.White) {
+          this.whiteStones.push({row: row, col: col});
         }
       }
     }
@@ -276,17 +253,18 @@ interface VariationLabel {
 }
 
 class Variation extends StoneBaseLayer {
-  private _childVariation: Nullable<Move> = null;
-  get childVariation() {
-    return this._childVariation;
+  private _requiredFirstMove: Nullable<Move> = null;
+  get requiredFirstMove() {
+    return this._requiredFirstMove;
   }
-  set childVariation(p: Nullable<Move>) {
-    if (!movesEqual(p, this._childVariation)) {
-      this._childVariation = p;
+  set requiredFirstMove(p: Nullable<Move>) {
+    if (!movesEqual(p, this._requiredFirstMove)) {
+      this._requiredFirstMove = p;
       this.board.draw();
     }
   }
 
+  private variation: Move[] = [];
   private blackLabels: VariationLabel[] = [];
   private whiteLabels: VariationLabel[] = [];
 
@@ -298,15 +276,29 @@ class Variation extends StoneBaseLayer {
     super.clear();
     this.blackLabels = [];
     this.whiteLabels = [];
-    this.childVariation = null;
+    this.requiredFirstMove = null;
   }
 
-  update(dataObj: DataObj) {
-    let variation = this.getData<Move[]>(dataObj, this.dataPropName);
-    if (variation === undefined) {
+  update(position: Position) {
+    let variation: Move[];
+    if (this.dataPropName == 'pv') {
+      variation = position.pv;
+    } else if (this.dataPropName == 'search') {
+      variation = position.search;
+    } else {
       return false;
     }
 
+    if (variation.length > 0 && this.requiredFirstMove != null &&
+        !movesEqual(variation[0], this.requiredFirstMove)) {
+      return false;
+    }
+
+    if (this.variationsEqual(variation, this.variation)) {
+      return false;
+    }
+
+    this.variation = variation;
     this.parseVariation(variation);
 
     // We assume here that every update contains a new variation.
@@ -317,19 +309,27 @@ class Variation extends StoneBaseLayer {
     return true;
   }
 
-  protected parseVariation(variation: Nullable<Move[]>) {
+  private variationsEqual(a: Move[], b: Move[]) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (let i = 0; i < a.length; ++i) {
+      if (!movesEqual(a[i], b[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  protected parseVariation(variation: Move[]) {
     let toPlay = this.board.position.toPlay;
     this.blackStones = [];
     this.whiteStones = [];
     this.blackLabels = [];
     this.whiteLabels = [];
 
-    if (variation == null || variation.length == 0) {
-      return;
-    }
-
-    if (!movesEqual(variation[0], this.childVariation)) {
-      return;
+    if (variation.length == 0) {
+      return true;
     }
 
     // The playedCount array keeps track of the number of times each point on
@@ -367,6 +367,8 @@ class Variation extends StoneBaseLayer {
         firstPlayed[idx].s += '*';
       }
     }
+
+    return true;
   }
 
   draw() {
@@ -393,7 +395,7 @@ class Variation extends StoneBaseLayer {
   }
 }
 
-class Annotations extends DataLayer {
+class Annotations extends Layer {
   private annotations = new Map<Annotation.Shape, Annotation[]>();
 
   constructor(private dataPropName = 'annotations') {
@@ -407,16 +409,10 @@ class Annotations extends DataLayer {
     }
   }
 
-  update(dataObj: DataObj) {
-    let annotations = this.getData<Annotation[]>(dataObj, this.dataPropName);
-    if (annotations === undefined) {
-      return false;
-    }
+  // TODO(tommadams): detect when nothing has changed.
+  update(position: Position) {
     this.annotations.clear();
-    if (annotations == null) {
-      return true;
-    }
-    for (let annotation of annotations) {
+    for (let annotation of position.annotations) {
       let byShape = this.annotations.get(annotation.shape);
       if (byShape === undefined) {
         byShape = [];
@@ -464,7 +460,7 @@ class NextMove {
   }
 }
 
-class Q extends DataLayer {
+class Q extends Layer {
   private nextMoves: NextMove[] = [];
 
   hasPoint(p: Point) {
@@ -483,10 +479,8 @@ class Q extends DataLayer {
     }
   }
 
-  update(dataObj: DataObj) {
-    let childN = this.getData<number[]>(dataObj, 'n');
-    let childQ = this.getData<number[]>(dataObj, 'childQ');
-    if (childN == null || childQ == null) {
+  update(position: Position) {
+    if (position.childN == null || position.childQ == null) {
       return false;
     }
 
@@ -499,23 +493,18 @@ class Q extends DataLayer {
       indices.push(i);
     }
     indices.sort((a: number, b: number) => {
-      let n = childN as number[];
-      let q = childQ as number[];
+      let n = position.childN as number[];
+      let q = position.childQ as number[];
       if (n[b] != n[a]) {
         return n[b] - n[a];
       }
       return q[b] - q[a];
     });
 
-    // We haven't done any reads yet.
-    let maxN = childN[indices[0]];
+    let maxN = position.childN[indices[0]];
     if (maxN == 0) {
+      // We haven't done any reads yet.
       return true;
-    }
-
-    let sumN = 0;
-    for (let n of childN) {
-      sumN += n;
     }
 
     let logMaxN = Math.log(maxN);
@@ -525,14 +514,14 @@ class Q extends DataLayer {
     let idx = indices[0];
     for (let i = 0; i < indices.length; ++i) {
       let idx = indices[i];
-      let n = childN[idx];
+      let n = position.childN[idx];
       if (n == 0) {
         break;
       }
-      let q = childQ[idx] / 10;
+      let q = position.childQ[idx];
       let alpha = Math.log(n) / logMaxN;
       alpha *= alpha;
-      if (n < sumN / 100) {
+      if (n < position.n / 100) {
         break;
       }
       this.nextMoves.push(new NextMove(idx, n, q, alpha));
@@ -576,11 +565,9 @@ class Q extends DataLayer {
 }
 
 export {
-  Annotation,
   Annotations,
   BoardStones,
   Caption,
-  DataObj,
   Grid,
   HeatMap,
   Label,

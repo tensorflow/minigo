@@ -1,7 +1,6 @@
 define(["require", "exports", "./position", "./base", "./util"], function (require, exports, position_1, base_1, util_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.Annotation = position_1.Annotation;
     const STAR_POINTS = {
         [base_1.BoardSize.Nine]: [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]],
         [base_1.BoardSize.Nineteen]: [[3, 3], [3, 9], [3, 15],
@@ -29,17 +28,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     exports.Layer = Layer;
     class StaticLayer extends Layer {
         clear() { }
-        update(dataObj) {
+        update(position) {
             return false;
-        }
-    }
-    class DataLayer extends Layer {
-        getData(obj, propName) {
-            let prop = obj[propName];
-            if (prop === undefined) {
-                return undefined;
-            }
-            return prop;
         }
     }
     class Grid extends StaticLayer {
@@ -125,7 +115,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Caption = Caption;
-    class HeatMap extends DataLayer {
+    class HeatMap extends Layer {
         constructor(dataPropName, colorizeFn) {
             super();
             this.dataPropName = dataPropName;
@@ -138,7 +128,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 this.board.draw();
             }
         }
-        update(dataObj) {
+        update(position) {
             let data = this.getData(dataObj, this.dataPropName);
             if (data === undefined) {
                 return false;
@@ -170,7 +160,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.HeatMap = HeatMap;
-    class StoneBaseLayer extends DataLayer {
+    class StoneBaseLayer extends Layer {
         constructor(alpha) {
             super();
             this.alpha = alpha;
@@ -193,24 +183,18 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         constructor() {
             super(1);
         }
-        update(dataObj) {
-            let stones = this.getData(dataObj, 'stones');
-            if (stones === undefined) {
-                return false;
-            }
+        update(position) {
             this.blackStones = [];
             this.whiteStones = [];
-            if (stones != null) {
-                let i = 0;
-                for (let row = 0; row < base_1.N; ++row) {
-                    for (let col = 0; col < base_1.N; ++col) {
-                        let color = stones[i++];
-                        if (color == base_1.Color.Black) {
-                            this.blackStones.push({ row: row, col: col });
-                        }
-                        else if (color == base_1.Color.White) {
-                            this.whiteStones.push({ row: row, col: col });
-                        }
+            let i = 0;
+            for (let row = 0; row < base_1.N; ++row) {
+                for (let col = 0; col < base_1.N; ++col) {
+                    let color = position.stones[i++];
+                    if (color == base_1.Color.Black) {
+                        this.blackStones.push({ row: row, col: col });
+                    }
+                    else if (color == base_1.Color.White) {
+                        this.whiteStones.push({ row: row, col: col });
                     }
                 }
             }
@@ -222,16 +206,17 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         constructor(dataPropName, alpha = 0.4) {
             super(alpha);
             this.dataPropName = dataPropName;
-            this._childVariation = null;
+            this._requiredFirstMove = null;
+            this.variation = [];
             this.blackLabels = [];
             this.whiteLabels = [];
         }
-        get childVariation() {
-            return this._childVariation;
+        get requiredFirstMove() {
+            return this._requiredFirstMove;
         }
-        set childVariation(p) {
-            if (!base_1.movesEqual(p, this._childVariation)) {
-                this._childVariation = p;
+        set requiredFirstMove(p) {
+            if (!base_1.movesEqual(p, this._requiredFirstMove)) {
+                this._requiredFirstMove = p;
                 this.board.draw();
             }
         }
@@ -239,14 +224,39 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             super.clear();
             this.blackLabels = [];
             this.whiteLabels = [];
-            this.childVariation = null;
+            this.requiredFirstMove = null;
         }
-        update(dataObj) {
-            let variation = this.getData(dataObj, this.dataPropName);
-            if (variation === undefined) {
+        update(position) {
+            let variation;
+            if (this.dataPropName == 'pv') {
+                variation = position.pv;
+            }
+            else if (this.dataPropName == 'search') {
+                variation = position.search;
+            }
+            else {
                 return false;
             }
+            if (variation.length > 0 && this.requiredFirstMove != null &&
+                !base_1.movesEqual(variation[0], this.requiredFirstMove)) {
+                return false;
+            }
+            if (this.variationsEqual(variation, this.variation)) {
+                return false;
+            }
+            this.variation = variation;
             this.parseVariation(variation);
+            return true;
+        }
+        variationsEqual(a, b) {
+            if (a.length != b.length) {
+                return false;
+            }
+            for (let i = 0; i < a.length; ++i) {
+                if (!base_1.movesEqual(a[i], b[i])) {
+                    return false;
+                }
+            }
             return true;
         }
         parseVariation(variation) {
@@ -255,11 +265,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             this.whiteStones = [];
             this.blackLabels = [];
             this.whiteLabels = [];
-            if (variation == null || variation.length == 0) {
-                return;
-            }
-            if (!base_1.movesEqual(variation[0], this.childVariation)) {
-                return;
+            if (variation.length == 0) {
+                return true;
             }
             let playedCount = new Uint16Array(base_1.N * base_1.N);
             let firstPlayed = [];
@@ -292,6 +299,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                     firstPlayed[idx].s += '*';
                 }
             }
+            return true;
         }
         draw() {
             super.draw();
@@ -313,7 +321,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Variation = Variation;
-    class Annotations extends DataLayer {
+    class Annotations extends Layer {
         constructor(dataPropName = 'annotations') {
             super();
             this.dataPropName = dataPropName;
@@ -325,16 +333,9 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 this.board.draw();
             }
         }
-        update(dataObj) {
-            let annotations = this.getData(dataObj, this.dataPropName);
-            if (annotations === undefined) {
-                return false;
-            }
+        update(position) {
             this.annotations.clear();
-            if (annotations == null) {
-                return true;
-            }
-            for (let annotation of annotations) {
+            for (let annotation of position.annotations) {
                 let byShape = this.annotations.get(annotation.shape);
                 if (byShape === undefined) {
                     byShape = [];
@@ -379,7 +380,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             };
         }
     }
-    class Q extends DataLayer {
+    class Q extends Layer {
         constructor() {
             super(...arguments);
             this.nextMoves = [];
@@ -398,10 +399,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 this.board.draw();
             }
         }
-        update(dataObj) {
-            let childN = this.getData(dataObj, 'n');
-            let childQ = this.getData(dataObj, 'childQ');
-            if (childN == null || childQ == null) {
+        update(position) {
+            if (position.childN == null || position.childQ == null) {
                 return false;
             }
             this.nextMoves = [];
@@ -410,33 +409,29 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 indices.push(i);
             }
             indices.sort((a, b) => {
-                let n = childN;
-                let q = childQ;
+                let n = position.childN;
+                let q = position.childQ;
                 if (n[b] != n[a]) {
                     return n[b] - n[a];
                 }
                 return q[b] - q[a];
             });
-            let maxN = childN[indices[0]];
+            let maxN = position.childN[indices[0]];
             if (maxN == 0) {
                 return true;
-            }
-            let sumN = 0;
-            for (let n of childN) {
-                sumN += n;
             }
             let logMaxN = Math.log(maxN);
             let idx = indices[0];
             for (let i = 0; i < indices.length; ++i) {
                 let idx = indices[i];
-                let n = childN[idx];
+                let n = position.childN[idx];
                 if (n == 0) {
                     break;
                 }
-                let q = childQ[idx] / 10;
+                let q = position.childQ[idx];
                 let alpha = Math.log(n) / logMaxN;
                 alpha *= alpha;
-                if (n < sumN / 100) {
+                if (n < position.n / 100) {
                     break;
                 }
                 this.nextMoves.push(new NextMove(idx, n, q, alpha));

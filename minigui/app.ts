@@ -12,62 +12,91 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Annotation, Position} from './position'
+import {Annotation, Position, rootPosition} from './position'
 import {Socket} from './gtp_socket'
 import {Color, Move, N, Nullable, movesEqual, setBoardSize, stonesEqual, toKgs} from './base'
 import {Board} from './board'
 import * as util from './util'
 
-interface SearchJson {
+// Raw position update JSON object. Gets parsed into a PositionUpdate.
+interface PositionUpdateJson {
   id: string;
   moveNum: number;
-  toPlay: string;
+  n: number;
+  q: number;
+  toPlay?: string;
+  parentId?: string;
+  stones?: string;
+  lastMove?: string;
   search?: string[];
-  n?: number[];
-  dq?: number[];
   pv?: string[];
-  childQ: number[];
+  childN?: number[];
+  childQ?: number[];
+  gameOver?: boolean;
 }
 
-class SearchMsg {
-  id: string;
-  moveNum: number;
-  toPlay: Color;
+class PositionUpdate {
+  n: number;
+  q: number;
+  moveNum: Nullable<number> = null;
+  toPlay: Nullable<Color> = null;
+  stones: Nullable<Color[]> = null;
+  lastMove: Nullable<Move> = null;
   search: Nullable<Move[]> = null;
-  n: Nullable<number[]> = null;
-  dq: Nullable<number[]> = null;
   pv: Nullable<Move[]> = null;
-  childQ: number[];
+  childN: Nullable<number[]> = null;
+  childQ: Nullable<number[]> = null;
+  gameOver: Nullable<boolean> = null;
 
-  constructor(j: SearchJson) {
+  constructor(public position: Position j: PositionUpdateJson) {
     this.id = j.id;
     this.moveNum = j.moveNum;
-    this.toPlay = util.parseColor(j.toPlay);
+    this.n = j.n;
+    this.q = j.q;
+
+    if (j.toPlay) {
+      this.toPlay = util.parseColor(j.toPlay);
+    }
+
+    if (j.parentId) {
+      this.parentId = j.parentId;
+    }
+
+    if (j.stones) {
+      const stoneMap: {[index: string]: Color} = {
+        '.': Color.Empty,
+        'X': Color.Black,
+        'O': Color.White,
+      };
+      this.stones = [];
+      for (let i = 0; i < j.board.length; ++i) {
+        this.stones.push(stoneMap[j.board[i]]);
+      }
+    }
+
+    if (j.lastMove) {
+      this.lastMove = util.parseMove(j.lastMove);
+    }
+
     if (j.search) {
       this.search = util.parseMoves(j.search);
-    }
-    this.childQ = j.childQ;
-    if (j.n) {
-      this.n = j.n;
-    }
-    if (j.dq) {
-      this.dq = j.dq;
     }
     if (j.pv) {
       this.pv = util.parseMoves(j.pv as string[]);
     }
+    if (j.childN) {
+      this.childN = j.childN;
+    }
+    if (j.childQ) {
+      this.childQ = [];
+      this.dq = [];
+      for (let q of j.childQ) {
+        q /= 1000;
+        this.childQ.push(q);
+        this.dq.push(q - this.q);
+      }
+    }
   }
-}
-
-interface GameStateJson {
-  id: string;
-  parent?: string;
-  board: string;
-  toPlay: string;
-  lastMove?: string;
-  moveNum: number;
-  q: number;
-  gameOver: boolean;
 }
 
 // App base class used by the different Minigui UI implementations.
@@ -94,20 +123,46 @@ abstract class App {
 
   protected abstract onGameOver(): void;
 
-  protected abstract onPosition(position: Position): void;
+  protected abstract onPosition(update: PositionUpdate): void;
 
   constructor() {
-    this.gtp.onData('mg-search', (j: SearchJson) => {
-      this.onSearch(new SearchMsg(j));
+    this.gtp.onData('mg-search', (j: PositionUpdateJson) => {
+      this.onSearch(new PositionUpdate(j));
     });
-    this.gtp.onData('mg-gamestate', (j: GameStateJson) => {
-      let position = this.parseGameState(j);
+    this.gtp.onData('mg-gamestate', (j: PositionUpdateJson) => {
+      let update = new PositionUpdate(j);
+      if (update.gameOver != null) {
+        this.gameOver = update.gameOver;
+      }
       this.gameOver = j.gameOver;
-      this.onPosition(position);
+      this.onPosition(update);
       if (j.gameOver) {
         this.onGameOver();
       }
     });
+  }
+
+  private parsePositionUpdate(j: PositionUpdateJson) {
+    let position = positionMap.get(j.id);
+    if (position !== undefined) {
+      if (position.parent != null) {
+        if (position.parent != positionMap.get(j.parentId)) {
+          throw new Error('parents don\'t match');
+        }
+      } else {
+        if (j.parentId !== undefined) {
+          throw new Error('parents don\'t match');
+        }
+      }
+    } else {
+      let parent = positionMap.get(j.parentId);
+      if (parent == null) {
+        throw new Error('can\'t find parent');
+      }
+      position = parent.addChild(j.id, j.lastMove, stones, j.q);
+    }
+
+    return update;
   }
 
   protected connect() {
@@ -176,7 +231,7 @@ abstract class App {
       // This can happen when refreshing the page, for example.
       return;
     }
-    const props = ['n', 'dq', 'pv', 'search', 'childQ'];
+    const props = ['n', 'q', 'dq', 'pv', 'search', 'childN', 'childQ'];
     util.partialUpdate(msg, position, props);
 
     if (position == this.activePosition) {
@@ -186,22 +241,6 @@ abstract class App {
 
   private parseGameState(j: GameStateJson) {
     // Parse parts of the JSON object that need it.
-    const stoneMap: {[index: string]: Color} = {
-      '.': Color.Empty,
-      'X': Color.Black,
-      'O': Color.White,
-    };
-    let stones = [];
-    for (let i = 0; i < j.board.length; ++i) {
-      stones.push(stoneMap[j.board[i]]);
-    }
-    let toPlay = util.parseColor(j.toPlay);
-
-    let lastMove: Nullable<Move> = null;
-    if (j.lastMove) {
-      lastMove = util.parseMove(j.lastMove);
-    }
-
     let position = this.positionMap.get(j.id);
     if (position !== undefined) {
       // We've already seen this position, verify that the JSON matches

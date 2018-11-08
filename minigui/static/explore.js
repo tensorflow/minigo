@@ -332,13 +332,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         }
         onSearch(msg) {
             super.onSearch(msg);
-            if (msg.n != null) {
-                let nSum = 0;
-                for (let n of msg.n) {
-                    nSum += n;
-                }
-                util_1.getElement('reads').innerText = this.formatNumReads(nSum);
-            }
+            util_1.getElement('reads').innerText = this.formatNumReads(msg.n);
         }
         formatNumReads(numReads) {
             if (numReads < 1000) {

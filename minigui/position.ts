@@ -28,12 +28,14 @@ interface Annotation {
 }
 
 class Position {
+  n = 0;
   moveNum: number;
   search: Move[] = [];
   pv: Move[] = [];
-  n: Nullable<number[]> = null;
+  // TODO(tommadams): remove dq
   dq: Nullable<number[]> = null;
   annotations: Annotation[] = [];
+  childN: Nullable<number[]> = null;
   childQ: Nullable<number[]> = null;
 
   // children[0] is the main line. Subsequent children are variations.

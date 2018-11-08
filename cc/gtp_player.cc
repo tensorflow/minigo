@@ -679,16 +679,12 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   const auto& pos = root()->position;
 
   nlohmann::json j = {
-      {"id", NodeId(root())},
+      {"id", RegisterNode(root())},
       {"moveNum", pos.n()},
       {"toPlay", pos.to_play() == Color::kBlack ? "B" : "W"},
       {"q", root()->Q()},
+      {"n", root()->N()},
   };
-
-  auto& childQ = j["childQ"];
-  for (int i = 0; i < kNumMoves; ++i) {
-    childQ.push_back(static_cast<int>(root()->child_Q(i) * 1000));
-  }
 
   if (last_read != nullptr) {
     auto& search = j["search"] = nlohmann::json::array();
@@ -701,17 +697,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
     }
   }
 
-  auto& dqs = j["dq"];
-  for (int i = 0; i < kNumMoves; ++i) {
-    float dq = root()->child_Q(i) - root()->Q();
-    dqs.push_back(static_cast<int>(std::round(dq * 100)));
-  }
-
-  auto& ns = j["n"];
-  for (const auto& edge : root()->edges) {
-    ns.push_back(static_cast<int>(edge.N));
-  }
-
+  // Only report the principal variation when it changes.
   std::vector<Coord> principal_variation;
   if (child_variation_ == Coord::kInvalid) {
     principal_variation = root()->MostVisitedPath();
@@ -721,8 +707,6 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
       principal_variation = it->second->MostVisitedPath();
     }
   }
-
-  // Only report the principal variation when it changes.
   if (principal_variation != last_principal_variation_sent_) {
     auto& pv = j["pv"];
     if (child_variation_ != Coord::kInvalid) {
@@ -732,6 +716,16 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
       pv.push_back(c.ToKgs());
     }
     last_principal_variation_sent_ = std::move(principal_variation);
+  }
+
+  auto& childN = j["childN"];
+  for (const auto& edge : root()->edges) {
+    childN.push_back(static_cast<int>(edge.N));
+  }
+
+  auto& childQ = j["childQ"];
+  for (int i = 0; i < kNumMoves; ++i) {
+    childQ.push_back(static_cast<int>(root()->child_Q(i) * 1000));
   }
 
   std::cerr << "mg-search:" << j.dump() << std::endl;
@@ -754,7 +748,7 @@ void GtpPlayer::ReportGameState() {
   }
 
   nlohmann::json j = {
-      {"id", NodeId(root())},
+      {"id", RegisterNode(root())},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
       {"board", oss.str()},
@@ -762,7 +756,7 @@ void GtpPlayer::ReportGameState() {
       {"gameOver", root()->game_over()},
   };
   if (root()->parent) {
-    j["parent"] = NodeId(root()->parent);
+    j["parentId"] = RegisterNode(root()->parent);
   }
   if (!history().empty()) {
     j["lastMove"] = history().back().c.ToKgs();
@@ -771,7 +765,7 @@ void GtpPlayer::ReportGameState() {
   std::cerr << "mg-gamestate: " << j.dump() << std::endl;
 }
 
-std::string GtpPlayer::NodeId(MctsNode* node) {
+std::string GtpPlayer::RegisterNode(MctsNode* node) {
   auto id = absl::StrFormat("%p", node);
   game_nodes_.emplace(id, node);
   return id;

@@ -1,31 +1,62 @@
 define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"], function (require, exports, position_1, gtp_socket_1, base_1, util) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    class SearchMsg {
-        constructor(j) {
+    class PositionUpdate {
+        constructor(position, j) {
+            this.position = position;
+            this.moveNum = null;
+            this.toPlay = null;
+            this.stones = null;
+            this.lastMove = null;
             this.search = null;
-            this.n = null;
-            this.dq = null;
             this.pv = null;
+            this.childN = null;
+            this.childQ = null;
+            this.gameOver = null;
             this.id = j.id;
             this.moveNum = j.moveNum;
-            this.toPlay = util.parseColor(j.toPlay);
+            this.n = j.n;
+            this.q = j.q;
+            if (j.toPlay) {
+                this.toPlay = util.parseColor(j.toPlay);
+            }
+            if (j.parentId) {
+                this.parentId = j.parentId;
+            }
+            if (j.stones) {
+                const stoneMap = {
+                    '.': base_1.Color.Empty,
+                    'X': base_1.Color.Black,
+                    'O': base_1.Color.White,
+                };
+                this.stones = [];
+                for (let i = 0; i < j.board.length; ++i) {
+                    this.stones.push(stoneMap[j.board[i]]);
+                }
+            }
+            if (j.lastMove) {
+                this.lastMove = util.parseMove(j.lastMove);
+            }
             if (j.search) {
                 this.search = util.parseMoves(j.search);
-            }
-            this.childQ = j.childQ;
-            if (j.n) {
-                this.n = j.n;
-            }
-            if (j.dq) {
-                this.dq = j.dq;
             }
             if (j.pv) {
                 this.pv = util.parseMoves(j.pv);
             }
+            if (j.childN) {
+                this.childN = j.childN;
+            }
+            if (j.childQ) {
+                this.childQ = [];
+                this.dq = [];
+                for (let q of j.childQ) {
+                    q /= 1000;
+                    this.childQ.push(q);
+                    this.dq.push(q - this.q);
+                }
+            }
         }
     }
-    exports.SearchMsg = SearchMsg;
     class App {
         constructor() {
             this.gtp = new gtp_socket_1.Socket();
@@ -34,16 +65,42 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.boards = [];
             this.positionMap = new Map();
             this.gtp.onData('mg-search', (j) => {
-                this.onSearch(new SearchMsg(j));
+                this.onSearch(new PositionUpdate(j));
             });
             this.gtp.onData('mg-gamestate', (j) => {
-                let position = this.parseGameState(j);
+                let update = new PositionUpdate(j);
+                if (update.gameOver != null) {
+                    this.gameOver = update.gameOver;
+                }
                 this.gameOver = j.gameOver;
-                this.onPosition(position);
+                this.onPosition(update);
                 if (j.gameOver) {
                     this.onGameOver();
                 }
             });
+        }
+        parsePositionUpdate(j) {
+            let position = positionMap.get(j.id);
+            if (position !== undefined) {
+                if (position.parent != null) {
+                    if (position.parent != positionMap.get(j.parentId)) {
+                        throw new Error('parents don\'t match');
+                    }
+                }
+                else {
+                    if (j.parentId !== undefined) {
+                        throw new Error('parents don\'t match');
+                    }
+                }
+            }
+            else {
+                let parent = positionMap.get(j.parentId);
+                if (parent == null) {
+                    throw new Error('can\'t find parent');
+                }
+                position = parent.addChild(j.id, j.lastMove, stones, j.q);
+            }
+            return update;
         }
         connect() {
             let uri = `http://${document.domain}:${location.port}/minigui`;
@@ -84,27 +141,13 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             if (!position) {
                 return;
             }
-            const props = ['n', 'dq', 'pv', 'search', 'childQ'];
+            const props = ['n', 'q', 'dq', 'pv', 'search', 'childN', 'childQ'];
             util.partialUpdate(msg, position, props);
             if (position == this.activePosition) {
                 this.updateBoards(position);
             }
         }
         parseGameState(j) {
-            const stoneMap = {
-                '.': base_1.Color.Empty,
-                'X': base_1.Color.Black,
-                'O': base_1.Color.White,
-            };
-            let stones = [];
-            for (let i = 0; i < j.board.length; ++i) {
-                stones.push(stoneMap[j.board[i]]);
-            }
-            let toPlay = util.parseColor(j.toPlay);
-            let lastMove = null;
-            if (j.lastMove) {
-                lastMove = util.parseMove(j.lastMove);
-            }
             let position = this.positionMap.get(j.id);
             if (position !== undefined) {
                 if (position.toPlay != toPlay) {

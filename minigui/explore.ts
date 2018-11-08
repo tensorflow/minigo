@@ -413,13 +413,7 @@ class ExploreApp extends App {
 
   protected onSearch(msg: SearchMsg) {
     super.onSearch(msg);
-    if (msg.n != null) {
-      let nSum = 0;
-      for (let n of msg.n) {
-        nSum += n;
-      }
-      getElement('reads').innerText = this.formatNumReads(nSum);
-    }
+    getElement('reads').innerText = this.formatNumReads(msg.n);
   }
 
   protected formatNumReads(numReads: number) {
