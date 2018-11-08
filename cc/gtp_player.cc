@@ -547,7 +547,7 @@ GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
 
   if (args[0] == "root") {
     ResetRoot();
-    return Response::Ok(std::string(args[0]));
+    return Response::Ok();
   }
 
   auto it = game_nodes_.find(args[0]);
@@ -556,6 +556,7 @@ GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
   }
 
   auto* node = it->second;
+  MG_CHECK(node != nullptr);
 
   // Build the sequence of moves the will end up at the requested position.
   std::vector<Coord> moves;
@@ -593,6 +594,9 @@ GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
   if (!response.ok) {
     return response;
   }
+
+  // Make sure we always send the principal varation next time.
+  last_principal_variation_sent_.clear();
 
   if (args.size() == 0) {
     child_variation_ = Coord::kInvalid;
@@ -653,7 +657,6 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   for (const auto& tree : sgf::GetMoveTrees(ast)) {
     impl(*tree, root());
   }
-  std::cerr << "### DONE" << std::endl;
 
   return Response::Ok();
 }
@@ -711,7 +714,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
     childQ.push_back(static_cast<int>(root()->child_Q(i) * 1000));
   }
 
-  std::cerr << "mg-search:" << j.dump() << std::endl;
+  std::cerr << "mg-update:" << j.dump() << std::endl;
 }
 
 void GtpPlayer::ReportPosition() {
@@ -745,7 +748,7 @@ void GtpPlayer::ReportPosition() {
     j["move"] = history().back().c.ToKgs();
   }
 
-  std::cerr << "mg-gamestate: " << j.dump() << std::endl;
+  std::cerr << "mg-position: " << j.dump() << std::endl;
 }
 
 std::string GtpPlayer::RegisterNode(MctsNode* node) {

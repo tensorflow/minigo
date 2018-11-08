@@ -181,7 +181,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             }
             let pr = util_1.pixelRatio();
             ctx.save();
-            ctx.translate(0.5 - this.scrollX, 0.5 - this.scrollY);
+            ctx.translate(0.5 - pr * this.scrollX, 0.5 - pr * this.scrollY);
             ctx.lineWidth = pr;
             let drawEdges = (node, drawMainline) => {
                 if (node.children.length == 0) {

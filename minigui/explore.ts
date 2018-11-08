@@ -407,10 +407,12 @@ class ExploreApp extends App {
     this.board.clear();
   }
 
-  protected onSearch(position: Position, update: Position.Update) {
-    this.selectPosition(position);
-    this.board.update(update);
-    getElement('reads').innerText = this.formatNumReads(position.n);
+  protected onPositionUpdate(position: Position, update: Position.Update) {
+    if (position == this.activePosition) {
+      this.board.update(update);
+      this.winrateGraph.setWinrate(position.moveNum, position.q);
+      getElement('reads').innerText = this.formatNumReads(position.n);
+    }
   }
 
   protected formatNumReads(numReads: number) {
@@ -422,7 +424,7 @@ class ExploreApp extends App {
      return numReads.toFixed(places) + 'k';
   }
 
-  protected onPositionUpdate(position: Position, update: Position.Update) {
+  protected onNewPosition(position: Position) {
     if (position.parent != null) {
       this.variationTree.addChild(position.parent, position);
     }

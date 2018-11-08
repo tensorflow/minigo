@@ -56,29 +56,36 @@ abstract class App {
 
   protected abstract onGameOver(): void;
 
-  protected abstract onSearch(position: Position, update: Position.Update): void;
-
   protected abstract onPositionUpdate(position: Position, update: Position.Update): void;
 
+  protected abstract onNewPosition(position: Position): void;
+
   constructor() {
-    this.gtp.onData('mg-search', (j: PositionUpdateJson) => {
-      let position = this.getPosition(j);
-      let update = this.getPositionUpdate(j);
+    this.gtp.onData('mg-update', (j: PositionUpdateJson) => {
+      let position = this.positionMap.get(j.id);
+      if (position === undefined) {
+        // Just after refreshing the page, the backend will still be sending 
+        // position updates if pondering is enabled. Ignore updates for any
+        // positions we don't know about.
+        return;
+      }
+      let update = this.newPositionUpdate(j);
       position.update(update);
-      this.onSearch(position, update);
+      this.onPositionUpdate(position, update);
     });
 
-    this.gtp.onData('mg-gamestate', (j: PositionUpdateJson) => {
-      let position = this.getPosition(j);
-      let update = this.getPositionUpdate(j);
-      this.onPositionUpdate(position, update);
+    this.gtp.onData('mg-position', (j: PositionJson | PositionUpdateJson) => {
+      let position = this.newPosition(j as PositionJson);
+      let update = this.newPositionUpdate(j);
+      position.update(update);
+      this.onNewPosition(position);
       if (position.gameOver) {
         this.onGameOver();
       }
     });
   }
 
-  private getPosition(j: PositionJson | PositionUpdateJson): Position {
+  private newPosition(j: PositionJson): Position {
     let position = this.positionMap.get(j.id);
     if (position !== undefined) {
       return position;
@@ -131,7 +138,7 @@ abstract class App {
     return position;
   }
 
-  private getPositionUpdate(j: PositionUpdateJson): Position.Update {
+  private newPositionUpdate(j: PositionUpdateJson): Position.Update {
     let update: Position.Update = {}
     if (j.n != null) { update.n = j.n; }
     if (j.q != null) { update.q = j.q; }
@@ -161,7 +168,10 @@ abstract class App {
 
   protected connect() {
     let uri = `http://${document.domain}:${location.port}/minigui`;
-    return this.gtp.connect(uri).then((size: number) => {
+    let params = new URLSearchParams(window.location.search);
+    let p = params.get("gtp_debug");
+    let debug = (p != null) && (p == "" || p == "1" || p.toLowerCase() == "true");
+    return this.gtp.connect(uri, debug).then((size: number) => {
       setBoardSize(size);
 
       let stones = new Array<Color>(N * N);

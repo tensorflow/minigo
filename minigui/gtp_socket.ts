@@ -44,10 +44,13 @@ class Socket {
   private dataHandlers: {prefix: string, handler: DataHandler}[] = [];
   private textHandlers: TextHandler[] = [];
 
+  private debug = false;
+
   // Connects to the Minigui server at the given URI.
   // Returns a promise that gets resolved of the board size when the connection
   // is established.
-  connect(uri: string) {
+  connect(uri: string, debug=false) {
+    this.debug = debug;
     this.sock = io.connect(uri)
 
     this.sock.on('json', (msg: string) => {
@@ -153,6 +156,10 @@ class Socket {
   private cmdHandler(line: string) {
     let {cmd, resolve, reject} = this.cmdQueue[0];
 
+    if (this.debug) {
+      console.log(`### OUT ${cmd} ${line}`);
+    }
+
     this.textHandler(`${trimText(cmd, 1024)} ${trimText(line, 1024)}`);
 
     if (line[0] == '=' || line[0] == '?') {
@@ -175,6 +182,11 @@ class Socket {
 
   private stderrHandler(line: string) {
     let handled = false;
+
+    if (this.debug) {
+      console.log(`### ERR ${line}`);
+    }
+
     for (let {prefix, handler} of this.dataHandlers) {
       if (line.substr(0, prefix.length) == prefix) {
         let stripped = line.substr(prefix.length);
@@ -203,6 +215,9 @@ class Socket {
     let {cmd} = this.cmdQueue[0];
     if (this.textHandler) {
       this.textHandler(trimText(cmd, 1024));
+    }
+    if (this.debug) {
+      console.log(`### SND ${cmd}`);
     }
     this.sock.emit('gtpcmd', {data: cmd});
   }

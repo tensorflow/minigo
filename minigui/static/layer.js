@@ -435,7 +435,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             let scoreScale = this.board.position.toPlay == base_1.Color.Black ? 1 : -1;
             for (let nextMove of this.nextMoves) {
                 let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
-                let winRate = (scoreScale * nextMove.q + 100) / 2;
+                let winRate = 50 + 50 * scoreScale * nextMove.q;
                 ctx.fillText(winRate.toFixed(1), c.x, c.y);
             }
         }

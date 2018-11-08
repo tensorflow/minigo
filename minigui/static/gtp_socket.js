@@ -16,8 +16,10 @@ define(["require", "exports"], function (require, exports) {
             this.lines = [];
             this.dataHandlers = [];
             this.textHandlers = [];
+            this.debug = false;
         }
-        connect(uri) {
+        connect(uri, debug = false) {
+            this.debug = debug;
             this.sock = io.connect(uri);
             this.sock.on('json', (msg) => {
                 let obj = JSON.parse(msg);
@@ -83,6 +85,9 @@ define(["require", "exports"], function (require, exports) {
         }
         cmdHandler(line) {
             let { cmd, resolve, reject } = this.cmdQueue[0];
+            if (this.debug) {
+                console.log(`### OUT ${cmd} ${line}`);
+            }
             this.textHandler(`${trimText(cmd, 1024)} ${trimText(line, 1024)}`);
             if (line[0] == '=' || line[0] == '?') {
                 this.cmdQueue = this.cmdQueue.slice(1);
@@ -101,6 +106,9 @@ define(["require", "exports"], function (require, exports) {
         }
         stderrHandler(line) {
             let handled = false;
+            if (this.debug) {
+                console.log(`### ERR ${line}`);
+            }
             for (let { prefix, handler } of this.dataHandlers) {
                 if (line.substr(0, prefix.length) == prefix) {
                     let stripped = line.substr(prefix.length);
@@ -128,6 +136,9 @@ define(["require", "exports"], function (require, exports) {
             let { cmd } = this.cmdQueue[0];
             if (this.textHandler) {
                 this.textHandler(trimText(cmd, 1024));
+            }
+            if (this.debug) {
+                console.log(`### SND ${cmd}`);
             }
             this.sock.emit('gtpcmd', { data: cmd });
         }

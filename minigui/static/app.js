@@ -6,22 +6,26 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.gtp = new gtp_socket_1.Socket();
             this.engineBusy = false;
             this.positionMap = new Map();
-            this.gtp.onData('mg-search', (j) => {
-                let position = this.getPosition(j);
-                let update = this.getPositionUpdate(j);
+            this.gtp.onData('mg-update', (j) => {
+                let position = this.positionMap.get(j.id);
+                if (position === undefined) {
+                    return;
+                }
+                let update = this.newPositionUpdate(j);
                 position.update(update);
-                this.onSearch(position, update);
-            });
-            this.gtp.onData('mg-gamestate', (j) => {
-                let position = this.getPosition(j);
-                let update = this.getPositionUpdate(j);
                 this.onPositionUpdate(position, update);
+            });
+            this.gtp.onData('mg-position', (j) => {
+                let position = this.newPosition(j);
+                let update = this.newPositionUpdate(j);
+                position.update(update);
+                this.onNewPosition(position);
                 if (position.gameOver) {
                     this.onGameOver();
                 }
             });
         }
-        getPosition(j) {
+        newPosition(j) {
             let position = this.positionMap.get(j.id);
             if (position !== undefined) {
                 return position;
@@ -67,7 +71,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.positionMap.set(position.id, position);
             return position;
         }
-        getPositionUpdate(j) {
+        newPositionUpdate(j) {
             let update = {};
             if (j.n != null) {
                 update.n = j.n;
@@ -100,7 +104,10 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
         }
         connect() {
             let uri = `http://${document.domain}:${location.port}/minigui`;
-            return this.gtp.connect(uri).then((size) => {
+            let params = new URLSearchParams(window.location.search);
+            let p = params.get("gtp_debug");
+            let debug = (p != null) && (p == "" || p == "1" || p.toLowerCase() == "true");
+            return this.gtp.connect(uri, debug).then((size) => {
                 base_1.setBoardSize(size);
                 let stones = new Array(base_1.N * base_1.N);
                 stones.fill(base_1.Color.Empty);

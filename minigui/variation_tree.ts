@@ -254,7 +254,7 @@ class VariationTree extends View {
     let pr = pixelRatio();
 
     ctx.save();
-    ctx.translate(0.5 - this.scrollX, 0.5 - this.scrollY);
+    ctx.translate(0.5 - pr * this.scrollX, 0.5 - pr * this.scrollY);
 
     ctx.lineWidth = pr;
 

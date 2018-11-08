@@ -102,7 +102,7 @@ MctsPlayer::~MctsPlayer() {
 
 void MctsPlayer::InitializeGame(const Position& position) {
   root_stats_ = {};
-  game_root_ = {&root_stats_, Position(&bv_, &gv_, position)};
+  game_root_ = MctsNode(&root_stats_, Position(&bv_, &gv_, position));
   ResetRoot();
 }
 

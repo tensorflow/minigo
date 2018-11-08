@@ -326,10 +326,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.winrateGraph.clear();
             this.board.clear();
         }
-        onSearch(position, update) {
-            this.selectPosition(position);
-            this.board.update(update);
-            util_1.getElement('reads').innerText = this.formatNumReads(position.n);
+        onPositionUpdate(position, update) {
+            if (position == this.activePosition) {
+                this.board.update(update);
+                this.winrateGraph.setWinrate(position.moveNum, position.q);
+                util_1.getElement('reads').innerText = this.formatNumReads(position.n);
+            }
         }
         formatNumReads(numReads) {
             if (numReads < 1000) {
@@ -339,7 +341,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             let places = Math.max(0, 2 - Math.floor(Math.log10(numReads)));
             return numReads.toFixed(places) + 'k';
         }
-        onPositionUpdate(position, update) {
+        onNewPosition(position) {
             if (position.parent != null) {
                 this.variationTree.addChild(position.parent, position);
             }
