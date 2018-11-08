@@ -14,7 +14,7 @@
 
 import {BoardSize, COL_LABELS, Color, Coord, Move, N, Nullable, Point} from './base'
 import {Grid, Layer} from './layer'
-import {Position, rootPosition} from './position'
+import {Position} from './position'
 import {getElement, pixelRatio} from './util'
 import {View} from './view'
 
@@ -27,11 +27,10 @@ class Board extends View {
   pointH: number;
   stoneRadius: number;
   elem: HTMLElement;
-  position: Position = rootPosition;
 
   protected layers: Layer[] = [];
 
-  constructor(parent: HTMLElement | string, layers: Layer[]) {
+  constructor(parent: HTMLElement | string, public position: Position, layers: Layer[]) {
     super();
 
     if (typeof(parent) == 'string') {
@@ -94,14 +93,27 @@ class Board extends View {
   // for a named property. If that property exists, the layer will update its
   // internal state from it.
   setPosition(position: Position) {
-    this.position = position;
-    let anything_changed = false;
-    for (let layer of this.layers) {
-      if (layer.update(position)) {
-        anything_changed = true;
-      }
+    if (this.position == position) {
+      return;
     }
-    return anything_changed;
+
+    this.position = position;
+    let allProps = new Set<string>(Object.keys(position));
+    for (let layer of this.layers) {
+      layer.update(allProps);
+    }
+    this.draw();
+  }
+
+  update(update: object) {
+    let anythingChanged = false;
+    let keys = new Set<string>(Object.keys(update));
+    for (let layer of this.layers) {
+      if (layer.update(keys)) {
+        anythingChanged = true;
+      }
+      this.draw();
+    }
   }
 
   drawImpl() {
@@ -215,8 +227,8 @@ class ClickableBoard extends Board {
   protected p: Point | null;
   protected listeners: ClickListener[] = [];
 
-  constructor(parent: HTMLElement | string, layerDescs: any[]) {
-    super(parent, layerDescs);
+  constructor(parent: HTMLElement | string, position: Position, layerDescs: any[]) {
+    super(parent, position, layerDescs);
 
     this.ctx.canvas.addEventListener('mousemove', (e) => {
       // Find the point on the board being hovered over.

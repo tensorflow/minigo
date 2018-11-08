@@ -73,7 +73,7 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
 
 MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : network_(std::move(network)),
-      game_root_(&dummy_stats_, {&bv_, &gv_, Color::kBlack}),
+      game_root_(&root_stats_, {&bv_, &gv_, Color::kBlack}),
       rnd_(options.random_seed),
       options_(options) {
   options_.resign_threshold = -std::abs(options_.resign_threshold);
@@ -101,12 +101,14 @@ MctsPlayer::~MctsPlayer() {
 }
 
 void MctsPlayer::InitializeGame(const Position& position) {
-  game_root_ = {&dummy_stats_, Position(&bv_, &gv_, position)};
-  root_ = &game_root_;
+  root_stats_ = {};
+  game_root_ = {&root_stats_, Position(&bv_, &gv_, position)};
+  ResetRoot();
 }
 
 void MctsPlayer::NewGame() {
-  game_root_ = MctsNode(&dummy_stats_, {&bv_, &gv_, Color::kBlack});
+  root_stats_ = {};
+  game_root_ = MctsNode(&root_stats_, {&bv_, &gv_, Color::kBlack});
   ResetRoot();
 }
 

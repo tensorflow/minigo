@@ -202,7 +202,7 @@ class MctsPlayer {
   std::unique_ptr<DualNet> network_;
   int temperature_cutoff_;
 
-  MctsNode::EdgeStats dummy_stats_;
+  MctsNode::EdgeStats root_stats_;
 
   MctsNode* root_;
   MctsNode game_root_;

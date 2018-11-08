@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {Color, Move, Nullable, Point, movesEqual, otherColor, stonesEqual} from './base'
-import {emptyBoard} from './util'
+import {partialUpdate} from './util'
 
 namespace Annotation {
   export enum Shape {
@@ -29,6 +29,7 @@ interface Annotation {
 
 class Position {
   n = 0;
+  q = 0;
   moveNum: number;
   search: Move[] = [];
   pv: Move[] = [];
@@ -44,9 +45,9 @@ class Position {
   constructor(public id: string,
               public parent: Nullable<Position>,
               public stones: Color[],
-              public q: number,
               public lastMove: Nullable<Move>,
               public toPlay: Color,
+              public gameOver: boolean,
               public isMainline: boolean) {
     this.moveNum = parent != null ? parent.moveNum + 1 : 0;
     if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
@@ -58,7 +59,7 @@ class Position {
     }
   }
 
-  addChild(id: string, move: Move, stones: Color[], q: number) {
+  addChild(id: string, move: Move, stones: Color[], gameOver: boolean) {
     // If the position already has a child with the given move, verify that the
     // stones are equal and return the existing child.
     for (let child of this.children) {
@@ -75,18 +76,35 @@ class Position {
 
     // Create a new child.
     let isMainline = this.isMainline && this.children.length == 0;
-    let child = new Position(
-      id, this, stones, q, move, otherColor(this.toPlay), isMainline);
+    let child = new Position(id, this, stones, move, otherColor(this.toPlay),
+                             gameOver, isMainline);
     this.children.push(child);
     return child;
   }
+
+  update(update: Position.Update) {
+    // TODO(tommadams): It would be more flexible to allow the position
+    // to store any/all properties return in the SearchMsg, without having to
+    // specify this property list.
+    const props = ['n', 'q', 'dq', 'pv', 'search', 'childN', 'childQ'];
+    partialUpdate(update, this, props);
+  }
 }
 
-let rootPosition = new Position(
-    'root', null, emptyBoard(), 0, null, Color.Black, true);
+
+namespace Position {
+  export interface Update {
+    n?: number;
+    q?: number;
+    pv?: Move[];
+    search?: Move[];
+    childN?: number[];
+    childQ?: number[];
+    dq?: number[];  // TODO(tommadams): remove this
+  }
+}
 
 export {
   Annotation,
   Position,
-  rootPosition,
 };

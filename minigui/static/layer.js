@@ -28,7 +28,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     exports.Layer = Layer;
     class StaticLayer extends Layer {
         clear() { }
-        update(position) {
+        update(props) {
             return false;
         }
     }
@@ -115,51 +115,6 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Caption = Caption;
-    class HeatMap extends Layer {
-        constructor(dataPropName, colorizeFn) {
-            super();
-            this.dataPropName = dataPropName;
-            this.colorizeFn = colorizeFn;
-            this.colors = null;
-        }
-        clear() {
-            if (this.colors) {
-                this.colors = null;
-                this.board.draw();
-            }
-        }
-        update(position) {
-            let data = this.getData(dataObj, this.dataPropName);
-            if (data === undefined) {
-                return false;
-            }
-            this.colors = data != null ? this.colorizeFn(data) : null;
-            return true;
-        }
-        draw() {
-            if (!this.colors) {
-                return;
-            }
-            let ctx = this.board.ctx;
-            let w = this.board.pointW;
-            let h = this.board.pointH;
-            let stones = this.board.stones;
-            let p = { row: 0, col: 0 };
-            let i = 0;
-            for (p.row = 0; p.row < base_1.N; ++p.row) {
-                for (p.col = 0; p.col < base_1.N; ++p.col) {
-                    let rgba = this.colors[i];
-                    if (stones[i++] != base_1.Color.Empty) {
-                        continue;
-                    }
-                    ctx.fillStyle = `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, ${rgba[3]}`;
-                    let c = this.boardToCanvas(p.row, p.col);
-                    ctx.fillRect(c.x - 0.5 * w, c.y - 0.5 * h, w, h);
-                }
-            }
-        }
-    }
-    exports.HeatMap = HeatMap;
     class StoneBaseLayer extends Layer {
         constructor(alpha) {
             super();
@@ -183,7 +138,11 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         constructor() {
             super(1);
         }
-        update(position) {
+        update(props) {
+            if (!props.has('stones')) {
+                return false;
+            }
+            let position = this.board.position;
             this.blackStones = [];
             this.whiteStones = [];
             let i = 0;
@@ -203,13 +162,16 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.BoardStones = BoardStones;
     class Variation extends StoneBaseLayer {
-        constructor(dataPropName, alpha = 0.4) {
+        constructor(prop, alpha = 0.4) {
             super(alpha);
-            this.dataPropName = dataPropName;
+            this.prop = prop;
             this._requiredFirstMove = null;
             this.variation = [];
             this.blackLabels = [];
             this.whiteLabels = [];
+            if (this.prop != 'pv' && this.prop != 'search') {
+                throw new Error('prop must be \'pv\' or \'search\'');
+            }
         }
         get requiredFirstMove() {
             return this._requiredFirstMove;
@@ -226,12 +188,16 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             this.whiteLabels = [];
             this.requiredFirstMove = null;
         }
-        update(position) {
+        update(props) {
+            if (!props.has(this.prop)) {
+                return false;
+            }
+            let position = this.board.position;
             let variation;
-            if (this.dataPropName == 'pv') {
+            if (this.prop == 'pv') {
                 variation = position.pv;
             }
-            else if (this.dataPropName == 'search') {
+            else if (this.prop == 'search') {
                 variation = position.search;
             }
             else {
@@ -322,9 +288,8 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.Variation = Variation;
     class Annotations extends Layer {
-        constructor(dataPropName = 'annotations') {
-            super();
-            this.dataPropName = dataPropName;
+        constructor() {
+            super(...arguments);
             this.annotations = new Map();
         }
         clear() {
@@ -333,7 +298,11 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 this.board.draw();
             }
         }
-        update(position) {
+        update(props) {
+            if (!props.has('annotations')) {
+                return false;
+            }
+            let position = this.board.position;
             this.annotations.clear();
             for (let annotation of position.annotations) {
                 let byShape = this.annotations.get(annotation.shape);
@@ -399,11 +368,15 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 this.board.draw();
             }
         }
-        update(position) {
-            if (position.childN == null || position.childQ == null) {
+        update(props) {
+            if (!props.has('childN') && !props.has('childQ')) {
                 return false;
             }
             this.nextMoves = [];
+            let position = this.board.position;
+            if (position.childN == null || position.childQ == null) {
+                return false;
+            }
             let indices = [];
             for (let i = 0; i < base_1.N * base_1.N; ++i) {
                 indices.push(i);

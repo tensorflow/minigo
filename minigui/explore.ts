@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {App, SearchMsg} from './app'
+import {App} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, Point, movesEqual, otherColor, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
 import {heatMapDq, heatMapN} from './heat_map'
@@ -69,8 +69,8 @@ class ExploreBoard extends ClickableBoard {
   private variationLayer: lyr.Variation;
   private nextLayer: lyr.Annotations;
 
-  constructor(parentId: string, private gtp: Socket) {
-    super(parentId, []);
+  constructor(parentElemId: string, position: Position, private gtp: Socket) {
+    super(parentElemId, position, []);
 
     this.qLayer = new lyr.Q();
     this.variationLayer = new lyr.Variation('pv');
@@ -79,7 +79,7 @@ class ExploreBoard extends ClickableBoard {
         new lyr.BoardStones(),
         this.qLayer,
         this.variationLayer,
-        new lyr.Annotations('annotations')]);
+        new lyr.Annotations()]);
     this.variationLayer.show = false;
     this.enabled = true;
 
@@ -102,7 +102,7 @@ class ExploreBoard extends ClickableBoard {
     });
 
     this.onClick((p: Point) => {
-      if (this.variationLayer.childVariation != null) {
+      if (this.variationLayer.requiredFirstMove != null) {
         this.gtp.send('variation');
       }
       this.variationLayer.clear();
@@ -165,7 +165,7 @@ class ExploreBoard extends ClickableBoard {
   }
 
   private showVariation(p: Nullable<Point>) {
-    if (movesEqual(p, this.variationLayer.childVariation)) {
+    if (movesEqual(p, this.variationLayer.requiredFirstMove)) {
       return;
     }
 
@@ -178,7 +178,7 @@ class ExploreBoard extends ClickableBoard {
     } else {
       this.gtp.send('variation');
     }
-    this.variationLayer.childVariation = p;
+    this.variationLayer.requiredFirstMove = p;
   }
 }
 
@@ -196,13 +196,12 @@ class ExploreApp extends App {
   constructor() {
     super();
     this.connect().then(() => {
-      this.board = new ExploreBoard('main-board', this.gtp);
+      this.board = new ExploreBoard('main-board', this.rootPosition, this.gtp);
 
       this.board.onClick((p: Point) => {
         this.playMove(this.activePosition.toPlay, p);
       });
 
-      this.init([this.board]);
       this.initEventListeners();
 
       // Initialize log.
@@ -381,7 +380,7 @@ class ExploreApp extends App {
   protected selectPosition(position: Position) {
     if (position != this.activePosition) {
       this.activePosition = position;
-      this.updateBoards(position);
+      this.board.setPosition(position);
       this.winrateGraph.setWinrate(position.moveNum, position.q);
       this.variationTree.setActive(position);
       let moveNumStr = position.moveNum.toString();
@@ -396,24 +395,22 @@ class ExploreApp extends App {
           this.moveElem.blur();
         }
       }
-      this.gtp.sendOne(`select_position ${position.id}`).catch(() => {
-        console.log('discarding select_position');
-      });
+      this.gtp.sendOne(`select_position ${position.id}`).catch(() => {});
     }
   }
 
   protected newGame() {
-    this.gtp.send('prune_nodes 1');
     super.newGame();
-    this.gtp.send('prune_nodes 0');
     this.variationTree.newGame(this.rootPosition);
     this.log.clear();
     this.winrateGraph.clear();
+    this.board.clear();
   }
 
-  protected onSearch(msg: SearchMsg) {
-    super.onSearch(msg);
-    getElement('reads').innerText = this.formatNumReads(msg.n);
+  protected onSearch(position: Position, update: Position.Update) {
+    this.selectPosition(position);
+    this.board.update(update);
+    getElement('reads').innerText = this.formatNumReads(position.n);
   }
 
   protected formatNumReads(numReads: number) {
@@ -425,7 +422,7 @@ class ExploreApp extends App {
      return numReads.toFixed(places) + 'k';
   }
 
-  protected onPosition(position: Position) {
+  protected onPositionUpdate(position: Position, update: Position.Update) {
     if (position.parent != null) {
       this.variationTree.addChild(position.parent, position);
     }
@@ -436,9 +433,7 @@ class ExploreApp extends App {
     let colorStr = color == Color.Black ? 'b' : 'w';
     let moveStr = toKgs(move);
     this.board.enabled = false;
-    this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
-      this.gtp.send('gamestate');
-    }).finally(() => {
+    this.gtp.send(`play ${colorStr} ${moveStr}`).finally(() => {
       this.board.enabled = true;
     });
   }

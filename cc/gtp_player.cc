@@ -50,6 +50,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
   RegisterCmd("echo", &GtpPlayer::HandleEcho);
   RegisterCmd("final_score", &GtpPlayer::HandleFinalScore);
+  // TODO(tommadams): remove gamestate
   RegisterCmd("gamestate", &GtpPlayer::HandleGamestate);
   RegisterCmd("genmove", &GtpPlayer::HandleGenmove);
   RegisterCmd("info", &GtpPlayer::HandleInfo);
@@ -59,10 +60,6 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("loadsgf", &GtpPlayer::HandleLoadsgf);
   RegisterCmd("name", &GtpPlayer::HandleName);
   RegisterCmd("play", &GtpPlayer::HandlePlay);
-
-  // TODO(tommadams): Remove PlayMultiple support, we don't need it any more
-  RegisterCmd("play_multiple", &GtpPlayer::HandlePlayMultiple);
-
   RegisterCmd("playsgf", &GtpPlayer::HandlePlaysgf);
   RegisterCmd("ponder", &GtpPlayer::HandlePonder);
   RegisterCmd("ponder_limit", &GtpPlayer::HandlePonderLimit);
@@ -276,12 +273,9 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(absl::string_view cmd,
     return response;
   }
 
-  if (options().prune_orphaned_nodes) {
-    game_nodes_.clear();
-    NewGame();
-  } else {
-    ResetRoot();
-  }
+  game_nodes_.clear();
+  NewGame();
+  ReportPosition();
 
   return Response::Ok();
 }
@@ -314,7 +308,7 @@ GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
     return response;
   }
 
-  ReportGameState();
+  ReportPosition();
 
   return Response::Ok();
 }
@@ -329,6 +323,8 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
   auto c = SuggestMove();
   std::cerr << root()->Describe() << std::endl;
   MG_CHECK(PlayMove(c));
+
+  ReportPosition();
 
   return Response::Ok(c.ToKgs());
 }
@@ -422,16 +418,34 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
   if (!response.ok) {
     return response;
   }
-  return PlayImpl(args);
-}
 
-GtpPlayer::Response GtpPlayer::HandlePlayMultiple(absl::string_view cmd,
-                                                  CmdArgs args) {
-  auto response = CheckArgsRange(cmd, 2, 0xffffffff, args);
-  if (!response.ok) {
-    return response;
+  Color color;
+  if (std::tolower(args[0][0]) == 'b') {
+    color = Color::kBlack;
+  } else if (std::tolower(args[0][0]) == 'w') {
+    color = Color::kWhite;
+  } else {
+    std::cerr << "ERRROR: expected b or w for player color, got " << args[0]
+              << std::endl;
+    return Response::Error("illegal move");
   }
-  return PlayImpl(args);
+  if (color != root()->position.to_play()) {
+    return Response::Error("out of turn moves are not yet supported");
+  }
+
+  Coord c = Coord::FromKgs(args[1], true);
+  if (c == Coord::kInvalid) {
+    std::cerr << "ERRROR: expected KGS coord for move, got " << args[1]
+              << std::endl;
+    return Response::Error("illegal move");
+  }
+
+  if (!PlayMove(c)) {
+    return Response::Error("illegal move");
+  }
+  ReportPosition();
+
+  return Response::Ok();
 }
 
 GtpPlayer::Response GtpPlayer::HandlePlaysgf(absl::string_view cmd,
@@ -626,12 +640,11 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
 
   std::function<void(const sgf::MoveTree&, MctsNode*)> impl =
       [&](const sgf::MoveTree& src, MctsNode* dst) {
-        std::cerr << "### " << src.move.c << std::endl;
         MG_CHECK(src.move.color == dst->position.to_play());
         auto* dst_child = dst->MaybeAddChild(src.move.c);
         ProcessLeaves({&dst_child, 1}, false);
         MG_CHECK(PlayMove(src.move.c));
-        ReportGameState();
+        ReportPosition();
         for (const auto& src_child : src.children) {
           impl(*src_child, dst_child);
         }
@@ -642,36 +655,6 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   }
   std::cerr << "### DONE" << std::endl;
 
-  return Response::Ok();
-}
-
-GtpPlayer::Response GtpPlayer::PlayImpl(CmdArgs args) {
-  Color color;
-  if (std::tolower(args[0][0]) == 'b') {
-    color = Color::kBlack;
-  } else if (std::tolower(args[0][0]) == 'w') {
-    color = Color::kWhite;
-  } else {
-    std::cerr << "ERRROR: expected b or w for player color, got " << args[0]
-              << std::endl;
-    return Response::Error("illegal move");
-  }
-  if (color != root()->position.to_play()) {
-    return Response::Error("out of turn moves are not yet supported");
-  }
-
-  for (size_t i = 1; i < args.size(); ++i) {
-    Coord c = Coord::FromKgs(args[i], true);
-    if (c == Coord::kInvalid) {
-      std::cerr << "ERRROR: expected KGS coord for move, got " << args[i]
-                << std::endl;
-      return Response::Error("illegal move");
-    }
-
-    if (!PlayMove(c)) {
-      return Response::Error("illegal move");
-    }
-  }
   return Response::Ok();
 }
 
@@ -731,7 +714,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   std::cerr << "mg-search:" << j.dump() << std::endl;
 }
 
-void GtpPlayer::ReportGameState() {
+void GtpPlayer::ReportPosition() {
   const auto& position = root()->position;
 
   std::ostringstream oss;
@@ -751,7 +734,7 @@ void GtpPlayer::ReportGameState() {
       {"id", RegisterNode(root())},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
-      {"board", oss.str()},
+      {"stones", oss.str()},
       {"q", root()->parent != nullptr ? root()->parent->Q() : 0},
       {"gameOver", root()->game_over()},
   };
@@ -759,7 +742,7 @@ void GtpPlayer::ReportGameState() {
     j["parentId"] = RegisterNode(root()->parent);
   }
   if (!history().empty()) {
-    j["lastMove"] = history().back().c.ToKgs();
+    j["move"] = history().back().c.ToKgs();
   }
 
   std::cerr << "mg-gamestate: " << j.dump() << std::endl;

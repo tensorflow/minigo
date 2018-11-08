@@ -51,12 +51,6 @@ function pixelRatio() {
   return window.devicePixelRatio || 1;
 }
 
-function emptyBoard(): Color[] {
-  let result = new Array<Color>(N * N);
-  result.fill(Color.Empty);
-  return result;
-}
-
 function partialUpdate(src: any, dst: any, propNames: string[]) {
   for (let name of propNames) {
     if (src[name] != null) {
@@ -84,7 +78,6 @@ function toPrettyResult(result: string) {
 }
 
 export {
-  emptyBoard,
   getElement,
   parseColor,
   parseMove,

@@ -1,12 +1,12 @@
-define(["require", "exports", "./base", "./layer", "./position", "./util", "./view"], function (require, exports, base_1, layer_1, position_1, util_1, view_1) {
+define(["require", "exports", "./base", "./layer", "./util", "./view"], function (require, exports, base_1, layer_1, util_1, view_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.COL_LABELS = base_1.COL_LABELS;
     class Board extends view_1.View {
-        constructor(parent, layers) {
+        constructor(parent, position, layers) {
             super();
+            this.position = position;
             this.stones = [];
-            this.position = position_1.rootPosition;
             this.layers = [];
             if (typeof (parent) == 'string') {
                 parent = util_1.getElement(parent);
@@ -54,14 +54,25 @@ define(["require", "exports", "./base", "./layer", "./position", "./util", "./vi
             }
         }
         setPosition(position) {
-            this.position = position;
-            let anything_changed = false;
-            for (let layer of this.layers) {
-                if (layer.update(position)) {
-                    anything_changed = true;
-                }
+            if (this.position == position) {
+                return;
             }
-            return anything_changed;
+            this.position = position;
+            let allProps = new Set(Object.keys(position));
+            for (let layer of this.layers) {
+                layer.update(allProps);
+            }
+            this.draw();
+        }
+        update(update) {
+            let anythingChanged = false;
+            let keys = new Set(Object.keys(update));
+            for (let layer of this.layers) {
+                if (layer.update(keys)) {
+                    anythingChanged = true;
+                }
+                this.draw();
+            }
         }
         drawImpl() {
             let ctx = this.ctx;
@@ -153,8 +164,8 @@ define(["require", "exports", "./base", "./layer", "./position", "./util", "./vi
     }
     exports.Board = Board;
     class ClickableBoard extends Board {
-        constructor(parent, layerDescs) {
-            super(parent, layerDescs);
+        constructor(parent, position, layerDescs) {
+            super(parent, position, layerDescs);
             this.enabled = false;
             this.listeners = [];
             this.ctx.canvas.addEventListener('mousemove', (e) => {

@@ -2,8 +2,8 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class ExploreBoard extends board_1.ClickableBoard {
-        constructor(parentId, gtp) {
-            super(parentId, []);
+        constructor(parentElemId, position, gtp) {
+            super(parentElemId, position, []);
             this.gtp = gtp;
             this._showSearch = true;
             this._showNext = true;
@@ -15,7 +15,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 new lyr.BoardStones(),
                 this.qLayer,
                 this.variationLayer,
-                new lyr.Annotations('annotations')
+                new lyr.Annotations()
             ]);
             this.variationLayer.show = false;
             this.enabled = true;
@@ -36,7 +36,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
             });
             this.onClick((p) => {
-                if (this.variationLayer.childVariation != null) {
+                if (this.variationLayer.requiredFirstMove != null) {
                     this.gtp.send('variation');
                 }
                 this.variationLayer.clear();
@@ -123,7 +123,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             ctx.setLineDash([]);
         }
         showVariation(p) {
-            if (base_1.movesEqual(p, this.variationLayer.childVariation)) {
+            if (base_1.movesEqual(p, this.variationLayer.requiredFirstMove)) {
                 return;
             }
             this.variationLayer.clear();
@@ -135,7 +135,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             else {
                 this.gtp.send('variation');
             }
-            this.variationLayer.childVariation = p;
+            this.variationLayer.requiredFirstMove = p;
         }
     }
     class ExploreApp extends app_1.App {
@@ -149,11 +149,10 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.showConsole = false;
             this.moveElem = util_1.getElement('move');
             this.connect().then(() => {
-                this.board = new ExploreBoard('main-board', this.gtp);
+                this.board = new ExploreBoard('main-board', this.rootPosition, this.gtp);
                 this.board.onClick((p) => {
                     this.playMove(this.activePosition.toPlay, p);
                 });
-                this.init([this.board]);
                 this.initEventListeners();
                 this.log.onConsoleCmd((cmd) => {
                     this.gtp.send(cmd).then(() => { this.log.scroll(); });
@@ -307,7 +306,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         selectPosition(position) {
             if (position != this.activePosition) {
                 this.activePosition = position;
-                this.updateBoards(position);
+                this.board.setPosition(position);
                 this.winrateGraph.setWinrate(position.moveNum, position.q);
                 this.variationTree.setActive(position);
                 let moveNumStr = position.moveNum.toString();
@@ -317,22 +316,20 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         this.moveElem.blur();
                     }
                 }
-                this.gtp.sendOne(`select_position ${position.id}`).catch(() => {
-                    console.log('discarding select_position');
-                });
+                this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
             }
         }
         newGame() {
-            this.gtp.send('prune_nodes 1');
             super.newGame();
-            this.gtp.send('prune_nodes 0');
             this.variationTree.newGame(this.rootPosition);
             this.log.clear();
             this.winrateGraph.clear();
+            this.board.clear();
         }
-        onSearch(msg) {
-            super.onSearch(msg);
-            util_1.getElement('reads').innerText = this.formatNumReads(msg.n);
+        onSearch(position, update) {
+            this.selectPosition(position);
+            this.board.update(update);
+            util_1.getElement('reads').innerText = this.formatNumReads(position.n);
         }
         formatNumReads(numReads) {
             if (numReads < 1000) {
@@ -342,7 +339,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             let places = Math.max(0, 2 - Math.floor(Math.log10(numReads)));
             return numReads.toFixed(places) + 'k';
         }
-        onPosition(position) {
+        onPositionUpdate(position, update) {
             if (position.parent != null) {
                 this.variationTree.addChild(position.parent, position);
             }
@@ -352,9 +349,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
             let moveStr = base_1.toKgs(move);
             this.board.enabled = false;
-            this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
-                this.gtp.send('gamestate');
-            }).finally(() => {
+            this.gtp.send(`play ${colorStr} ${moveStr}`).finally(() => {
                 this.board.enabled = true;
             });
         }

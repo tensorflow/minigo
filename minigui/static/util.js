@@ -38,12 +38,6 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
         return window.devicePixelRatio || 1;
     }
     exports.pixelRatio = pixelRatio;
-    function emptyBoard() {
-        let result = new Array(base_1.N * base_1.N);
-        result.fill(base_1.Color.Empty);
-        return result;
-    }
-    exports.emptyBoard = emptyBoard;
     function partialUpdate(src, dst, propNames) {
         for (let name of propNames) {
             if (src[name] != null) {

@@ -10,15 +10,16 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
     })(Annotation || (Annotation = {}));
     exports.Annotation = Annotation;
     class Position {
-        constructor(id, parent, stones, q, lastMove, toPlay, isMainline) {
+        constructor(id, parent, stones, lastMove, toPlay, gameOver, isMainline) {
             this.id = id;
             this.parent = parent;
             this.stones = stones;
-            this.q = q;
             this.lastMove = lastMove;
             this.toPlay = toPlay;
+            this.gameOver = gameOver;
             this.isMainline = isMainline;
             this.n = 0;
+            this.q = 0;
             this.search = [];
             this.pv = [];
             this.dq = null;
@@ -35,7 +36,7 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
                 });
             }
         }
-        addChild(id, move, stones, q) {
+        addChild(id, move, stones, gameOver) {
             for (let child of this.children) {
                 if (child.lastMove == null) {
                     throw new Error('Child node shouldn\'t have a null lastMove');
@@ -48,13 +49,15 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
                 }
             }
             let isMainline = this.isMainline && this.children.length == 0;
-            let child = new Position(id, this, stones, q, move, base_1.otherColor(this.toPlay), isMainline);
+            let child = new Position(id, this, stones, move, base_1.otherColor(this.toPlay), gameOver, isMainline);
             this.children.push(child);
             return child;
         }
+        update(update) {
+            const props = ['n', 'q', 'dq', 'pv', 'search', 'childN', 'childQ'];
+            util_1.partialUpdate(update, this, props);
+        }
     }
     exports.Position = Position;
-    let rootPosition = new Position('root', null, util_1.emptyBoard(), 0, null, base_1.Color.Black, true);
-    exports.rootPosition = rootPosition;
 });
 //# sourceMappingURL=position.js.map

@@ -47,9 +47,11 @@ abstract class Layer {
 
   abstract clear(): void;
 
+  // Tell the layer that the given properties on the board's position have
+  // been updated.
   // Returns true if position contained updated data for the layer and it should
   // be redrawn.
-  abstract update(position: Position): boolean;
+  abstract update(props: Set<string>): boolean;
 
   abstract draw(): void;
 }
@@ -57,7 +59,7 @@ abstract class Layer {
 abstract class StaticLayer extends Layer {
   clear() {}
 
-  update(position: Position) {
+  update(props: Set<string>) {
     return false;
   }
 }
@@ -153,6 +155,7 @@ class Caption extends StaticLayer {
   }
 }
 
+  /*
 class HeatMap extends Layer {
   private colors: Nullable<Float32Array[]> = null;
 
@@ -168,7 +171,7 @@ class HeatMap extends Layer {
     }
   }
 
-  update(position: Position) {
+  update(props: Set<string>) {
     let data = this.getData<Nullable<number[]>>(dataObj, this.dataPropName);
     if (data === undefined) {
       return false;
@@ -201,6 +204,7 @@ class HeatMap extends Layer {
     }
   }
 }
+   */
 
 abstract class StoneBaseLayer extends Layer {
   protected blackStones: Point[] = [];
@@ -229,7 +233,11 @@ class BoardStones extends StoneBaseLayer {
     super(1);
   }
 
-  update(position: Position) {
+  update(props: Set<string>) {
+    if (!props.has('stones')) {
+      return false;
+    }
+    let position = this.board.position;
     this.blackStones = [];
     this.whiteStones = [];
     let i = 0;
@@ -268,8 +276,11 @@ class Variation extends StoneBaseLayer {
   private blackLabels: VariationLabel[] = [];
   private whiteLabels: VariationLabel[] = [];
 
-  constructor(private dataPropName: string, alpha = 0.4) {
+  constructor(private prop: string, alpha = 0.4) {
     super(alpha);
+    if (this.prop != 'pv' && this.prop != 'search') {
+      throw new Error('prop must be \'pv\' or \'search\'');
+    }
   }
 
   clear() {
@@ -279,11 +290,16 @@ class Variation extends StoneBaseLayer {
     this.requiredFirstMove = null;
   }
 
-  update(position: Position) {
+  update(props: Set<string>) {
+    if (!props.has(this.prop)) {
+      return false;
+    }
+
+    let position = this.board.position;
     let variation: Move[];
-    if (this.dataPropName == 'pv') {
+    if (this.prop == 'pv') {
       variation = position.pv;
-    } else if (this.dataPropName == 'search') {
+    } else if (this.prop == 'search') {
       variation = position.search;
     } else {
       return false;
@@ -398,10 +414,6 @@ class Variation extends StoneBaseLayer {
 class Annotations extends Layer {
   private annotations = new Map<Annotation.Shape, Annotation[]>();
 
-  constructor(private dataPropName = 'annotations') {
-    super();
-  }
-
   clear() {
     if (this.annotations.size > 0) {
       this.annotations.clear();
@@ -409,8 +421,12 @@ class Annotations extends Layer {
     }
   }
 
-  // TODO(tommadams): detect when nothing has changed.
-  update(position: Position) {
+  update(props: Set<string>) {
+    if (!props.has('annotations')) {
+      return false;
+    }
+
+    let position = this.board.position;
     this.annotations.clear();
     for (let annotation of position.annotations) {
       let byShape = this.annotations.get(annotation.shape);
@@ -479,12 +495,17 @@ class Q extends Layer {
     }
   }
 
-  update(position: Position) {
-    if (position.childN == null || position.childQ == null) {
+  update(props: Set<string>) {
+    if (!props.has('childN') && !props.has('childQ')) {
       return false;
     }
 
     this.nextMoves = [];
+
+    let position = this.board.position;
+    if (position.childN == null || position.childQ == null) {
+      return false;
+    }
 
     // Build a list of indices into childN & childQ sorted in descending N
     // then descending Q.
@@ -569,7 +590,7 @@ export {
   BoardStones,
   Caption,
   Grid,
-  HeatMap,
+  //HeatMap,
   Label,
   Layer,
   Q,
