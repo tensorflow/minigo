@@ -45,6 +45,9 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
       courtesy_pass_(options.courtesy_pass),
       ponder_read_limit_(options.ponder_limit) {
+  if (ponder_read_limit_ > 0) {
+    ponder_type_ = PonderType::kReadLimited;
+  }
   RegisterCmd("benchmark", &GtpPlayer::HandleBenchmark);
   RegisterCmd("boardsize", &GtpPlayer::HandleBoardsize);
   RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
@@ -124,27 +127,18 @@ void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
 }
 
 bool GtpPlayer::MaybePonder() {
-  switch (ponder_type_) {
-    case PonderType::kOff:
-      return false;
-
-    case PonderType::kReadLimited:
-      if (ponder_read_count_ >= ponder_read_limit_) {
-        ponder_type_ = PonderType::kOff;
-      }
-      break;
-
-    case PonderType::kTimeLimited:
-      if (absl::Now() >= ponder_time_limit_) {
-        ponder_type_ = PonderType::kOff;
-      }
-      break;
+  if (ponder_type_ == PonderType::kOff || ponder_limit_reached_) {
+    return false;
   }
 
-  if (ponder_type_ == PonderType::kOff) {
-    // If we got this far, ponder_type_ was previously != kOff, so report
-    // that pondering has just finished.
-    std::cerr << "mg-ponder: done" << std::endl;
+  if ((ponder_type_ == PonderType::kReadLimited &&
+       ponder_read_count_ >= ponder_read_limit_) ||
+      (ponder_type_ == PonderType::kTimeLimited &&
+       absl::Now() >= ponder_time_limit_)) {
+    if (!ponder_limit_reached_) {
+      std::cerr << "mg-ponder: done" << std::endl;
+      ponder_limit_reached_ = true;
+    }
     return false;
   }
 
@@ -330,9 +324,12 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
   MG_CHECK(PlayMove(c));
 
   // Begin pondering again if requested.
-  if (ponder_read_limit_ > 0) {
-    ponder_type_ = PonderType::kReadLimited;
+  if (ponder_type_ != PonderType::kOff) {
+    ponder_limit_reached_ = false;
     ponder_read_count_ = 0;
+    if (ponder_type_ == PonderType::kTimeLimited) {
+      ponder_time_limit_ = absl::Now() + ponder_duration_;
+    }
   }
 
   ReportPosition();
@@ -476,21 +473,27 @@ GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
   ponder_type_ = PonderType::kOff;
   ponder_read_count_ = 0;
   ponder_read_limit_ = 0;
+  ponder_duration_ = {};
+  ponder_time_limit_ = absl::InfinitePast();
+  ponder_limit_reached_ = true;
 
-  if (args[0] == "moves") {
+  if (args[0] == "reads") {
     if (!absl::SimpleAtoi(args[1], &ponder_read_limit_) ||
         ponder_read_limit_ <= 0) {
       return Response::Error("couldn't parse read limit");
     }
-    ponder_read_count_ = 0;
     ponder_type_ = PonderType::kReadLimited;
+    ponder_read_count_ = 0;
+    ponder_limit_reached_ = false;
   } else if (args[0] == "time") {
-    float time;
-    if (!absl::SimpleAtof(args[1], &time) || time <= 0) {
+    float duration;
+    if (!absl::SimpleAtof(args[1], &duration) || duration <= 0) {
       return Response::Error("couldn't parse time limit");
     }
-    ponder_time_limit_ = absl::Now() + absl::Seconds(time);
     ponder_type_ = PonderType::kTimeLimited;
+    ponder_duration_ = absl::Seconds(duration);
+    ponder_time_limit_ = absl::Now() + ponder_duration_;
+    ponder_limit_reached_ = false;
   } else if (args[0] != "off") {
     return Response::Error("unrecognized ponder mode");
   }

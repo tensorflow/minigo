@@ -131,7 +131,6 @@ class GtpPlayer : public MctsPlayer {
   // There are two kinds of pondering supported:
   //   kReadLimited: pondering will run for a maximum number of reads.
   //   kTimeLimited: pondering will run for a maximum number of seconds.
-  // Once pondering has reached its limit, ponder type switches back to kOff.
   enum class PonderType {
     kOff,
     kReadLimited,
@@ -140,7 +139,9 @@ class GtpPlayer : public MctsPlayer {
   PonderType ponder_type_ = PonderType::kOff;
   int ponder_read_count_ = 0;
   int ponder_read_limit_ = 0;
-  absl::Time ponder_time_limit_;
+  absl::Duration ponder_duration_ = {};
+  absl::Time ponder_time_limit_ = absl::InfinitePast();
+  bool ponder_limit_reached_ = false;
 
   absl::flat_hash_map<std::string, CmdHandler> cmd_handlers_;
 

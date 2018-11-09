@@ -148,8 +148,8 @@ class WinrateGraph extends View {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'butt';
 
     // Apply a translation such that (0, 0) is the center of the pixel at the
     // top left of the graph.
@@ -159,19 +159,19 @@ class WinrateGraph extends View {
     ctx.lineWidth = pr;
 
     ctx.strokeStyle = '#96928f';
+    ctx.setLineDash([1, 2]);
+    ctx.beginPath();
+    ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0.5);
+    ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h - 0.5);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(0, h);
     ctx.moveTo(0, Math.floor(0.5 * h));
     ctx.lineTo(w, Math.floor(0.5 * h));
     ctx.stroke();
-
-    ctx.setLineDash([2, 2]);
-    ctx.beginPath();
-    ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0);
-    ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h);
-    ctx.stroke();
-    ctx.setLineDash([]);
 
     // Draw the Y axis labels.
     ctx.font = `${this.textHeight}px sans-serif`;
@@ -184,7 +184,7 @@ class WinrateGraph extends View {
     if (this.variation.length == 0) {
       this.drawPlot(this.mainLine, pr, '#ffe');
     } else {
-      this.drawPlot(this.mainLine, pr, '#96928f');
+      this.drawPlot(this.mainLine, pr, '#615b56');
       this.drawPlot(this.variation, pr, '#ffe');
     }
 

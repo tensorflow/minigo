@@ -95,23 +95,23 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             let h = this.h;
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            ctx.lineCap = 'butt';
+            ctx.lineJoin = 'butt';
             ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
             ctx.lineWidth = pr;
             ctx.strokeStyle = '#96928f';
+            ctx.setLineDash([1, 2]);
+            ctx.beginPath();
+            ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0.5);
+            ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h - 0.5);
+            ctx.stroke();
+            ctx.setLineDash([]);
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(0, h);
             ctx.moveTo(0, Math.floor(0.5 * h));
             ctx.lineTo(w, Math.floor(0.5 * h));
             ctx.stroke();
-            ctx.setLineDash([2, 2]);
-            ctx.beginPath();
-            ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0);
-            ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h);
-            ctx.stroke();
-            ctx.setLineDash([]);
             ctx.font = `${this.textHeight}px sans-serif`;
             ctx.fillStyle = '#96928f';
             ctx.textAlign = 'right';
@@ -122,7 +122,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 this.drawPlot(this.mainLine, pr, '#ffe');
             }
             else {
-                this.drawPlot(this.mainLine, pr, '#96928f');
+                this.drawPlot(this.mainLine, pr, '#615b56');
                 this.drawPlot(this.variation, pr, '#ffe');
             }
             ctx.textAlign = 'left';
