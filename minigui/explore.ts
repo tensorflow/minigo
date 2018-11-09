@@ -230,6 +230,18 @@ class ExploreApp extends App {
       this.variationTree.onHover((position: Nullable<Position>) => {
         this.board.highlightedVariation = position;
       });
+
+      // Repeatedly ponder for a few seconds at a time.
+      // We do this instead of pondering permanently because if simply
+      // enabled pondering and let it run, then if the user closed their
+      // Minigui tab without killing the backend, we'd permanently peg their
+      // accelerator.
+      this.gtp.onData('mg-ponder', (result: string) => {
+        if (result.trim().toLowerCase() == 'done') {
+          this.gtp.send('ponder time 10');
+        }
+      });
+      this.gtp.send('ponder time 10');
     });
   }
 
@@ -333,13 +345,11 @@ class ExploreApp extends App {
 
         this.board.enabled = false;
         this.board.showSearch = false;
-        this.gtp.send('ponder 0');
         this.gtp.send(`playsgf ${sgf}`).then(() => {
           this.selectPosition(this.rootPosition);
         }).finally(() => {
           this.board.enabled = true;
           this.board.showSearch = this.showSearch;
-          this.gtp.send('ponder 1');
         });
       };
       reader.readAsText(files[0]);

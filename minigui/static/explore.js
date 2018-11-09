@@ -178,6 +178,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.variationTree.onHover((position) => {
                     this.board.highlightedVariation = position;
                 });
+                this.gtp.onData('mg-ponder', (result) => {
+                    if (result.trim().toLowerCase() == 'done') {
+                        this.gtp.send('ponder time 10');
+                    }
+                });
+                this.gtp.send('ponder time 10');
             });
         }
         initEventListeners() {
@@ -270,13 +276,11 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     let sgf = reader.result.replace(/\n/g, '\\n');
                     this.board.enabled = false;
                     this.board.showSearch = false;
-                    this.gtp.send('ponder 0');
                     this.gtp.send(`playsgf ${sgf}`).then(() => {
                         this.selectPosition(this.rootPosition);
                     }).finally(() => {
                         this.board.enabled = true;
                         this.board.showSearch = this.showSearch;
-                        this.gtp.send('ponder 1');
                     });
                 };
                 reader.readAsText(files[0]);

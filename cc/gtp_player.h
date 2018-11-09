@@ -105,7 +105,6 @@ class GtpPlayer : public MctsPlayer {
   Response HandlePlay(absl::string_view cmd, CmdArgs args);
   Response HandlePlaysgf(absl::string_view cmd, CmdArgs args);
   Response HandlePonder(absl::string_view cmd, CmdArgs args);
-  Response HandlePonderLimit(absl::string_view cmd, CmdArgs args);
   Response HandlePruneNodes(absl::string_view cmd, CmdArgs args);
   Response HandleReadouts(absl::string_view cmd, CmdArgs args);
   Response HandleReportSearchInterval(absl::string_view cmd, CmdArgs args);
@@ -125,12 +124,23 @@ class GtpPlayer : public MctsPlayer {
   // map.
   std::string RegisterNode(MctsNode* node);
 
-  bool ponder_enabled_ = false;
-  int ponder_count_ = 0;
-  int ponder_limit_ = 0;
   bool courtesy_pass_;
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;
+
+  // There are two kinds of pondering supported:
+  //   kReadLimited: pondering will run for a maximum number of reads.
+  //   kTimeLimited: pondering will run for a maximum number of seconds.
+  // Once pondering has reached its limit, ponder type switches back to kOff.
+  enum class PonderType {
+    kOff,
+    kReadLimited,
+    kTimeLimited,
+  };
+  PonderType ponder_type_ = PonderType::kOff;
+  int ponder_read_count_ = 0;
+  int ponder_read_limit_ = 0;
+  absl::Time ponder_time_limit_;
 
   absl::flat_hash_map<std::string, CmdHandler> cmd_handlers_;
 

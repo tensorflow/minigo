@@ -43,8 +43,8 @@ const auto kGtpCmdDone = "__GTP_CMD_DONE__";
 
 GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
-      ponder_limit_(options.ponder_limit),
-      courtesy_pass_(options.courtesy_pass) {
+      courtesy_pass_(options.courtesy_pass),
+      ponder_read_limit_(options.ponder_limit) {
   RegisterCmd("benchmark", &GtpPlayer::HandleBenchmark);
   RegisterCmd("boardsize", &GtpPlayer::HandleBoardsize);
   RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
@@ -60,7 +60,6 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("play", &GtpPlayer::HandlePlay);
   RegisterCmd("playsgf", &GtpPlayer::HandlePlaysgf);
   RegisterCmd("ponder", &GtpPlayer::HandlePonder);
-  RegisterCmd("ponder_limit", &GtpPlayer::HandlePonderLimit);
   RegisterCmd("prune_nodes", &GtpPlayer::HandlePruneNodes);
   RegisterCmd("readouts", &GtpPlayer::HandleReadouts);
   RegisterCmd("report_search_interval", &GtpPlayer::HandleReportSearchInterval);
@@ -125,16 +124,36 @@ void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
 }
 
 bool GtpPlayer::MaybePonder() {
-  if (!ponder_enabled_ || ponder_count_ >= ponder_limit_) {
-    ponder_count_ = 0;
+  switch (ponder_type_) {
+    case PonderType::kOff:
+      return false;
+
+    case PonderType::kReadLimited:
+      if (ponder_read_count_ >= ponder_read_limit_) {
+        ponder_type_ = PonderType::kOff;
+      }
+      break;
+
+    case PonderType::kTimeLimited:
+      if (absl::Now() >= ponder_time_limit_) {
+        ponder_type_ = PonderType::kOff;
+      }
+      break;
+  }
+
+  if (ponder_type_ == PonderType::kOff) {
+    // If we got this far, ponder_type_ was previously != kOff, so report
+    // that pondering has just finished.
+    std::cerr << "mg-ponder: done" << std::endl;
     return false;
   }
 
-  if (ponder_count_++ == 0) {
+  if (ponder_read_count_ == 0) {
     std::cerr << "pondering..." << std::endl;
   }
-
+  int n = root()->N();
   TreeSearch();
+  ponder_read_count_ += root()->N() - n;
 
   return true;
 }
@@ -310,6 +329,12 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
   std::cerr << root()->Describe() << std::endl;
   MG_CHECK(PlayMove(c));
 
+  // Begin pondering again if requested.
+  if (ponder_read_limit_ > 0) {
+    ponder_type_ = PonderType::kReadLimited;
+    ponder_read_count_ = 0;
+  }
+
   ReportPosition();
 
   return Response::Ok(c.ToKgs());
@@ -442,35 +467,33 @@ GtpPlayer::Response GtpPlayer::HandlePlaysgf(absl::string_view cmd,
 
 GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
                                             CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+  auto response = CheckArgsExact(cmd, 2, args);
   if (!response.ok) {
     return response;
   }
 
-  int x;
-  if (!absl::SimpleAtoi(args[0], &x)) {
-    return Response::Error("couldn't parse ", args[0], " as an integer");
+  // Default to pondering disabled in case parsing fails.
+  ponder_type_ = PonderType::kOff;
+  ponder_read_count_ = 0;
+  ponder_read_limit_ = 0;
+
+  if (args[0] == "moves") {
+    if (!absl::SimpleAtoi(args[1], &ponder_read_limit_) ||
+        ponder_read_limit_ <= 0) {
+      return Response::Error("couldn't parse read limit");
+    }
+    ponder_read_count_ = 0;
+    ponder_type_ = PonderType::kReadLimited;
+  } else if (args[0] == "time") {
+    float time;
+    if (!absl::SimpleAtof(args[1], &time) || time <= 0) {
+      return Response::Error("couldn't parse time limit");
+    }
+    ponder_time_limit_ = absl::Now() + absl::Seconds(time);
+    ponder_type_ = PonderType::kTimeLimited;
+  } else if (args[0] != "off") {
+    return Response::Error("unrecognized ponder mode");
   }
-
-  ponder_enabled_ = x != 0;
-  ponder_count_ = 0;
-
-  return Response::Ok();
-}
-
-GtpPlayer::Response GtpPlayer::HandlePonderLimit(absl::string_view cmd,
-                                                 CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
-  if (!response.ok) {
-    return response;
-  }
-
-  int x;
-  if (!absl::SimpleAtoi(args[0], &x) || x < 0) {
-    return Response::Error("couldn't parse ", args[0], " as an integer >= 0");
-  }
-
-  ponder_limit_ = x;
 
   return Response::Ok();
 }
