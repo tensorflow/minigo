@@ -256,6 +256,46 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->decay_factor = FLAGS_decay_factor;
 }
 
+void LogEndGameInfo(const MctsPlayer& player, absl::Duration game_time) {
+  std::cout << player.result_string() << std::endl;
+  std::cout << "Playing game: " << absl::ToDoubleSeconds(game_time)
+            << std::endl;
+  std::cout << "Played moves: " << player.root()->position.n() << std::endl;
+
+  const auto& history = player.history();
+  if (history.empty()) {
+    return;
+  }
+
+  int bleakest_move = 0;
+  float q = 0.0;
+  if (FindBleakestMove(player, &bleakest_move, &q)) {
+    std::cout << "Bleakest eval: move=" << bleakest_move << " Q=" << q
+              << std::endl;
+  }
+
+  // If resignation is disabled, check to see if the first time Q_perspective
+  // crossed the resign_threshold the eventual winner of the game would have
+  // resigned. Note that we only check for the first resignation: if the
+  // winner would have incorrectly resigned AFTER the loser would have
+  // resigned on an earlier move, this is not counted as a bad resignation for
+  // the winner (since the game would have ended after the loser's initial
+  // resignation).
+  float result = player.result();
+  if (!player.options().resign_enabled) {
+    for (size_t i = 0; i < history.size(); ++i) {
+      if (history[i].node->Q_perspective() <
+          player.options().resign_threshold) {
+        if ((history[i].node->Q() < 0) != (result < 0)) {
+          std::cout << "Bad resign: move=" << i << " Q=" << history[i].node->Q()
+                    << std::endl;
+        }
+        break;
+      }
+    }
+  }
+}
+
 class SelfPlayer {
  public:
   void Run() {
@@ -306,55 +346,6 @@ class SelfPlayer {
     std::string sgf_dir;
   };
 
-  void LogEndGameInfo(MctsPlayer* player, absl::Duration game_time) {
-    std::cout << player->result_string() << std::endl;
-    std::cout << "Playing game: " << absl::ToDoubleSeconds(game_time)
-              << std::endl;
-    std::cout << "Played moves: " << player->root()->position.n() << std::endl;
-
-    const auto& history = player->history();
-    if (history.empty()) {
-      return;
-    }
-
-    // Find the move at which the game looked the bleakest from the perspective
-    // of the winner.
-    float result = player->result();
-    float bleakest_eval = history[0].node->Q() * result;
-    float bleakest_move = 0;
-    for (size_t i = 1; i < history.size(); ++i) {
-      float eval = history[i].node->Q() * result;
-      if (eval < bleakest_eval) {
-        bleakest_eval = eval;
-        bleakest_move = i;
-      }
-    }
-    if (!player->options().resign_enabled) {
-      std::cout << "Bleakest eval: move=" << bleakest_move
-                << " Q=" << history[bleakest_move].node->Q() << std::endl;
-    }
-
-    // If resignation is disabled, check to see if the first time Q_perspective
-    // crossed the resign_threshold the eventual winner of the game would have
-    // resigned. Note that we only check for the first resignation: if the
-    // winner would have incorrectly resigned AFTER the loser would have
-    // resigned on an earlier move, this is not counted as a bad resignation for
-    // the winner (since the game would have ended after the loser's initial
-    // resignation).
-    if (!player->options().resign_enabled) {
-      for (size_t i = 0; i < history.size(); ++i) {
-        if (history[i].node->Q_perspective() <
-            player->options().resign_threshold) {
-          if ((history[i].node->Q() < 0) != (result < 0)) {
-            std::cout << "Bad resign: move=" << i
-                      << " Q=" << history[i].node->Q() << std::endl;
-          }
-          break;
-        }
-      }
-    }
-  }
-
   void ThreadRun(int thread_id) {
     // Only print the board using ANSI colors if stderr is sent to the
     // terminal.
@@ -403,7 +394,7 @@ class SelfPlayer {
         // Log the end game info with the shared mutex held to prevent the
         // outputs from multiple threads being interleaved.
         absl::MutexLock lock(&mutex_);
-        LogEndGameInfo(player.get(), absl::Now() - start_time);
+        LogEndGameInfo(*player, absl::Now() - start_time);
       }
 
       // Write the outputs.

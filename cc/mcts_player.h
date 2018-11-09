@@ -219,6 +219,14 @@ class MctsPlayer {
   std::vector<const Position::Stones*> recent_positions_;
 };
 
+// Get information on the bleakest move for a completed game, if the game has
+// history and was played with resign disabled.  (If resign was enabled,
+// bleakest-move calculation is not relevant, since quitters don't know how bad
+// it could have been.)
+//
+// Returns true if the bleakest move was found and returned; false otherwise.
+bool FindBleakestMove(const MctsPlayer& player, int* move, float* q);
+
 }  // namespace minigo
 
 #endif  // CC_MCTS_PLAYER_H_

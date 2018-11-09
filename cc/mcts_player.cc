@@ -407,4 +407,29 @@ void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves,
   }
 }
 
+bool FindBleakestMove(const MctsPlayer& player, int* move, float* q) {
+  if (player.options().resign_enabled) {
+    return false;
+  }
+  const auto& history = player.history();
+  if (history.empty()) {
+    return false;
+  }
+  // Find the move at which the game looked the bleakest from the perspective
+  // of the winner.
+  float result = player.result();
+  float bleakest_eval = history[0].node->Q() * result;
+  size_t bleakest_move = 0;
+  for (size_t i = 1; i < history.size(); ++i) {
+    float eval = history[i].node->Q() * result;
+    if (eval < bleakest_eval) {
+      bleakest_eval = eval;
+      bleakest_move = i;
+    }
+  }
+  *move = int(bleakest_move);
+  *q = history[bleakest_move].node->Q();
+  return true;
+}
+
 }  // namespace minigo

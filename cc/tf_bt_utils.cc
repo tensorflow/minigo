@@ -112,6 +112,17 @@ void WriteGameExamples(const std::string& gcp_project_name,
 
   auto row_prefix = absl::StrFormat(kGameRowFormat, game_counter);
   WriteTfExamples(table, row_prefix, examples);
+  int bleakest_move = 0;
+  float bleakest_q = 0.0;
+  if (FindBleakestMove(player, &bleakest_move, &bleakest_q)) {
+    auto bleak_row_name =
+        absl::StrFormat(kPrefixAndMoveFormat, row_prefix, bleakest_move);
+    google::cloud::bigtable::SingleRowMutation row_mutation(bleak_row_name);
+    row_mutation.emplace_back(
+        SetCell("metadata", "bleakest_q", absl::StrCat(bleakest_q)));
+    table.Apply(std::move(row_mutation));
+  }
+
   std::cerr << "Bigtable rows written to prefix " << row_prefix << " : "
             << examples.size() << std::endl;
 }
