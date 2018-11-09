@@ -352,6 +352,7 @@ class ExploreApp extends App {
           this.board.showSearch = this.showSearch;
         });
       };
+      reader.readAsText(files[0]);
       // Clear the input's value. If we don't do this then reloading the
       // currently loaded SGF won't work because we listen to the 'change' even
       // and the value doesn't change when choosing the previously loaded file.

@@ -283,6 +283,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         this.board.showSearch = this.showSearch;
                     });
                 };
+                reader.readAsText(files[0]);
                 loadSgfElem.value = "";
             });
             let mainLineElem = util_1.getElement('main-line');
