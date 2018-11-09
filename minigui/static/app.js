@@ -79,11 +79,14 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             if (j.q != null) {
                 update.q = j.q;
             }
-            if (j.search != null) {
-                update.search = util.parseMoves(j.search);
-            }
-            if (j.pv != null) {
-                update.pv = util.parseMoves(j.pv);
+            if (j.variations != null) {
+                update.variations = {};
+                for (let key in j.variations) {
+                    if (key == null) {
+                        continue;
+                    }
+                    update.variations[key] = util.parseMoves(j.variations[key]);
+                }
             }
             if (j.childN != null) {
                 update.childN = j.childN;
@@ -92,12 +95,6 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                 update.childQ = [];
                 for (let q of j.childQ) {
                     update.childQ.push(q / 1000);
-                }
-                if (j.q != null) {
-                    update.dq = [];
-                    for (let q of update.childQ) {
-                        update.dq.push(q - j.q);
-                    }
                 }
             }
             return update;

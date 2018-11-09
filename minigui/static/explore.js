@@ -8,12 +8,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this._showSearch = true;
             this._showNext = true;
             this._highlightedVariation = null;
-            this.qLayer = new lyr.Q();
+            this.searchLayer = new lyr.Search();
             this.variationLayer = new lyr.Variation('pv');
             this.addLayers([
                 new lyr.Label(),
                 new lyr.BoardStones(),
-                this.qLayer,
+                this.searchLayer,
                 this.variationLayer,
                 new lyr.Annotations()
             ]);
@@ -23,7 +23,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 if (this.showSearch) {
                     let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
                     if (p != null) {
-                        if (this.getStone(p) != base_1.Color.Empty || !this.qLayer.hasPoint(p)) {
+                        if (this.getStone(p) != base_1.Color.Empty || !this.searchLayer.hasVariation(p)) {
                             p = null;
                         }
                     }
@@ -36,13 +36,14 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
             });
             this.onClick((p) => {
-                if (this.variationLayer.requiredFirstMove != null) {
+                if (this.variationLayer.showVariation != 'pv') {
                     this.gtp.send('variation');
                 }
+                this.variationLayer.showVariation = 'pv';
                 this.variationLayer.clear();
                 this.variationLayer.show = false;
-                this.qLayer.clear();
-                this.qLayer.show = true;
+                this.searchLayer.clear();
+                this.searchLayer.show = true;
             });
         }
         get showSearch() {
@@ -53,11 +54,11 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this._showSearch = x;
                 if (x) {
                     this.variationLayer.show = false;
-                    this.qLayer.show = true;
+                    this.searchLayer.show = true;
                 }
                 else {
                     this.variationLayer.show = false;
-                    this.qLayer.show = false;
+                    this.searchLayer.show = false;
                 }
                 this.draw();
             }
@@ -123,19 +124,26 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             ctx.setLineDash([]);
         }
         showVariation(p) {
-            if (base_1.movesEqual(p, this.variationLayer.requiredFirstMove)) {
+            let moveStr;
+            if (p == null) {
+                moveStr = 'pv';
+            }
+            else {
+                moveStr = base_1.toKgs(p);
+            }
+            if (moveStr == this.variationLayer.showVariation) {
                 return;
             }
+            this.variationLayer.showVariation = moveStr;
             this.variationLayer.clear();
             this.variationLayer.show = p != null;
-            this.qLayer.show = p == null;
+            this.searchLayer.show = p == null;
             if (p != null) {
-                this.gtp.send(`variation ${base_1.toKgs(p)}`);
+                this.gtp.send(`variation ${moveStr}`);
             }
             else {
                 this.gtp.send('variation');
             }
-            this.variationLayer.requiredFirstMove = p;
         }
     }
     class ExploreApp extends app_1.App {
@@ -196,11 +204,23 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 switch (e.key) {
                     case 'ArrowUp':
                     case 'ArrowLeft':
-                        this.selectPrevPosition();
+                        this.goBack(1);
                         break;
                     case 'ArrowRight':
                     case 'ArrowDown':
-                        this.selectNextPosition();
+                        this.goForward(1);
+                        break;
+                    case 'PageUp':
+                        this.goBack(10);
+                        break;
+                    case 'PageDown':
+                        this.goForward(10);
+                        break;
+                    case 'Home':
+                        this.goBack(Infinity);
+                        break;
+                    case 'End':
+                        this.goForward(Infinity);
                         break;
                 }
             });
@@ -209,10 +229,10 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     return;
                 }
                 if (e.deltaY < 0) {
-                    this.selectPrevPosition();
+                    this.goBack(1);
                 }
                 else if (e.deltaY > 0) {
-                    this.selectNextPosition();
+                    this.goForward(1);
                 }
             });
             let searchElem = util_1.getElement('toggle-search');
@@ -265,7 +285,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             mainLineElem.addEventListener('click', () => {
                 let position = this.activePosition;
                 while (position != this.rootPosition &&
-                    !position.isMainline && position.parent != null) {
+                    !position.isMainLine && position.parent != null) {
                     position = position.parent;
                 }
                 this.selectPosition(position);
@@ -290,24 +310,25 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
             });
         }
-        selectNextPosition() {
-            if (this.activePosition.children.length > 0) {
-                this.selectPosition(this.activePosition.children[0]);
+        goBack(n) {
+            let position = this.activePosition;
+            for (let i = 0; i < n && position.parent != null; ++i) {
+                position = position.parent;
             }
+            this.selectPosition(position);
         }
-        selectPrevPosition() {
-            if (this.activePosition.parent != null) {
-                let p = this.activePosition.parent;
-                for (let i = 0; i < 10; ++i) {
-                    this.selectPosition(p);
-                }
+        goForward(n) {
+            let position = this.activePosition;
+            for (let i = 0; i < n && position.children.length > 0; ++i) {
+                position = position.children[0];
             }
+            this.selectPosition(position);
         }
         selectPosition(position) {
             if (position != this.activePosition) {
                 this.activePosition = position;
                 this.board.setPosition(position);
-                this.winrateGraph.setWinrate(position.moveNum, position.q);
+                this.winrateGraph.update(position);
                 this.variationTree.setActive(position);
                 let moveNumStr = position.moveNum.toString();
                 if (this.moveElem.innerText != moveNumStr) {
@@ -329,7 +350,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         onPositionUpdate(position, update) {
             if (position == this.activePosition) {
                 this.board.update(update);
-                this.winrateGraph.setWinrate(position.moveNum, position.q);
+                this.winrateGraph.update(position);
                 util_1.getElement('reads').innerText = this.formatNumReads(position.n);
             }
         }

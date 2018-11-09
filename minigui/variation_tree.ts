@@ -368,7 +368,7 @@ class VariationTree extends View {
     // Right-most node at each depth in the tree.
     let rightNode: Node[] = [this.rootNode];
 
-    // We want to lay the nodes in the tree out such that the mainline of each
+    // We want to lay the nodes in the tree out such that the main line of each
     // node (the chain of first children of all descendants) is a vertical line.
     // We do this by incrementally building a new tree of layout data in
     // traversal order of the game tree, satisfying the following constraints at

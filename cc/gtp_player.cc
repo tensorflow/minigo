@@ -50,8 +50,6 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
   RegisterCmd("echo", &GtpPlayer::HandleEcho);
   RegisterCmd("final_score", &GtpPlayer::HandleFinalScore);
-  // TODO(tommadams): remove gamestate
-  RegisterCmd("gamestate", &GtpPlayer::HandleGamestate);
   RegisterCmd("genmove", &GtpPlayer::HandleGenmove);
   RegisterCmd("info", &GtpPlayer::HandleInfo);
   RegisterCmd("known_command", &GtpPlayer::HandleKnownCommand);
@@ -299,18 +297,6 @@ GtpPlayer::Response GtpPlayer::HandleFinalScore(absl::string_view cmd,
     // Game is over, we have the result available.
     return Response::Ok(result_string());
   }
-}
-
-GtpPlayer::Response GtpPlayer::HandleGamestate(absl::string_view cmd,
-                                               CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 0, args);
-  if (!response.ok) {
-    return response;
-  }
-
-  ReportPosition();
-
-  return Response::Ok();
 }
 
 GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
@@ -595,9 +581,6 @@ GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
     return response;
   }
 
-  // Make sure we always send the principal varation next time.
-  last_principal_variation_sent_.clear();
-
   if (args.size() == 0) {
     child_variation_ = Coord::kInvalid;
   } else {
@@ -672,43 +655,49 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
       {"n", root()->N()},
   };
 
-  if (last_read != nullptr) {
-    auto& search = j["search"] = nlohmann::json::array();
-    std::vector<const MctsNode*> path;
-    for (const auto* node = last_read; node != root(); node = node->parent) {
-      path.push_back(node);
-    }
-    for (auto it = path.rbegin(); it != path.rend(); ++it) {
-      search.push_back((*it)->move.ToKgs());
+  // Pricipal variation.
+  auto src_pv = root()->MostVisitedPath();
+  if (!src_pv.empty()) {
+    auto& dst_pv = j["variations"]["pv"];
+    for (Coord c : src_pv) {
+      dst_pv.push_back(c.ToKgs());
     }
   }
 
-  // Only report the principal variation when it changes.
-  std::vector<Coord> principal_variation;
-  if (child_variation_ == Coord::kInvalid) {
-    principal_variation = root()->MostVisitedPath();
-  } else {
+  // Current tree search variation.
+  if (last_read != nullptr) {
+    std::vector<const MctsNode*> src_search;
+    for (const auto* node = last_read; node != root(); node = node->parent) {
+      src_search.push_back(node);
+    }
+    if (!src_search.empty()) {
+      std::reverse(src_search.begin(), src_search.end());
+      auto& dst_search = j["variations"]["search"];
+      for (const auto* node : src_search) {
+        dst_search.push_back(node->move.ToKgs());
+      }
+    }
+  }
+
+  // Requested child variation, if any.
+  if (child_variation_ != Coord::kInvalid) {
+    auto& child_v = j["variations"][child_variation_.ToKgs()];
+    child_v.push_back(child_variation_.ToKgs());
     auto it = root()->children.find(child_variation_);
     if (it != root()->children.end()) {
-      principal_variation = it->second->MostVisitedPath();
+      for (Coord c : it->second->MostVisitedPath()) {
+        child_v.push_back(c.ToKgs());
+      }
     }
-  }
-  if (principal_variation != last_principal_variation_sent_) {
-    auto& pv = j["pv"];
-    if (child_variation_ != Coord::kInvalid) {
-      pv.push_back(child_variation_.ToKgs());
-    }
-    for (Coord c : principal_variation) {
-      pv.push_back(c.ToKgs());
-    }
-    last_principal_variation_sent_ = std::move(principal_variation);
   }
 
+  // Child N.
   auto& childN = j["childN"];
   for (const auto& edge : root()->edges) {
     childN.push_back(static_cast<int>(edge.N));
   }
 
+  // Child Q.
   auto& childQ = j["childQ"];
   for (int i = 0; i < kNumMoves; ++i) {
     childQ.push_back(static_cast<int>(root()->child_Q(i) * 1000));

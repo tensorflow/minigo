@@ -71,6 +71,10 @@ interface Point {
 
 type Move = Point | 'pass' | 'resign';
 
+function moveIsPoint(move: Nullable<Move>): move is Point {
+  return move != null && move != 'pass' && move != 'resign';
+}
+
 function toKgs(move: Move) {
   if (move == 'pass' || move == 'resign') {
     return move;
@@ -100,6 +104,7 @@ export {
   N,
   Nullable,
   Point,
+  moveIsPoint,
   movesEqual,
   otherColor,
   setBoardSize,

@@ -95,7 +95,6 @@ class GtpPlayer : public MctsPlayer {
   Response HandleClearBoard(absl::string_view cmd, CmdArgs args);
   Response HandleEcho(absl::string_view cmd, CmdArgs args);
   Response HandleFinalScore(absl::string_view cmd, CmdArgs args);
-  Response HandleGamestate(absl::string_view cmd, CmdArgs args);
   Response HandleGenmove(absl::string_view cmd, CmdArgs args);
   Response HandleInfo(absl::string_view cmd, CmdArgs args);
   Response HandleKnownCommand(absl::string_view cmd, CmdArgs args);
@@ -140,8 +139,6 @@ class GtpPlayer : public MctsPlayer {
   // root is reported. Otherwise, the principle variation of the
   // corresponding child of the root is reported.
   Coord child_variation_ = Coord::kInvalid;
-
-  std::vector<Coord> last_principal_variation_sent_;
 
   // The nodes we've informed the front end about.
   absl::flat_hash_map<std::string, MctsNode*> game_nodes_;

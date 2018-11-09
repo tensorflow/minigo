@@ -1,11 +1,25 @@
 define(["require", "exports", "./util", "./view"], function (require, exports, util_1, view_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    const MIN_POINTS = 10;
+    function arraysApproxEqual(a, b, threshold) {
+        if (a.length != b.length) {
+            return false;
+        }
+        for (let i = 0; i < a.length; ++i) {
+            if (Math.abs(a[i] - b[i]) > threshold) {
+                return false;
+            }
+        }
+        return true;
+    }
     class WinrateGraph extends view_1.View {
         constructor(parent) {
             super();
-            this.points = new Array();
-            this.minPoints = 10;
+            this.mainLine = [];
+            this.variation = [];
+            this.moveNum = 0;
+            this.xScale = MIN_POINTS;
             if (typeof (parent) == 'string') {
                 parent = util_1.getElement(parent);
             }
@@ -36,34 +50,49 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             this.textHeight = 0.06 * this.h;
         }
         clear() {
-            this.points = [[0, 0]];
+            this.mainLine = [];
+            this.variation = [];
+            this.moveNum = 0;
             this.draw();
         }
-        setWinrate(move, winrate) {
-            this.points[move] = [move, winrate];
-            this.draw();
+        update(position) {
+            let anythingChanged = position.moveNum != this.moveNum;
+            this.moveNum = position.moveNum;
+            while (position.children.length > 0) {
+                position = position.children[0];
+            }
+            let values = [];
+            let p = position;
+            while (p != null) {
+                values.push(p.q);
+                p = p.parent;
+            }
+            values.reverse();
+            if (position.isMainLine) {
+                this.mainLine = values;
+                this.variation = [];
+                anythingChanged =
+                    anythingChanged || !arraysApproxEqual(values, this.mainLine, 0.001);
+            }
+            else {
+                this.variation = values;
+                anythingChanged =
+                    anythingChanged || arraysApproxEqual(values, this.variation, 0.001);
+            }
+            if (anythingChanged) {
+                this.xScale = Math.max(this.mainLine.length - 1, this.variation.length - 1, MIN_POINTS);
+                this.draw();
+            }
         }
         drawImpl() {
             let pr = util_1.pixelRatio();
             let ctx = this.ctx;
             let w = this.w;
             let h = this.h;
-            let xScale = Math.max(this.points.length - 1, this.minPoints);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
             ctx.lineWidth = pr;
-            ctx.strokeStyle = '#56504b';
-            ctx.beginPath();
-            ctx.moveTo(0, Math.round(0.95 * h));
-            ctx.lineTo(w, Math.round(0.95 * h));
-            ctx.moveTo(0, Math.round(0.05 * h));
-            ctx.lineTo(w, Math.round(0.05 * h));
-            ctx.stroke();
-            let lineWidth = 3 * pr;
-            ctx.lineWidth = lineWidth;
             ctx.strokeStyle = '#96928f';
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -71,46 +100,57 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             ctx.moveTo(0, Math.floor(0.5 * h));
             ctx.lineTo(w, Math.floor(0.5 * h));
             ctx.stroke();
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0);
+            ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h);
+            ctx.stroke();
+            ctx.setLineDash([]);
             ctx.font = `${this.textHeight}px sans-serif`;
             ctx.fillStyle = '#96928f';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
             ctx.fillText('B', -0.5 * this.textHeight, Math.round(0.05 * h));
             ctx.fillText('W', -0.5 * this.textHeight, Math.round(0.95 * h));
-            let xOfs = Math.floor(lineWidth / 2);
-            ctx.translate(xOfs, 0);
-            w -= xOfs;
-            if (this.points.length >= 2) {
-                ctx.lineWidth = pr;
-                ctx.strokeStyle = '#eee';
-                ctx.beginPath();
-                let [x, y] = this.points[0];
-                ctx.moveTo(w * x / xScale, h * (0.5 - 0.5 * y));
-                for (let i = 1; i < this.points.length; ++i) {
-                    [x, y] = this.points[i];
-                    ctx.lineTo(w * x / xScale, h * (0.5 - 0.5 * y));
-                }
-                ctx.stroke();
+            if (this.variation.length == 0) {
+                this.drawPlot(this.mainLine, pr, '#ffe');
+            }
+            else {
+                this.drawPlot(this.mainLine, pr, '#96928f');
+                this.drawPlot(this.variation, pr, '#ffe');
             }
             ctx.textAlign = 'left';
             ctx.fillStyle = '#ffe';
-            let y;
-            if (this.points.length > 0) {
-                y = this.points[this.points.length - 1][1];
+            let y = 0;
+            let values = this.variation.length > 0 ? this.variation : this.mainLine;
+            if (values.length > 0) {
+                y = values[this.moveNum];
             }
-            else {
-                y = 0;
-            }
-            let score = y;
+            let score = 50 + 50 * y;
             y = h * (0.5 - 0.5 * y);
             let txt;
-            if (score > 0) {
-                txt = `B:${Math.round(score * 100)}%`;
+            if (score > 50) {
+                txt = `B:${Math.round(score)}%`;
             }
             else {
-                txt = `W:${Math.round(-score * 100)}%`;
+                txt = `W:${Math.round(100 - score)}%`;
             }
             ctx.fillText(txt, w + 8, y);
+        }
+        drawPlot(values, lineWidth, style) {
+            if (values.length < 2) {
+                return;
+            }
+            let ctx = this.ctx;
+            ctx.lineWidth = lineWidth;
+            ctx.strokeStyle = style;
+            ctx.beginPath();
+            ctx.moveTo(0, this.h * (0.5 - 0.5 * values[0]));
+            for (let x = 0; x < values.length; ++x) {
+                let y = values[x];
+                ctx.lineTo(this.w * x / this.xScale, this.h * (0.5 - 0.5 * y));
+            }
+            ctx.stroke();
         }
     }
     exports.WinrateGraph = WinrateGraph;

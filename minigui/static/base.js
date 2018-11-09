@@ -48,6 +48,10 @@ define(["require", "exports"], function (require, exports) {
         }
     }
     exports.setBoardSize = setBoardSize;
+    function moveIsPoint(move) {
+        return move != null && move != 'pass' && move != 'resign';
+    }
+    exports.moveIsPoint = moveIsPoint;
     function toKgs(move) {
         if (move == 'pass' || move == 'resign') {
             return move;

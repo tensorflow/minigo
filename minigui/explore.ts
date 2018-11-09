@@ -34,10 +34,10 @@ class ExploreBoard extends ClickableBoard {
       this._showSearch = x;
       if (x) {
         this.variationLayer.show = false;
-        this.qLayer.show = true;
+        this.searchLayer.show = true;
       } else {
         this.variationLayer.show = false;
-        this.qLayer.show = false;
+        this.searchLayer.show = false;
       }
       this.draw();
     }
@@ -65,19 +65,19 @@ class ExploreBoard extends ClickableBoard {
     }
   }
 
-  private qLayer: lyr.Q;
+  private searchLayer: lyr.Search;
   private variationLayer: lyr.Variation;
   private nextLayer: lyr.Annotations;
 
   constructor(parentElemId: string, position: Position, private gtp: Socket) {
     super(parentElemId, position, []);
 
-    this.qLayer = new lyr.Q();
+    this.searchLayer = new lyr.Search();
     this.variationLayer = new lyr.Variation('pv');
     this.addLayers([
         new lyr.Label(),
         new lyr.BoardStones(),
-        this.qLayer,
+        this.searchLayer,
         this.variationLayer,
         new lyr.Annotations()]);
     this.variationLayer.show = false;
@@ -87,7 +87,7 @@ class ExploreBoard extends ClickableBoard {
       if (this.showSearch) {
         let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
         if (p != null) {
-          if (this.getStone(p) != Color.Empty || !this.qLayer.hasPoint(p)) {
+          if (this.getStone(p) != Color.Empty || !this.searchLayer.hasVariation(p)) {
             p = null;
           }
         }
@@ -102,13 +102,14 @@ class ExploreBoard extends ClickableBoard {
     });
 
     this.onClick((p: Point) => {
-      if (this.variationLayer.requiredFirstMove != null) {
+      if (this.variationLayer.showVariation != 'pv') {
         this.gtp.send('variation');
       }
+      this.variationLayer.showVariation = 'pv';
       this.variationLayer.clear();
       this.variationLayer.show = false;
-      this.qLayer.clear();
-      this.qLayer.show = true;
+      this.searchLayer.clear();
+      this.searchLayer.show = true;
     });
   }
 
@@ -165,20 +166,26 @@ class ExploreBoard extends ClickableBoard {
   }
 
   private showVariation(p: Nullable<Point>) {
-    if (movesEqual(p, this.variationLayer.requiredFirstMove)) {
+    let moveStr: string;
+    if (p == null) {
+      moveStr = 'pv';
+    } else {
+      moveStr = toKgs(p);
+    }
+    if (moveStr == this.variationLayer.showVariation) {
       return;
     }
 
+    this.variationLayer.showVariation = moveStr;
     this.variationLayer.clear();
     this.variationLayer.show = p != null;
-    this.qLayer.show = p == null;
+    this.searchLayer.show = p == null;
 
     if (p != null) {
-      this.gtp.send(`variation ${toKgs(p)}`);
+      this.gtp.send(`variation ${moveStr}`);
     } else {
       this.gtp.send('variation');
     }
-    this.variationLayer.requiredFirstMove = p;
   }
 }
 
@@ -254,12 +261,23 @@ class ExploreApp extends App {
       switch (e.key) {
         case 'ArrowUp':
         case 'ArrowLeft':
-          this.selectPrevPosition();
+          this.goBack(1);
           break;
-
         case 'ArrowRight':
         case 'ArrowDown':
-          this.selectNextPosition();
+          this.goForward(1);
+          break;
+        case 'PageUp':
+          this.goBack(10);
+          break;
+        case 'PageDown':
+          this.goForward(10);
+          break;
+        case 'Home':
+          this.goBack(Infinity);
+          break;
+        case 'End':
+          this.goForward(Infinity);
           break;
       }
     });
@@ -269,11 +287,10 @@ class ExploreApp extends App {
       if (this.showConsole) {
         return;
       }
-
       if (e.deltaY < 0) {
-        this.selectPrevPosition();
+        this.goBack(1);
       } else if (e.deltaY > 0) {
-        this.selectNextPosition();
+        this.goForward(1);
       }
     });
 
@@ -333,7 +350,7 @@ class ExploreApp extends App {
     mainLineElem.addEventListener('click', () => {
       let position = this.activePosition;
       while (position != this.rootPosition &&
-             !position.isMainline && position.parent != null) {
+             !position.isMainLine && position.parent != null) {
         position = position.parent;
       }
       this.selectPosition(position);
@@ -362,26 +379,27 @@ class ExploreApp extends App {
     });
   }
 
-  protected selectNextPosition() {
-    if (this.activePosition.children.length > 0) {
-      this.selectPosition(this.activePosition.children[0]);
+  protected goBack(n: number) {
+    let position = this.activePosition;
+    for (let i = 0; i < n && position.parent != null; ++i) {
+      position = position.parent;
     }
+    this.selectPosition(position);
   }
 
-  protected selectPrevPosition() {
-    if (this.activePosition.parent != null) {
-      let p = this.activePosition.parent;
-      for (let i = 0; i < 10; ++i) {
-        this.selectPosition(p);
-      }
+  protected goForward(n: number) {
+    let position = this.activePosition;
+    for (let i = 0; i < n && position.children.length > 0; ++i) {
+      position = position.children[0];
     }
+    this.selectPosition(position);
   }
 
   protected selectPosition(position: Position) {
     if (position != this.activePosition) {
       this.activePosition = position;
       this.board.setPosition(position);
-      this.winrateGraph.setWinrate(position.moveNum, position.q);
+      this.winrateGraph.update(position);
       this.variationTree.setActive(position);
       let moveNumStr = position.moveNum.toString();
       if (this.moveElem.innerText != moveNumStr) {
@@ -410,7 +428,7 @@ class ExploreApp extends App {
   protected onPositionUpdate(position: Position, update: Position.Update) {
     if (position == this.activePosition) {
       this.board.update(update);
-      this.winrateGraph.setWinrate(position.moveNum, position.q);
+      this.winrateGraph.update(position);
       getElement('reads').innerText = this.formatNumReads(position.n);
     }
   }

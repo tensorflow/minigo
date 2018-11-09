@@ -162,56 +162,45 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.BoardStones = BoardStones;
     class Variation extends StoneBaseLayer {
-        constructor(prop, alpha = 0.4) {
+        constructor(_showVariation, alpha = 0.4) {
             super(alpha);
-            this.prop = prop;
-            this._requiredFirstMove = null;
+            this._showVariation = _showVariation;
             this.variation = [];
             this.blackLabels = [];
             this.whiteLabels = [];
-            if (this.prop != 'pv' && this.prop != 'search') {
-                throw new Error('prop must be \'pv\' or \'search\'');
-            }
         }
-        get requiredFirstMove() {
-            return this._requiredFirstMove;
+        get showVariation() {
+            return this._showVariation;
         }
-        set requiredFirstMove(p) {
-            if (!base_1.movesEqual(p, this._requiredFirstMove)) {
-                this._requiredFirstMove = p;
-                this.board.draw();
+        set showVariation(x) {
+            if (x == this._showVariation) {
+                return;
             }
+            this._showVariation = x;
+            this.update(new Set(["variations"]));
+            this.draw();
         }
         clear() {
             super.clear();
+            this.variation = [];
             this.blackLabels = [];
             this.whiteLabels = [];
-            this.requiredFirstMove = null;
         }
         update(props) {
-            if (!props.has(this.prop)) {
+            if (!props.has("variations")) {
                 return false;
             }
             let position = this.board.position;
-            let variation;
-            if (this.prop == 'pv') {
-                variation = position.pv;
-            }
-            else if (this.prop == 'search') {
-                variation = position.search;
-            }
-            else {
-                return false;
-            }
-            if (variation.length > 0 && this.requiredFirstMove != null &&
-                !base_1.movesEqual(variation[0], this.requiredFirstMove)) {
+            let variation = position.variations.get(this.showVariation);
+            if (variation === undefined) {
+                this.clear();
                 return false;
             }
             if (this.variationsEqual(variation, this.variation)) {
                 return false;
             }
-            this.variation = variation;
-            this.parseVariation(variation);
+            this.variation = variation.slice(0);
+            this.parseVariation(this.variation);
             return true;
         }
         variationsEqual(a, b) {
@@ -287,6 +276,15 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Variation = Variation;
+    (function (Variation) {
+        let Type;
+        (function (Type) {
+            Type[Type["Principal"] = 0] = "Principal";
+            Type[Type["CurrentSearch"] = 1] = "CurrentSearch";
+            Type[Type["SpecificMove"] = 2] = "SpecificMove";
+        })(Type = Variation.Type || (Variation.Type = {}));
+    })(Variation || (Variation = {}));
+    exports.Variation = Variation;
     class Annotations extends Layer {
         constructor() {
             super(...arguments);
@@ -338,33 +336,17 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Annotations = Annotations;
-    class NextMove {
-        constructor(idx, n, q, alpha) {
-            this.n = n;
-            this.q = q;
-            this.alpha = alpha;
-            this.p = {
-                row: Math.floor(idx / base_1.N),
-                col: idx % base_1.N,
-            };
-        }
-    }
-    class Q extends Layer {
+    class Search extends Layer {
         constructor() {
             super(...arguments);
-            this.nextMoves = [];
+            this.bestVariations = new Map();
         }
-        hasPoint(p) {
-            for (let move of this.nextMoves) {
-                if (base_1.movesEqual(p, move.p)) {
-                    return true;
-                }
-            }
-            return false;
+        hasVariation(p) {
+            return this.bestVariations.has(p.col + p.row * base_1.N);
         }
         clear() {
-            if (this.nextMoves.length > 0) {
-                this.nextMoves = [];
+            if (this.bestVariations.size > 0) {
+                this.bestVariations.clear();
                 this.board.draw();
             }
         }
@@ -372,7 +354,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             if (!props.has('childN') && !props.has('childQ')) {
                 return false;
             }
-            this.nextMoves = [];
+            this.bestVariations.clear();
             let position = this.board.position;
             if (position.childN == null || position.childQ == null) {
                 return false;
@@ -383,11 +365,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             }
             indices.sort((a, b) => {
                 let n = position.childN;
-                let q = position.childQ;
-                if (n[b] != n[a]) {
-                    return n[b] - n[a];
-                }
-                return q[b] - q[a];
+                return n[b] - n[a];
             });
             let maxN = position.childN[indices[0]];
             if (maxN == 0) {
@@ -398,48 +376,73 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             for (let i = 0; i < indices.length; ++i) {
                 let idx = indices[i];
                 let n = position.childN[idx];
-                if (n == 0) {
+                if (n <= 1 || n < position.n / 100) {
                     break;
                 }
-                let q = position.childQ[idx];
-                let alpha = Math.log(n) / logMaxN;
-                alpha *= alpha;
-                if (n < position.n / 100) {
-                    break;
+                this.addVariation(idx, logMaxN);
+            }
+            for (let child of position.children) {
+                if (base_1.moveIsPoint(child.lastMove) && !this.hasVariation(child.lastMove)) {
+                    let idx = child.lastMove.col + child.lastMove.row * base_1.N;
+                    this.addVariation(idx, logMaxN);
                 }
-                this.nextMoves.push(new NextMove(idx, n, q, alpha));
             }
             return true;
         }
         draw() {
-            if (this.nextMoves.length == 0) {
+            if (this.bestVariations.size == 0) {
                 return;
             }
             let ctx = this.board.ctx;
             let pr = util_1.pixelRatio();
             let stoneRgb = this.board.position.toPlay == base_1.Color.Black ? 0 : 255;
             let textRgb = 255 - stoneRgb;
-            for (let nextMove of this.nextMoves) {
-                ctx.fillStyle =
-                    `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${nextMove.alpha})`;
-                let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
+            this.bestVariations.forEach((v) => {
+                ctx.fillStyle = `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${v.alpha})`;
+                let c = this.boardToCanvas(v.p.row, v.p.col);
                 ctx.beginPath();
                 ctx.arc(c.x + 0.5, c.y + 0.5, this.board.stoneRadius, 0, 2 * Math.PI);
                 ctx.fill();
-            }
+            });
             let textHeight = Math.floor(0.8 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = `rgba(${textRgb}, ${textRgb}, ${textRgb}, 0.8)`;
             let scoreScale = this.board.position.toPlay == base_1.Color.Black ? 1 : -1;
-            for (let nextMove of this.nextMoves) {
-                let c = this.boardToCanvas(nextMove.p.row, nextMove.p.col);
-                let winRate = 50 + 50 * scoreScale * nextMove.q;
+            this.bestVariations.forEach((v) => {
+                let c = this.boardToCanvas(v.p.row, v.p.col);
+                let winRate = 50 + 50 * scoreScale * v.q;
                 ctx.fillText(winRate.toFixed(1), c.x, c.y);
+            });
+        }
+        addVariation(idx, logMaxN) {
+            if (this.board.position.childN == null ||
+                this.board.position.childQ == null) {
+                return;
             }
+            let n = this.board.position.childN[idx];
+            let q = this.board.position.childQ[idx];
+            let alpha = Math.log(n) / logMaxN;
+            alpha *= alpha;
+            this.bestVariations.set(idx, new Search.Move(idx, n, q, alpha));
         }
     }
-    exports.Q = Q;
+    exports.Search = Search;
+    (function (Search) {
+        class Move {
+            constructor(idx, n, q, alpha) {
+                this.n = n;
+                this.q = q;
+                this.alpha = alpha;
+                this.p = {
+                    row: Math.floor(idx / base_1.N),
+                    col: idx % base_1.N,
+                };
+            }
+        }
+        Search.Move = Move;
+    })(Search || (Search = {}));
+    exports.Search = Search;
 });
 //# sourceMappingURL=layer.js.map

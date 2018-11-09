@@ -32,7 +32,8 @@ interface PositionUpdateJson {
   id: string;
   n?: number;
   q?: number;
-  pv?: string[];
+  pv?: string;
+  variations?: string[][];
   search?: string[];
   childN?: number[];
   childQ?: number[];
@@ -64,7 +65,7 @@ abstract class App {
     this.gtp.onData('mg-update', (j: PositionUpdateJson) => {
       let position = this.positionMap.get(j.id);
       if (position === undefined) {
-        // Just after refreshing the page, the backend will still be sending 
+        // Just after refreshing the page, the backend will still be sending
         // position updates if pondering is enabled. Ignore updates for any
         // positions we don't know about.
         return;
@@ -142,11 +143,14 @@ abstract class App {
     let update: Position.Update = {}
     if (j.n != null) { update.n = j.n; }
     if (j.q != null) { update.q = j.q; }
-    if (j.search != null) {
-      update.search = util.parseMoves(j.search);
-    }
-    if (j.pv != null) {
-      update.pv = util.parseMoves(j.pv as string[]);
+    if (j.variations != null) {
+      update.variations = {};
+      for (let key in j.variations) {
+        if (key == null) {
+          continue;
+        }
+        update.variations[key] = util.parseMoves(j.variations[key]);
+      }
     }
     if (j.childN != null) {
       update.childN = j.childN;
@@ -155,12 +159,6 @@ abstract class App {
       update.childQ = [];
       for (let q of j.childQ) {
         update.childQ.push(q / 1000);
-      }
-      if (j.q != null) {
-        update.dq = [];
-        for (let q of update.childQ) {
-          update.dq.push(q - j.q);
-        }
       }
     }
     return update;

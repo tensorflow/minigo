@@ -12,21 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Nullable} from './base'
+import {Position} from './position'
 import {getElement, pixelRatio} from './util'
 import {View} from './view'
 
+const MIN_POINTS = 10;
+
+function arraysApproxEqual(a: number[], b: number[], threshold: number) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; ++i) {
+    if (Math.abs(a[i] - b[i]) > threshold) {
+      return false;
+    }
+  }
+  return true;
+}
+
 class WinrateGraph extends View {
   protected ctx: CanvasRenderingContext2D;
-  protected points = new Array<[number, number]>();
   protected marginTop: number;
   protected marginBottom: number;
   protected marginLeft: number;
   protected marginRight: number;
   protected textHeight: number;
-  protected minPoints = 10;
 
   protected w: number;
   protected h: number;
+
+  protected mainLine: number[] = [];
+  protected variation: number[] = [];
+
+  protected moveNum = 0;
+
+  protected xScale = MIN_POINTS;
 
   constructor(parent: HTMLElement | string) {
     super();
@@ -66,14 +87,51 @@ class WinrateGraph extends View {
   }
 
   clear() {
-    this.points = [[0, 0]];
+    this.mainLine = [];
+    this.variation = [];
+    this.moveNum = 0;
     this.draw();
   }
 
   // Sets the predicted winrate for the given move.
-  setWinrate(move: number, winrate: number) {
-    this.points[move] = [move, winrate];
-    this.draw();
+  update(position: Position) {
+    let anythingChanged = position.moveNum != this.moveNum;
+    this.moveNum = position.moveNum;
+
+    // Find the end of this variation.
+    while (position.children.length > 0) {
+      position = position.children[0];
+    }
+
+    // Get the score history for this line.
+    let values: number[] = [];
+    let p: Nullable<Position> = position;
+    while (p != null) {
+      values.push(p.q);
+      p = p.parent;
+    }
+    values.reverse();
+
+    if (position.isMainLine) {
+      // When the given position is on the main line, update it and remove the
+      // variation.
+      this.mainLine = values;
+      this.variation = [];
+      anythingChanged =
+          anythingChanged || !arraysApproxEqual(values, this.mainLine, 0.001);
+    } else {
+      // When the given position is a variation, update it but leave the main
+      // line alone.
+      this.variation = values;
+      anythingChanged =
+          anythingChanged || arraysApproxEqual(values, this.variation, 0.001);
+    }
+
+    if (anythingChanged) {
+      this.xScale = Math.max(
+          this.mainLine.length - 1, this.variation.length - 1, MIN_POINTS);
+      this.draw();
+    }
   }
 
   drawImpl() {
@@ -81,7 +139,6 @@ class WinrateGraph extends View {
     let ctx = this.ctx;
     let w = this.w;
     let h = this.h;
-    let xScale = Math.max(this.points.length - 1, this.minPoints);
 
     // Reset the transform to identity and clear.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -91,23 +148,8 @@ class WinrateGraph extends View {
     // top left of the graph.
     ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
 
-    // Round caps & joins look nice.
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // Draw the resign threshold lines.
+    // Draw the horizontal & vertical axis and the move.
     ctx.lineWidth = pr;
-    ctx.strokeStyle = '#56504b';
-    ctx.beginPath();
-    ctx.moveTo(0, Math.round(0.95 * h));
-    ctx.lineTo(w, Math.round(0.95 * h));
-    ctx.moveTo(0, Math.round(0.05 * h));
-    ctx.lineTo(w, Math.round(0.05 * h));
-    ctx.stroke();
-
-    // Draw the horizontal & vertical axis.
-    let lineWidth = 3 * pr;
-    ctx.lineWidth = lineWidth;
 
     ctx.strokeStyle = '#96928f';
     ctx.beginPath();
@@ -117,6 +159,13 @@ class WinrateGraph extends View {
     ctx.lineTo(w, Math.floor(0.5 * h));
     ctx.stroke();
 
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0);
+    ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     // Draw the Y axis labels.
     ctx.font = `${this.textHeight}px sans-serif`;
     ctx.fillStyle = '#96928f';
@@ -125,44 +174,47 @@ class WinrateGraph extends View {
     ctx.fillText('B', -0.5 * this.textHeight, Math.round(0.05 * h));
     ctx.fillText('W', -0.5 * this.textHeight, Math.round(0.95 * h));
 
-    // Offset the start of the X axis by the width of the vertical axis.
-    // It looks nicer that way.
-    let xOfs = Math.floor(lineWidth / 2);
-    ctx.translate(xOfs, 0);
-    w -= xOfs;
-
-    // Draw the graph.
-    if (this.points.length >= 2) {
-      ctx.lineWidth = pr;
-      ctx.strokeStyle = '#eee';
-      ctx.beginPath();
-      let [x, y] = this.points[0];
-      ctx.moveTo(w * x / xScale, h * (0.5 - 0.5 * y));
-      for (let i = 1; i < this.points.length; ++i) {
-        [x, y] = this.points[i];
-        ctx.lineTo(w * x / xScale, h * (0.5 - 0.5 * y));
-      }
-      ctx.stroke();
+    if (this.variation.length == 0) {
+      this.drawPlot(this.mainLine, pr, '#ffe');
+    } else {
+      this.drawPlot(this.mainLine, pr, '#96928f');
+      this.drawPlot(this.variation, pr, '#ffe');
     }
 
     // Draw the value label.
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffe';
-    let y;
-    if (this.points.length > 0) {
-      y = this.points[this.points.length - 1][1];
-    } else {
-      y = 0;
+    let y = 0;
+    let values = this.variation.length > 0 ? this.variation : this.mainLine;
+    if (values.length > 0) {
+      y = values[this.moveNum];
     }
-    let score = y;
+    let score = 50 + 50 * y;
     y = h * (0.5 - 0.5 * y);
     let txt: string;
-    if (score > 0) {
-      txt = `B:${Math.round(score * 100)}%`;
+    if (score > 50) {
+      txt = `B:${Math.round(score)}%`;
     } else {
-      txt = `W:${Math.round(-score * 100)}%`;
+      txt = `W:${Math.round(100 - score)}%`;
     }
     ctx.fillText(txt, w + 8, y);
+  }
+
+  private drawPlot(values: number[], lineWidth: number, style: string) {
+    if (values.length < 2) {
+      return;
+    }
+
+    let ctx = this.ctx;
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = style;
+    ctx.beginPath();
+    ctx.moveTo(0, this.h * (0.5 - 0.5 * values[0]));
+    for (let x = 0; x < values.length; ++x) {
+      let y = values[x];
+      ctx.lineTo(this.w * x / this.xScale, this.h * (0.5 - 0.5 * y));
+    }
+    ctx.stroke();
   }
 }
 

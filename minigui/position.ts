@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Color, Move, Nullable, Point, movesEqual, otherColor, stonesEqual} from './base'
+import {Color, Move, Nullable, Point, movesEqual, otherColor, stonesEqual, toKgs} from './base'
 import {partialUpdate} from './util'
 
 namespace Annotation {
@@ -32,9 +32,13 @@ class Position {
   q = 0;
   moveNum: number;
   search: Move[] = [];
-  pv: Move[] = [];
-  // TODO(tommadams): remove dq
-  dq: Nullable<number[]> = null;
+
+  // A map of variations.
+  // The pricinpal variation is keyed by "pv".
+  // The current tree search is keyed by "search".
+  // All other variations are keyed by their KGS string.
+  variations = new Map<string, Move[]>();
+
   annotations: Annotation[] = [];
   childN: Nullable<number[]> = null;
   childQ: Nullable<number[]> = null;
@@ -48,7 +52,7 @@ class Position {
               public lastMove: Nullable<Move>,
               public toPlay: Color,
               public gameOver: boolean,
-              public isMainline: boolean) {
+              public isMainLine: boolean) {
     this.moveNum = parent != null ? parent.moveNum + 1 : 0;
     if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
       this.annotations.push({
@@ -75,32 +79,55 @@ class Position {
     }
 
     // Create a new child.
-    let isMainline = this.isMainline && this.children.length == 0;
+    let isMainLine = this.isMainLine && this.children.length == 0;
     let child = new Position(id, this, stones, move, otherColor(this.toPlay),
-                             gameOver, isMainline);
+                             gameOver, isMainLine);
     this.children.push(child);
     return child;
   }
 
   update(update: Position.Update) {
-    // TODO(tommadams): It would be more flexible to allow the position
-    // to store any/all properties return in the SearchMsg, without having to
-    // specify this property list.
-    const props = ['n', 'q', 'dq', 'pv', 'search', 'childN', 'childQ'];
+    // Update simple properties.
+    const props = ['n', 'q', 'childN', 'childQ'];
     partialUpdate(update, this, props);
+
+    // Variations need special handling.
+    if (update.variations != null) {
+      for (let key in update.variations) {
+        this.variations.set(key, update.variations[key]);
+      }
+      // If the update has a principal variation also update the variation
+      // at it's first move.
+      if ("pv" in update.variations) {
+        let pv = update.variations["pv"];
+        if (pv.length > 0) {
+          this.variations.set(toKgs(pv[0]), pv);
+        }
+      }
+    }
   }
 }
 
 
 namespace Position {
   export interface Update {
+    // Number of reads under this position.
     n?: number;
+
+    // This position's Q score.
     q?: number;
-    pv?: Move[];
-    search?: Move[];
+
+    // A map of variations.
+    // The pricinpal variation is keyed by "pv".
+    // The current tree search is keyed by "search".
+    // All other variations are keyed by their KGS string.
+    variations?: {[index: string]: Move[]};
+
+    // Child visit counts.
     childN?: number[];
+
+    // Child Q scores.
     childQ?: number[];
-    dq?: number[];  // TODO(tommadams): remove this
   }
 }
 

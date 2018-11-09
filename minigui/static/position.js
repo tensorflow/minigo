@@ -10,19 +10,18 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
     })(Annotation || (Annotation = {}));
     exports.Annotation = Annotation;
     class Position {
-        constructor(id, parent, stones, lastMove, toPlay, gameOver, isMainline) {
+        constructor(id, parent, stones, lastMove, toPlay, gameOver, isMainLine) {
             this.id = id;
             this.parent = parent;
             this.stones = stones;
             this.lastMove = lastMove;
             this.toPlay = toPlay;
             this.gameOver = gameOver;
-            this.isMainline = isMainline;
+            this.isMainLine = isMainLine;
             this.n = 0;
             this.q = 0;
             this.search = [];
-            this.pv = [];
-            this.dq = null;
+            this.variations = new Map();
             this.annotations = [];
             this.childN = null;
             this.childQ = null;
@@ -48,14 +47,25 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
                     return child;
                 }
             }
-            let isMainline = this.isMainline && this.children.length == 0;
-            let child = new Position(id, this, stones, move, base_1.otherColor(this.toPlay), gameOver, isMainline);
+            let isMainLine = this.isMainLine && this.children.length == 0;
+            let child = new Position(id, this, stones, move, base_1.otherColor(this.toPlay), gameOver, isMainLine);
             this.children.push(child);
             return child;
         }
         update(update) {
-            const props = ['n', 'q', 'dq', 'pv', 'search', 'childN', 'childQ'];
+            const props = ['n', 'q', 'childN', 'childQ'];
             util_1.partialUpdate(update, this, props);
+            if (update.variations != null) {
+                for (let key in update.variations) {
+                    this.variations.set(key, update.variations[key]);
+                }
+                if ("pv" in update.variations) {
+                    let pv = update.variations["pv"];
+                    if (pv.length > 0) {
+                        this.variations.set(base_1.toKgs(pv[0]), pv);
+                    }
+                }
+            }
         }
     }
     exports.Position = Position;
