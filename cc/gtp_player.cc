@@ -258,7 +258,7 @@ GtpPlayer::Response GtpPlayer::HandleFinalScore(absl::string_view cmd,
   if (!response.ok) {
     return response;
   }
-  if (!game_over()) {
+  if (!root()->game_over()) {
     // Game isn't over yet, calculate the current score using Tromp-Taylor
     // scoring.
     return Response::Ok(
@@ -551,7 +551,7 @@ void GtpPlayer::ReportGameState() const {
       {"moveNum", position.n()},
       {"board", oss.str()},
       {"q", root()->parent != nullptr ? root()->parent->Q() : 0},
-      {"gameOver", game_over()},
+      {"gameOver", root()->game_over()},
   };
   if (!history().empty()) {
     j["lastMove"] = history().back().c.ToKgs();

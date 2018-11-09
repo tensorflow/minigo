@@ -71,6 +71,12 @@ class MctsNode {
            (1 + child_N(i));
   }
 
+  bool game_over() const {
+    return (position.previous_move() == Coord::kResign) ||
+           (position.previous_move() == Coord::kPass && parent != nullptr &&
+            parent->position.previous_move() == Coord::kPass);
+  }
+
   // Finds the best move by visit count, N. Ties are broken using the child
   // action score.
   Coord GetMostVisitedMove() const;

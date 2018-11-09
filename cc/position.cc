@@ -67,8 +67,8 @@ Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
 }
 
 void Position::PlayMove(Coord c, Color color) {
-  if (c == Coord::kPass) {
-    PassMove();
+  if (c == Coord::kPass || c == Coord::kResign) {
+    PassOrResignMove(c);
     return;
   }
 
@@ -83,7 +83,6 @@ void Position::PlayMove(Coord c, Color color) {
   AddStoneToBoard(c, color);
 
   n_ += 1;
-  num_consecutive_passes_ = 0;
   to_play_ = OtherColor(to_play_);
   previous_move_ = c;
 }
@@ -162,12 +161,11 @@ std::string Position::ToPrettyString(bool use_ansi_colors) const {
   return oss.str();
 }
 
-void Position::PassMove() {
+void Position::PassOrResignMove(Coord c) {
   n_ += 1;
-  num_consecutive_passes_ += 1;
   ko_ = Coord::kInvalid;
   to_play_ = OtherColor(to_play_);
-  previous_move_ = Coord::kPass;
+  previous_move_ = c;
 }
 
 void Position::AddStoneToBoard(Coord c, Color color) {

@@ -260,10 +260,10 @@ MctsNode* MctsNode::SelectLeaf() {
 
 void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
                                   float value, MctsNode* up_to) {
-  assert(move_probabilities.size() == kNumMoves);
+  MG_DCHECK(move_probabilities.size() == kNumMoves);
   // A finished game should not be going through this code path, it should
   // directly call BackupValue on the result of the game.
-  assert(!position.is_game_over());
+  MG_DCHECK(!game_over());
 
   // If the node has already been selected for the next inference batch, we
   // shouldn't 'expand' it again.
@@ -304,8 +304,8 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
 }
 
 void MctsNode::IncorporateEndGameResult(float value, MctsNode* up_to) {
-  assert(position.is_game_over() || position.n() == kMaxSearchDepth);
-  assert(!is_expanded);
+  MG_DCHECK(game_over() || position.n() == kMaxSearchDepth);
+  MG_DCHECK(!is_expanded);
   BackupValue(value, up_to);
 }
 

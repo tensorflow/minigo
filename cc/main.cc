@@ -377,7 +377,7 @@ class SelfPlayer {
 
       // Play the game.
       auto start_time = absl::Now();
-      while (!player->game_over()) {
+      while (!player->root()->game_over()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
           const auto& position = player->root()->position;
@@ -650,7 +650,7 @@ class Evaluator {
     auto* factory = model->factory.get();
     auto* other_factory = other_model->factory.get();
 
-    while (!player->game_over()) {
+    while (!player->root()->game_over()) {
       // Create the DualNet for a single move and dispose it again. This
       // is required because a BatchingDualNet instance can prevent the
       // inference queue from being flushed if it's not sending any requests.

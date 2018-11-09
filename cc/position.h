@@ -196,7 +196,6 @@ class Position {
   Coord previous_move() const { return previous_move_; }
   const Stones& stones() const { return stones_; }
   int n() const { return n_; }
-  bool is_game_over() const { return num_consecutive_passes_ >= 2; }
   zobrist::Hash stone_hash() const { return stone_hash_; }
 
   // The following methods are protected to enable direct testing by unit tests.
@@ -213,8 +212,11 @@ class Position {
   Color IsKoish(Coord c) const;
 
  private:
-  // Play a pass move.
-  void PassMove();
+  // Play a pass or resign move.
+  // Note that in computer go, resign isn't normally considered a move but we
+  // treat it as such here so that we can handle a game tree that potentially
+  // contains multiple resigned positions in its different variations.
+  void PassOrResignMove(Coord c);
 
   // Removes the group with a stone at the given coordinate from the board,
   // updating the liberty counts of neighboring groups.
@@ -241,7 +243,6 @@ class Position {
   std::array<int, 2> num_captures_{{0, 0}};
 
   int n_;
-  int num_consecutive_passes_ = 0;
 
   // Zobrist hash of the stones. It can be used for positional superko.
   // This has does not include number of consecutive passes or ko, so should not

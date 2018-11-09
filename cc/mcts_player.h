@@ -136,24 +136,20 @@ class MctsPlayer {
   MctsNode* root() { return root_; }
   const MctsNode* root() const { return root_; }
 
-  // Returns true if the game is over, either because both players passed, one
-  // player resigned, or the game reached the maximum number of allowed moves.
-  bool game_over() const { return game_over_; }
-
   // Returns the result of the game:
   //   +1.0 if black won.
   //    0.0 if the game was drawn.
   //   -1.0 if white won.
   // Check fails if the game is not yet over.
   float result() const {
-    MG_CHECK(game_over_);
+    MG_CHECK(root_->game_over());
     return result_;
   }
 
   // Return a text description of the game result, e.g. "B+R", "W+1.5".
   // Check fails if the game is not yet over.
   const std::string& result_string() const {
-    MG_CHECK(game_over_);
+    MG_CHECK(root_->game_over());
     return result_string_;
   }
 
@@ -204,7 +200,6 @@ class MctsPlayer {
 
   float result_ = 0;
   std::string result_string_;
-  bool game_over_ = false;
 
   std::vector<History> history_;
 

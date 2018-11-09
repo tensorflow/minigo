@@ -103,13 +103,11 @@ MctsPlayer::~MctsPlayer() {
 void MctsPlayer::InitializeGame(const Position& position) {
   game_root_ = {&dummy_stats_, Position(&bv_, &gv_, position)};
   root_ = &game_root_;
-  game_over_ = false;
 }
 
 void MctsPlayer::NewGame() {
   game_root_ = MctsNode(&dummy_stats_, {&bv_, &gv_, Color::kBlack});
   root_ = &game_root_;
-  game_over_ = false;
   history_.clear();
 }
 
@@ -208,8 +206,7 @@ absl::Span<MctsNode* const> MctsPlayer::TreeSearch() {
     if (leaf == nullptr) {
       continue;
     }
-    if (leaf->position.is_game_over() ||
-        leaf->position.n() >= kMaxSearchDepth) {
+    if (leaf->game_over() || leaf->position.n() >= kMaxSearchDepth) {
       float value = leaf->position.CalculateScore(options_.komi) > 0 ? 1 : -1;
       leaf->IncorporateEndGameResult(value, root_);
     } else {
@@ -237,8 +234,7 @@ bool MctsPlayer::ShouldResign() const {
 }
 
 bool MctsPlayer::PlayMove(Coord c) {
-  std::cerr << "PlayMove(" << c << ")" << std::endl;
-  if (game_over_) {
+  if (root_->game_over()) {
     std::cerr << "ERROR: can't play move " << c << ", game is over"
               << std::endl;
     return false;
@@ -246,14 +242,14 @@ bool MctsPlayer::PlayMove(Coord c) {
 
   // Handle resignations.
   if (c == Coord::kResign) {
+    root_ = root_->MaybeAddChild(c);
     if (root_->position.to_play() == Color::kBlack) {
-      result_ = -1;
-      result_string_ = "W+R";
-    } else {
       result_ = 1;
       result_string_ = "B+R";
+    } else {
+      result_ = -1;
+      result_string_ = "W+R";
     }
-    game_over_ = true;
     return true;
   }
 
@@ -275,12 +271,10 @@ bool MctsPlayer::PlayMove(Coord c) {
   }
 
   // Handle consecutive passing.
-  if (root_->position.is_game_over() ||
-      root_->position.n() >= kMaxSearchDepth) {
+  if (root_->game_over() || root_->position.n() >= kMaxSearchDepth) {
     float score = root_->position.CalculateScore(options_.komi);
     result_string_ = FormatScore(score);
     result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
-    game_over_ = true;
   }
 
   return true;

@@ -365,7 +365,7 @@ TEST(MctsPlayerTest, ExtractDataNormalEnd) {
   player->PlayMove(Coord::kPass);
 
   auto* root = player->root();
-  EXPECT_TRUE(root->position.is_game_over());
+  EXPECT_TRUE(root->game_over());
   EXPECT_EQ(Color::kBlack, root->position.to_play());
 
   ASSERT_EQ(2, player->history().size());

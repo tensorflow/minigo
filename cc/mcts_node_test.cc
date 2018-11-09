@@ -194,8 +194,7 @@ TEST(MctsNodeTest, DoNotExplorePastFinish) {
   auto* first_pass = root.MaybeAddChild(Coord::kPass);
   first_pass->IncorporateResults(probs, 0, &root);
   auto* second_pass = first_pass->MaybeAddChild(Coord::kPass);
-  EXPECT_DEATH(second_pass->IncorporateResults(probs, 0, &root),
-               "is_game_over");
+  EXPECT_DEATH(second_pass->IncorporateResults(probs, 0, &root), "game_over");
   float value = second_pass->position.CalculateScore(0) > 0 ? 1 : -1;
   second_pass->IncorporateEndGameResult(value, &root);
   auto* node_to_explore = second_pass->SelectLeaf();
