@@ -69,15 +69,19 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             }
             values.reverse();
             if (position.isMainLine) {
-                this.mainLine = values;
-                this.variation = [];
                 anythingChanged =
                     anythingChanged || !arraysApproxEqual(values, this.mainLine, 0.001);
+                if (anythingChanged) {
+                    this.mainLine = values;
+                }
+                this.variation = [];
             }
             else {
-                this.variation = values;
                 anythingChanged =
-                    anythingChanged || arraysApproxEqual(values, this.variation, 0.001);
+                    anythingChanged || !arraysApproxEqual(values, this.variation, 0.001);
+                if (anythingChanged) {
+                    this.variation = values;
+                }
             }
             if (anythingChanged) {
                 this.xScale = Math.max(this.mainLine.length - 1, this.variation.length - 1, MIN_POINTS);
@@ -91,6 +95,8 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             let h = this.h;
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
             ctx.lineWidth = pr;
             ctx.strokeStyle = '#96928f';

@@ -113,18 +113,22 @@ class WinrateGraph extends View {
     values.reverse();
 
     if (position.isMainLine) {
-      // When the given position is on the main line, update it and remove the
-      // variation.
-      this.mainLine = values;
-      this.variation = [];
+      // When the given position is on the main line, update it and remove
+      // the variation.
       anythingChanged =
           anythingChanged || !arraysApproxEqual(values, this.mainLine, 0.001);
+      if (anythingChanged) {
+        this.mainLine = values;
+      }
+      this.variation = [];
     } else {
       // When the given position is a variation, update it but leave the main
       // line alone.
-      this.variation = values;
       anythingChanged =
-          anythingChanged || arraysApproxEqual(values, this.variation, 0.001);
+          anythingChanged || !arraysApproxEqual(values, this.variation, 0.001);
+      if (anythingChanged) {
+        this.variation = values;
+      }
     }
 
     if (anythingChanged) {
@@ -143,6 +147,9 @@ class WinrateGraph extends View {
     // Reset the transform to identity and clear.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     // Apply a translation such that (0, 0) is the center of the pixel at the
     // top left of the graph.
