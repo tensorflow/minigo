@@ -105,13 +105,15 @@ class Board extends View {
     this.draw();
   }
 
-  update(update: object) {
+  update(update: Position | Position.Update) {
     let anythingChanged = false;
     let keys = new Set<string>(Object.keys(update));
     for (let layer of this.layers) {
       if (layer.update(keys)) {
         anythingChanged = true;
       }
+    }
+    if (anythingChanged) {
       this.draw();
     }
   }

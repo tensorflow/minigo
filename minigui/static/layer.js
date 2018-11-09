@@ -115,6 +115,96 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Caption = Caption;
+    class HeatMapBase extends Layer {
+        constructor() {
+            super(...arguments);
+            this.colors = [];
+        }
+        clear() {
+            if (this.colors.length > 0) {
+                this.colors = [];
+                this.board.draw();
+            }
+        }
+        draw() {
+            if (this.colors.length == 0) {
+                return;
+            }
+            let ctx = this.board.ctx;
+            let w = this.board.pointW;
+            let h = this.board.pointH;
+            let stones = this.board.stones;
+            let p = { row: 0, col: 0 };
+            let i = 0;
+            for (p.row = 0; p.row < base_1.N; ++p.row) {
+                for (p.col = 0; p.col < base_1.N; ++p.col) {
+                    let rgba = this.colors[i];
+                    if (stones[i++] != base_1.Color.Empty) {
+                        continue;
+                    }
+                    ctx.fillStyle = `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, ${rgba[3]}`;
+                    let c = this.boardToCanvas(p.row, p.col);
+                    ctx.fillRect(c.x - 0.5 * w, c.y - 0.5 * h, w, h);
+                }
+            }
+        }
+    }
+    (function (HeatMapBase) {
+        HeatMapBase.TRANSPARENT = new Float32Array([0, 0, 0, 0]);
+    })(HeatMapBase || (HeatMapBase = {}));
+    class VisitCountHeatMap extends HeatMapBase {
+        update(props) {
+            if (!props.has('childN')) {
+                return false;
+            }
+            this.colors = [];
+            if (this.board.position.childN == null) {
+                return true;
+            }
+            let n = Math.max(this.board.position.n, 1);
+            for (let childN of this.board.position.childN) {
+                if (childN == 0) {
+                    this.colors.push(HeatMapBase.TRANSPARENT);
+                }
+                else {
+                    let a = Math.min(Math.sqrt(childN / n), 0.6);
+                    if (a > 0) {
+                        a = 0.1 + 0.9 * a;
+                    }
+                    this.colors.push(new Float32Array([0, 0, 0, a]));
+                }
+            }
+            return true;
+        }
+    }
+    exports.VisitCountHeatMap = VisitCountHeatMap;
+    class DeltaQHeatMap extends HeatMapBase {
+        update(props) {
+            if (!props.has('childQ')) {
+                return false;
+            }
+            let position = this.board.position;
+            this.colors = [];
+            if (position.childQ == null) {
+                return true;
+            }
+            let q = position.q;
+            for (let i = 0; i < base_1.N * base_1.N; ++i) {
+                if (position.stones[i] != base_1.Color.Empty) {
+                    this.colors.push(HeatMapBase.TRANSPARENT);
+                }
+                else {
+                    let childQ = position.childQ[i];
+                    let dq = childQ - q;
+                    let rgb = dq > 0 ? 0 : 255;
+                    let a = Math.min(Math.abs(dq), 0.6);
+                    this.colors.push(new Float32Array([rgb, rgb, rgb, a]));
+                }
+            }
+            return true;
+        }
+    }
+    exports.DeltaQHeatMap = DeltaQHeatMap;
     class StoneBaseLayer extends Layer {
         constructor(alpha) {
             super();

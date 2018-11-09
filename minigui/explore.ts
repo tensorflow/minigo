@@ -15,7 +15,6 @@
 import {App} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, Point, movesEqual, otherColor, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
-import {heatMapDq, heatMapN} from './heat_map'
 import {Socket} from './gtp_socket'
 import * as lyr from './layer'
 import {Log} from './log'
@@ -440,11 +439,12 @@ class ExploreApp extends App {
   }
 
   protected onPositionUpdate(position: Position, update: Position.Update) {
-    if (position == this.activePosition) {
-      this.board.update(update);
-      this.winrateGraph.update(position);
-      getElement('reads').innerText = this.formatNumReads(position.n);
+    if (position != this.activePosition) {
+      return;
     }
+    this.board.update(update);
+    this.winrateGraph.update(position);
+    getElement('reads').innerText = this.formatNumReads(position.n);
   }
 
   protected formatNumReads(numReads: number) {

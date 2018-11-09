@@ -353,11 +353,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.board.clear();
         }
         onPositionUpdate(position, update) {
-            if (position == this.activePosition) {
-                this.board.update(update);
-                this.winrateGraph.update(position);
-                util_1.getElement('reads').innerText = this.formatNumReads(position.n);
+            if (position != this.activePosition) {
+                return;
             }
+            this.board.update(update);
+            this.winrateGraph.update(position);
+            util_1.getElement('reads').innerText = this.formatNumReads(position.n);
         }
         formatNumReads(numReads) {
             if (numReads < 1000) {

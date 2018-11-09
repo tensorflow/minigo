@@ -155,33 +155,18 @@ class Caption extends StaticLayer {
   }
 }
 
-  /*
-class HeatMap extends Layer {
-  private colors: Nullable<Float32Array[]> = null;
-
-  constructor(private dataPropName: string,
-      private colorizeFn: (src: number[] | Float32Array) => Float32Array[]) {
-    super();
-  }
+abstract class HeatMapBase extends Layer {
+  protected colors: Float32Array[] = [];
 
   clear() {
-    if (this.colors) {
-      this.colors = null;
+    if (this.colors.length > 0) {
+      this.colors = [];
       this.board.draw();
     }
   }
 
-  update(props: Set<string>) {
-    let data = this.getData<Nullable<number[]>>(dataObj, this.dataPropName);
-    if (data === undefined) {
-      return false;
-    }
-    this.colors = data != null ? this.colorizeFn(data) : null;
-    return true;
-  }
-
   draw() {
-    if (!this.colors) {
+    if (this.colors.length == 0) {
       return;
     }
 
@@ -204,7 +189,68 @@ class HeatMap extends Layer {
     }
   }
 }
-   */
+
+namespace HeatMapBase {
+  export const TRANSPARENT = new Float32Array([0, 0, 0, 0]);
+}
+
+class VisitCountHeatMap extends HeatMapBase {
+  update(props: Set<string>) {
+    if (!props.has('childN')) {
+      return false;
+    }
+
+    this.colors = [];
+    if (this.board.position.childN == null) {
+      return true;
+    }
+
+    let n = Math.max(this.board.position.n, 1);
+    for (let childN of this.board.position.childN) {
+      if (childN == 0) {
+        this.colors.push(HeatMapBase.TRANSPARENT);
+      } else {
+        let a = Math.min(Math.sqrt(childN / n), 0.6);
+        if (a > 0) {
+          a = 0.1 + 0.9 * a;
+        }
+        this.colors.push(new Float32Array([0, 0, 0, a]));
+      }
+    }
+
+    return true;
+  }
+}
+
+class DeltaQHeatMap extends HeatMapBase {
+  update(props: Set<string>) {
+    if (!props.has('childQ')) {
+      return false;
+    }
+
+    let position = this.board.position;
+    this.colors = [];
+    if (position.childQ == null) {
+      return true;
+    }
+
+    let q = position.q;
+    for (let i = 0; i < N * N; ++i) {
+      if (position.stones[i] != Color.Empty) {
+        this.colors.push(HeatMapBase.TRANSPARENT);
+      } else {
+        let childQ = position.childQ[i];
+        let dq = childQ - q;
+        let rgb = dq > 0 ? 0 : 255;
+        let a = Math.min(Math.abs(dq), 0.6);
+        this.colors.push(new Float32Array([rgb, rgb, rgb, a]));
+      }
+    }
+
+    return true;
+  }
+}
+
 
 abstract class StoneBaseLayer extends Layer {
   protected blackStones: Point[] = [];
@@ -592,10 +638,11 @@ export {
   Annotations,
   BoardStones,
   Caption,
+  DeltaQHeatMap,
   Grid,
-  //HeatMap,
   Label,
   Layer,
   Search,
   Variation,
+  VisitCountHeatMap,
 }

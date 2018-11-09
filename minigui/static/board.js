@@ -71,6 +71,8 @@ define(["require", "exports", "./base", "./layer", "./util", "./view"], function
                 if (layer.update(keys)) {
                     anythingChanged = true;
                 }
+            }
+            if (anythingChanged) {
                 this.draw();
             }
         }

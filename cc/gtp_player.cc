@@ -726,7 +726,7 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   // Child Q.
   auto& childQ = j["childQ"];
   for (int i = 0; i < kNumMoves; ++i) {
-    childQ.push_back(static_cast<int>(root()->child_Q(i) * 1000));
+    childQ.push_back(static_cast<int>(std::round(root()->child_Q(i) * 1000)));
   }
 
   std::cerr << "mg-update:" << j.dump() << std::endl;
