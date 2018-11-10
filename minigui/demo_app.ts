@@ -1,4 +1,3 @@
-/*
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +15,6 @@
 import {App} from './app'
 import {COL_LABELS, Color, Move, N, Nullable, toKgs} from './base'
 import {Board, ClickableBoard} from './board'
-import {heatMapDq, heatMapN} from './heat_map'
 import * as lyr from './layer'
 import {Log} from './log'
 import {Position} from './position'
@@ -32,6 +30,7 @@ class DemoApp extends App {
   private playerElems: HTMLElement[] = [];
   private winrateGraph = new WinrateGraph('winrate-graph');
   private log = new Log('log', 'console');
+  private boards: Board[] = [];
 
   constructor() {
     super();
@@ -40,17 +39,17 @@ class DemoApp extends App {
       // Create boards for each of the elements in the UI.
       // The extra board views aren't available in the lightweight UI, so we
       // must check if the HTML elements exist.
-      this.mainBoard = new ClickableBoard('main-board', [
+      this.mainBoard = new ClickableBoard('main-board', this.rootPosition, [
           new lyr.Label(),
           new lyr.BoardStones(),
           new lyr.Variation('pv'),
           new lyr.Annotations()]);
 
-      let boards: Board[] = [this.mainBoard];
+      this.boards = [this.mainBoard];
 
       let searchElem = getElement('search-board');
       if (searchElem) {
-        boards.push(new Board(searchElem, [
+        this.boards.push(new Board(searchElem, this.rootPosition, [
             new lyr.Caption('search'),
             new lyr.BoardStones(),
             new lyr.Variation('search')]));
@@ -58,21 +57,19 @@ class DemoApp extends App {
 
       let nElem = getElement('n-board');
       if (nElem) {
-        boards.push(new Board(nElem, [
+        this.boards.push(new Board(nElem, this.rootPosition, [
             new lyr.Caption('N'),
-            new lyr.HeatMap('n', heatMapN),
+            new lyr.VisitCountHeatMap(),
             new lyr.BoardStones()]));
       }
 
       let dqElem = getElement('dq-board');
       if (dqElem) {
-        boards.push(new Board('dq-board', [
+        this.boards.push(new Board('dq-board', this.rootPosition, [
             new lyr.Caption('ΔQ'),
-            new lyr.HeatMap('dq', heatMapDq),
+            new lyr.DeltaQHeatMap(),
             new lyr.BoardStones()]));
       }
-
-      this.init(boards);
 
       this.mainBoard.onClick((p) => {
         this.playMove(this.activePosition.toPlay, p);
@@ -111,7 +108,9 @@ class DemoApp extends App {
         } else {
           elem.innerText = HUMAN;
         }
-        this.onPlayerChanged();
+        if (!this.engineBusy) {
+          this.onPlayerChanged();
+        }
       });
     };
     initPlayerButton(Color.Black, 'black-player');
@@ -125,35 +124,45 @@ class DemoApp extends App {
   }
 
   private onPlayerChanged() {
-    if (this.engineBusy || this.gameOver) {
+    if (this.activePosition.gameOver) {
       return;
     }
 
     if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
       this.mainBoard.enabled = false;
       this.engineBusy = true;
-      this.gtp.send('genmove').then((move: string) => {
+      this.gtp.send('genmove').finally(() => {
         this.engineBusy = false;
-        this.gtp.send('gamestate');
       });
     } else {
       this.mainBoard.enabled = true;
     }
   }
 
-  protected onPosition(position: Position) {
-    this.updateBoards(position);
+  protected onPositionUpdate(position: Position, update: Position.Update) {
+    if (position != this.activePosition) {
+      return;
+    }
+    for (let board of this.boards) {
+      board.update(update);
+    }
+    this.winrateGraph.update(position);
+  }
+
+  protected onNewPosition(position: Position) {
+    this.activePosition = position
+    for (let board of this.boards) {
+      board.setPosition(position);
+    }
+    this.winrateGraph.update(position);
     this.log.scroll();
-    this.winrateGraph.setWinrate(position.moveNum, position.q);
     this.onPlayerChanged();
   }
 
   private playMove(color: Color, move: Move) {
     let colorStr = color == Color.Black ? 'b' : 'w';
     let moveStr = toKgs(move);
-    this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
-      this.gtp.send('gamestate');
-    });
+    this.gtp.send(`play ${colorStr} ${moveStr}`);
   }
 
   protected onGameOver() {
@@ -165,4 +174,3 @@ class DemoApp extends App {
 }
 
 new DemoApp();
-*/

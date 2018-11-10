@@ -56,7 +56,6 @@ define(["require", "exports", "./app", "./board", "./layer", "./log", "./util", 
             }
             this.winrateGraph.update(position);
             this.log.scroll();
-            console.log(this.activePosition);
             if (this.activePosition.gameOver) {
                 window.setTimeout(() => { this.newGame(); }, 3000);
             }

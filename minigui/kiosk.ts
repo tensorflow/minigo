@@ -78,7 +78,6 @@ class KioskApp extends App {
     this.winrateGraph.update(position);
     this.log.scroll();
 
-    console.log(this.activePosition);
     if (this.activePosition.gameOver) {
       window.setTimeout(() => { this.newGame(); }, 3000);
     } else {

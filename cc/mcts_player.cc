@@ -122,7 +122,6 @@ bool MctsPlayer::UndoMove() {
     return false;
   }
   root_ = root_->parent;
-  game_over_ = false;
   history_.pop_back();
   return true;
 }

@@ -177,9 +177,15 @@ TEST(MctsPlayerTest, PickMoveArgMax) {
   auto player = CreateBasicPlayer(options);
   auto* root = player->root();
 
-  root->edges[Coord(2, 0)].N = 10;
-  root->edges[Coord(1, 0)].N = 5;
-  root->edges[Coord(3, 0)].N = 1;
+  std::vector<std::pair<Coord, int>> child_visits = {
+      {{2, 0}, 10},
+      {{1, 0}, 5},
+      {{3, 0}, 1},
+  };
+  for (const auto& p : child_visits) {
+    root->MaybeAddChild(p.first);
+    root->edges[p.first].N = p.second;
+  }
 
   for (int i = 0; i < 100; ++i) {
     EXPECT_EQ(Coord(2, 0), player->PickMove());
