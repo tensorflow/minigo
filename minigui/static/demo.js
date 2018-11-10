@@ -133,4 +133,4 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
     }
     new DemoApp();
 });
-//# sourceMappingURL=demo_app.js.map
+//# sourceMappingURL=demo.js.map

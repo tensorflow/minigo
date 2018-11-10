@@ -391,4 +391,4 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
     }
     new ExploreApp();
 });
-//# sourceMappingURL=explore.js.map
+//# sourceMappingURL=study.js.map
