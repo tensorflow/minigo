@@ -270,7 +270,7 @@ bool MctsPlayer::PlayMove(Coord c) {
     std::cerr << "Played >>" << c << std::endl;
   }
 
-  // Handle consecutive passing.
+  // Handle consecutive passing or termination by move limit.
   if (root_->game_over() || root_->position.n() >= kMaxSearchDepth) {
     float score = root_->position.CalculateScore(options_.komi);
     result_string_ = FormatScore(score);
