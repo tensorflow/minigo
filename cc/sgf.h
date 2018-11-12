@@ -118,6 +118,8 @@ struct CreateSgfOptions {
 std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                             const CreateSgfOptions& options);
 
+// TODO(tommadams): Remove GetMainLineMoves, it's been superseded by
+// GetMoveTrees.
 // Extracts the main line series of moves from an SGF AST tree.
 std::vector<Move> GetMainLineMoves(const Ast::Tree& tree);
 

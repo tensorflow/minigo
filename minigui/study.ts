@@ -236,6 +236,9 @@ class ExploreApp extends App {
       // Minigui tab without killing the backend, we'd permanently peg their
       // accelerator.
       this.gtp.onData('mg-ponder', (result: string) => {
+        // Pondering reports 'done' when it has finised the requested pondering
+        // and reports 'failed' when it couldn't perform any reads (which is
+        // possible in some edge cases where the board is almost full).
         if (result.trim().toLowerCase() == 'done') {
           this.gtp.send('ponder time 10');
         }

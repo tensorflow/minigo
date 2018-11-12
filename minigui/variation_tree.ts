@@ -22,7 +22,7 @@ const SPACE = 19;
 // Padding from the edge of the canvas.
 const PAD = 11;
 
-// Raius of the nodes.
+// Radius of the nodes.
 const RADIUS = 5;
 
 interface Position {

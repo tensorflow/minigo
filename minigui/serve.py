@@ -122,6 +122,8 @@ def process_line(stream_name, line):
         if "GTP engine ready" in line:
             echo_streams = False
 
+    # TODO(tommadams): trim newlines in the frontend to make sure we preserve
+    # the exact output of the engine.
     if line[-1] == "\n":
         line = line[:-1]
 

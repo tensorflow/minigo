@@ -57,8 +57,10 @@ class TestablePlayer : public MctsPlayer {
   using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;
   using MctsPlayer::ProcessLeaves;
+  using MctsPlayer::ResetRoot;
   using MctsPlayer::rnd;
   using MctsPlayer::TreeSearch;
+  using MctsPlayer::UndoMove;
 
   std::array<float, kNumMoves> Noise() {
     std::array<float, kNumMoves> noise;
@@ -476,6 +478,45 @@ TEST(MctsPlayerTest, SymmetriesTest) {
       }
     }
   }
+}
+
+TEST(MctsPlayerTest, ResetRoot) {
+  auto player = absl::make_unique<TestablePlayer>(MctsPlayer::Options());
+
+  auto* game_root = player->root();
+
+  auto c = Coord(12);
+  player->PlayMove(c);
+
+  EXPECT_EQ(c, player->root()->move);
+  player->ResetRoot();
+  EXPECT_EQ(game_root, player->root());
+}
+
+TEST(MctsPlayerTest, UndoMove) {
+  auto player = absl::make_unique<TestablePlayer>(MctsPlayer::Options());
+
+  // Can't undo without first playing a move.
+  EXPECT_FALSE(player->UndoMove());
+
+  player->PlayMove(Coord::kPass);
+  player->PlayMove(Coord::kPass);
+
+  auto* root = player->root();
+  EXPECT_TRUE(root->game_over());
+  EXPECT_EQ(Color::kBlack, root->position.to_play());
+  ASSERT_EQ(2, player->history().size());
+  EXPECT_EQ(-1, player->result());
+  EXPECT_EQ("W+7.5", player->result_string());
+
+  // Undo the last pass, the game should no longer be over.
+  EXPECT_TRUE(player->UndoMove());
+
+  root = player->root();
+  EXPECT_FALSE(root->game_over());
+  EXPECT_EQ(Coord::kPass, root->move);
+  EXPECT_EQ(Color::kWhite, root->position.to_play());
+  ASSERT_EQ(1, player->history().size());
 }
 
 }  // namespace

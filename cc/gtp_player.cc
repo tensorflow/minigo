@@ -127,7 +127,8 @@ void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
 }
 
 bool GtpPlayer::MaybePonder() {
-  if (ponder_type_ == PonderType::kOff || ponder_limit_reached_) {
+  if (root()->game_over() || ponder_type_ == PonderType::kOff ||
+      ponder_limit_reached_) {
     return false;
   }
 
@@ -145,8 +146,13 @@ bool GtpPlayer::MaybePonder() {
   if (ponder_read_count_ == 0) {
     std::cerr << "pondering..." << std::endl;
   }
+
+  // Remember the number of reads at the root.
   int n = root()->N();
+
   TreeSearch();
+
+  // Increment the ponder count by difference new and old reads.
   ponder_read_count_ += root()->N() - n;
 
   return true;
