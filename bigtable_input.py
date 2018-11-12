@@ -4,6 +4,7 @@
 import collections
 import numpy as np
 import os
+import re
 import struct
 import time
 from google.cloud import bigtable
@@ -57,6 +58,28 @@ def get_game_range_row_names(game_begin, game_end):
     """
     row_fmt = 'g_{:0>10}_'
     return row_fmt.format(game_begin), row_fmt.format(game_end)
+
+
+def get_bleakest_moves(start_game, end_game):
+    """Given a range of games, return the bleakest moves.
+
+    Returns a list of (game, move, q) sorted by q.
+    """
+    row_fmt = 'g_{:0>10}_'
+    bleak = b'bleakest_q'
+    rows = _bt_table.read_rows(
+        row_fmt.format(start_game),
+        row_fmt.format(end_game),
+        filter_=row_filters.ColumnRangeFilter(
+            'metadata', bleak, bleak))
+    gm_pat = re.compile(r'g_(\d+)_m_(\d+)')
+    bleakest = [gm_pat.match(str(r.row_key, 'utf-8')).groups() +
+                (r.cell_value('metadata', bleak),)
+                for r in rows]
+    # Convert to numbers in a second pass
+    bleakest = [(int(g), int(m), float(q)) for g, m, q in bleakest]
+    bleakest.sort(key=operator.itemgetter(2))
+    return bleakest
 
 
 def make_single_array(ds, batch_size=8*1024):
