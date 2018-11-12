@@ -54,6 +54,7 @@ FLAGS = flags.FLAGS
 
 class EchoStepCounterHook(tf.train.StepCounterHook):
     """A hook that logs steps per second."""
+
     def _log_and_record(self, elapsed_steps, elapsed_time, global_step):
         s_per_sec = elapsed_steps / elapsed_time
         logging.info("{}: {:.3f} steps per second".format(global_step, s_per_sec))
@@ -76,6 +77,7 @@ def compute_update_ratio(weight_tensors, before_weights, after_weights):
 
 class UpdateRatioSessionHook(tf.train.SessionRunHook):
     """A hook that computes ||grad|| / ||weights|| (using frobenius norm)."""
+
     def __init__(self, output_dir, every_n_steps=1000):
         self.output_dir = output_dir
         self.every_n_steps = every_n_steps

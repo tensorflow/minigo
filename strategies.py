@@ -17,7 +17,6 @@ import random
 import time
 
 from absl import flags
-import numpy as np
 
 import coords
 import go

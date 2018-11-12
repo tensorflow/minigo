@@ -103,7 +103,7 @@ class MCTSNode(object):
 
     @property
     def child_U(self):
-        return (FLAGS.c_puct * math.sqrt(max(1, self.N-1)) *
+        return (FLAGS.c_puct * math.sqrt(max(1, self.N - 1)) *
                 self.child_prior / (1 + self.child_N))
 
     @property

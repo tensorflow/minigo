@@ -43,6 +43,7 @@ def main(unused_argv):
         dual_net.bootstrap()
     dual_net.export_model(FLAGS.export_path)
 
+
 if __name__ == '__main__':
     flags.mark_flags_as_required(['work_dir', 'export_path'])
     app.run(main)

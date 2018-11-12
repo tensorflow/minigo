@@ -15,6 +15,7 @@
 import mask_flags
 import test_utils
 
+
 class TestMaskFlags(test_utils.MiniGoUnitTest):
     def test_pyflags_extraction(self):
         self.assertEqual(mask_flags.parse_helpfull_output('''
@@ -31,5 +32,3 @@ class TestMaskFlags(test_utils.MiniGoUnitTest):
              -[no]bool_flag (Flag description)
           ''', regex=mask_flags.FLAG_HELP_RE_CC),
                          {'--some_flag', '--bool_flag', '--nobool_flag'})
-
-

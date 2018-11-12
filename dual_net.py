@@ -31,7 +31,6 @@ from tensorflow.contrib.tpu.python.tpu import tpu_optimizer
 
 import features as features_lib
 import go
-import preprocessing
 import symmetries
 
 flags.DEFINE_integer('train_batch_size', 256,
@@ -560,8 +559,8 @@ def freeze_graph_tpu(model_path):
         # initialization and shutdown of the TPU. We do it this way because
         # TensorFlow currently doesn't expose a C++ API for TPU initialization
         # and shutdown.
-        init_def = tf.contrib.tpu.initialize_system()
-        shutdown_def = tf.contrib.tpu.shutdown_system()
+        tf.contrib.tpu.initialize_system()
+        tf.contrib.tpu.shutdown_system()
 
         tf.train.Saver().restore(sess, model_path)
 

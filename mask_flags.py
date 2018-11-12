@@ -79,6 +79,7 @@ def prepare_subprocess_cmd(subprocess_cmd):
     else:
         valid_flags = parse_helpfull_output(help_output, regex=FLAG_HELP_RE_CC)
     parsed_flags = flags.FlagValues().read_flags_from_files(subprocess_cmd[1:])
+
     def valid_argv(argv):
         ''' Figures out if a flag parsed from the flagfile matches a flag in
         the command about to be run.'''
@@ -90,6 +91,7 @@ def prepare_subprocess_cmd(subprocess_cmd):
     filtered_flags = list(filter(valid_argv, parsed_flags))
     return [subprocess_cmd[0]] + filtered_flags
 
+
 def run(cmd):
     '''Prepare and run a subprocess cmd, returning a CompletedProcess.'''
     print("Preparing the following cmd:")
@@ -100,6 +102,7 @@ def run(cmd):
     for token in cmd:
         print(token)
     return subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
+
 
 def checked_run(cmd):
     '''Prepare and run a subprocess cmd, checking for successful completion.'''

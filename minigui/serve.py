@@ -76,7 +76,7 @@ socketio = SocketIO(app, logger=log, engineio_logger=log)
 
 def _open_pipes():
     if FLAGS.engine == "py":
-        GTP_COMMAND = [FLAGS.python_for_engine,  "-u",  # turn off buffering
+        GTP_COMMAND = [FLAGS.python_for_engine, "-u",  # turn off buffering
                        "gtp.py",
                        "--load_file=%s" % FLAGS.model,
                        "--minigui_mode=true",

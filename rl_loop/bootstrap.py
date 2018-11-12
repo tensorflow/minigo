@@ -27,6 +27,7 @@ from rl_loop import shipname
 flags.declare_key_flag('bucket_name')
 flags.declare_key_flag('base_dir')
 
+
 def bootstrap(unused_argv):
     bootstrap_name = shipname.generate(0)
     bootstrap_model_path = os.path.join(fsdb.models_dir(), bootstrap_name)
@@ -34,6 +35,7 @@ def bootstrap(unused_argv):
         'python', 'bootstrap.py',
         '--export_path={}'.format(bootstrap_model_path),
         '--flagfile=rl_loop/distributed_flags'])
+
 
 if __name__ == '__main__':
     app.run(bootstrap)

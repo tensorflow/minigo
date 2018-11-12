@@ -498,9 +498,9 @@ class Position():
         return pos
 
     def is_game_over(self):
-        return (len(self.recent) >= 2
-                and self.recent[-1].move is None
-                and self.recent[-2].move is None)
+        return (len(self.recent) >= 2 and
+                self.recent[-1].move is None and
+                self.recent[-2].move is None)
 
     def score(self):
         'Return score from B perspective. If W is winning, score is negative.'
