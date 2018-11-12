@@ -74,6 +74,51 @@ def make_single_array(ds, batch_size=8*1024):
     return np.concatenate(batches)
 
 
+def require_fresh_games(number_fresh):
+    """Require a given number of fresh games to be played.
+
+    Updates the cell `table_state=metadata:wait_for_game_number`
+    by the given number of games.
+    """
+    latest = get_latest_game_number()
+    wait_cell = b'wait_for_game_number'
+    table_state = _bt_table.row(b'table_state')
+    table_state.set_cell('metadata', wait_cell, latest + number_fresh)
+    table_state.commit()
+
+
+def wait_for_fresh_games(poll_interval=15.0):
+    """Block caller until required new games have been played.
+
+    If the cell `table_state=metadata:wait_for_game_number` exists,
+    then block the caller, checking every `poll_interval` seconds,
+    until `table_state=metadata:game_counter is at least the value
+    in that cell.
+    """
+    wait_cell = b'wait_for_game_number'
+    table_state = _bt_table.read_row(
+        b'table_state',
+        filter_=row_filters.ColumnRangeFilter(
+            'metadata', wait_cell, wait_cell))
+    if table_state is None:
+        utils.dbg('No waiting for new games needed; '
+                  'wait_for_game_number column not in table_state')
+        return
+    value = table_state.cell_value('metadata', wait_cell)
+    if not value:
+        utils.dbg('No waiting for new games needed; '
+                  'no value in wait_for_game_number cell '
+                  'in table_state')
+        return
+    wait_until_game = struct.unpack('>q', value)[0]
+    latest_game = get_latest_game_number()
+    while latest_game < wait_until_game:
+        utils.dbg('Latest game {} not yet at required game {}'.
+                  format(latest_game, wait_until_game))
+        time.sleep(poll_interval)
+        latest_game = get_latest_game_number()
+
+
 def get_moves_from_games(start_game, end_game, moves, shuffle,
                          column_family, column):
     start_row, end_row = get_game_range_row_names(start_game, end_game)
@@ -120,6 +165,7 @@ def get_unparsed_moves_from_last_n_games(n,
       A dataset containing no more than `moves` examples, sampled
         randomly from the last `n` games in the table.
     """
+    wait_for_fresh_games()
     latest_game = int(get_latest_game_number())
     utils.dbg('Latest game: %s' % latest_game)
     if latest_game == 0:
