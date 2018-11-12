@@ -54,6 +54,7 @@ sh_binary(
         "@org_tensorflow//tensorflow:libtensorflow_framework.so",
         "@org_tensorflow//third_party/eigen3:eigen_third_party_header_files",
     ],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
@@ -63,6 +64,7 @@ alias(
         "//cc/config:enable_tpu": "@local_config_tensorflow//:lib/libgrpc_runtime.so",
         "//conditions:default": "@local_config_tensorflow//:lib/libtensorflow_cc.so",
     }),
+    tags = ["manual"],
 )
 
 alias(
@@ -71,6 +73,7 @@ alias(
         "//cc/config:enable_tpu": "@org_tensorflow//tensorflow/core/distributed_runtime/rpc:grpc_runtime",
         "//conditions:default": "@org_tensorflow//tensorflow/core:tensorflow",
     }),
+    tags = ["manual"],
 )
 
 check(
@@ -82,6 +85,7 @@ check(
 
 cc_binary(
     name = "libgrpc_runtime.so",
+    tags = ["manual"],
     linkshared = True,
     linkstatic = True,
     deps = [
@@ -91,6 +95,7 @@ cc_binary(
 
 cc_binary(
     name = "libtensorflow_lite.so",
+    tags = ["manual"],
     linkshared = True,
     linkstatic = True,
     deps = [
@@ -101,6 +106,7 @@ cc_binary(
 
 transitive_hdrs(
     name = "tensorflow_hdrs",
+    tags = ["manual"],
     deps = [
         ":libtensorflow_lite.so",
         "@eigen_archive//:eigen",
