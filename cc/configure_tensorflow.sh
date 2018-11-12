@@ -45,7 +45,7 @@ while true; do
 done
 
 echo "Building tensorflow package"
-bazel run -c opt --config=opt //cc/tensorflow:build -- ${workspace}/cc/tensorflow
+bazel run -c opt //cc/tensorflow:build -- ${workspace}/cc/tensorflow
 
 printf """
 # This statement makes bazel use prebuilt binaries of TensorFlow.

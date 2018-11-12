@@ -15,16 +15,14 @@
 # This file builds the images that are used by prow to run the Minigo tests.
 
 IMG_V2 = gcr.io/minigo-testing/minigo-prow-harness-v2
-TAG := $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)-$(shell git diff | openssl sha -sha256 | cut -c -6)
-DIR := ${CURDIR}
+TAG := $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)-$(shell git diff | sha256sum | cut -c -6)
 
 all: build
 
 buildv2:
 	mkdir -p staging/tensorflow
-  bazel run -c opt //cc/tensorflow:build -- staging/tensorflow
+	bazel run -c opt //cc/tensorflow:build -- ${CURDIR}/staging/tensorflow
 	cp ../requirements.txt staging/requirements.txt
-	@echo {\"image\": \"$(IMG_V2):$(TAG)\"} > version-v2.json
 	docker build -f Dockerfile.v2 -t $(IMG_V2):$(TAG) .
 	docker tag $(IMG_V2):$(TAG) $(IMG_V2):latest
 	rm -rf staging/
