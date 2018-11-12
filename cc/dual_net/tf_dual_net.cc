@@ -24,6 +24,7 @@
 #include "cc/check.h"
 #include "cc/constants.h"
 #include "cc/thread_safe_queue.h"
+#include "tensorflow/core/common_runtime/gpu/gpu_init.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -31,10 +32,6 @@
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/stream_executor/platform.h"
-
-#if MINIGO_ENABLE_GPU
-#include "tensorflow/core/common_runtime/gpu/gpu_init.h"
-#endif
 
 using tensorflow::DT_FLOAT;
 using tensorflow::Env;
@@ -177,8 +174,7 @@ TfDualNet::TfDualNet(std::string graph_path)
     }
   };
 
-  // Create two worker threads per device.
-#if MINIGO_ENABLE_GPU
+  // Create two worker threads per GPU.
   if (tensorflow::ValidateGPUMachineManager().ok()) {
     int device_count = tensorflow::GPUMachineManager()->VisibleDeviceCount();
     for (int device_id = 0; device_id < device_count; ++device_id) {
@@ -191,8 +187,8 @@ TfDualNet::TfDualNet(std::string graph_path)
       return;
     }
   }
-#endif
 
+  // No GPUs available, use CPU instead.
   worker_threads_.emplace_back(functor, graph_def);
   worker_threads_.emplace_back(functor, graph_def);
 }

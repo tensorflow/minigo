@@ -20,6 +20,7 @@
 # NOTE! If this file changes/moves, please change
 # https://github.com/kubernetes/test-infra/blob/master/config/jobs/tensorflow/minigo/minigo.yaml
 
-# Copy prebuilt TensorFlow from image.
-rsync -ah /app/cc/tensorflow/ ./cc/tensorflow/
-
+printf """
+# Use prebuilt TensorFlow from image.
+build --action_env MG_PREBUILT_TF_PATH=/app/cc/tensorflow
+""" >> ./tf_configure.bazelrc

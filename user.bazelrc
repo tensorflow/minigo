@@ -1,0 +1,9 @@
+# These statements configure supported backends.
+build --define=tf=1
+# build --define=lite=1
+# build --define=trt=1
+# build --define=tpu=1
+# build --define=bt=1
+
+import %workspace%/tensorflow.bazelrc
+import %workspace%/tf_configure.bazelrc

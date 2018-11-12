@@ -9,27 +9,15 @@ build system. We have experienced build issues with the latest version of Bazel,
 so for now we recommend installing
 [bazel-0.17.2-installer-linux-x86\_64.sh](https://github.com/bazelbuild/bazel/releases).
 
-Minigo++ depends on the Tensorflow C++ libraries, but we have not yet set up
-Bazel WORKSPACE and BUILD rules to automatically download and configure
-Tensorflow so (for now at least) you must perform a manual step to build the
-library.  This depends on `zip`, so be sure that package is installed first:
+Minigo++ depends on the Tensorflow C++ libraries through bazel. You first need to configure
+TensorFlow by running
 
 ```shell
-sudo apt-get install zip
 ./cc/configure_tensorflow.sh
 ```
 
-If you want to compile for CPU and not GPU, then change `TF_NEED_CUDA` to 0 in
-`configure_tensorflow.sh`
-
-This will automatically perform the first steps of
-[Installing Tensorflow from Sources](https://www.tensorflow.org/install/install_sources)
-but instead of installing the Tensorflow package, it extracts the generated C++
-headers into the `cc/tensorflow` subdirectory of the repo. The script then
-builds the required Tensorflow shared libraries and copies them to the same
-directory. The tensorflow cc\_library build target in `cc/BUILD` pulls these
-header and library files together into a format the Bazel understands how to link
-against.
+The script allows you to pre-build TensorFlow and save the binaries to cc/tensorflow. Otherwise
+TensorFlow is built as a bazel dependency of Minigo.
 
 ## Building
 
@@ -122,8 +110,7 @@ Build `//cc:main` with `--define=lite=1` and run with `--engine=lite`.
 First, run a frozen graph through Toco, the TensorFlow optimizing compiler:
 
 ```
-BATCH_SIZE=8
-./cc/tensorflow/toco \
+bazel run @org_tensorflow//tensorflow/contrib/lite/toco:toco -- \
   --input_file=saved_models/000256-opossum.pb \
   --input_format=TENSORFLOW_GRAPHDEF \
   --output_format=TFLITE \

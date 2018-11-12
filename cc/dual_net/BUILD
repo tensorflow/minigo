@@ -13,6 +13,9 @@ load(
     "minigo_cc_test_19_only",
     "minigo_cc_test_9_only",
 )
+load("@local_config_cuda//cuda:build_defs.bzl", "if_cuda")
+load("@local_config_tensorflow//:build_defs.bzl", "check")
+load("@local_config_tensorrt//:build_defs.bzl", "if_tensorrt")
 
 minigo_cc_library(
     name = "dual_net",
@@ -84,17 +87,13 @@ minigo_cc_library(
     name = "tf_dual_net",
     srcs = ["tf_dual_net.cc"],
     hdrs = ["tf_dual_net.h"],
-    copts = select({
-        "//cc/config:enable_gpu": ["-DMINIGO_ENABLE_GPU=1"],
-        "//conditions:default": [],
-    }),
     tags = ["manual"],
     deps = [
         ":dual_net",
         "//cc:base",
         "//cc:check",
-        "//cc:tensorflow",
         "//cc:thread_safe_queue",
+        "//cc/tensorflow",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
@@ -110,7 +109,7 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:check",
-        "//cc:tf_lite",
+        "//cc/tensorflow:tf_lite",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -125,27 +124,37 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:check",
-        "//cc:tensorflow",
         "//cc:thread_safe_queue",
+        "//cc/tensorflow",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
+)
+
+check(
+    name = "trt_configured",
+    condition = if_tensorrt(True, False),
+    message = "Cannot build with --define=tf=1 when TensorFlow was not configured for TensorRT.",
+    visibility = ["//visibility:private"],
 )
 
 minigo_cc_library(
     name = "trt_dual_net",
     srcs = ["trt_dual_net.cc"],
     hdrs = ["trt_dual_net.h"],
+    data = [":trt_configured"],
     tags = ["manual"],
     deps = [
         ":dual_net",
         "//cc:base",
         "//cc:check",
-        "//cc:cuda",
-        "//cc:tensorrt",
         "//cc:thread_safe_queue",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
+        "@local_config_cuda//cuda:cuda_headers",
+        "@local_config_tensorrt//:nv_infer",
+        "@local_config_tensorrt//:tensorrt_headers",
+        "@local_config_tensorrt_parsers//:nvparsers",
     ],
 )
 
