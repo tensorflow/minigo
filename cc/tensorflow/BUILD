@@ -77,6 +77,7 @@ check(
     name = "tf_configured",
     condition = if_tf_configured(True, False),
     message = "TensorFlow has not been configured yet, run cc/configure_tensorflow.sh.",
+    tags = ["manual"],
 )
 
 cc_binary(

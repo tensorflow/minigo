@@ -134,7 +134,8 @@ minigo_cc_library(
 check(
     name = "trt_configured",
     condition = if_tensorrt(True, False),
-    message = "Cannot build with --define=tf=1 when TensorFlow was not configured for TensorRT.",
+    message = "Cannot build with --define=trt=1 when TensorFlow was not configured for TensorRT.",
+    tags = ["manual"],
     visibility = ["//visibility:private"],
 )
 
