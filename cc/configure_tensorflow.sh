@@ -24,8 +24,7 @@ bazel --bazelrc=/dev/null run @org_tensorflow//:configure
 output_base=$(bazel info output_base)
 workspace=$(bazel info workspace)
 
-# Copy TensorFlow's bazelrc files to workspace.
-cp ${output_base}/external/org_tensorflow/tools/bazel.rc ${workspace}/tensorflow.bazelrc
+# Copy the generated TensorFlow bazelrc file to workspace.
 cp ${output_base}/external/org_tensorflow/.tf_configure.bazelrc ${workspace}/tf_configure.bazelrc
 
 echo

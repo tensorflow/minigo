@@ -27,6 +27,7 @@ minigo_cc_library(
         "move.h",
         "stone.h",
     ],
+    linkopts = ["-lm"],
     deps = [
         ":check",
         ":inline_vector",
