@@ -657,8 +657,8 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   // Clear the board before replaying sgf.
   NewGame();
 
-  std::function<void(const sgf::MoveTree&, MctsNode*)> impl =
-      [&](const sgf::MoveTree& src, MctsNode* dst) {
+  std::function<void(const sgf::Node&, MctsNode*)> impl =
+      [&](const sgf::Node& src, MctsNode* dst) {
         MG_CHECK(src.move.color == dst->position.to_play());
         auto* dst_child = dst->MaybeAddChild(src.move.c);
         ProcessLeaves({&dst_child, 1}, false);
@@ -669,7 +669,7 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
         }
         UndoMove();
       };
-  for (const auto& tree : sgf::GetMoveTrees(ast)) {
+  for (const auto& tree : sgf::GetTrees(ast)) {
     impl(*tree, root());
   }
 

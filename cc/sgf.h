@@ -40,8 +40,8 @@ class Ast {
   struct Property {
     std::string ToString() const;
 
-    absl::string_view id;
-    std::vector<absl::string_view> values;
+    std::string id;
+    std::vector<std::string> values;
   };
 
   struct Node {
@@ -74,6 +74,7 @@ class Ast {
   std::string contents_;
 };
 
+// TODO(tommadams): Replace sgf::MoveWithComment with sgf::Node.
 // A single move with a (possibly empty) comment.
 struct MoveWithComment {
   MoveWithComment() = default;
@@ -97,11 +98,17 @@ struct MoveWithComment {
 
 std::ostream& operator<<(std::ostream& ios, const MoveWithComment& move);
 
-// A node in the parsed game tree.
-struct MoveTree {
-  explicit MoveTree(Move move) : move(move) {}
+struct Node {
+  Node(Move move, std::string comment)
+      : move(move), comment(std::move(comment)) {}
+
+  // Returns a flattened copy of the main line moves: the chain of moves formed
+  // by this node and its left-most descendants.
+  std::vector<Move> ExtractMainLine() const;
+
   const Move move;
-  std::vector<std::unique_ptr<MoveTree>> children;
+  std::string comment;
+  std::vector<std::unique_ptr<Node>> children;
 };
 
 struct CreateSgfOptions {
@@ -117,22 +124,8 @@ struct CreateSgfOptions {
 std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                             const CreateSgfOptions& options);
 
-// TODO(tommadams): Remove GetMainLineMoves, it's been superseded by
-// GetMoveTrees.
-// Extracts the main line series of moves from an SGF AST tree.
-std::vector<Move> GetMainLineMoves(const Ast::Tree& tree);
-
 // Extracts the complete game trees from an SGF AST.
-std::vector<std::unique_ptr<MoveTree>> GetMoveTrees(const Ast& ast);
-
-// Extracts the main line series of moves from the first tree in an SGF file.
-// Returns an empty vector if the AST has no trees.
-inline std::vector<Move> GetMainLineMoves(const Ast& ast) {
-  if (ast.trees().empty()) {
-    return {};
-  }
-  return GetMainLineMoves(ast.trees()[0]);
-}
+std::vector<std::unique_ptr<Node>> GetTrees(const Ast& ast);
 
 }  // namespace sgf
 }  // namespace minigo

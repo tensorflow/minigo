@@ -745,7 +745,9 @@ void Puzzle() {
     MG_CHECK(file::ReadFile(path, &contents));
     sgf::Ast ast;
     MG_CHECK(ast.Parse(contents));
-    auto moves = GetMainLineMoves(ast);
+    auto trees = GetTrees(ast);
+    MG_CHECK(!trees.empty());
+    auto moves = trees[0]->ExtractMainLine();
     parallel_games += moves.size();
     games.emplace_back(std::move(moves));
   }
