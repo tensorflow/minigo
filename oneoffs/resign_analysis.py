@@ -13,13 +13,14 @@
 # limitations under the License.
 
 import fire
-import os
-import itertools
-import re
+import glob
 import numpy as np
+import os.path
+import re
 from tqdm import tqdm
 
-def crawl(sgf_directory='sgf', print_summary=True): 
+
+def crawl(sgf_directory='sgf', print_summary=True):
     max_w_upset = {'value': 0}
     max_b_upset = {'value': 0}
 
@@ -29,47 +30,45 @@ def crawl(sgf_directory='sgf', print_summary=True):
     bad_resigns = 0
     bad_resign_files = []
     other_thresh = 0.9
-    sgfs = lambda root,fils: [os.path.join(root, f) for f in fils if f.endswith('.sgf')]
-    fs = [ i for sublist in [sgfs(root, files) for root, _, files in os.walk(sgf_directory)] for i in sublist]
+    fs = glob.glob(os.path.join(sgf_directory, '**', '*.sgf'), recursive=True)
     for filename in tqdm(fs):
 
-          data = open(filename).read()
-          result = re.search("RE\[([BWbw])\+", data)
-          if not result:
-              print("No result string found in sgf: ", filename)
-              continue
-          else:
-              result = result.group(1)
+        data = open(filename).read()
+        result = re.search("RE\[([BWbw])\+", data)
+        if not result:
+            print("No result string found in sgf: ", filename)
+            continue
+        else:
+            result = result.group(1)
 
-          threshold = re.search("Resign Threshold: -(\d.\d*)", data)
-          if not threshold:
-              print("No threshold found for ", filename)
-          else:
-              threshold = float(threshold.group(1))
-              if threshold == 1.0:
-                  num_resign_disabled += 1
+        threshold = re.search("Resign Threshold: -(\d.\d*)", data)
+        if not threshold:
+            print("No threshold found for ", filename)
+        else:
+            threshold = float(threshold.group(1))
+            if threshold == 1.0:
+                num_resign_disabled += 1
 
-          tot_files += 1
-          q_values = list(map(float, re.findall("C\[(-?\d.\d*)", data)))
-          if result == "B":
-              look_for = min
-          else:
-              look_for = max
+        tot_files += 1
+        q_values = list(map(float, re.findall("C\[(-?\d.\d*)", data)))
+        if result == "B":
+            look_for = min
+        else:
+            look_for = max
 
-          #print("%s:%s+:%s" % (filename, result, min(q_values)))
-          worst_qs.append(look_for(q_values))
+        # print("%s:%s+:%s" % (filename, result, min(q_values)))
+        worst_qs.append(look_for(q_values))
 
-          if threshold == 1.0 and abs(look_for(q_values)) > other_thresh:
-              bad_resigns += 1
-              bad_resign_files.append(filename)
+        if threshold == 1.0 and abs(look_for(q_values)) > other_thresh:
+            bad_resigns += 1
+            bad_resign_files.append(filename)
 
-          if look_for == min and min(q_values) < max_b_upset['value']:
-              max_b_upset = {"filename": filename,
-                             "value": look_for(q_values)}
-          elif look_for == max and max(q_values) > max_w_upset['value']:
-              max_w_upset = {"filename": filename,
-                             "value": max(q_values)}
-
+        if look_for == min and min(q_values) < max_b_upset['value']:
+            max_b_upset = {"filename": filename,
+                           "value": look_for(q_values)}
+        elif look_for == max and max(q_values) > max_w_upset['value']:
+            max_w_upset = {"filename": filename,
+                           "value": max(q_values)}
 
     if print_summary:
         b_upsets = np.array([q for q in worst_qs if q < 0])
@@ -77,13 +76,16 @@ def crawl(sgf_directory='sgf', print_summary=True):
         both = np.array(list(map(abs, worst_qs)))
         print("Biggest w upset:", max_w_upset)
         print("Biggest b upset:", max_b_upset)
-        print ("99th percentiles (both/w/b)")
+        print("99th percentiles (both/w/b)")
         print(np.percentile(both, 99))
         print(np.percentile(b_upsets, 1))
         print(np.percentile(w_upsets, 99))
-        print ("Bad resigns: {} / {} ({:.2f}%) ".format(bad_resigns, num_resign_disabled, (bad_resigns / (num_resign_disabled+1)) * 100.0))
-        print ("Total files:", tot_files)
-        print (bad_resign_files)
+        bad_resign_pct = 100.0 * bad_resigns / min(1, num_resign_disabled)
+        print("Bad resigns: {} / {} ({:.2f}%) ".format(
+            bad_resigns, num_resign_disabled, bad_resign_pct))
+        print("Total files:", tot_files)
+        print(bad_resign_files)
+
 
 if __name__ == '__main__':
     fire.Fire(crawl)

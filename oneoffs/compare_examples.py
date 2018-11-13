@@ -67,7 +67,7 @@ def ReadExamples(path):
 
 
 def main(unused_argv):
-    with tf.Session() as _:
+    with tf.Session():
         examples_a = ReadExamples(FLAGS.a)
         examples_b = ReadExamples(FLAGS.b)
     print(len(examples_a), len(examples_b))

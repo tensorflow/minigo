@@ -49,7 +49,7 @@ def main(argv):
 
     embedding_file = FLAGS.embedding_file
     with open(embedding_file, 'rb') as pickle_file:
-      metadata, embeddings = pickle.load(pickle_file)
+        metadata, embeddings = pickle.load(pickle_file)
 
     t1 = time.time()
 
@@ -67,8 +67,6 @@ def main(argv):
 
     t2 = time.time()
 
-    #reduced = reduced[:150]
-
     print('Shape:', reduced.shape)
     tsne = TSNE(
         n_components=2,
@@ -81,7 +79,7 @@ def main(argv):
     assert len(coords.shape) == 2, coords.shape[1] == 2
 
     # scale coords to be [0,1] in both dims
-    coords -= [min(coords[:,0]), min(coords[:,1])]
+    coords -= [min(coords[:, 0]), min(coords[:, 1])]
     coords /= max(coords.flatten())
 
     t3 = time.time()
@@ -95,7 +93,7 @@ def main(argv):
             # NOTE: sgftopng is a pain to install, sorry.
             with open(path) as sgf_file:
                 subprocess.run(
-                    ['sgftopng', png, '-'+str(move+1)],
+                    ['sgftopng', png, '-' + str(move + 1)],
                     stdin=sgf_file)
         metadata[i] = (path, move, png)
 
@@ -110,7 +108,6 @@ def main(argv):
         pickle.dump([metadata, embeddings, coords], pickle_file)
 
     print('TSNE cords added to', new_file)
-
 
 
 if __name__ == '__main__':

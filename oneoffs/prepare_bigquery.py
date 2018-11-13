@@ -46,7 +46,6 @@ import re
 from absl import app, flags
 from tensorflow import gfile
 from tqdm import tqdm
-import sgf
 
 import coords
 import sgf_wrapper
@@ -164,7 +163,7 @@ def extract_move_data(root_node, worker_id, completed_time, board_size):
             assert len(debug_rows) <= 1
             row_data = list(map(get_row_data, debug_rows))
         else:
-            row_data = [[0,0,0,0] for _ in range(board_size * board_size + 1)]
+            row_data = [[0] * 4 for _ in range(board_size * board_size + 1)]
             for debug_row in debug_rows:
                 move = debug_row.move
                 row_data[move] = get_row_data(debug_row)

@@ -26,7 +26,6 @@ sys.path.insert(0, '.')
 import os
 
 from absl import app, flags
-import numpy as np
 from tqdm import tqdm
 
 import go

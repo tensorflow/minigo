@@ -52,12 +52,12 @@ FLAGS = flags.FLAGS
 
 
 def get_files():
-  files = []
-  for d in os.listdir(FLAGS.sgf_root):
-    for f in os.listdir(os.path.join(FLAGS.sgf_root, d)):
-        if f.endswith('.sgf'):
-            files.append(os.path.join(FLAGS.sgf_root, d, f))
-  return random.sample(files, FLAGS.num_games)
+    files = []
+    for d in os.listdir(FLAGS.sgf_root):
+        for f in os.listdir(os.path.join(FLAGS.sgf_root, d)):
+            if f.endswith('.sgf'):
+                files.append(os.path.join(FLAGS.sgf_root, d, f))
+    return random.sample(files, FLAGS.num_games)
 
 
 def main(argv):
@@ -69,41 +69,42 @@ def main(argv):
         sys.exit(1)
 
     p_out, v_out, logits, shared = tf_tensors
-    predictions = { 'shared': shared }
+    predictions = {'shared': shared}
 
     sess = tf.Session()
     tf.train.Saver().restore(sess, FLAGS.model)
 
     try:
-      progress = tqdm(get_files())
-      embeddings = []
-      metadata = []
-      for i, f in enumerate(progress):
-        short_f = os.path.basename(f)
-        short_f = short_f.replace('-minigo-cc-evaluator', '-')
-        short_f = short_f.replace('-000', '-')
-        progress.set_description('Processing %s' % short_f)
+        progress = tqdm(get_files())
+        embeddings = []
+        metadata = []
+        for i, f in enumerate(progress):
+            short_f = os.path.basename(f)
+            short_f = short_f.replace('-minigo-cc-evaluator', '-')
+            short_f = short_f.replace('-000', '-')
+            progress.set_description('Processing %s' % short_f)
 
-        processed = []
-        for idx, p in enumerate(sgf_wrapper.replay_sgf_file(f)):
-          if idx < FLAGS.first: continue
-          if idx > FLAGS.last: break
-          if idx % FLAGS.every != 0: continue
+            processed = []
+            for idx, p in enumerate(sgf_wrapper.replay_sgf_file(f)):
+                if idx < FLAGS.first: continue
+                if idx > FLAGS.last: break
+                if idx % FLAGS.every != 0: continue
 
-          processed.append(features_lib.extract_features(p.position))
-          metadata.append((f, idx))
+                processed.append(features_lib.extract_features(p.position))
+                metadata.append((f, idx))
 
-        if len(processed) > 0:
-          # If len(processed) gets too large may have to chunk.
-          res = sess.run(predictions, feed_dict={features: processed})
-          for r in res['shared']:
-            embeddings.append(r.flatten())
+            if len(processed) > 0:
+                # If len(processed) gets too large may have to chunk.
+                res = sess.run(predictions, feed_dict={features: processed})
+                for r in res['shared']:
+                    embeddings.append(r.flatten())
     except:
-      # Raise shows us the error but only after the finally block executes.
-      raise
+        # Raise shows us the error but only after the finally block executes.
+        raise
     finally:
-      with open(FLAGS.embedding_file, 'wb') as pickle_file:
-        pickle.dump([metadata, np.array(embeddings)], pickle_file)
+        with open(FLAGS.embedding_file, 'wb') as pickle_file:
+            pickle.dump([metadata, np.array(embeddings)], pickle_file)
+
 
 if __name__ == "__main__":
     app.run(main)

@@ -30,19 +30,16 @@ python training_curve.py --min_year=2005
 import sys
 sys.path.insert(0, '.')
 
-import go
 import os.path
 
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import tensorflow as tf
 from absl import app, flags
 from tqdm import tqdm
 
 import coords
 from rl_loop import fsdb
-from strategies import MCTSPlayer
 import oneoff_utils
 
 flags.DEFINE_string("sgf_dir", None, "sgf database")
@@ -69,7 +66,7 @@ def batch_run_many(player, positions, batch_size=100):
     prob_list = []
     value_list = []
     for idx in range(0, len(positions), batch_size):
-        probs, values = player.network.run_many(positions[idx:idx+batch_size])
+        probs, values = player.network.run_many(positions[idx:idx + batch_size])
         prob_list.append(probs)
         value_list.append(values)
     return np.concatenate(prob_list, axis=0), np.concatenate(value_list, axis=0)
@@ -80,7 +77,7 @@ def eval_player(player, positions, moves, results):
     policy_moves = [coords.from_flat(c) for c in np.argmax(probs, axis=1)]
     top_move_agree = [moves[idx] == policy_moves[idx]
                       for idx in range(len(moves))]
-    square_err = (values - results)**2/4
+    square_err = (values - results) ** 2 / 4
     return top_move_agree, square_err
 
 
@@ -97,7 +94,7 @@ def sample_positions_from_games(sgf_files, num_positions=1):
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            print ("Parse exception:", e)
+            print("Parse exception:", e)
             fail_count += 1
             continue
 
@@ -174,5 +171,4 @@ def main(unusedargv):
 
 
 if __name__ == "__main__":
-    remaining_argv = flags.FLAGS(sys.argv, known_only=True)
-    main(remaining_argv)
+    app.run(main)
