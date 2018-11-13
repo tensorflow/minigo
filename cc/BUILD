@@ -289,6 +289,7 @@ minigo_cc_test(
     name = "random_test",
     size = "small",
     srcs = ["random_test.cc"],
+    linkopts = ["-lm"],
     deps = [
         ":random",
         "@com_google_googletest//:gtest_main",
