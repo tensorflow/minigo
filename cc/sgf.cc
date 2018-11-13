@@ -18,6 +18,7 @@
 #include <iostream>
 #include <utility>
 
+#include "absl/memory/memory.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"

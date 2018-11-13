@@ -38,8 +38,6 @@ define(["require", "exports"], function (require, exports) {
     let N = BoardSize.Nineteen;
     exports.N = N;
     function setBoardSize(size) {
-        switch (size) {
-        }
         if (size == BoardSize.Nine || size == BoardSize.Nineteen) {
             exports.N = N = size;
         }
@@ -62,12 +60,12 @@ define(["require", "exports"], function (require, exports) {
     }
     exports.toKgs = toKgs;
     function movesEqual(a, b) {
-        if (a == null || b == null ||
-            a == 'pass' || b == 'pass' ||
-            a == 'resign' || b == 'resign') {
+        if (moveIsPoint(a) && moveIsPoint(b)) {
+            return a.row == b.row && a.col == b.col;
+        }
+        else {
             return a == b;
         }
-        return a.row == b.row && a.col == b.col;
     }
     exports.movesEqual = movesEqual;
 });

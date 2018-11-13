@@ -48,8 +48,6 @@ enum BoardSize {
 let N = BoardSize.Nineteen;
 
 function setBoardSize(size: number) {
-  switch (size) {
-  }
   if (size == BoardSize.Nine || size == BoardSize.Nineteen) {
     N = size;
   } else {
@@ -85,12 +83,11 @@ function toKgs(move: Move) {
 }
 
 function movesEqual(a: Nullable<Move>, b: Nullable<Move>) {
-  if (a == null || b == null ||
-      a == 'pass' || b == 'pass' ||
-      a == 'resign' || b == 'resign') {
+  if (moveIsPoint(a) && moveIsPoint(b)) {
+    return a.row == b.row && a.col == b.col;
+  } else {
     return a == b;
   }
-  return a.row == b.row && a.col == b.col;
 }
 
 type Nullable<T> = T | null;

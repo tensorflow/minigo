@@ -109,6 +109,12 @@ Coord MctsNode::GetMostVisitedMove() const {
   int best_N = -1;
   for (int i = 0; i < kNumMoves; ++i) {
     int cn = child_N(i);
+    // In cases like Minigui's Study mode, where we can add nodes directly into
+    // the tree without calling TreeSearch, and where we can freely change the
+    // current root around, it's possible to end up in a situation where none of
+    // the children of the game root have been visited (N == 0).
+    // TODO(tommadams): consider returning Coord::kInvalid in these cases
+    // instead of a node with 0 visits.
     if (cn >= best_N && children.contains(i)) {
       if (cn > best_N) {
         moves.clear();
