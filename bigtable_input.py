@@ -106,7 +106,7 @@ def require_fresh_games(number_fresh):
     latest = get_latest_game_number()
     wait_cell = b'wait_for_game_number'
     table_state = _bt_table.row(b'table_state')
-    table_state.set_cell('metadata', wait_cell, latest + number_fresh)
+    table_state.set_cell('metadata', wait_cell, int(latest + number_fresh))
     table_state.commit()
 
 
