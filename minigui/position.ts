@@ -72,7 +72,7 @@ class Position {
       }
       if (movesEqual(child.lastMove, move)) {
         if (!stonesEqual(stones, child.stones)) {
-          throw new Error(`Position has child ${move} with different stones`);
+          throw new Error(`Position has child ${toKgs(move)} with different stones`);
         }
         return child;
       }

@@ -42,7 +42,7 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
                 }
                 if (base_1.movesEqual(child.lastMove, move)) {
                     if (!base_1.stonesEqual(stones, child.stones)) {
-                        throw new Error(`Position has child ${move} with different stones`);
+                        throw new Error(`Position has child ${base_1.toKgs(move)} with different stones`);
                     }
                     return child;
                 }

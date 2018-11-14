@@ -276,9 +276,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     let sgf = reader.result.replace(/\n/g, '\\n');
                     this.board.enabled = false;
                     this.board.showSearch = false;
-                    this.gtp.send(`playsgf ${sgf}`).then(() => {
-                        this.selectPosition(this.rootPosition);
-                    }).finally(() => {
+                    this.gtp.send(`playsgf ${sgf}`).finally(() => {
                         this.board.enabled = true;
                         this.board.showSearch = this.showSearch;
                     });

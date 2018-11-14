@@ -56,7 +56,7 @@ class GtpPlayer : public MctsPlayer {
   Coord SuggestMove() override;
 
  protected:
-  absl::Span<MctsNode* const> TreeSearch() override;
+  absl::Span<const TreePath> TreeSearch() override;
 
  private:
   struct Response {
@@ -118,7 +118,7 @@ class GtpPlayer : public MctsPlayer {
 
   void ReportSearchStatus(const MctsNode* last_read);
 
-  void ReportPosition();
+  void ReportPosition(MctsNode* node);
 
   // Calculates a unique id for the given node and adds it to the game_nodes_
   // map.

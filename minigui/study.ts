@@ -347,9 +347,7 @@ class ExploreApp extends App {
 
         this.board.enabled = false;
         this.board.showSearch = false;
-        this.gtp.send(`playsgf ${sgf}`).then(() => {
-          this.selectPosition(this.rootPosition);
-        }).finally(() => {
+        this.gtp.send(`playsgf ${sgf}`).finally(() => {
           this.board.enabled = true;
           this.board.showSearch = this.showSearch;
         });

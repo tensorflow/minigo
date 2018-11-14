@@ -166,6 +166,13 @@ class MctsPlayer {
   const std::vector<InferenceInfo>& inferences() const { return inferences_; }
 
  protected:
+  // Path in the game tree from leaf to root.
+  struct TreePath {
+    TreePath(MctsNode* root, MctsNode* leaf) : root(root), leaf(leaf) {}
+    MctsNode* root;
+    MctsNode* leaf;
+  };
+
   Options* mutable_options() { return &options_; }
 
   Coord PickMove();
@@ -181,7 +188,7 @@ class MctsPlayer {
 
   // Returns the list of nodes that TreeSearch performed inference on.
   // The contents of the returned Span is valid until the next call TreeSearch.
-  virtual absl::Span<MctsNode* const> TreeSearch();
+  virtual absl::Span<const TreePath> TreeSearch();
 
   // Returns the root of the game tree.
   MctsNode* game_root() { return &game_root_; }
@@ -194,7 +201,7 @@ class MctsPlayer {
   DualNet* network() { return network_.get(); }
 
   // Run inference for the given leaf nodes & incorportate the inference output.
-  void ProcessLeaves(absl::Span<MctsNode*> leaves, bool random_symmetry);
+  void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);
 
  private:
   void PushHistory(Coord c);
@@ -223,7 +230,7 @@ class MctsPlayer {
   std::vector<InferenceInfo> inferences_;
 
   // Vectors reused when running TreeSearch.
-  std::vector<MctsNode*> leaves_;
+  std::vector<TreePath> tree_search_paths_;
   std::vector<DualNet::BoardFeatures> features_;
   std::vector<DualNet::Output> outputs_;
   std::vector<symmetry::Symmetry> symmetries_used_;

@@ -59,6 +59,7 @@ class TestablePlayer : public MctsPlayer {
   using MctsPlayer::ProcessLeaves;
   using MctsPlayer::ResetRoot;
   using MctsPlayer::rnd;
+  using MctsPlayer::TreePath;
   using MctsPlayer::TreeSearch;
   using MctsPlayer::UndoMove;
 
@@ -445,7 +446,8 @@ TEST(MctsPlayerTest, SymmetriesTest) {
   // Without playing a move, all features planes should be zero except the last
   // one (it's black's turn to play).
   auto* root = player.root();
-  player.ProcessLeaves({&root, 1}, true);
+  TestablePlayer::TreePath path(root, root);
+  player.ProcessLeaves({&path, 1}, true);
   for (int i = 0; i < kN * kN; ++i) {
     ASSERT_EQ(0.0, root->child_P(i));
   }
@@ -468,7 +470,8 @@ TEST(MctsPlayerTest, SymmetriesTest) {
   // the symmetries.
   for (int i = 0; i < 100; ++i) {
     auto* leaf = nodes.back().get();
-    player.ProcessLeaves({&leaf, 1}, true);
+    path.leaf = leaf;
+    player.ProcessLeaves({&path, 1}, true);
     ASSERT_EQ(0.0, leaf->child_P(Coord::FromKgs("pass")));
     for (const auto move : moves) {
       // Playing where stones exist is illegal and should have been marked as 0.

@@ -226,6 +226,7 @@ minigo_cc_library(
     hdrs = ["test_utils.h"],
     deps = [
         ":base",
+        ":check",
         ":mcts",
         ":position",
         "@com_google_absl//absl/strings",

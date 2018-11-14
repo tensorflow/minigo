@@ -187,16 +187,16 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   return true;
 }
 
-absl::Span<MctsNode* const> GtpPlayer::TreeSearch() {
-  auto leaves = MctsPlayer::TreeSearch();
-  if (!leaves.empty() && report_search_interval_ != absl::ZeroDuration()) {
+absl::Span<const MctsPlayer::TreePath> GtpPlayer::TreeSearch() {
+  auto paths = MctsPlayer::TreeSearch();
+  if (!paths.empty() && report_search_interval_ != absl::ZeroDuration()) {
     auto now = absl::Now();
     if (now - last_report_time_ > report_search_interval_) {
       last_report_time_ = now;
-      ReportSearchStatus(leaves.back());
+      ReportSearchStatus(paths.back().leaf);
     }
   }
-  return leaves;
+  return paths;
 }
 
 GtpPlayer::Response GtpPlayer::CheckArgsExact(absl::string_view cmd,
@@ -292,7 +292,7 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(absl::string_view cmd,
 
   game_nodes_.clear();
   NewGame();
-  ReportPosition();
+  ReportPosition(root());
 
   return Response::Ok();
 }
@@ -338,7 +338,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
     }
   }
 
-  ReportPosition();
+  ReportPosition(root());
 
   return Response::Ok(c.ToKgs());
 }
@@ -457,7 +457,7 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
   if (!PlayMove(c)) {
     return Response::Error("illegal move");
   }
-  ReportPosition();
+  ReportPosition(root());
 
   return Response::Ok();
 }
@@ -657,20 +657,53 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   // Clear the board before replaying sgf.
   NewGame();
 
-  std::function<void(const sgf::Node&, MctsNode*)> impl =
-      [&](const sgf::Node& src, MctsNode* dst) {
-        MG_CHECK(src.move.color == dst->position.to_play());
-        auto* dst_child = dst->MaybeAddChild(src.move.c);
-        ProcessLeaves({&dst_child, 1}, false);
-        MG_CHECK(PlayMove(src.move.c));
-        ReportPosition();
-        for (const auto& src_child : src.children) {
-          impl(*src_child, dst_child);
-        }
-        UndoMove();
-      };
-  for (const auto& tree : sgf::GetTrees(ast)) {
-    impl(*tree, root());
+  std::vector<TreePath> paths;
+
+  // Run inference on a batch of positions, then report the results to the
+  // frontend.
+  auto run_inference = [&]() {
+    ProcessLeaves(absl::MakeSpan(paths), false);
+    for (const auto& path : paths) {
+      ReportPosition(path.leaf);
+    }
+    paths.clear();
+  };
+
+  // Traverse the SGF's game trees, loading them into the backend & running
+  // inference on the positions in batches.
+  std::function<void(const sgf::Node&)> traverse = [&](const sgf::Node& node) {
+    MG_CHECK(node.move.color == root()->position.to_play());
+    auto* leaf = root()->MaybeAddChild(node.move.c);
+    MG_CHECK(PlayMove(node.move.c));
+
+    paths.emplace_back(root(), leaf);
+    if (paths.size() == static_cast<size_t>(options().batch_size)) {
+      run_inference();
+    }
+
+    for (const auto& child : node.children) {
+      traverse(*child);
+    }
+    UndoMove();
+  };
+
+  auto trees = sgf::GetTrees(ast);
+  for (const auto& tree : trees) {
+    traverse(*tree);
+  }
+
+  // Run inference on any stragglers.
+  if (!paths.empty()) {
+    run_inference();
+  }
+
+  // Play the main line.
+  ResetRoot();
+  if (!trees.empty()) {
+    for (const auto& move : trees[0]->ExtractMainLine()) {
+      MG_CHECK(PlayMove(move.c));
+    }
+    ReportPosition(root());
   }
 
   return Response::Ok();
@@ -738,8 +771,8 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   std::cerr << "mg-update:" << j.dump() << std::endl;
 }
 
-void GtpPlayer::ReportPosition() {
-  const auto& position = root()->position;
+void GtpPlayer::ReportPosition(MctsNode* node) {
+  const auto& position = node->position;
 
   std::ostringstream oss;
   for (const auto& stone : position.stones()) {
@@ -755,18 +788,18 @@ void GtpPlayer::ReportPosition() {
   }
 
   nlohmann::json j = {
-      {"id", RegisterNode(root())},
+      {"id", RegisterNode(node)},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
       {"stones", oss.str()},
-      {"q", root()->parent != nullptr ? root()->parent->Q() : 0},
-      {"gameOver", root()->game_over()},
+      {"q", node->parent != nullptr ? node->parent->Q() : 0},
+      {"gameOver", node->game_over()},
   };
-  if (root()->parent) {
-    j["parentId"] = RegisterNode(root()->parent);
+  if (node->parent != nullptr) {
+    j["parentId"] = RegisterNode(node->parent);
   }
-  if (!history().empty()) {
-    j["move"] = history().back().c.ToKgs();
+  if (node->move != Coord::kInvalid) {
+    j["move"] = node->move.ToKgs();
   }
 
   std::cerr << "mg-position: " << j.dump() << std::endl;

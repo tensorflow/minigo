@@ -135,7 +135,8 @@ Coord MctsPlayer::SuggestMove() {
   // a prior call to SuggestMove.
   if (!root_->is_expanded) {
     auto* first_node = root_->SelectLeaf();
-    ProcessLeaves({&first_node, 1}, options_.random_symmetry);
+    TreePath path(root_, first_node);
+    ProcessLeaves({&path, 1}, options_.random_symmetry);
   }
 
   if (options_.inject_noise) {
@@ -211,11 +212,11 @@ Coord MctsPlayer::PickMove() {
   return c;
 }
 
-absl::Span<MctsNode* const> MctsPlayer::TreeSearch() {
+absl::Span<const MctsPlayer::TreePath> MctsPlayer::TreeSearch() {
   int batch_size = options_.batch_size;
   int max_iterations = batch_size * 2;
 
-  leaves_.resize(0);
+  tree_search_paths_.clear();
   for (int i = 0; i < max_iterations; ++i) {
     auto* leaf = root_->SelectLeaf();
     if (leaf == nullptr) {
@@ -226,21 +227,21 @@ absl::Span<MctsNode* const> MctsPlayer::TreeSearch() {
       leaf->IncorporateEndGameResult(value, root_);
     } else {
       leaf->AddVirtualLoss(root_);
-      leaves_.push_back(leaf);
-      if (static_cast<int>(leaves_.size()) == batch_size) {
+      tree_search_paths_.emplace_back(root_, leaf);
+      if (static_cast<int>(tree_search_paths_.size()) == batch_size) {
         break;
       }
     }
   }
 
-  if (!leaves_.empty()) {
-    ProcessLeaves(absl::MakeSpan(leaves_), options_.random_symmetry);
-    for (auto* leaf : leaves_) {
-      leaf->RevertVirtualLoss(root_);
+  if (!tree_search_paths_.empty()) {
+    ProcessLeaves(absl::MakeSpan(tree_search_paths_), options_.random_symmetry);
+    for (const auto& path : tree_search_paths_) {
+      path.leaf->RevertVirtualLoss(path.root);
     }
   }
 
-  return absl::MakeConstSpan(leaves_);
+  return absl::MakeConstSpan(tree_search_paths_);
 }
 
 bool MctsPlayer::ShouldResign() const {
@@ -346,27 +347,28 @@ void MctsPlayer::PushHistory(Coord c) {
   }
 }
 
-void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves,
+void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
                                bool random_symmetry) {
   // Select symmetry operations to apply.
   symmetries_used_.resize(0);
   if (random_symmetry) {
-    symmetries_used_.reserve(leaves.size());
-    for (size_t i = 0; i < leaves.size(); ++i) {
+    symmetries_used_.reserve(paths.size());
+    for (size_t i = 0; i < paths.size(); ++i) {
       symmetries_used_.push_back(static_cast<symmetry::Symmetry>(
           rnd_.UniformInt(0, symmetry::kNumSymmetries - 1)));
     }
   } else {
-    symmetries_used_.resize(leaves.size(), symmetry::kIdentity);
+    symmetries_used_.resize(paths.size(), symmetry::kIdentity);
   }
 
   // Build input features for each leaf, applying random symmetries if
   // requested.
   DualNet::BoardFeatures raw_features;
-  features_.resize(leaves.size());
-  for (size_t i = 0; i < leaves.size(); ++i) {
-    leaves[i]->GetMoveHistory(DualNet::kMoveHistory, &recent_positions_);
-    DualNet::SetFeatures(recent_positions_, leaves[i]->position.to_play(),
+  features_.resize(paths.size());
+  for (size_t i = 0; i < paths.size(); ++i) {
+    const auto* leaf = paths[i].leaf;
+    leaf->GetMoveHistory(DualNet::kMoveHistory, &recent_positions_);
+    DualNet::SetFeatures(recent_positions_, leaf->position.to_play(),
                          &raw_features);
     if (network_->GetInputLayout() == DualNet::InputLayout::kNCHW) {
       using OutIter =
@@ -386,7 +388,7 @@ void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves,
     feature_ptrs.push_back(&feature);
   }
 
-  outputs_.resize(leaves.size());
+  outputs_.resize(paths.size());
   std::vector<DualNet::Output*> output_ptrs;
   output_ptrs.reserve(outputs_.size());
   for (auto& output : outputs_) {
@@ -402,19 +404,20 @@ void MctsPlayer::ProcessLeaves(absl::Span<MctsNode*> leaves,
       inferences_.emplace_back(model_, root_->position.n());
     }
     inferences_.back().last_move = root_->position.n();
-    inferences_.back().total_count += leaves.size();
+    inferences_.back().total_count += paths.size();
   }
 
   // Incorporate the inference outputs back into tree search, undoing any
   // previously applied random symmetries.
   std::array<float, kNumMoves> raw_policy;
-  for (size_t i = 0; i < leaves.size(); ++i) {
-    MctsNode* leaf = leaves[i];
+  for (size_t i = 0; i < paths.size(); ++i) {
+    auto* root = paths[i].root;
+    auto* leaf = paths[i].leaf;
     const auto& output = outputs_[i];
     symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(symmetries_used_[i]),
                                    output.policy.data(), raw_policy.data());
     raw_policy[Coord::kPass] = output.policy[Coord::kPass];
-    leaf->IncorporateResults(raw_policy, output.value, root_);
+    leaf->IncorporateResults(raw_policy, output.value, root);
   }
 }
 
