@@ -13,7 +13,7 @@ source cluster/common.sh
 
 If you would like to override the GCR Project or image tag, you can set:
 
-```
+```shell
 export PROJECT=my-project
 export VERSION_TAG=0.12.34
 ```
@@ -22,16 +22,23 @@ Then `make` will produce and push the image!
 
 CPU worker:
 
-```
-make cpu-image
-make cpu-push
+```shell
+make py-image
+make py-push
 ```
 
-GPU worker:
+GPU worker (C++ engine):
 
+```shell
+make cc-image
+make cc-push
 ```
-make gpu-image
-make gpu-push
+
+TPU worker (C++ engine):
+
+```shell
+make tpu-image
+make tpu-push
 ```
 
 ## Creating the Kubernetes CLuster

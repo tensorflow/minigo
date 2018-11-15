@@ -61,3 +61,52 @@ To reset your environment variables:
 ```shell
 source unset_common.sh
 ```
+
+### Building the images, an overview
+
+The docker images are built from the Makefiles inside the subdirectories here.
+The images have various entrypoints into the varioius minigo binaries depending
+on their purpose.  Some of the images only differ in the way the minigo cc/main
+binary is called, e.g. enabling TPU or not, etc.
+
+The images used are:
+
+  - `cc-base`: A base image with tensorflow precompiled with CUDA support.
+  - `minigo-cc-player`: A selfplay image using the C++ engine, built on the base
+    image, using GPUs by default.
+  - `minigo-tpu-player`: A selfplay image using the C++ engine, built to use
+    TPUs.
+  - `minigo-cc-evaluator`: An image built to run a game between two models,
+    saving the SGF to GCS, using the C++ engine (GPUs supported)
+  - `minigo-gpu-evaluator`: Same, but using the Python engine.
+  - `minigo-player`: Python selfplay (with compiled tensorflow wheel in python,
+    optimized for a target architecture, *not* using GPUs)
+
+The engines using the C++ engine (`cc-player`, `cc-evaluator`, `tpu-player`) are
+all built off of the cc-base image.
+
+In order to build an image, `cd` to the appropriate directory, read the Makefile
+to determine the appropriate targets, and note which environment variables are
+set.  In particular, `make` will automatically tag the built images so they can
+be uploaded to the Google Container Registry, so the environment variables
+identifying the project (`$PROJECT`) and the tag (`$VERSION_TAG`) need to be
+set.  The 'version tag' can be whatever you want -- use whatever versioning
+system keeps things organized.  Docker can run images specified by tag, and
+whatever docker orchestration layer (kubernetes, GKE, etc) will also refer to
+the tags, e.g., the kubernetes yaml configurations specify the tag to use.
+
+For example, building the base image could be accomplished like so:
+
+```shell
+PROJECT=my-project VERSION_TAG=0.1234 make base-image
+```
+
+Once the image is built, you can push it to the container registry via the other
+targets in the Makefile, e.g. `PROJECT=foo VERSION_TAG=bar make base-push`
+
+
+Generally, the idea of deriving our various images from a base image is to
+minimize the number of times tensorflow has to be compiled; the base image
+compiles tensorflow without bringing in any of our source files, so changes to
+our source files don't invalidate docker's caching, which would trigger a
+rebuild.
