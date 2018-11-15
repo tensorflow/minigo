@@ -79,7 +79,7 @@ function create_gcs_bucket() {
 #   CBT_INSTANCE: The Cloud Bigtable instance to create within PROJECT
 #   CBT_ZONE:  The zone in which to create the instance
 #   CBT_TABLE:  The name of the Cloud Bigtable table within the instance
-function create_cbt_table() {
+function create_cbt_instance() {
   check_cbt_exists
   if [[ -z "${PROJECT}" ]]; then
     echo >&2 "PROJECT is not defined"
@@ -94,12 +94,28 @@ function create_cbt_table() {
     return 1
   fi
   if ! ( cbt -project ${PROJECT} createinstance ${CBT_INSTANCE} ${CBT_INSTANCE} \
-                                                ${CBT_INSTANCE}-c ${CBT_ZONE} 3 SSD && \
-         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createtable ${CBT_TABLE} && \
-         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} tfexample && \
-         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${CBT_TABLE} tfexample maxversions=1 &&
-         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} metadata && \
-         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${CBT_TABLE} metadata maxversions=1 ); then
+             ${CBT_INSTANCE}-c ${CBT_ZONE} 3 SSD ); then
+    echo "Could not create instance ${CBT_INSTANCE} in project ${PROJECT}"
+    return 1
+  fi
+}
+
+
+# Creates a Cloud Bigtable table for storing games.
+# Globals:
+#   PROJECT: The cloud project
+#   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
+#   CBT_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
+function create_cbt_table() {
+  check_cbt_exists
+  if ! ( cbt -project ${PROJECT} listinstances | grep -wq "^${CBT_INSTANCE}" ); then
+    create_cbt_instance
+  fi
+  if ! (cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createtable ${CBT_TABLE} && \
+           cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} tfexample && \
+           cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${CBT_TABLE} tfexample maxversions=1 &&
+           cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} metadata && \
+           cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${CBT_TABLE} metadata maxversions=1 ); then
     echo "Could not create table ${CBT_TABLE} on instance ${CBT_INSTANCE} in project ${PROJECT}"
     return 1
   fi
