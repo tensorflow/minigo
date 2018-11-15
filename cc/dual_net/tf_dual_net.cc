@@ -183,7 +183,7 @@ TfDualNet::TfDualNet(std::string graph_path)
       worker_threads_.emplace_back(functor, graph_def);
       worker_threads_.emplace_back(functor, graph_def);
     }
-    if (device_count) {
+    if (device_count > 0) {
       return;
     }
   }
