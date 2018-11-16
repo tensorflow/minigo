@@ -2,87 +2,63 @@
 """
 
 import collections
-import numpy as np
+import operator
 import os
 import re
 import struct
 import time
+import numpy as np
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 import tensorflow as tf
 import utils
 
 
-# TODO(president.jackson): document these
-_project_name = os.environ['PROJECT']
-_instance_name = os.environ['CBT_INSTANCE']
-_table_name = os.environ['CBT_TABLE']
+# Constants
 
-_bt_table = bigtable.Client(
-    _project_name).instance(
-        _instance_name).table(
-            _table_name)
+ROW_PREFIX = 'g_{:0>10}_'
+ROWCOUNT_PREFIX = 'ct_{:0>10}_'
 
-_tf_table = tf.contrib.cloud.BigtableClient(
-    _project_name,
-    _instance_name).table(
-        _table_name)
+## Column family and qualifier constants.
+
+#### Column Families
+
+METADATA = 'metadata'
+
+#### Column Qualifiers
+
+#### Note that in CBT, families are strings and qualifiers are bytes.
+
+TABLE_STATE = b'table_state'
+WAIT_CELL = b'wait_for_game_number'
+MOVE_COUNT = b'move_count'
+
+# Patterns
+
+_game_row_key = re.compile(r'g_(\d+)_m_(\d+)')
 
 
-def get_latest_game_number():
-    """Return the number of the next game to be stored.
+def cbt_intvalue(value):
+    """Decode a big-endian uint64.
 
-    The state of the table is stored in `metadata:game_counter`
-    in the `table_state` row only.
+    Cloud Bigtable stores integers as big-endian uint64,
+    and performs this translation when integers are being
+    set.  But when being read, the values need to be
+    decoded.
     """
-    table_state = _bt_table.read_row(
-        b'table_state',
-        filter_=row_filters.ColumnRangeFilter(
-            'metadata', b'game_counter', b'game_counter'))
-    value = table_state.cell_value('metadata', b'game_counter')
-    return struct.unpack('>q', value)[0]
-
-
-def get_game_range_row_names(game_begin, game_end):
-    """Get the row range containing the given games.
-
-    Sample row name:
-      g_0000000001_m001
-
-    Args:
-      game_begin:  an integer of the beginning game number.
-      game_end:  an integer of the ending game number, exclusive.
-
-    Returns:
-      The two string row numbers to pass to Bigtable as the row range.
-    """
-    row_fmt = 'g_{:0>10}_'
-    return row_fmt.format(game_begin), row_fmt.format(game_end)
-
-
-def get_bleakest_moves(start_game, end_game):
-    """Given a range of games, return the bleakest moves.
-
-    Returns a list of (game, move, q) sorted by q.
-    """
-    row_fmt = 'g_{:0>10}_'
-    bleak = b'bleakest_q'
-    rows = _bt_table.read_rows(
-        row_fmt.format(start_game),
-        row_fmt.format(end_game),
-        filter_=row_filters.ColumnRangeFilter(
-            'metadata', bleak, bleak))
-    gm_pat = re.compile(r'g_(\d+)_m_(\d+)')
-    bleakest = [gm_pat.match(str(r.row_key, 'utf-8')).groups() +
-                (r.cell_value('metadata', bleak),)
-                for r in rows]
-    # Convert to numbers in a second pass
-    bleakest = [(int(g), int(m), float(q)) for g, m, q in bleakest]
-    bleakest.sort(key=operator.itemgetter(2))
-    return bleakest
+    return int(struct.unpack('>q', value)[0])
 
 
 def make_single_array(ds, batch_size=8*1024):
+    """Create a single numpy array from a dataset.
+
+    Args:
+      ds:  a TF Dataset.
+      batch_size:  how many elements to read per pass
+
+    Returns:
+      a single numpy array.
+    """
     batches = []
     with tf.Session() as sess:
         ds = ds.batch(batch_size)
@@ -97,76 +73,241 @@ def make_single_array(ds, batch_size=8*1024):
     return np.concatenate(batches)
 
 
-def require_fresh_games(number_fresh):
-    """Require a given number of fresh games to be played.
+def _histogram_move_keys_by_game(sess, ds, batch_size=8*1024):
+    """Given dataset of key names, return histogram of moves/game.
 
-    Updates the cell `table_state=metadata:wait_for_game_number`
-    by the given number of games.
+    Move counts are written by the game players, so
+    this is mostly useful for repair or backfill.
+
+    Args:
+      sess:  TF session
+      ds:  TF dataset containing game move keys.
+      batch_size:  performance tuning parameter
     """
-    latest = get_latest_game_number()
-    wait_cell = b'wait_for_game_number'
-    table_state = _bt_table.row(b'table_state')
-    table_state.set_cell('metadata', wait_cell, int(latest + number_fresh))
-    table_state.commit()
+    ds = ds.batch(batch_size)
+    # Turns 'g_0000001234_m_133' into 'g_0000001234'
+    ds = ds.map(lambda x: tf.strings.substr(x, 0, 12))
+    iterator = ds.make_initializable_iterator()
+    sess.run(iterator.initializer)
+    get_next = iterator.get_next()
+    h = collections.Counter()
+    try:
+        while True:
+            h.update(sess.run(get_next))
+    except tf.errors.OutOfRangeError:
+        pass
+    # NOTE:  Cannot be truly sure the count is right till the end.
+    return h
 
 
-def wait_for_fresh_games(poll_interval=15.0):
-    """Block caller until required new games have been played.
+class GameQueue:
+    """Queue of games stored in a Cloud Bigtable.
 
-    If the cell `table_state=metadata:wait_for_game_number` exists,
-    then block the caller, checking every `poll_interval` seconds,
-    until `table_state=metadata:game_counter is at least the value
-    in that cell.
+    The state of the table is stored in the `table_state`
+    row, which includes the columns `metadata:game_counter`.
     """
-    wait_cell = b'wait_for_game_number'
-    table_state = _bt_table.read_row(
-        b'table_state',
-        filter_=row_filters.ColumnRangeFilter(
-            'metadata', wait_cell, wait_cell))
-    if table_state is None:
-        utils.dbg('No waiting for new games needed; '
-                  'wait_for_game_number column not in table_state')
-        return
-    value = table_state.cell_value('metadata', wait_cell)
-    if not value:
-        utils.dbg('No waiting for new games needed; '
-                  'no value in wait_for_game_number cell '
-                  'in table_state')
-        return
-    wait_until_game = struct.unpack('>q', value)[0]
-    latest_game = get_latest_game_number()
-    while latest_game < wait_until_game:
-        utils.dbg('Latest game {} not yet at required game {}'.
-                  format(latest_game, wait_until_game))
-        time.sleep(poll_interval)
-        latest_game = get_latest_game_number()
 
+    def __init__(self, project_name, instance_name, table_name):
+        """Constructor.
 
-def get_moves_from_games(start_game, end_game, moves, shuffle,
+        Args:
+          project_name:  string name of GCP project having table.
+          instance_name:  string name of CBT instance in project.
+          table_name:  string name of CBT table in instance.
+        """
+        self.bt_table = bigtable.Client(
+            project_name).instance(
+                instance_name).table(
+                    table_name)
+        self.tf_table = tf.contrib.cloud.BigtableClient(
+            project_name,
+            instance_name).table(
+                table_name)
+
+    def latest_game_number(self):
+        """Return the number of the next game to be written."""
+        game_counter = b'game_counter'
+        table_state = self.bt_table.read_row(
+            TABLE_STATE,
+            filter_=row_filters.ColumnRangeFilter(
+                METADATA, game_counter, game_counter))
+        return cbt_intvalue(table_state.cell_value(METADATA, game_counter))
+
+    def bleakest_moves(self, start_game, end_game):
+        """Given a range of games, return the bleakest moves.
+
+        Returns a list of (game, move, q) sorted by q.
+        """
+        bleak = b'bleakest_q'
+        rows = self.bt_table.read_rows(
+            ROW_PREFIX.format(start_game),
+            ROW_PREFIX.format(end_game),
+            filter_=row_filters.ColumnRangeFilter(
+                METADATA, bleak, bleak))
+        def parse(r):
+            rk = str(r.row_key, 'utf-8')
+            g, m = _game_row_key.match(rk).groups()
+            q = r.cell_value(METADATA, bleak)
+            return int(g), int(m), float(q)
+        return sorted([parse(r) for r in rows], key=operator.itemgetter(2))
+
+    def require_fresh_games(self, number_fresh):
+        """Require a given number of fresh games to be played.
+
+        Args:
+          number_fresh:  integer, number of new fresh games needed
+
+        Increments the cell `table_state=metadata:wait_for_game_number`
+        by the given number of games.  This will cause
+        `self.wait_for_fresh_games()` to block until the game
+        counter has reached this number.
+        """
+        latest = self.latest_game_number()
+        table_state = self.bt_table.row(TABLE_STATE)
+        table_state.set_cell(METADATA, WAIT_CELL, int(latest + number_fresh))
+        table_state.commit()
+
+    def wait_for_fresh_games(self, poll_interval=15.0):
+        """Block caller until required new games have been played.
+
+        Args:
+          poll_interval:  number of seconds to wait between checks
+
+        If the cell `table_state=metadata:wait_for_game_number` exists,
+        then block the caller, checking every `poll_interval` seconds,
+        until `table_state=metadata:game_counter is at least the value
+        in that cell.
+        """
+        table_state = self.bt_table.read_row(
+            TABLE_STATE,
+            filter_=row_filters.ColumnRangeFilter(
+                METADATA, WAIT_CELL, WAIT_CELL))
+        if table_state is None:
+            utils.dbg('No waiting for new games needed; '
+                      'wait_for_game_number column not in table_state')
+            return
+        value = table_state.cell_value(METADATA, WAIT_CELL)
+        if not value:
+            utils.dbg('No waiting for new games needed; '
+                      'no value in wait_for_game_number cell '
+                      'in table_state')
+            return
+        wait_until_game = cbt_intvalue(value)
+        latest_game = self.latest_game_number()
+        while latest_game < wait_until_game:
+            utils.dbg('Latest game {} not yet at required game {}'.
+                      format(latest_game, wait_until_game))
+            time.sleep(poll_interval)
+            latest_game = self.latest_game_number()
+
+    def count_moves_in_game_range(self, game_begin, game_end):
+        """Count the total moves in a game range.
+
+        Args:
+          game_begin:  integer, starting game
+          game_end:  integer, ending game
+
+        Uses the `ct_` keyspace for rapid move summary.
+        """
+        rows = self.bt_table.read_rows(
+            ROWCOUNT_PREFIX.format(game_begin),
+            ROWCOUNT_PREFIX.format(game_end),
+            filter_=row_filters.ColumnRangeFilter(
+                METADATA, MOVE_COUNT, MOVE_COUNT))
+        return sum([int(r.cell_value(METADATA, MOVE_COUNT)) for r in rows])
+
+    def moves_from_games(self, start_game, end_game, moves, shuffle,
                          column_family, column):
-    start_row, end_row = get_game_range_row_names(start_game, end_game)
-    # NOTE:  Choose a probability high enough to guarantee at least the
-    # required number of moves, by using a slightly lower estimate
-    # of the total moves, then trimming the result.
-    total_moves = count_moves_in_game_range(start_game, end_game)
-    probability = moves / (total_moves * 0.99)
-    utils.dbg('Row range: %s - %s; total moves: %d; probability %.3f' % (
-        start_row, end_row, total_moves, probability))
-    shards = 8
-    ds = _tf_table.parallel_scan_range(start_row, end_row,
-                                       probability=probability,
-                                       num_parallel_scans=shards,
-                                       columns=[(column_family, column)])
-    if shuffle:
-        rds = tf.data.Dataset.from_tensor_slices(
-            tf.random_shuffle(tf.range(0, shards, dtype=tf.int64)))
-        ds = rds.apply(
-            tf.contrib.data.parallel_interleave(
-                lambda x: ds.shard(shards, x),
-                cycle_length=shards, block_length=1024))
-        ds = ds.shuffle(shards * 1024 * 2)
-    ds = ds.take(moves)
-    return ds
+        """Dataset of samples and/or shuffled moves from game range.
+
+        Args:
+          n:  an integer indicating how many past games should be sourced.
+          moves:  an integer indicating how many moves should be sampled
+            from those N games.
+          column_family:  name of the column family containing move examples.
+          column:  name of the column containing move examples.
+          shuffle:  if True, shuffle the selected move examples.
+
+        Returns:
+          A dataset containing no more than `moves` examples, sampled
+            randomly from the last `n` games in the table.
+        """
+        start_row = ROW_PREFIX.format(start_game)
+        end_row = ROW_PREFIX.format(end_game)
+        # NOTE:  Choose a probability high enough to guarantee at least the
+        # required number of moves, by using a slightly lower estimate
+        # of the total moves, then trimming the result.
+        total_moves = self.count_moves_in_game_range(start_game, end_game)
+        probability = moves / (total_moves * 0.99)
+        utils.dbg('Row range: %s - %s; total moves: %d; probability %.3f' % (
+            start_row, end_row, total_moves, probability))
+        shards = 8
+        ds = self.tf_table.parallel_scan_range(start_row, end_row,
+                                               probability=probability,
+                                               num_parallel_scans=shards,
+                                               columns=[(column_family, column)])
+        if shuffle:
+            rds = tf.data.Dataset.from_tensor_slices(
+                tf.random_shuffle(tf.range(0, shards, dtype=tf.int64)))
+            ds = rds.apply(
+                tf.contrib.data.parallel_interleave(
+                    lambda x: ds.shard(shards, x),
+                    cycle_length=shards, block_length=1024))
+            ds = ds.shuffle(shards * 1024 * 2)
+        ds = ds.take(moves)
+        return ds
+
+    def _write_move_counts(self, sess, h):
+        """Add move counts from the given histogram to the table.
+
+        Used to update the move counts in an existing table.  Should
+        not be needed except for backfill or repair.
+
+        Args:
+          sess:  TF session to use for doing a Bigtable write.
+          tf_table:  TF Cloud Bigtable to use for writing.
+          h:  a dictionary keyed by game row prefix ("g_0023561") whose values
+             are the move counts for each game.
+        """
+        def gen():
+            for k, v in h.items():
+                # The keys in the histogram may be of type 'bytes'
+                k = str(k, 'utf-8')
+                vs = str(v)
+                yield (k.replace('g_', 'ct_') + '_%d' % v, vs)
+                yield (k + '_m_000', vs)
+        mc = tf.data.Dataset.from_generator(gen, (tf.string, tf.string))
+        wr_op = self.tf_table.write(mc,
+                                    column_families=[METADATA],
+                                    columns=[MOVE_COUNT])
+        sess.run(wr_op)
+
+    def update_move_counts(self, start_game, end_game, interval=1000):
+        """Used to update the move_count cell for older games.
+
+        Should not be needed except for backfill or repair.
+
+        move_count cells will be updated in both g_<game_id>_m_000 rows
+        and ct_<game_id>_<move_count> rows.
+        """
+        for g in range(start_game, end_game, interval):
+            with tf.Session() as sess:
+                start_row = ROW_PREFIX.format(g)
+                end_row = ROW_PREFIX.format(g + interval)
+                print('Range:', start_row, end_row)
+                start_time = time.time()
+                ds = self.tf_table.keys_by_range_dataset(start_row, end_row)
+                h = _histogram_move_keys_by_game(sess, ds)
+                self._write_move_counts(sess, h)
+                end_time = time.time()
+                elapsed = end_time - start_time
+                print('  games/sec:', len(h)/elapsed)
+
+
+# TODO(president.jackson): document these
+_games = GameQueue(os.environ['PROJECT'],
+                   os.environ['CBT_INSTANCE'],
+                   os.environ['CBT_TABLE'])
 
 
 def get_unparsed_moves_from_last_n_games(n,
@@ -188,86 +329,16 @@ def get_unparsed_moves_from_last_n_games(n,
       A dataset containing no more than `moves` examples, sampled
         randomly from the last `n` games in the table.
     """
-    wait_for_fresh_games()
-    latest_game = int(get_latest_game_number())
+    _games.wait_for_fresh_games()
+    latest_game = int(_games.latest_game_number())
     utils.dbg('Latest game: %s' % latest_game)
     if latest_game == 0:
         raise ValueError('Cannot find a latest game in the table')
 
     start = int(max(0, latest_game - n))
-    ds = get_moves_from_games(start, latest_game, moves, shuffle,
-                              column_family, column)
+    ds = _games.moves_from_games(start, latest_game, moves, shuffle,
+                                 column_family, column)
     return ds.map(lambda row_name, s: s)
-
-
-def histogram_move_keys_by_game(sess, ds, batch_size=8*1024):
-    """Given dataset of key names, return histogram of moves/game."""
-    ds = ds.batch(batch_size)
-    # Turns 'g_0000001234_m_133' into 'g_0000001234'
-    ds = ds.map(lambda x: tf.strings.substr(x, 0, 12))
-    iterator = ds.make_initializable_iterator()
-    sess.run(iterator.initializer)
-    get_next = iterator.get_next()
-    h = collections.Counter()
-    try:
-        while True:
-            h.update(sess.run(get_next))
-    except tf.errors.OutOfRangeError:
-        pass
-    # NOTE:  Cannot be truly sure the count is right till the end.
-    return h
-
-
-def write_move_counts(sess, h):
-    """Add move counts from the given histogram to the table.
-
-    Args:
-      sess:  TF session to use for doing a Bigtable write.
-      h:  a dictionary keyed by game row prefix ("g_0023561") whose values
-         are the move counts for each game.
-    """
-    def gen():
-        for k, v in h.items():
-            # The keys in the histogram may be of type 'bytes'
-            k = str(k, 'utf-8')
-            vs = str(v)
-            yield (k.replace('g_', 'ct_') + '_%d' % v, vs)
-            yield (k + '_m_000', vs)
-    mc = tf.data.Dataset.from_generator(gen, (tf.string, tf.string))
-    wr_op = _tf_table.write(mc, column_families=['metadata'], columns=['move_count'])
-    sess.run(wr_op)
-
-
-def update_move_count_in_games(start_game, end_game, interval=1000):
-    """Used to update the move_count cell for older games.
-
-    move_count cells will be updated in both g_<game_id>_m_000 rows
-    and ct_<game_id>_<move_count> rows.
-    """
-    for g in range(start_game, end_game, interval):
-        with tf.Session() as sess:
-            g_range = get_game_range_row_names(g, g + interval)
-            print('Range:', g_range)
-            start_time = time.time()
-            ds = _tf_table.keys_by_range_dataset(*g_range)
-            h = histogram_move_keys_by_game(sess, ds)
-            write_move_counts(sess, h)
-            end_time = time.time()
-            elapsed = end_time - start_time
-            print('  games/sec:', len(h)/elapsed)
-
-
-def count_moves_in_game_range(game_begin, game_end):
-    """Use the ct_ rows for rapid move summary.
-    """
-    row_fmt = 'ct_{:0>10}_'
-    start_row = row_fmt.format(game_begin)
-    end_row = row_fmt.format(game_end)
-    rows = _bt_table.read_rows(start_row, end_row,
-                               filter_=row_filters.ColumnRangeFilter(
-                                   'metadata', b'move_count', b'move_count'))
-    moves = sum([int(r.cell_value('metadata', b'move_count')) for r in rows])
-    return moves
 
 
 def count_elements_in_dataset(ds, batch_size=1*1024, parallel_batch=8):
