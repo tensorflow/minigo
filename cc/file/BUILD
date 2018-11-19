@@ -20,7 +20,7 @@ cc_library(
     deps = [
         "@com_google_absl//absl/strings",
     ] + select({
-        "//cc/config:enable_tf": ["//cc/tensorflow"],
+        "//cc/config:enable_tf": ["//cc:tensorflow"],
         "//conditions:default": [],
     }),
 )

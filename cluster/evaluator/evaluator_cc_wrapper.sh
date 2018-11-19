@@ -16,7 +16,7 @@
 # Added to the evaluator image.
 # Wraps our call to cc/main
 
-# MODEL_BLACK and MODEL_WHITE should be full gs:// paths
+# MODEL_BLACK and MODEL_WHITE should be full gs:// paths to .pb files
 
 set -e
 
@@ -26,6 +26,7 @@ echo bucket: $SGF_BUCKET_NAME
 echo black:  ${MODEL_BLACK}
 echo white:  ${MODEL_WHITE}
 
+# TODO(amj) Check that cc/main runs with perms to read a gs:// path directly
 echo Retrieiving Models
 gsutil cp ${MODEL_BLACK} .
 gsutil cp ${MODEL_WHITE} .

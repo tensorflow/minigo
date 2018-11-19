@@ -37,7 +37,7 @@ RUN echo "startup --batch" >>/etc/bazel.bazelrc
 RUN echo "build --spawn_strategy=standalone --genrule_strategy=standalone" \
     >>/etc/bazel.bazelrc
 # Install the most recent bazel release.
-ENV BAZEL_VERSION 0.11.0
+ENV BAZEL_VERSION 0.15.2
 WORKDIR /
 RUN mkdir /bazel && \
     cd /bazel && \
@@ -52,10 +52,12 @@ RUN mkdir /bazel && \
 
 RUN git clone https://github.com/tensorflow/tensorflow.git && \
     cd tensorflow && \
-    git checkout r1.7
+    git checkout r1.11
 WORKDIR /tensorflow
 
 ENV CI_BUILD_PYTHON python3
+RUN pip3 install --upgrade pip setuptools
+RUN pip3 install keras
 
 # --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0" \
 RUN ln -s /usr/bin/python3 /usr/bin/python  && tensorflow/tools/ci_build/builds/configured CPU \
@@ -70,7 +72,6 @@ WORKDIR /
 
 ADD staging/requirements.txt /app/requirements.txt
 
-RUN pip3 install --upgrade pip
 RUN pip3 install -r /app/requirements.txt
 
 ADD staging/ /app

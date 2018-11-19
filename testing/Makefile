@@ -20,8 +20,7 @@ TAG := $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)-$(sh
 all: build
 
 buildv2:
-	mkdir -p staging/tensorflow
-	bazel run -c opt //cc/tensorflow:build -- ${CURDIR}/staging/tensorflow
+	mkdir -p staging
 	cp ../requirements.txt staging/requirements.txt
 	docker build -f Dockerfile.v2 -t $(IMG_V2):$(TAG) .
 	docker tag $(IMG_V2):$(TAG) $(IMG_V2):latest

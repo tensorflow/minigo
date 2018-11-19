@@ -5,10 +5,11 @@
 #	  VERSION_TAG=0.XY make target
 
 base-image:
-		mkdir -p staging/cc
+		mkdir -p staging/cc/tensorflow
 		cp ../../WORKSPACE staging/
+		cp ../../*.bazelrc staging/
+		cp ../../requirements.txt staging/
 		cp -r -p ../../cc/ staging/
-		cp -r -p ../../proto/ staging/
 		rm -rfd staging/cc/tensorflow
 		docker build -t "gcr.io/${PROJECT}/cc-base:${VERSION_TAG}" .
 		rm -rfd staging/

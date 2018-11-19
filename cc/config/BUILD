@@ -42,6 +42,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_gpu",
+    define_values = {"gpu": "1"},
+)
+
+config_setting(
     name = "enable_tpu",
     define_values = {"tpu": "1"},
 )

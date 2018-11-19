@@ -38,7 +38,7 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     apt-get update -y && apt-get install google-cloud-sdk -y
 
-ENV BAZEL_VERSION 0.11.0
+ENV BAZEL_VERSION 0.15.2
 
 WORKDIR /
 RUN mkdir /bazel && \
@@ -64,6 +64,12 @@ WORKDIR /app
 # For the slow stuff, copy just the needed scripts so we don't break the docker cache
 COPY staging/cc/configure_tensorflow.sh cc/configure_tensorflow.sh
 ENV CC_OPT_FLAGS -march=ivybridge
+ADD staging/requirements.txt /app/requirements.txt
+
+RUN pip3 install --upgrade pip setuptools
+#TODO: just install what we need (keras?) so changes to requirements.txt don't trigger TF rebuilds
+RUN pip3 install -r /app/requirements.txt
+
 RUN cc/configure_tensorflow.sh
 
 # Now bring in the rest of our code; changing our code will only trigger rebuilds below here

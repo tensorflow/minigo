@@ -1,4 +1,4 @@
-FROM gcr.io/${PROJECT}/cc-base:0.17
+FROM gcr.io/${PROJECT}/cc-base:v14
 
 RUN apt-get update && apt-get install gettext -y
 
@@ -14,6 +14,9 @@ WORKDIR /app
 
 RUN gsutil cp gs://minigo-pub/v7-19x19/models/$MODEL /app
 COPY config.txt /app
+
+# config.txt should setup the username and password for cgos
+# it's not checked in for obvious reasons.
 RUN envsubst < config.txt > config.txt
 
 RUN cat config.txt

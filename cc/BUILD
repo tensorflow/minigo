@@ -1,4 +1,6 @@
-package(default_visibility = [":__subpackages__"])
+package(default_visibility = [
+    ":__subpackages__",
+])
 
 licenses(["notice"])  # Apache License 2.0
 
@@ -9,6 +11,66 @@ load(
     "minigo_cc_test",
     "minigo_cc_test_19_only",
     "minigo_cc_test_9_only",
+)
+
+cc_library(
+    name = "tensorflow",
+    srcs = [
+        "tensorflow/libtensorflow_framework.so",
+    ] + select({
+        "//cc/config:enable_tpu": ["tensorflow/libgrpc_runtime.so"],
+        "//conditions:default": ["tensorflow/libtensorflow_cc.so"],
+    }),
+    hdrs = glob(
+        ["tensorflow/**/*"],
+        exclude = [
+            "**/*.a",
+            "**/*.so",
+            "tensorflow/flatbuffers/**",
+            "tensorflow/tensorflow/contrib/lite/**",
+        ],
+    ),
+    includes = [
+        "tensorflow",
+        "tensorflow/external/nsync/public",
+    ],
+    tags = ["manual"],
+)
+
+cc_library(
+    name = "tf_lite",
+    srcs = [
+        "tensorflow/libtensorflow_lite.a",
+    ],
+    hdrs = glob(
+        [
+            "tensorflow/flatbuffers/*.h",
+            "tensorflow/tensorflow/contrib/lite/**",
+        ],
+        exclude = ["**/*.so"],
+    ),
+    includes = ["tensorflow"],
+    linkopts = ["-ldl"],
+)
+
+cc_library(
+    name = "cuda",
+    deps = select({
+        "//cc/config:enable_gpu": [
+            "@local_config_cuda//:cuda_headers",
+            "@local_config_cuda//:cudart",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "tensorrt",
+    deps = [
+        "@local_config_tensorrt//:nv_infer",
+        "@local_config_tensorrt//:nvparsers",
+        "@local_config_tensorrt//:tensorrt_headers",
+    ],
 )
 
 minigo_cc_library(
@@ -54,17 +116,17 @@ minigo_cc_library(
     name = "gtp_player",
     srcs = ["gtp_player.cc"],
     hdrs = ["gtp_player.h"],
-    copts = ["-I external/nlohmann_json_lib/include"],
     deps = [
         ":base",
         ":mcts",
         ":sgf",
         "//cc:thread_safe_queue",
         "//cc/dual_net",
+        "@com_github_nlohmann_json//:json",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
-        "@nlohmann_json_lib",
     ],
 )
 
@@ -196,7 +258,7 @@ minigo_cc_library(
                "//conditions:default": [],
            }) +
            select({
-               "//cc/config:enable_tf": ["//cc/tensorflow"],
+               "//cc/config:enable_tf": ["//cc:tensorflow"],
                "//conditions:default": [],
            }),
 )

@@ -22,12 +22,10 @@ saved_models/
 staging/
 
 bazel-*
-cc/tensorflow/*/
+cc/tensorflow/
 
 minigui/static/*.js.map
 
 cluster/cgos/cgosGtp*
 
-# Ignore bazel configuration files except .bazelrc itself.
-*.bazelrc
-!.bazelrc
+.bazelrc

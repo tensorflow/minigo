@@ -1,0 +1,9 @@
+ARG PROJECT
+FROM gcr.io/$PROJECT/cc-base:latest
+
+WORKDIR /app
+ADD staging/rl_loop/ /app
+ADD staging/mask_flags.py /app
+
+RUN bazel build -c opt cc/main --define=tf=1 --define=tpu=1
+CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=tpu"]

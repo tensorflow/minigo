@@ -1,3 +1,8 @@
-FROM gcr.io/$PROJECT/cc-base:0.17
+ARG PROJECT
+FROM gcr.io/$PROJECT/cc-base:latest
+
+WORKDIR /app
+ADD staging/rl_loop/ /app
+ADD staging/mask_flags.py /app
 
 CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=cc"]

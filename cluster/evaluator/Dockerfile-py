@@ -1,5 +1,4 @@
 FROM nvidia/cuda:9.0-base-ubuntu16.04
-#FROM tensorflow/tensorflow:1.7.1-gpu-py3
 
 RUN apt update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -40,8 +39,8 @@ ADD staging/requirements.txt /app/requirements.txt
 
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /app/requirements.txt
-RUN pip3 install "tensorflow-gpu>=1.7,<1.8"
+RUN pip3 install "tensorflow-gpu>=1.11,<1.12"
 
 ADD staging/ /app
 
-CMD ["/bin/sh", "evaluator_wrapper.sh"]
+CMD ["/bin/sh", "evaluator_py_wrapper.sh"]

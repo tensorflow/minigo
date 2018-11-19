@@ -27,13 +27,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     rsync \
     git \
-    wget \
-    pkg-config \
-    zip \
-    g++ \
-    zlib1g-dev \
-    unzip \
-    clang-format && \
+    wget && \
     apt-get clean
 
 ENV GCLOUD_VERSION 163.0.0
@@ -43,15 +37,12 @@ RUN wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud
     /google-cloud-sdk/install.sh
 ENV PATH "/google-cloud-sdk/bin:${PATH}"
 
-RUN wget https://github.com/bazelbuild/bazel/releases/download/0.17.1/bazel-0.17.1-installer-linux-x86_64.sh && \
-    chmod +x bazel-0.17.1-installer-linux-x86_64.sh && \
-    ./bazel-0.17.1-installer-linux-x86_64.sh
-
 WORKDIR /workspace
+COPY bootstrap_v2.sh /workspace/bootstrap_v2.sh
 
 COPY staging/requirements.txt /workspace/requirements.txt
 RUN pip3 install --upgrade pip
 RUN pip3 install -r /workspace/requirements.txt
 RUN pip3 install "tensorflow>=1.11"
 
-COPY staging/tensorflow/ /app/cc/tensorflow/
+ENTRYPOINT ["/bin/sh", "/workspace/bootstrap_v2.sh"]

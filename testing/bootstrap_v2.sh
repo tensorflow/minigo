@@ -1,5 +1,3 @@
-#!/bin/bash
-#
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,12 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Simple shell script to lint files and run the tests. Could be helpful for
-# users, but largely for automation.
+#!/bin/bash
 #
-# NOTE! If this file changes/moves, please change
-# https://github.com/kubernetes/test-infra/blob/master/config/jobs/tensorflow/minigo/minigo.yaml
+# This script is used to bootstrap the [prow
+# jobs](https://github.com/kubernetes/test-infra/tree/master/prow), which is
+# the Kubernetes open source test-runner, rather like Jenkins. In other words,
+# this pulls the Minigo repo at some point (i.e., at the a pull request or
+# commit sha) and then runs the Minigo tests.
 
-# Copy prebuilt TensorFlow from image.
-rsync -ah /app/cc/tensorflow/ ./cc/tensorflow/
+set -o errexit
 
+git clone https://github.com/kubernetes/test-infra
+
+python2.7 ./test-infra/jenkins/bootstrap.py \
+    --job=${JOB_NAME} \
+    --service-account=${GOOGLE_APPLICATION_CREDENTIALS} \
+    "$@"
