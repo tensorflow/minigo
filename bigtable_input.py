@@ -322,7 +322,9 @@ class GameQueue:
                 print('  games/sec:', len(h)/elapsed)
 
 
-# TODO(president.jackson): document these
+# PROJECT:  the GCP project in which the Cloud Bigtable is located.
+# CBT_INSTANCE:  identifier of Cloud Bigtable instance in PROJECT.
+# CBT_TABLE:  identifier of Cloud Bigtable table in CBT_INSTANCE.
 _games = GameQueue(os.environ['PROJECT'],
                    os.environ['CBT_INSTANCE'],
                    os.environ['CBT_TABLE'])
