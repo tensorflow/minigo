@@ -100,6 +100,24 @@ def _histogram_move_keys_by_game(sess, ds, batch_size=8*1024):
     return h
 
 
+def _game_keys_as_array(ds):
+    """Turn keys of a Bigtable dataset into an array.
+
+    Take g_GGG_m_MMM and create GGG.MMM numbers.
+
+    Valuable when visualizing the distribution of a given dataset in
+    the game keyspace.
+    """
+    ds = ds.map(lambda row_key, cell: row_key)
+    # want 'g_0000001234_m_133' is '0000001234.133' and so forth
+    ds = ds.map(lambda x:
+                tf.strings.to_number(tf.strings.substr(x, 2, 10) +
+                                     '.' +
+                                     tf.strings.substr(x, 15, 3),
+                                     out_type=tf.float64))
+    return make_single_array(ds)
+
+
 class GameQueue:
     """Queue of games stored in a Cloud Bigtable.
 
