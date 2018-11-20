@@ -38,4 +38,9 @@ ENV PATH "/google-cloud-sdk/bin:${PATH}"
 WORKDIR /workspace
 COPY bootstrap_v2.sh /workspace/bootstrap_v2.sh
 
+COPY staging/requirements.txt /workspace/requirements.txt 
+RUN pip3 install --upgrade pip setuptools
+RUN pip3 install -r /workspace/requirements.txt
+RUN pip3 install "tensorflow>=1.11"
+
 ENTRYPOINT ["/bin/sh", "/workspace/bootstrap_v2.sh"]
