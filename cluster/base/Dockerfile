@@ -71,8 +71,3 @@ RUN pip3 install --upgrade pip setuptools
 RUN pip3 install -r /app/requirements.txt
 
 RUN cc/configure_tensorflow.sh
-
-# Now bring in the rest of our code; changing our code will only trigger rebuilds below here
-COPY staging /app
-
-RUN bazel build --copt=-march=ivybridge cc/main
