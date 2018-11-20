@@ -98,17 +98,8 @@ void WriteGameExamples(const std::string& gcp_project_name,
   // This will be everything from a single game, so retrieve the game
   // counter from the Bigtable and increment it atomically.
   using namespace google::cloud::bigtable;
-  auto rule =
-      ReadModifyWriteRule::IncrementAmount("metadata", "game_counter", 1);
-  auto row = table.ReadModifyWriteRow("table_state", rule);
-  uint64_t game_counter = 0;
-  for (auto const& cell : row.cells()) {
-    if (cell.family_name() == "metadata" &&
-        cell.column_qualifier() == "game_counter") {
-      game_counter = cell.value_as<bigendian64_t>().get();
-      break;
-    }
-  }
+  uint64_t game_counter = IncrementGameCounter(
+      gcp_project_name, instance_name, table_name, 1);
 
   auto row_prefix = absl::StrFormat(kGameRowFormat, game_counter);
   WriteTfExamples(table, row_prefix, examples);

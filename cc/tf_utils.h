@@ -35,8 +35,6 @@ void WriteGameExamples(const std::string& output_dir,
 
 // Writes a list of tensorflow Example protos to the specified
 // Bigtable, one example per row, starting at the given row cursor.
-// Returns the value of the row cursor after having written out
-// the examples.
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
                        const std::string& table_name, const MctsPlayer& player);
