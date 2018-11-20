@@ -234,7 +234,7 @@ class DeltaQHeatMap extends HeatMapBase {
       return true;
     }
 
-    let q = position.q;
+    let q = position.q || 0;
     for (let i = 0; i < N * N; ++i) {
       if (position.stones[i] != Color.Empty) {
         this.colors.push(HeatMapBase.TRANSPARENT);

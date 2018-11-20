@@ -84,7 +84,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         newGame() {
             super.newGame();
             this.log.clear();
-            this.winrateGraph.clear();
+            this.winrateGraph.newGame(this.rootPosition);
         }
         onPlayerChanged() {
             if (this.activePosition.gameOver) {

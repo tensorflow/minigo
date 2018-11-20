@@ -120,7 +120,7 @@ class DemoApp extends App {
   protected newGame() {
     super.newGame();
     this.log.clear();
-    this.winrateGraph.clear();
+    this.winrateGraph.newGame(this.rootPosition);
   }
 
   private onPlayerChanged() {

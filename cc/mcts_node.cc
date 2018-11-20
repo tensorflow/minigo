@@ -248,7 +248,7 @@ MctsNode* MctsNode::SelectLeaf() {
   auto* node = this;
   for (;;) {
     // If a node has never been evaluated, we have no basis to select a child.
-    if (!node->is_expanded) {
+    if (!node->HasFlag(Flag::kExpanded)) {
       return node;
     }
     // HACK: if last move was a pass, always investigate double-pass first
@@ -274,7 +274,7 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
 
   // If the node has already been selected for the next inference batch, we
   // shouldn't 'expand' it again.
-  if (is_expanded) {
+  if (HasFlag(Flag::kExpanded)) {
     return;
   }
 
@@ -288,7 +288,7 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
     policy_scalar = 1 / policy_scalar;
   }
 
-  is_expanded = true;
+  SetFlag(Flag::kExpanded);
   for (int i = 0; i < kNumMoves; ++i) {
     // Zero out illegal moves, and re-normalize move_probabilities.
     float move_prob =
@@ -305,14 +305,14 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
     //
     // The value seeded here acts as a prior, and gets averaged into Q
     // calculations.
-    edges[i].W = value;
+    edges[i].W += value;
   }
   BackupValue(value, up_to);
 }
 
 void MctsNode::IncorporateEndGameResult(float value, MctsNode* up_to) {
   MG_DCHECK(game_over() || position.n() == kMaxSearchDepth);
-  MG_DCHECK(!is_expanded);
+  MG_DCHECK(!HasFlag(Flag::kExpanded));
   BackupValue(value, up_to);
 }
 
@@ -330,20 +330,26 @@ void MctsNode::BackupValue(float value, MctsNode* up_to) {
 
 void MctsNode::AddVirtualLoss(MctsNode* up_to) {
   auto* node = this;
-  do {
+  for (;;) {
     ++node->num_virtual_losses_applied;
     node->stats->W += node->position.to_play() == Color::kBlack ? 1 : -1;
+    if (node == up_to) {
+      return;
+    }
     node = node->parent;
-  } while (node != nullptr && node != up_to);
+  }
 }
 
 void MctsNode::RevertVirtualLoss(MctsNode* up_to) {
   auto* node = this;
-  do {
+  for (;;) {
     --node->num_virtual_losses_applied;
     node->stats->W -= node->position.to_play() == Color::kBlack ? 1 : -1;
+    if (node == up_to) {
+      return;
+    }
     node = node->parent;
-  } while (node != nullptr && node != up_to);
+  }
 }
 
 void MctsNode::PruneChildren(Coord c) {

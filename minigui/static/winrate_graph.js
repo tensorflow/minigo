@@ -18,8 +18,9 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             super();
             this.mainLine = [];
             this.variation = [];
-            this.moveNum = 0;
             this.xScale = MIN_POINTS;
+            this.rootPosition = null;
+            this.activePosition = null;
             if (typeof (parent) == 'string') {
                 parent = util_1.getElement(parent);
             }
@@ -31,7 +32,6 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 this.resizeCanvas();
                 this.draw();
             });
-            this.draw();
         }
         resizeCanvas() {
             let pr = util_1.pixelRatio();
@@ -49,42 +49,48 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             this.h = canvas.height - this.marginTop - this.marginBottom;
             this.textHeight = 0.06 * this.h;
         }
-        clear() {
+        newGame(rootPosition) {
+            this.rootPosition = rootPosition;
+            this.activePosition = rootPosition;
             this.mainLine = [];
             this.variation = [];
-            this.moveNum = 0;
+            this.xScale = MIN_POINTS;
             this.draw();
         }
+        setActive(position) {
+            if (position != this.activePosition) {
+                this.xScale = Math.max(this.xScale, position.moveNum);
+                this.activePosition = position;
+                this.update(position);
+                this.draw();
+            }
+        }
         update(position) {
-            let anythingChanged = position.moveNum != this.moveNum;
-            this.moveNum = position.moveNum;
-            while (position.children.length > 0) {
-                position = position.children[0];
+            if (this.rootPosition == null || this.activePosition == null) {
+                return;
             }
-            let values = [];
-            let p = position;
-            while (p != null) {
-                values.push(p.q);
-                p = p.parent;
-            }
-            values.reverse();
-            if (position.isMainLine) {
-                anythingChanged =
-                    anythingChanged || !arraysApproxEqual(values, this.mainLine, 0.001);
-                if (anythingChanged) {
-                    this.mainLine = values;
+            if (!position.isMainLine) {
+                if (this.activePosition.isMainLine) {
+                    return;
                 }
-                this.variation = [];
+                else if (this.activePosition.getFullLine().indexOf(position) == -1) {
+                    return;
+                }
             }
-            else {
-                anythingChanged =
-                    anythingChanged || !arraysApproxEqual(values, this.variation, 0.001);
-                if (anythingChanged) {
-                    this.variation = values;
+            let anythingChanged = false;
+            let mainLine = this.getWinRate(this.rootPosition.getFullLine());
+            if (!arraysApproxEqual(mainLine, this.mainLine, 0.001)) {
+                anythingChanged = true;
+                this.mainLine = mainLine;
+            }
+            if (!position.isMainLine) {
+                let variation = this.getWinRate(position.getFullLine());
+                if (!arraysApproxEqual(variation, this.variation, 0.001)) {
+                    anythingChanged = true;
+                    this.variation = variation;
                 }
             }
             if (anythingChanged) {
-                this.xScale = Math.max(this.mainLine.length - 1, this.variation.length - 1, MIN_POINTS);
                 this.draw();
             }
         }
@@ -100,12 +106,6 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
             ctx.lineWidth = pr;
             ctx.strokeStyle = '#96928f';
-            ctx.setLineDash([1, 2]);
-            ctx.beginPath();
-            ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0.5);
-            ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h - 0.5);
-            ctx.stroke();
-            ctx.setLineDash([]);
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(0, h);
@@ -118,7 +118,17 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             ctx.textBaseline = 'middle';
             ctx.fillText('B', -0.5 * this.textHeight, Math.round(0.05 * h));
             ctx.fillText('W', -0.5 * this.textHeight, Math.round(0.95 * h));
-            if (this.variation.length == 0) {
+            if (this.activePosition == null) {
+                return;
+            }
+            let moveNum = this.activePosition.moveNum;
+            ctx.setLineDash([1, 2]);
+            ctx.beginPath();
+            ctx.moveTo(Math.round(w * moveNum / this.xScale), 0.5);
+            ctx.lineTo(Math.round(w * moveNum / this.xScale), h - 0.5);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            if (this.activePosition.isMainLine) {
                 this.drawPlot(this.mainLine, pr, '#ffe');
             }
             else {
@@ -127,13 +137,13 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             }
             ctx.textAlign = 'left';
             ctx.fillStyle = '#ffe';
-            let y = 0;
-            let values = this.variation.length > 0 ? this.variation : this.mainLine;
+            let q = 0;
+            let values = this.activePosition.isMainLine ? this.mainLine : this.variation;
             if (values.length > 0) {
-                y = values[this.moveNum];
+                q = values[Math.min(moveNum, values.length - 1)];
             }
-            let score = 50 + 50 * y;
-            y = h * (0.5 - 0.5 * y);
+            let score = 50 + 50 * q;
+            let y = h * (0.5 - 0.5 * q);
             let txt;
             if (score > 50) {
                 txt = `B:${Math.round(score)}%`;
@@ -142,6 +152,16 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 txt = `W:${Math.round(100 - score)}%`;
             }
             ctx.fillText(txt, w + 8, y);
+        }
+        getWinRate(variation) {
+            let result = [];
+            for (let p of variation) {
+                if (p.q == null) {
+                    break;
+                }
+                result.push(p.q);
+            }
+            return result;
         }
         drawPlot(values, lineWidth, style) {
             if (values.length < 2) {

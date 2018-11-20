@@ -19,7 +19,7 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             this.gameOver = gameOver;
             this.isMainLine = isMainLine;
             this.n = 0;
-            this.q = 0;
+            this.q = null;
             this.search = [];
             this.variations = new Map();
             this.annotations = [];
@@ -66,6 +66,18 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
                     }
                 }
             }
+        }
+        getFullLine() {
+            let result = [];
+            let node;
+            for (node = this.parent; node != null; node = node.parent) {
+                result.push(node);
+            }
+            result.reverse();
+            for (node = this; node != null; node = node.children[0]) {
+                result.push(node);
+            }
+            return result;
         }
     }
     exports.Position = Position;

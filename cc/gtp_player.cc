@@ -38,13 +38,14 @@ namespace minigo {
 
 namespace {
 // String written to stderr to signify that handling a GTP command is done.
-const auto kGtpCmdDone = "__GTP_CMD_DONE__";
+constexpr auto kGtpCmdDone = "__GTP_CMD_DONE__";
 }  // namespace
 
 GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
       courtesy_pass_(options.courtesy_pass),
-      ponder_read_limit_(options.ponder_limit) {
+      ponder_read_limit_(options.ponder_limit),
+      num_eval_reads_(options.num_eval_reads) {
   if (ponder_read_limit_ > 0) {
     ponder_type_ = PonderType::kReadLimited;
   }
@@ -115,11 +116,28 @@ void GtpPlayer::Run() {
   stdin_thread.join();
 }
 
+void GtpPlayer::NewGame() {
+  node_to_info_.clear();
+  id_to_info_.clear();
+  to_eval_.clear();
+  MctsPlayer::NewGame();
+  RegisterNode(root());
+}
+
 Coord GtpPlayer::SuggestMove() {
   if (courtesy_pass_ && root()->move == Coord::kPass) {
     return Coord::kPass;
   }
   return MctsPlayer::SuggestMove();
+}
+
+bool GtpPlayer::PlayMove(Coord c) {
+  if (!MctsPlayer::PlayMove(c)) {
+    return false;
+  }
+
+  RefreshPendingWinRateEvals();
+  return true;
 }
 
 void GtpPlayer::RegisterCmd(const std::string& cmd, CmdHandler handler) {
@@ -132,6 +150,7 @@ bool GtpPlayer::MaybePonder() {
     return false;
   }
 
+  // Check if we're finished pondering.
   if ((ponder_type_ == PonderType::kReadLimited &&
        ponder_read_count_ >= ponder_read_limit_) ||
       (ponder_type_ == PonderType::kTimeLimited &&
@@ -143,17 +162,61 @@ bool GtpPlayer::MaybePonder() {
     return false;
   }
 
-  if (ponder_read_count_ == 0) {
-    std::cerr << "pondering..." << std::endl;
-  }
-
   // Remember the number of reads at the root.
   int n = root()->N();
 
-  TreeSearch();
+  // First populate the batch with any nodes that require win rate evaluation.
+  std::vector<TreePath> paths;
+  while (!to_eval_.empty()) {
+    auto* info = to_eval_.front();
+    int eval_limit = options().batch_size;
+    // While there are still nodes in the win rate eval queue that haven't had
+    // any reads, use all the available reads in the batch to perform win rate
+    // evaluation. Otherwise use up to 50% of each batch for win rate
+    // evaluation.
+    if (info->num_eval_reads > 0) {
+      eval_limit /= 2;
+    }
+    if (static_cast<int>(paths.size()) >= eval_limit) {
+      break;
+    }
+    to_eval_.pop_front();
+    SelectLeaves(info->node, 1, &paths);
+  }
+
+  // While there is still space left in the batch, perform regular tree search.
+  int num_eval_reads = static_cast<int>(paths.size());
+  int num_search_reads = options().batch_size - num_eval_reads;
+  if (num_search_reads > 0) {
+    SelectLeaves(root(), num_search_reads, &paths);
+  }
+
+  ProcessLeaves(absl::MakeSpan(paths), options().random_symmetry);
+
+  // Send updated visit and Q data for all the nodes we performed win rate
+  // evaluation on. This updates Minigui's win rate graph.
+  for (int i = 0; i < num_eval_reads; ++i) {
+    auto* root = paths[i].root;
+    nlohmann::json j = {
+        {"id", GetAuxInfo(root)->id},
+        {"n", root->N()},
+        {"q", root->Q()},
+    };
+    std::cerr << "mg-update:" << j.dump() << std::endl;
+  }
 
   // Increment the ponder count by difference new and old reads.
   ponder_read_count_ += root()->N() - n;
+
+  // Increment the number of reads for all the nodes we performed win rate
+  // evaluation on, pushing nodes that require more reads onto the back of the
+  // queue.
+  for (int i = 0; i < num_eval_reads; ++i) {
+    auto* info = GetAuxInfo(paths[i].root);
+    if (++info->num_eval_reads < num_eval_reads_) {
+      to_eval_.push_back(info);
+    }
+  }
 
   return true;
 }
@@ -187,16 +250,16 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   return true;
 }
 
-absl::Span<const MctsPlayer::TreePath> GtpPlayer::TreeSearch() {
-  auto paths = MctsPlayer::TreeSearch();
+void GtpPlayer::ProcessLeaves(absl::Span<TreePath> paths,
+                              bool random_symmetry) {
+  MctsPlayer::ProcessLeaves(paths, random_symmetry);
   if (!paths.empty() && report_search_interval_ != absl::ZeroDuration()) {
     auto now = absl::Now();
     if (now - last_report_time_ > report_search_interval_) {
       last_report_time_ = now;
-      ReportSearchStatus(paths.back().leaf);
+      ReportSearchStatus(paths.back().root, paths.back().leaf);
     }
   }
-  return paths;
 }
 
 GtpPlayer::Response GtpPlayer::CheckArgsExact(absl::string_view cmd,
@@ -290,7 +353,6 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(absl::string_view cmd,
     return response;
   }
 
-  game_nodes_.clear();
   NewGame();
   ReportPosition(root());
 
@@ -470,28 +532,54 @@ GtpPlayer::Response GtpPlayer::HandlePlaysgf(absl::string_view cmd,
 
 GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
                                             CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 2, args);
+  auto response = CheckArgsRange(cmd, 1, 2, args);
   if (!response.ok) {
     return response;
   }
 
-  // Default to pondering disabled in case parsing fails.
-  ponder_type_ = PonderType::kOff;
-  ponder_read_count_ = 0;
-  ponder_read_limit_ = 0;
-  ponder_duration_ = {};
-  ponder_time_limit_ = absl::InfinitePast();
-  ponder_limit_reached_ = true;
+  if (args[0] == "off") {
+    // Disable pondering.
+    ponder_type_ = PonderType::kOff;
+    ponder_read_count_ = 0;
+    ponder_read_limit_ = 0;
+    ponder_duration_ = {};
+    ponder_time_limit_ = absl::InfinitePast();
+    ponder_limit_reached_ = true;
+    return Response::Ok();
+  }
+
+  // Subsequent sub commands require exactly 2 arguments.
+  response = CheckArgsExact(cmd, 2, args);
+  if (!response.ok) {
+    return response;
+  }
+
+  if (args[0] == "winrate") {
+    // Set the number of reads for win rate evaluation.
+    int num_reads;
+    if (!absl::SimpleAtoi(args[1], &num_reads) || num_reads < 0) {
+      return Response::Error("invalid num_reads");
+    }
+    num_eval_reads_ = num_reads;
+    RefreshPendingWinRateEvals();
+    return Response::Ok();
+  }
 
   if (args[0] == "reads") {
-    if (!absl::SimpleAtoi(args[1], &ponder_read_limit_) ||
-        ponder_read_limit_ <= 0) {
+    // Enable pondering limited by number of reads.
+    int read_limit;
+    if (!absl::SimpleAtoi(args[1], &read_limit) || read_limit <= 0) {
       return Response::Error("couldn't parse read limit");
     }
+    ponder_read_limit_ = read_limit;
     ponder_type_ = PonderType::kReadLimited;
     ponder_read_count_ = 0;
     ponder_limit_reached_ = false;
-  } else if (args[0] == "time") {
+    return Response::Ok();
+  }
+
+  if (args[0] == "time") {
+    // Enable pondering limited by time.
     float duration;
     if (!absl::SimpleAtof(args[1], &duration) || duration <= 0) {
       return Response::Error("couldn't parse time limit");
@@ -500,11 +588,10 @@ GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
     ponder_duration_ = absl::Seconds(duration);
     ponder_time_limit_ = absl::Now() + ponder_duration_;
     ponder_limit_reached_ = false;
-  } else if (args[0] != "off") {
-    return Response::Error("unrecognized ponder mode");
+    return Response::Ok();
   }
 
-  return Response::Ok();
+  return Response::Error("unrecognized ponder mode");
 }
 
 GtpPlayer::Response GtpPlayer::HandlePruneNodes(absl::string_view cmd,
@@ -568,13 +655,11 @@ GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
     return Response::Ok();
   }
 
-  auto it = game_nodes_.find(args[0]);
-  if (it == game_nodes_.end()) {
-    return Response::Error("position id not found");
+  auto it = id_to_info_.find(args[0]);
+  if (it == id_to_info_.end()) {
+    return Response::Error("unknown position id");
   }
-
-  auto* node = it->second;
-  MG_CHECK(node != nullptr);
+  auto* node = it->second->node;
 
   // Build the sequence of moves the will end up at the requested position.
   std::vector<Coord> moves;
@@ -618,13 +703,13 @@ GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
   } else {
     Coord c = Coord::FromKgs(args[0], true);
     if (c == Coord::kInvalid) {
-      std::cerr << "ERRROR: expected KGS coord for move, got " << args[0]
+      std::cerr << "ERROR: expected KGS coord for move, got " << args[0]
                 << std::endl;
       return Response::Error("illegal move");
     }
     if (c != child_variation_) {
       child_variation_ = c;
-      ReportSearchStatus(nullptr);
+      ReportSearchStatus(root(), nullptr);
     }
   }
 
@@ -657,30 +742,13 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   // Clear the board before replaying sgf.
   NewGame();
 
-  std::vector<TreePath> paths;
-
-  // Run inference on a batch of positions, then report the results to the
-  // frontend.
-  auto run_inference = [&]() {
-    ProcessLeaves(absl::MakeSpan(paths), false);
-    for (const auto& path : paths) {
-      ReportPosition(path.leaf);
-    }
-    paths.clear();
-  };
-
   // Traverse the SGF's game trees, loading them into the backend & running
   // inference on the positions in batches.
   std::function<void(const sgf::Node&)> traverse = [&](const sgf::Node& node) {
     MG_CHECK(node.move.color == root()->position.to_play());
-    auto* leaf = root()->MaybeAddChild(node.move.c);
+    root()->MaybeAddChild(node.move.c);
     MG_CHECK(PlayMove(node.move.c));
-
-    paths.emplace_back(root(), leaf);
-    if (paths.size() == static_cast<size_t>(options().batch_size)) {
-      run_inference();
-    }
-
+    ReportPosition(root());
     for (const auto& child : node.children) {
       traverse(*child);
     }
@@ -690,11 +758,6 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   auto trees = sgf::GetTrees(ast);
   for (const auto& tree : trees) {
     traverse(*tree);
-  }
-
-  // Run inference on any stragglers.
-  if (!paths.empty()) {
-    run_inference();
   }
 
   // Play the main line.
@@ -709,19 +772,15 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   return Response::Ok();
 }
 
-void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
-  const auto& pos = root()->position;
-
+void GtpPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf) {
   nlohmann::json j = {
-      {"id", RegisterNode(root())},
-      {"moveNum", pos.n()},
-      {"toPlay", pos.to_play() == Color::kBlack ? "B" : "W"},
-      {"q", root()->Q()},
-      {"n", root()->N()},
+      {"id", GetAuxInfo(root)->id},
+      {"n", root->N()},
+      {"q", root->Q()},
   };
 
   // Pricipal variation.
-  auto src_pv = root()->MostVisitedPath();
+  auto src_pv = root->MostVisitedPath();
   if (!src_pv.empty()) {
     auto& dst_pv = j["variations"]["pv"];
     for (Coord c : src_pv) {
@@ -730,9 +789,9 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   }
 
   // Current tree search variation.
-  if (last_read != nullptr) {
+  if (leaf != nullptr) {
     std::vector<const MctsNode*> src_search;
-    for (const auto* node = last_read; node != root(); node = node->parent) {
+    for (const auto* node = leaf; node != root; node = node->parent) {
       src_search.push_back(node);
     }
     if (!src_search.empty()) {
@@ -748,8 +807,8 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
   if (child_variation_ != Coord::kInvalid) {
     auto& child_v = j["variations"][child_variation_.ToKgs()];
     child_v.push_back(child_variation_.ToKgs());
-    auto it = root()->children.find(child_variation_);
-    if (it != root()->children.end()) {
+    auto it = root->children.find(child_variation_);
+    if (it != root->children.end()) {
       for (Coord c : it->second->MostVisitedPath()) {
         child_v.push_back(c.ToKgs());
       }
@@ -758,14 +817,14 @@ void GtpPlayer::ReportSearchStatus(const MctsNode* last_read) {
 
   // Child N.
   auto& childN = j["childN"];
-  for (const auto& edge : root()->edges) {
+  for (const auto& edge : root->edges) {
     childN.push_back(static_cast<int>(edge.N));
   }
 
   // Child Q.
   auto& childQ = j["childQ"];
   for (int i = 0; i < kNumMoves; ++i) {
-    childQ.push_back(static_cast<int>(std::round(root()->child_Q(i) * 1000)));
+    childQ.push_back(static_cast<int>(std::round(root->child_Q(i) * 1000)));
   }
 
   std::cerr << "mg-update:" << j.dump() << std::endl;
@@ -788,15 +847,18 @@ void GtpPlayer::ReportPosition(MctsNode* node) {
   }
 
   nlohmann::json j = {
-      {"id", RegisterNode(node)},
+      {"id", GetAuxInfo(node)->id},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
       {"stones", oss.str()},
-      {"q", node->parent != nullptr ? node->parent->Q() : 0},
       {"gameOver", node->game_over()},
   };
   if (node->parent != nullptr) {
-    j["parentId"] = RegisterNode(node->parent);
+    j["parentId"] = GetAuxInfo(node->parent)->id;
+    if (node->N() > 0) {
+      // Only send Q if the node has been read at least once.
+      j["q"] = node->Q();
+    }
   }
   if (node->move != Coord::kInvalid) {
     j["move"] = node->move.ToKgs();
@@ -805,10 +867,60 @@ void GtpPlayer::ReportPosition(MctsNode* node) {
   std::cerr << "mg-position: " << j.dump() << std::endl;
 }
 
-std::string GtpPlayer::RegisterNode(MctsNode* node) {
-  auto id = absl::StrFormat("%p", node);
-  game_nodes_.emplace(id, node);
-  return id;
+GtpPlayer::AuxInfo* GtpPlayer::RegisterNode(MctsNode* node) {
+  auto it = node_to_info_.find(node);
+  if (it != node_to_info_.end()) {
+    return it->second.get();
+  }
+
+  auto* parent = node->parent != nullptr ? GetAuxInfo(node->parent) : nullptr;
+  auto info = absl::make_unique<AuxInfo>(parent, node);
+  auto raw_info = info.get();
+  id_to_info_.emplace(info->id, raw_info);
+  node_to_info_.emplace(node, std::move(info));
+  return raw_info;
+}
+
+GtpPlayer::AuxInfo* GtpPlayer::GetAuxInfo(MctsNode* node) const {
+  auto it = node_to_info_.find(node);
+  MG_CHECK(it != node_to_info_.end());
+  return it->second.get();
+}
+
+GtpPlayer::AuxInfo::AuxInfo(AuxInfo* parent, MctsNode* node)
+    : parent(parent), node(node), id(absl::StrFormat("%p", node)) {
+  if (parent != nullptr) {
+    parent->children.push_back(this);
+  }
+}
+
+void GtpPlayer::RefreshPendingWinRateEvals() {
+  to_eval_.clear();
+
+  // Build a new list of nodes that require win rate evaluation.
+  // First, traverse to the leaf node of the current position's main line.
+  auto* info = RegisterNode(root());
+  while (!info->children.empty()) {
+    info = info->children[0];
+  }
+
+  // Walk back up the tree to the root, enqueing all nodes that have fewer than
+  // the num_eval_reads_ win rate evaluations.
+  while (info != nullptr) {
+    if (info->num_eval_reads < num_eval_reads_) {
+      to_eval_.push_back(info);
+    }
+    info = info->parent;
+  }
+
+  // Sort the nodes for eval by number of eval reads, breaking ties by the move
+  // number.
+  std::sort(to_eval_.begin(), to_eval_.end(), [](AuxInfo* a, AuxInfo* b) {
+    if (a->num_eval_reads != b->num_eval_reads) {
+      return a->num_eval_reads < b->num_eval_reads;
+    }
+    return a->node->position.n() < b->node->position.n();
+  });
 }
 
 }  // namespace minigo

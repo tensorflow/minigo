@@ -15,6 +15,7 @@
 #ifndef CC_GTP_PLAYER_H_
 #define CC_GTP_PLAYER_H_
 
+#include <deque>
 #include <map>
 #include <memory>
 #include <string>
@@ -47,18 +48,53 @@ class GtpPlayer : public MctsPlayer {
 
     // If true, we will always pass if the opponent passes.
     bool courtesy_pass = false;
+
+    // Number of times to perform tree search for each position in an SGF in
+    // order to evalute a win rate estimation.
+    int num_eval_reads = 4;
   };
 
   GtpPlayer(std::unique_ptr<DualNet> network, const Options& options);
 
   void Run();
 
+  void NewGame() override;
   Coord SuggestMove() override;
+  bool PlayMove(Coord c) override;
 
  protected:
-  absl::Span<const TreePath> TreeSearch() override;
+  void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry) override;
 
  private:
+  // We maintain some auxiliary data structures about nodes in the search tree
+  // that correspond to actual positions played.
+  struct AuxInfo {
+    AuxInfo(AuxInfo* parent, MctsNode* node);
+
+    // Parent in the game tree.
+    AuxInfo* parent;
+
+    // Tree search node.
+    MctsNode* node;
+
+    // Unique ID.
+    std::string id;
+
+    // Number of times we have performed tree search for win rate evaluation for
+    // this position. This is tracked separately from MctsNode.N to that every
+    // position requiring win rate evaluation is evaluated as a tree search
+    // root, regardless of what the "real" tree search is doing.
+    int num_eval_reads = 0;
+
+    // Children of this position. These are stored in order that the positions
+    // were played (MctsNode::children is unordered), so that the chain of
+    // descendants from this position formed by children[0] is the position's
+    // main line. Children at index 1 and later are variations from the main
+    // line.
+    std::vector<AuxInfo*> children;
+  };
+
+  // Response from the GTP command handler.
   struct Response {
     static Response Ok(std::string str = "") { return {std::move(str), true}; }
 
@@ -90,6 +126,8 @@ class GtpPlayer : public MctsPlayer {
 
   Response DispatchCmd(const std::string& cmd, CmdArgs args);
 
+  // TODO(tommadams): clearly document these methods w.r.t. the GTP standard and
+  // what public methods they call.
   Response HandleBenchmark(absl::string_view cmd, CmdArgs args);
   Response HandleBoardsize(absl::string_view cmd, CmdArgs args);
   Response HandleClearBoard(absl::string_view cmd, CmdArgs args);
@@ -116,13 +154,25 @@ class GtpPlayer : public MctsPlayer {
   // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
   Response ParseSgf(const std::string& sgf_str);
 
-  void ReportSearchStatus(const MctsNode* last_read);
+  // Writes the search data for the tree search path from root -> leaf to stderr
+  // as a JSON object.
+  void ReportSearchStatus(MctsNode* root, MctsNode* leaf);
 
+  // Writes the position data for the node to stderr as a JSON object.
   void ReportPosition(MctsNode* node);
 
-  // Calculates a unique id for the given node and adds it to the game_nodes_
-  // map.
-  std::string RegisterNode(MctsNode* node);
+  // Registers the given node as having been played during the game,
+  // assigning the node a unique ID and constructing AuxInfo for it.
+  AuxInfo* RegisterNode(MctsNode* node);
+
+  // Gets the AuxInfo for the given node.
+  // CHECK fails if there isn't any AuxInfo, which means that RegisterNode
+  // hasn't previously been called: this node doesn't correspond to a move
+  // played during the game or a variation (it's a node from tree search).
+  AuxInfo* GetAuxInfo(MctsNode* node) const;
+
+  // Clears the to_eval_ win rate evaluation queue and repopulates it.
+  void RefreshPendingWinRateEvals();
 
   bool courtesy_pass_;
   absl::Duration report_search_interval_;
@@ -151,8 +201,19 @@ class GtpPlayer : public MctsPlayer {
   // corresponding child of the root is reported.
   Coord child_variation_ = Coord::kInvalid;
 
-  // The nodes we've informed the front end about.
-  absl::flat_hash_map<std::string, MctsNode*> game_nodes_;
+  // Map from MctsNode to auxiliary info about that node used by the GtpPlayer.
+  absl::flat_hash_map<MctsNode*, std::unique_ptr<AuxInfo>> node_to_info_;
+
+  // Map from unique ID associated with every position played in a game or
+  // variation to the position's auxiliary info and MctsNode.
+  absl::flat_hash_map<std::string, AuxInfo*> id_to_info_;
+
+  // Queue of positions that require their win rate to be evaluated.
+  std::deque<AuxInfo*> to_eval_;
+
+  // Number of times to perform tree search for each position when evaluating
+  // its win rate.
+  int num_eval_reads_;
 
   ThreadSafeQueue<std::string> stdin_queue_;
 };

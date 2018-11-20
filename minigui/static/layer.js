@@ -188,7 +188,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             if (position.childQ == null) {
                 return true;
             }
-            let q = position.q;
+            let q = position.q || 0;
             for (let i = 0; i < base_1.N * base_1.N; ++i) {
                 if (position.stones[i] != base_1.Color.Empty) {
                     this.colors.push(HeatMapBase.TRANSPARENT);

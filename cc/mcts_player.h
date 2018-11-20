@@ -129,11 +129,11 @@ class MctsPlayer {
 
   void InitializeGame(const Position& position);
 
-  void NewGame();
+  virtual void NewGame();
 
   virtual Coord SuggestMove();
 
-  bool PlayMove(Coord c);
+  virtual bool PlayMove(Coord c);
 
   bool ShouldResign() const;
 
@@ -186,9 +186,10 @@ class MctsPlayer {
   // history but preserving the game tree.
   bool UndoMove();
 
-  // Returns the list of nodes that TreeSearch performed inference on.
-  // The contents of the returned Span is valid until the next call TreeSearch.
-  virtual absl::Span<const TreePath> TreeSearch();
+  void TreeSearch();
+
+  void SelectLeaves(MctsNode* root, int num_leaves,
+                    std::vector<MctsPlayer::TreePath>* paths);
 
   // Returns the root of the game tree.
   MctsNode* game_root() { return &game_root_; }
@@ -201,7 +202,7 @@ class MctsPlayer {
   DualNet* network() { return network_.get(); }
 
   // Run inference for the given leaf nodes & incorportate the inference output.
-  void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);
+  virtual void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);
 
  private:
   void PushHistory(Coord c);

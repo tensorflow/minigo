@@ -306,7 +306,7 @@ TEST(MctsPlayerTest, ColdStartParallelTreeSearch) {
 
   // Test that parallel tree search doesn't trip on an empty tree.
   EXPECT_EQ(0, root->N());
-  EXPECT_EQ(false, root->is_expanded);
+  EXPECT_EQ(false, root->HasFlag(MctsNode::Flag::kExpanded));
   player->TreeSearch(4);
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
 
@@ -447,6 +447,7 @@ TEST(MctsPlayerTest, SymmetriesTest) {
   // one (it's black's turn to play).
   auto* root = player.root();
   TestablePlayer::TreePath path(root, root);
+  root->AddVirtualLoss(root);
   player.ProcessLeaves({&path, 1}, true);
   for (int i = 0; i < kN * kN; ++i) {
     ASSERT_EQ(0.0, root->child_P(i));
@@ -471,6 +472,7 @@ TEST(MctsPlayerTest, SymmetriesTest) {
   for (int i = 0; i < 100; ++i) {
     auto* leaf = nodes.back().get();
     path.leaf = leaf;
+    leaf->AddVirtualLoss(root);
     player.ProcessLeaves({&path, 1}, true);
     ASSERT_EQ(0.0, leaf->child_P(Coord::FromKgs("pass")));
     for (const auto move : moves) {

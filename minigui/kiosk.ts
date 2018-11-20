@@ -57,7 +57,7 @@ class KioskApp extends App {
   protected newGame() {
     super.newGame();
     this.log.clear();
-    this.winrateGraph.clear();
+    this.winrateGraph.newGame(this.rootPosition);
   }
 
   protected onPositionUpdate(position: Position, update: Position.Update) {

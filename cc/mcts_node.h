@@ -77,6 +77,14 @@ class MctsNode {
             parent->position.previous_move() == Coord::kPass);
   }
 
+  enum class Flag : uint8_t {
+    // Node is expanded.
+    kExpanded = (1 << 0),
+  };
+
+  void SetFlag(Flag flag) { flags |= static_cast<uint8_t>(flag); }
+  bool HasFlag(Flag flag) { return (flags & static_cast<uint8_t>(flag)) != 0; }
+
   // Finds the best move by visit count, N. Ties are broken using the child
   // action score.
   Coord GetMostVisitedMove() const;
@@ -138,14 +146,14 @@ class MctsNode {
   // Move that led to this position.
   Coord move;
 
+  uint8_t flags = 0;
+
   std::array<EdgeStats, kNumMoves> edges;
 
   std::array<bool, kNumMoves> legal_moves;
 
   // Map from move to resulting MctsNode.
   absl::flat_hash_map<Coord, std::unique_ptr<MctsNode>> children;
-
-  bool is_expanded = false;
 
   // Current board position.
   Position position;

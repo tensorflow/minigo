@@ -38,7 +38,7 @@ define(["require", "exports", "./app", "./board", "./layer", "./log", "./util", 
         newGame() {
             super.newGame();
             this.log.clear();
-            this.winrateGraph.clear();
+            this.winrateGraph.newGame(this.rootPosition);
         }
         onPositionUpdate(position, update) {
             if (position != this.activePosition) {

@@ -331,7 +331,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             if (position != this.activePosition) {
                 this.activePosition = position;
                 this.board.setPosition(position);
-                this.winrateGraph.update(position);
+                this.winrateGraph.setActive(position);
                 this.variationTree.setActive(position);
                 let moveNumStr = position.moveNum.toString();
                 if (this.moveElem.innerText != moveNumStr) {
@@ -346,16 +346,16 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         newGame() {
             super.newGame();
             this.variationTree.newGame(this.rootPosition);
+            this.winrateGraph.newGame(this.rootPosition);
             this.log.clear();
-            this.winrateGraph.clear();
             this.board.clear();
         }
         onPositionUpdate(position, update) {
+            this.winrateGraph.update(position);
             if (position != this.activePosition) {
                 return;
             }
             this.board.update(update);
-            this.winrateGraph.update(position);
             util_1.getElement('reads').innerText = this.formatNumReads(position.n);
         }
         formatNumReads(numReads) {

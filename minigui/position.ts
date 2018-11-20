@@ -29,7 +29,7 @@ interface Annotation {
 
 class Position {
   n = 0;
-  q = 0;
+  q: Nullable<number> = null;
   moveNum: number;
   search: Move[] = [];
 
@@ -105,6 +105,26 @@ class Position {
         }
       }
     }
+  }
+
+  // Returns a copy of the complete variation that this position is a part of,
+  // starting from the root, down to the last move in the line.
+  // The varation of the root node is its main line.
+  getFullLine() {
+    // Get all ancestors.
+    let result: Position[] = [];
+    let node: Nullable<Position>
+    for (node = this.parent; node != null; node = node.parent) {
+      result.push(node);
+    }
+    result.reverse();
+
+    // Append descendants.
+    for (node = this; node != null; node = node.children[0]) {
+      result.push(node);
+    }
+
+    return result;
   }
 }
 

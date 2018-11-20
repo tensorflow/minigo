@@ -45,9 +45,17 @@ class WinrateGraph extends View {
   protected mainLine: number[] = [];
   protected variation: number[] = [];
 
-  protected moveNum = 0;
-
+  // Horizontal scaling factor used when plotting. It's the maximum move number
+  // seen, with a minimum of MIN_POINTS. Note that because win rate evaluation
+  // is computed lazily after an SGF file has been loaded, the maximum move
+  // number can be larger than the prefix of the current variation that we have
+  // data to plot. Scaling by the maximum move number therefore gives an
+  // indication to the user how many more moves need to be evaluated before we
+  // have a win rate estimation for the complete game.
   protected xScale = MIN_POINTS;
+
+  protected rootPosition: Nullable<Position> = null;
+  protected activePosition: Nullable<Position> = null;
 
   constructor(parent: HTMLElement | string) {
     super();
@@ -64,8 +72,6 @@ class WinrateGraph extends View {
       this.resizeCanvas();
       this.draw();
     });
-
-    this.draw();
   }
 
   private resizeCanvas() {
@@ -86,54 +92,60 @@ class WinrateGraph extends View {
     this.textHeight = 0.06 * this.h;
   }
 
-  clear() {
+  newGame(rootPosition: Position) {
+    this.rootPosition = rootPosition;
+    this.activePosition = rootPosition;
     this.mainLine = [];
     this.variation = [];
-    this.moveNum = 0;
+    this.xScale = MIN_POINTS;
     this.draw();
   }
 
-  // Sets the predicted winrate for the given move.
+  setActive(position: Position) {
+    if (position != this.activePosition) {
+      this.xScale = Math.max(this.xScale, position.moveNum);
+      this.activePosition = position;
+      this.update(position);
+      this.draw();
+    }
+  }
+
   update(position: Position) {
-    let anythingChanged = position.moveNum != this.moveNum;
-    this.moveNum = position.moveNum;
-
-    // Find the end of this variation.
-    while (position.children.length > 0) {
-      position = position.children[0];
+    if (this.rootPosition == null || this.activePosition == null) {
+      return;
     }
-
-    // Get the score history for this line.
-    let values: number[] = [];
-    let p: Nullable<Position> = position;
-    while (p != null) {
-      values.push(p.q);
-      p = p.parent;
-    }
-    values.reverse();
-
-    if (position.isMainLine) {
-      // When the given position is on the main line, update it and remove
-      // the variation.
-      anythingChanged =
-          anythingChanged || !arraysApproxEqual(values, this.mainLine, 0.001);
-      if (anythingChanged) {
-        this.mainLine = values;
+    if (!position.isMainLine) {
+      // The updated position isn't on the main line, we may not need to update
+      // anything.
+      if (this.activePosition.isMainLine) {
+        // Only showing the main line, nothing to do.
+        return;
+      } else if (this.activePosition.getFullLine().indexOf(position) == -1) {
+        // This position isn't from the current variation, nothing to do.
+        return;
       }
-      this.variation = [];
-    } else {
-      // When the given position is a variation, update it but leave the main
-      // line alone.
-      anythingChanged =
-          anythingChanged || !arraysApproxEqual(values, this.variation, 0.001);
-      if (anythingChanged) {
-        this.variation = values;
+    }
+
+    // Always check if the main line plot needs updating, since the main line
+    // and any currently active variation likely share a prefix of moves.
+    let anythingChanged = false;
+    let mainLine = this.getWinRate(this.rootPosition.getFullLine());
+    if (!arraysApproxEqual(mainLine, this.mainLine, 0.001)) {
+      anythingChanged = true;
+      this.mainLine = mainLine;
+    }
+
+    // If the updated position is a variation, check if the variation plot needs
+    // updating.
+    if (!position.isMainLine) {
+      let variation = this.getWinRate(position.getFullLine());
+      if (!arraysApproxEqual(variation, this.variation, 0.001)) {
+        anythingChanged = true;
+        this.variation = variation;
       }
     }
 
     if (anythingChanged) {
-      this.xScale = Math.max(
-          this.mainLine.length - 1, this.variation.length - 1, MIN_POINTS);
       this.draw();
     }
   }
@@ -159,12 +171,6 @@ class WinrateGraph extends View {
     ctx.lineWidth = pr;
 
     ctx.strokeStyle = '#96928f';
-    ctx.setLineDash([1, 2]);
-    ctx.beginPath();
-    ctx.moveTo(Math.round(w * this.moveNum / this.xScale), 0.5);
-    ctx.lineTo(Math.round(w * this.moveNum / this.xScale), h - 0.5);
-    ctx.stroke();
-    ctx.setLineDash([]);
 
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -181,7 +187,19 @@ class WinrateGraph extends View {
     ctx.fillText('B', -0.5 * this.textHeight, Math.round(0.05 * h));
     ctx.fillText('W', -0.5 * this.textHeight, Math.round(0.95 * h));
 
-    if (this.variation.length == 0) {
+    if (this.activePosition == null) {
+      return;
+    }
+
+    let moveNum = this.activePosition.moveNum;
+    ctx.setLineDash([1, 2]);
+    ctx.beginPath();
+    ctx.moveTo(Math.round(w * moveNum / this.xScale), 0.5);
+    ctx.lineTo(Math.round(w * moveNum / this.xScale), h - 0.5);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (this.activePosition.isMainLine) {
       this.drawPlot(this.mainLine, pr, '#ffe');
     } else {
       this.drawPlot(this.mainLine, pr, '#615b56');
@@ -191,13 +209,14 @@ class WinrateGraph extends View {
     // Draw the value label.
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffe';
-    let y = 0;
-    let values = this.variation.length > 0 ? this.variation : this.mainLine;
+    let q = 0;
+    let values =
+        this.activePosition.isMainLine ? this.mainLine : this.variation;
     if (values.length > 0) {
-      y = values[this.moveNum];
+      q = values[Math.min(moveNum, values.length - 1)];
     }
-    let score = 50 + 50 * y;
-    y = h * (0.5 - 0.5 * y);
+    let score = 50 + 50 * q;
+    let y = h * (0.5 - 0.5 * q);
     let txt: string;
     if (score > 50) {
       txt = `B:${Math.round(score)}%`;
@@ -205,6 +224,21 @@ class WinrateGraph extends View {
       txt = `W:${Math.round(100 - score)}%`;
     }
     ctx.fillText(txt, w + 8, y);
+  }
+
+  // Returns the win rate estimation for the prefix of `variation` that has
+  // valid Q values (the backend has either performed tree search or win rate
+  // evaluation on every position in the prefix at least once).
+  private getWinRate(variation: Position[]) {
+    let result: number[] = [];
+    for (let p of variation) {
+      if (p.q == null) {
+        // Stop when we reach the first position that doesn't have a valid Q.
+        break;
+      }
+      result.push(p.q);
+    }
+    return result;
   }
 
   private drawPlot(values: number[], lineWidth: number, style: string) {

@@ -133,10 +133,10 @@ Coord MctsPlayer::SuggestMove() {
   // must be expanded. The root will always be expanded unless this is the first
   // time SuggestMove has been called for a game, or PlayMove was called without
   // a prior call to SuggestMove.
-  if (!root_->is_expanded) {
-    auto* first_node = root_->SelectLeaf();
-    TreePath path(root_, first_node);
-    ProcessLeaves({&path, 1}, options_.random_symmetry);
+  if (!root_->HasFlag(MctsNode::Flag::kExpanded)) {
+    tree_search_paths_.clear();
+    SelectLeaves(root_, 1, &tree_search_paths_);
+    ProcessLeaves(absl::MakeSpan(tree_search_paths_), options_.random_symmetry);
   }
 
   if (options_.inject_noise) {
@@ -212,36 +212,29 @@ Coord MctsPlayer::PickMove() {
   return c;
 }
 
-absl::Span<const MctsPlayer::TreePath> MctsPlayer::TreeSearch() {
-  int batch_size = options_.batch_size;
-  int max_iterations = batch_size * 2;
-
+void MctsPlayer::TreeSearch() {
   tree_search_paths_.clear();
+  SelectLeaves(root_, options_.batch_size, &tree_search_paths_);
+  ProcessLeaves(absl::MakeSpan(tree_search_paths_), options_.random_symmetry);
+}
+
+void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
+                              std::vector<MctsPlayer::TreePath>* paths) {
+  int max_iterations = num_leaves * 2;
+  int num_selected = 0;
   for (int i = 0; i < max_iterations; ++i) {
-    auto* leaf = root_->SelectLeaf();
-    if (leaf == nullptr) {
-      continue;
-    }
+    auto* leaf = root->SelectLeaf();
     if (leaf->game_over() || leaf->position.n() >= kMaxSearchDepth) {
       float value = leaf->position.CalculateScore(options_.komi) > 0 ? 1 : -1;
-      leaf->IncorporateEndGameResult(value, root_);
+      leaf->IncorporateEndGameResult(value, root);
     } else {
-      leaf->AddVirtualLoss(root_);
-      tree_search_paths_.emplace_back(root_, leaf);
-      if (static_cast<int>(tree_search_paths_.size()) == batch_size) {
+      leaf->AddVirtualLoss(root);
+      paths->emplace_back(root, leaf);
+      if (++num_selected == num_leaves) {
         break;
       }
     }
   }
-
-  if (!tree_search_paths_.empty()) {
-    ProcessLeaves(absl::MakeSpan(tree_search_paths_), options_.random_symmetry);
-    for (const auto& path : tree_search_paths_) {
-      path.leaf->RevertVirtualLoss(path.root);
-    }
-  }
-
-  return absl::MakeConstSpan(tree_search_paths_);
 }
 
 bool MctsPlayer::ShouldResign() const {
@@ -349,6 +342,10 @@ void MctsPlayer::PushHistory(Coord c) {
 
 void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
                                bool random_symmetry) {
+  if (paths.empty()) {
+    return;
+  }
+
   // Select symmetry operations to apply.
   symmetries_used_.resize(0);
   if (random_symmetry) {
@@ -367,6 +364,8 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
   features_.resize(paths.size());
   for (size_t i = 0; i < paths.size(); ++i) {
     const auto* leaf = paths[i].leaf;
+    MG_CHECK(leaf->num_virtual_losses_applied > 0)
+        << "Don't forget to add a virtual loss before calling ProcessLeaves";
     leaf->GetMoveHistory(DualNet::kMoveHistory, &recent_positions_);
     DualNet::SetFeatures(recent_positions_, leaf->position.to_play(),
                          &raw_features);
@@ -418,6 +417,7 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
                                    output.policy.data(), raw_policy.data());
     raw_policy[Coord::kPass] = output.policy[Coord::kPass];
     leaf->IncorporateResults(raw_policy, output.value, root);
+    leaf->RevertVirtualLoss(root);
   }
 }
 
