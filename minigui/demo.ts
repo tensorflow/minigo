@@ -31,6 +31,7 @@ class DemoApp extends App {
   private winrateGraph = new WinrateGraph('winrate-graph');
   private log = new Log('log', 'console');
   private boards: Board[] = [];
+  private pvLayer: lyr.Layer;
 
   constructor() {
     super();
@@ -39,10 +40,11 @@ class DemoApp extends App {
       // Create boards for each of the elements in the UI.
       // The extra board views aren't available in the lightweight UI, so we
       // must check if the HTML elements exist.
+      this.pvLayer = new lyr.Variation('pv');
       this.mainBoard = new ClickableBoard('main-board', this.rootPosition, [
           new lyr.Label(),
           new lyr.BoardStones(),
-          new lyr.Variation('pv'),
+          this.pvLayer,
           new lyr.Annotations()]);
 
       this.boards = [this.mainBoard];
@@ -130,12 +132,14 @@ class DemoApp extends App {
 
     if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
       this.mainBoard.enabled = false;
+      this.pvLayer.show = true;
       this.engineBusy = true;
       this.gtp.send('genmove').finally(() => {
         this.engineBusy = false;
       });
     } else {
       this.mainBoard.enabled = true;
+      this.pvLayer.show = false;
     }
   }
 

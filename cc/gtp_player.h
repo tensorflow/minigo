@@ -72,6 +72,8 @@ class GtpPlayer : public MctsPlayer {
     AuxInfo(AuxInfo* parent, MctsNode* node);
 
     // Parent in the game tree.
+    // This is a shortcut for the following expression:
+    //   node->parent != nullptr ? GetAuxInfo(node->parent) : nullptr
     AuxInfo* parent;
 
     // Tree search node.
@@ -92,6 +94,9 @@ class GtpPlayer : public MctsPlayer {
     // main line. Children at index 1 and later are variations from the main
     // line.
     std::vector<AuxInfo*> children;
+
+    // Any SGF comments associated with this position.
+    std::string comment;
   };
 
   // Response from the GTP command handler.
@@ -154,8 +159,9 @@ class GtpPlayer : public MctsPlayer {
   // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
   Response ParseSgf(const std::string& sgf_str);
 
-  // Writes the search data for the tree search path from root -> leaf to stderr
-  // as a JSON object.
+  // Writes the search data for the tree search being performed at the given
+  // root to stderr. If leaf is non-null, the search path from root to leaf
+  // is also written.
   void ReportSearchStatus(MctsNode* root, MctsNode* leaf);
 
   // Writes the position data for the node to stderr as a JSON object.

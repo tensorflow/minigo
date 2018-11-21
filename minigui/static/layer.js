@@ -485,20 +485,22 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             }
             let ctx = this.board.ctx;
             let pr = util_1.pixelRatio();
-            let stoneRgb = this.board.position.toPlay == base_1.Color.Black ? 0 : 255;
-            let textRgb = 255 - stoneRgb;
+            let toPlay = this.board.position.toPlay;
+            let stoneRgb = toPlay == base_1.Color.Black ? 0 : 255;
             this.bestVariations.forEach((v) => {
-                ctx.fillStyle = `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${v.alpha})`;
                 let c = this.boardToCanvas(v.p.row, v.p.col);
+                let x = c.x + 0.5;
+                let y = c.y + 0.5;
+                ctx.fillStyle = `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${v.alpha})`;
                 ctx.beginPath();
-                ctx.arc(c.x + 0.5, c.y + 0.5, this.board.stoneRadius, 0, 2 * Math.PI);
+                ctx.arc(x, y, 0.85 * this.board.stoneRadius, 0, 2 * Math.PI);
                 ctx.fill();
             });
             let textHeight = Math.floor(0.8 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = `rgba(${textRgb}, ${textRgb}, ${textRgb}, 0.8)`;
+            ctx.fillStyle = toPlay == base_1.Color.Black ? '#fff' : '#000';
             let scoreScale = this.board.position.toPlay == base_1.Color.Black ? 1 : -1;
             this.bestVariations.forEach((v) => {
                 let c = this.boardToCanvas(v.p.row, v.p.col);
@@ -512,9 +514,12 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 return;
             }
             let n = this.board.position.childN[idx];
+            if (n == 0 || logMaxN == 0) {
+                return;
+            }
             let q = this.board.position.childQ[idx];
             let alpha = Math.log(n) / logMaxN;
-            alpha *= alpha;
+            alpha = Math.max(0, Math.min(alpha, 1));
             this.bestVariations.set(idx, new Search.Move(idx, n, q, alpha));
         }
     }

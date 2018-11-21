@@ -12,31 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_MOVE_H_
-#define CC_MOVE_H_
+#include "cc/move.h"
 
-#include <iostream>
-#include <string>
-
-#include "cc/color.h"
-#include "cc/coord.h"
+#include "absl/strings/str_cat.h"
 
 namespace minigo {
 
-struct Move {
-  Move() = default;
-  Move(Color color, Coord c) : color(color), c(c) {}
-
-  Color color = Color::kEmpty;
-  Coord c = Coord::kInvalid;
-
-  std::string ToSgf() const;
-
-  bool operator==(const Move& other) const {
-    return color == other.color && c == other.c;
-  }
-};
+std::string Move::ToSgf() const {
+  return absl::StrCat(ColorToCode(color), "[", c.ToSgf(), "]");
+}
 
 }  // namespace minigo
-
-#endif  // CC_MOVE_H_

@@ -314,7 +314,7 @@ class Variation extends StoneBaseLayer {
     this.draw();
   }
 
-  private variation: Move[] = [];
+  public variation: Move[] = [];
   private blackLabels: Variation.Label[] = [];
   private whiteLabels: Variation.Label[] = [];
 
@@ -583,14 +583,15 @@ class Search extends Layer {
     let ctx = this.board.ctx;
     let pr = pixelRatio();
 
-    let stoneRgb = this.board.position.toPlay == Color.Black ? 0 : 255;
-    let textRgb = 255 - stoneRgb;
-
+    let toPlay = this.board.position.toPlay;
+    let stoneRgb = toPlay == Color.Black ? 0 : 255;
     this.bestVariations.forEach((v: Search.Move) => {
-      ctx.fillStyle = `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${v.alpha})`;
       let c = this.boardToCanvas(v.p.row, v.p.col);
+      let x = c.x + 0.5;
+      let y = c.y + 0.5;
+      ctx.fillStyle = `rgba(${stoneRgb}, ${stoneRgb}, ${stoneRgb}, ${v.alpha})`;
       ctx.beginPath();
-      ctx.arc(c.x + 0.5, c.y + 0.5, this.board.stoneRadius, 0, 2 * Math.PI);
+      ctx.arc(x, y, 0.85 * this.board.stoneRadius, 0, 2 * Math.PI);
       ctx.fill();
     });
 
@@ -598,7 +599,7 @@ class Search extends Layer {
     ctx.font = `${textHeight}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = `rgba(${textRgb}, ${textRgb}, ${textRgb}, 0.8)`;
+    ctx.fillStyle = toPlay == Color.Black ? '#fff' : '#000';
     let scoreScale = this.board.position.toPlay == Color.Black ? 1 : -1;
     this.bestVariations.forEach((v: Search.Move) => {
       let c = this.boardToCanvas(v.p.row, v.p.col);
@@ -613,9 +614,12 @@ class Search extends Layer {
       return;
     }
     let n = this.board.position.childN[idx];
+    if (n == 0 || logMaxN == 0) {
+      return;
+    }
     let q = this.board.position.childQ[idx];
     let alpha = Math.log(n) / logMaxN;
-    alpha *= alpha;
+    alpha = Math.max(0, Math.min(alpha, 1));
     this.bestVariations.set(idx, new Search.Move(idx, n, q, alpha));
   }
 }

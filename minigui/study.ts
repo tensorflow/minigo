@@ -42,26 +42,19 @@ class ExploreBoard extends ClickableBoard {
     }
   }
 
-  private _showNext = true;
-  get showNext() {
-    return this._showNext;
+  private _highlightedNextMove: Nullable<Move> = null;
+  get highlightedNextMove() {
+    return this._highlightedNextMove;
   }
-  set showNext(x: boolean) {
-    if (x != this._showNext) {
-      this._showNext = x;
+  set highlightedNextMove(x: Nullable<Move>) {
+    if (x != this._highlightedNextMove) {
+      this._highlightedNextMove = x;
       this.draw();
     }
   }
 
-  private _highlightedVariation: Nullable<Position> = null;
-  get highlightedVariation() {
-    return this._highlightedVariation;
-  }
-  set highlightedVariation(x: Nullable<Position>) {
-    if (x != this._highlightedVariation) {
-      this._highlightedVariation = x;
-      this.draw();
-    }
+  get variation() {
+    return this.variationLayer.variation;
   }
 
   private searchLayer: lyr.Search;
@@ -112,9 +105,21 @@ class ExploreBoard extends ClickableBoard {
     });
   }
 
+  setPosition(position: Position) {
+    if (position != this.position) {
+      this.showVariation(null);
+      super.setPosition(position);
+    }
+  }
+
   drawImpl() {
     super.drawImpl();
+    if (this.showSearch) {
+      this.drawNextMoves();
+    }
+  }
 
+  private drawNextMoves() {
     let sr = this.stoneRadius;
     let pr = pixelRatio();
 
@@ -148,7 +153,7 @@ class ExploreBoard extends ClickableBoard {
           continue;
         }
 
-        if (child == this.highlightedVariation) {
+        if (child.lastMove == this.highlightedNextMove) {
           ctx.setLineDash([]);
         }
         let c = this.boardToCanvas(move.row, move.col);
@@ -156,7 +161,7 @@ class ExploreBoard extends ClickableBoard {
         ctx.moveTo(c.x + 0.5 + sr, c.y + 0.5);
         ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
         ctx.stroke();
-        if (child == this.highlightedVariation) {
+        if (child.lastMove == this.highlightedNextMove) {
           ctx.setLineDash(lineDash);
         }
       }
@@ -195,9 +200,9 @@ class ExploreApp extends App {
   private variationTree = new VariationTree('tree');
   private log = new Log('log', 'console');
   private showSearch = true;
-  private showNext = true;
   private showConsole = false;
   private moveElem = getElement('move');
+  private commentElem = getElement('comment');
 
   constructor() {
     super();
@@ -224,10 +229,16 @@ class ExploreApp extends App {
       this.newGame();
 
       this.variationTree.onClick((position: Position) => {
-        this.selectPosition(position);
+        if (position != this.activePosition) {
+          this.selectPosition(position);
+        }
       });
       this.variationTree.onHover((position: Nullable<Position>) => {
-        this.board.highlightedVariation = position;
+        if (position != null) {
+          this.board.highlightedNextMove = position.lastMove;
+        } else {
+          this.board.highlightedNextMove = null;
+        }
       });
 
       // Repeatedly ponder for a few seconds at a time.
@@ -272,6 +283,23 @@ class ExploreApp extends App {
         }
       }
 
+      // If the user is hovering over a searched node and displaying a
+      // variation, pressing a number will play the move out the corresponding
+      // position in the variation.
+      if (e.key >= '0' && e.key <= '9' && this.board.variation != null) {
+        let move = e.key.charCodeAt(0) - '0'.charCodeAt(0);
+        if (move == 0) {
+          move = 10;
+        }
+        if (move <= this.board.variation.length) {
+          let color = this.board.position.toPlay;
+          for (let i = 0; i < move; ++i) {
+            this.playMove(color, this.board.variation[i]);
+            color = otherColor(color);
+          }
+        }
+      }
+
       switch (e.key) {
         case 'ArrowUp':
         case 'ArrowLeft':
@@ -298,7 +326,7 @@ class ExploreApp extends App {
 
     // Mouse wheel.
     window.addEventListener('wheel', (e: WheelEvent) => {
-      if (this.showConsole) {
+      if (this.showConsole || e.target == this.commentElem) {
         return;
       }
       if (e.deltaY < 0) {
@@ -320,17 +348,9 @@ class ExploreApp extends App {
       }
     });
 
-    // Toggle variation display.
-    let variationElem = getElement('toggle-variation');
-    variationElem.addEventListener('click', () => {
-      this.showNext = !this.showNext;
-      this.board.showNext = this.showNext;
-      if (this.showNext) {
-        variationElem.innerText = 'Hide variation';
-      } else {
-        variationElem.innerText = 'Show variation';
-      }
-    });
+    // Clear the board and start a new game.
+    let clearElem = getElement('clear-board');
+    clearElem.addEventListener('click', () => { this.newGame(); });
 
     // Load an SGF file.
     let loadSgfElem = getElement('load-sgf-input') as HTMLInputElement;
@@ -341,13 +361,14 @@ class ExploreApp extends App {
       }
       let reader = new FileReader();
       reader.onload = () => {
-        this.board.clear();
         this.newGame();
         let sgf = reader.result.replace(/\n/g, '\\n');
 
         this.board.enabled = false;
         this.board.showSearch = false;
-        this.gtp.send(`playsgf ${sgf}`).finally(() => {
+        this.gtp.send(`playsgf ${sgf}`).catch((error) => {
+          window.alert(error);
+        }).finally(() => {
           this.board.enabled = true;
           this.board.showSearch = this.showSearch;
         });
@@ -367,7 +388,9 @@ class ExploreApp extends App {
              !position.isMainLine && position.parent != null) {
         position = position.parent;
       }
-      this.selectPosition(position);
+      if (position != this.activePosition) {
+        this.selectPosition(position);
+      }
     });
 
     // Set move number.
@@ -388,7 +411,9 @@ class ExploreApp extends App {
         position = position.children[0];
       }
       if (position.moveNum == moveNum) {
-        this.selectPosition(position);
+        if (position != this.activePosition) {
+          this.selectPosition(position);
+        }
       }
     });
   }
@@ -410,33 +435,32 @@ class ExploreApp extends App {
   }
 
   protected selectPosition(position: Position) {
-    if (position != this.activePosition) {
-      this.activePosition = position;
-      this.board.setPosition(position);
-      this.winrateGraph.setActive(position);
-      this.variationTree.setActive(position);
-      let moveNumStr = position.moveNum.toString();
-      if (this.moveElem.innerText != moveNumStr) {
-        this.moveElem.innerText = moveNumStr;
-        // If the user changes the current move using the scroll wheel while the
-        // move element text field has focus, setting the innerText will mess up
-        // the caret position. We'll just remove focus from the text field to
-        // work around this. The UX is actually pretty good and this is waaay
-        // easier than the "correct" solution.
-        if (document.activeElement == this.moveElem) {
-          this.moveElem.blur();
-        }
+    this.activePosition = position;
+    this.board.setPosition(position);
+    this.winrateGraph.setActive(position);
+    this.variationTree.setActive(position);
+    this.commentElem.innerText = position.comment;
+    let moveNumStr = position.moveNum.toString();
+    if (this.moveElem.innerText != moveNumStr) {
+      this.moveElem.innerText = moveNumStr;
+      // If the user changes the current move using the scroll wheel while the
+      // move element text field has focus, setting the innerText will mess up
+      // the caret position. We'll just remove focus from the text field to
+      // work around this. The UX is actually pretty good and this is waaay
+      // easier than the "correct" solution.
+      if (document.activeElement == this.moveElem) {
+        this.moveElem.blur();
       }
-      this.gtp.sendOne(`select_position ${position.id}`).catch(() => {});
     }
+    this.gtp.sendOne(`select_position ${position.id}`).catch(() => {});
   }
 
   protected newGame() {
     super.newGame();
     this.variationTree.newGame(this.rootPosition);
     this.winrateGraph.newGame(this.rootPosition);
+    this.board.newGame(this.rootPosition);
     this.log.clear();
-    this.board.clear();
   }
 
   protected onPositionUpdate(position: Position, update: Position.Update) {

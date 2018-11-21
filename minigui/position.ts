@@ -46,6 +46,8 @@ class Position {
   // children[0] is the main line. Subsequent children are variations.
   children: Position[] = [];
 
+  comment = "";
+
   constructor(public id: string,
               public parent: Nullable<Position>,
               public stones: Color[],

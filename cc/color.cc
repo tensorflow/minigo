@@ -16,17 +16,27 @@
 
 namespace minigo {
 
+namespace {
+const auto kBlackCode = "B";
+const auto kWhiteCode = "W";
+const auto kEmptyCode = ".";
+}  // namespace
+
 std::ostream& operator<<(std::ostream& os, Color color) {
+  return os << ColorToCode(color);
+}
+
+absl::string_view ColorToCode(Color color) {
   switch (color) {
     case Color::kEmpty:
-      return os << ".";
+      return kEmptyCode;
     case Color::kBlack:
-      return os << "B";
+      return kBlackCode;
     case Color::kWhite:
-      return os << "W";
+      return kWhiteCode;
     default:
       MG_FATAL() << "<" << static_cast<int>(color) << ">";
-      return os;
+      return "BAD";
   }
 }
 

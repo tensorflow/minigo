@@ -65,6 +65,9 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                 let move = util.parseMove(def.move);
                 position = parent.addChild(def.id, move, stones, gameOver);
             }
+            if (j.comment) {
+                position.comment = j.comment;
+            }
             if (position.toPlay != toPlay) {
                 throw new Error(`expected ${position.toPlay}, got ${toPlay}`);
             }

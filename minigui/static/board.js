@@ -13,9 +13,6 @@ define(["require", "exports", "./base", "./layer", "./util", "./view"], function
             }
             this.elem = parent;
             this.backgroundColor = '#db6';
-            for (let i = 0; i < base_1.N * base_1.N; ++i) {
-                this.stones.push(base_1.Color.Empty);
-            }
             let canvas = document.createElement('canvas');
             this.ctx = canvas.getContext('2d');
             parent.appendChild(canvas);
@@ -39,10 +36,12 @@ define(["require", "exports", "./base", "./layer", "./util", "./view"], function
             this.pointH = this.ctx.canvas.height / (base_1.N + 1);
             this.stoneRadius = 0.96 * Math.min(this.pointW, this.pointH) / 2;
         }
-        clear() {
+        newGame(rootPosition) {
+            this.position = rootPosition;
             for (let layer of this.layers) {
                 layer.clear();
             }
+            this.draw();
         }
         addLayer(layer) {
             this.layers.push(layer);
@@ -87,7 +86,7 @@ define(["require", "exports", "./base", "./layer", "./util", "./view"], function
             }
         }
         getStone(p) {
-            return this.stones[p.row * base_1.N + p.col];
+            return this.position.stones[p.row * base_1.N + p.col];
         }
         canvasToBoard(x, y, threshold) {
             let pr = util_1.pixelRatio();
@@ -206,6 +205,12 @@ define(["require", "exports", "./base", "./layer", "./util", "./view"], function
         }
         onClick(cb) {
             this.listeners.push(cb);
+        }
+        setPosition(position) {
+            if (position != this.position) {
+                this.p = null;
+                super.setPosition(position);
+            }
         }
         drawImpl() {
             super.drawImpl();

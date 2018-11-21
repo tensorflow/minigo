@@ -135,7 +135,6 @@ bool GtpPlayer::PlayMove(Coord c) {
   if (!MctsPlayer::PlayMove(c)) {
     return false;
   }
-
   RefreshPendingWinRateEvals();
   return true;
 }
@@ -744,26 +743,58 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
 
   // Traverse the SGF's game trees, loading them into the backend & running
   // inference on the positions in batches.
-  std::function<void(const sgf::Node&)> traverse = [&](const sgf::Node& node) {
-    MG_CHECK(node.move.color == root()->position.to_play());
-    root()->MaybeAddChild(node.move.c);
-    MG_CHECK(PlayMove(node.move.c));
-    ReportPosition(root());
-    for (const auto& child : node.children) {
-      traverse(*child);
-    }
-    UndoMove();
-  };
+  std::function<Response(const sgf::Node&)> traverse =
+      [&](const sgf::Node& node) {
+        if (node.move.color != root()->position.to_play()) {
+          // The move color is different than expected. Play a pass move to flip
+          // the colors.
+          if (root()->move == Coord::kPass) {
+            auto expected = ColorToCode(root()->position.to_play());
+            auto actual = node.move.ToSgf();
+            return Response::Error(
+                "expected move by ", expected, ", got ", actual,
+                " but can't play an intermediate pass because the previous ",
+                "move was also a pass");
+          }
+          std::cerr << "Inserting pass move" << std::endl;
+          MG_CHECK(PlayMove(Coord::kPass));
+          ReportPosition(root());
+        }
+
+        if (!PlayMove(node.move.c)) {
+          return Response::Error("error playing ", node.move.ToSgf());
+        }
+
+        if (!node.comment.empty()) {
+          auto* info = GetAuxInfo(root());
+          info->comment = node.comment;
+        }
+
+        ReportPosition(root());
+        for (const auto& child : node.children) {
+          auto response = traverse(*child);
+          if (!response.ok) {
+            return response;
+          }
+        }
+        UndoMove();
+        return Response::Ok();
+      };
 
   auto trees = sgf::GetTrees(ast);
   for (const auto& tree : trees) {
-    traverse(*tree);
+    auto response = traverse(*tree);
+    if (!response.ok) {
+      return response;
+    }
   }
 
   // Play the main line.
   ResetRoot();
   if (!trees.empty()) {
     for (const auto& move : trees[0]->ExtractMainLine()) {
+      // We already validated that all the moves could be played in traverse(),
+      // so if PlayMove fails here, something has gone seriously awry.
       MG_CHECK(PlayMove(move.c));
     }
     ReportPosition(root());
@@ -846,8 +877,9 @@ void GtpPlayer::ReportPosition(MctsNode* node) {
     oss << ch;
   }
 
+  auto* info = GetAuxInfo(node);
   nlohmann::json j = {
-      {"id", GetAuxInfo(node)->id},
+      {"id", info->id},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
       {"stones", oss.str()},
@@ -862,6 +894,9 @@ void GtpPlayer::ReportPosition(MctsNode* node) {
   }
   if (node->move != Coord::kInvalid) {
     j["move"] = node->move.ToKgs();
+  }
+  if (!info->comment.empty()) {
+    j["comment"] = info->comment;
   }
 
   std::cerr << "mg-position: " << j.dump() << std::endl;

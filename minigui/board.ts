@@ -40,10 +40,6 @@ class Board extends View {
 
     this.backgroundColor = '#db6';
 
-    for (let i = 0; i < N * N; ++i) {
-      this.stones.push(Color.Empty);
-    }
-
     let canvas = document.createElement('canvas');
     this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 
@@ -71,10 +67,12 @@ class Board extends View {
     this.stoneRadius = 0.96 * Math.min(this.pointW, this.pointH) / 2;
   }
 
-  clear() {
+  newGame(rootPosition: Position) {
+    this.position = rootPosition;
     for (let layer of this.layers) {
       layer.clear();
     }
+    this.draw();
   }
 
   addLayer(layer: Layer) {
@@ -130,7 +128,7 @@ class Board extends View {
   }
 
   getStone(p: Point) {
-    return this.stones[p.row * N + p.col];
+    return this.position.stones[p.row * N + p.col];
   }
 
   canvasToBoard(x: number, y: number, threshold?: number): Nullable<Point> {
@@ -275,6 +273,13 @@ class ClickableBoard extends Board {
 
   onClick(cb: ClickListener) {
     this.listeners.push(cb);
+  }
+
+  setPosition(position: Position) {
+    if (position != this.position) {
+      this.p = null;
+      super.setPosition(position);
+    }
   }
 
   drawImpl() {

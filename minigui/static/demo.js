@@ -11,10 +11,11 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.log = new log_1.Log('log', 'console');
             this.boards = [];
             this.connect().then(() => {
+                this.pvLayer = new lyr.Variation('pv');
                 this.mainBoard = new board_1.ClickableBoard('main-board', this.rootPosition, [
                     new lyr.Label(),
                     new lyr.BoardStones(),
-                    new lyr.Variation('pv'),
+                    this.pvLayer,
                     new lyr.Annotations()
                 ]);
                 this.boards = [this.mainBoard];
@@ -92,6 +93,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             }
             if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
                 this.mainBoard.enabled = false;
+                this.pvLayer.show = true;
                 this.engineBusy = true;
                 this.gtp.send('genmove').finally(() => {
                     this.engineBusy = false;
@@ -99,6 +101,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             }
             else {
                 this.mainBoard.enabled = true;
+                this.pvLayer.show = false;
             }
         }
         onPositionUpdate(position, update) {

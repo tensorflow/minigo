@@ -58,9 +58,20 @@
       #console { font-size: 10px; width: calc(100vw - 16px); padding: 3px 0 3px 0; }
       #console:focus { outline: none; }
 
+      #comment {
+        width: 39vh;
+        height: 7vh;
+        background-color: #2c241e;
+        color: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        font-size: 10px;
+        font-family: monospace;
+        overflow-y: scroll;
+      }
+
       #tree {
         width: 39vh;
-        height: 49vh;
+        height: 42vh;
         background-color: #2c241e;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
         overflow: hidden;
@@ -83,7 +94,7 @@
   <body>
     <!--
       Explanation of settings:
-        report_search_interval=250 : backend sends search messages every 250ms.
+        report_search_interval=50 : backend sends search messages every 250ms.
         prune_nodes=0 : don't delete any nodes in the tree.
         verbosity=0 : disable a bunch of debug messages.
     -->
@@ -100,7 +111,7 @@
         <div class="fs-0" style="display:flex">
           <div id="toggle-search" class="button">Hide search</div>
           <div class="sp-3vh"></div>
-          <div id="toggle-variation" class="button">Hide variation</div>
+          <div id="clear-board" class="button">Clear board</div>
           <div class="sp-3vh"></div>
           <label class="button">Load SGF
             <input id="load-sgf-input" type="file" accept=".sgf">
@@ -126,10 +137,12 @@
 
         <div class="sp-3vh"></div>
 
+        <div id="comment"></div>
+
+        <div class="sp-3vh"></div>
+
         <div id="winrate-graph" class="winrate-graph"></div>
       </div>
-
-      <div class="sp-3vh"></div>
 
       <div id="log-container" class="log-container">
         <div id="log" class="log"></div>

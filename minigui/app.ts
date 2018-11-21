@@ -26,6 +26,7 @@ interface PositionJson {
   stones: string;
   move?: string;
   gameOver: boolean;
+  comment?: string;
 }
 
 interface PositionUpdateJson {
@@ -130,6 +131,10 @@ abstract class App {
       }
       let move = util.parseMove(def.move);
       position = parent.addChild(def.id, move, stones, gameOver);
+    }
+
+    if (j.comment) {
+      position.comment = j.comment;
     }
 
     if (position.toPlay != toPlay) {

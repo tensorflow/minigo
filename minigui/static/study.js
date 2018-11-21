@@ -6,8 +6,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             super(parentElemId, position, []);
             this.gtp = gtp;
             this._showSearch = true;
-            this._showNext = true;
-            this._highlightedVariation = null;
+            this._highlightedNextMove = null;
             this.searchLayer = new lyr.Search();
             this.variationLayer = new lyr.Variation('pv');
             this.addLayers([
@@ -63,26 +62,31 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.draw();
             }
         }
-        get showNext() {
-            return this._showNext;
+        get highlightedNextMove() {
+            return this._highlightedNextMove;
         }
-        set showNext(x) {
-            if (x != this._showNext) {
-                this._showNext = x;
+        set highlightedNextMove(x) {
+            if (x != this._highlightedNextMove) {
+                this._highlightedNextMove = x;
                 this.draw();
             }
         }
-        get highlightedVariation() {
-            return this._highlightedVariation;
+        get variation() {
+            return this.variationLayer.variation;
         }
-        set highlightedVariation(x) {
-            if (x != this._highlightedVariation) {
-                this._highlightedVariation = x;
-                this.draw();
+        setPosition(position) {
+            if (position != this.position) {
+                this.showVariation(null);
+                super.setPosition(position);
             }
         }
         drawImpl() {
             super.drawImpl();
+            if (this.showSearch) {
+                this.drawNextMoves();
+            }
+        }
+        drawNextMoves() {
             let sr = this.stoneRadius;
             let pr = util_1.pixelRatio();
             let circum = 2 * Math.PI * sr;
@@ -108,7 +112,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     if (move == null || move == 'pass' || move == 'resign') {
                         continue;
                     }
-                    if (child == this.highlightedVariation) {
+                    if (child.lastMove == this.highlightedNextMove) {
                         ctx.setLineDash([]);
                     }
                     let c = this.boardToCanvas(move.row, move.col);
@@ -116,7 +120,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     ctx.moveTo(c.x + 0.5 + sr, c.y + 0.5);
                     ctx.arc(c.x + 0.5, c.y + 0.5, sr, 0, 2 * Math.PI);
                     ctx.stroke();
-                    if (child == this.highlightedVariation) {
+                    if (child.lastMove == this.highlightedNextMove) {
                         ctx.setLineDash(lineDash);
                     }
                 }
@@ -153,9 +157,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.variationTree = new variation_tree_1.VariationTree('tree');
             this.log = new log_1.Log('log', 'console');
             this.showSearch = true;
-            this.showNext = true;
             this.showConsole = false;
             this.moveElem = util_1.getElement('move');
+            this.commentElem = util_1.getElement('comment');
             this.connect().then(() => {
                 this.board = new ExploreBoard('main-board', this.rootPosition, this.gtp);
                 this.board.onClick((p) => {
@@ -173,10 +177,17 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 });
                 this.newGame();
                 this.variationTree.onClick((position) => {
-                    this.selectPosition(position);
+                    if (position != this.activePosition) {
+                        this.selectPosition(position);
+                    }
                 });
                 this.variationTree.onHover((position) => {
-                    this.board.highlightedVariation = position;
+                    if (position != null) {
+                        this.board.highlightedNextMove = position.lastMove;
+                    }
+                    else {
+                        this.board.highlightedNextMove = null;
+                    }
                 });
                 this.gtp.onData('mg-ponder', (result) => {
                     if (result.trim().toLowerCase() == 'done') {
@@ -207,6 +218,19 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         return;
                     }
                 }
+                if (e.key >= '0' && e.key <= '9' && this.board.variation != null) {
+                    let move = e.key.charCodeAt(0) - '0'.charCodeAt(0);
+                    if (move == 0) {
+                        move = 10;
+                    }
+                    if (move <= this.board.variation.length) {
+                        let color = this.board.position.toPlay;
+                        for (let i = 0; i < move; ++i) {
+                            this.playMove(color, this.board.variation[i]);
+                            color = base_1.otherColor(color);
+                        }
+                    }
+                }
                 switch (e.key) {
                     case 'ArrowUp':
                     case 'ArrowLeft':
@@ -231,7 +255,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
             });
             window.addEventListener('wheel', (e) => {
-                if (this.showConsole) {
+                if (this.showConsole || e.target == this.commentElem) {
                     return;
                 }
                 if (e.deltaY < 0) {
@@ -252,17 +276,8 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     searchElem.innerText = 'Show search';
                 }
             });
-            let variationElem = util_1.getElement('toggle-variation');
-            variationElem.addEventListener('click', () => {
-                this.showNext = !this.showNext;
-                this.board.showNext = this.showNext;
-                if (this.showNext) {
-                    variationElem.innerText = 'Hide variation';
-                }
-                else {
-                    variationElem.innerText = 'Show variation';
-                }
-            });
+            let clearElem = util_1.getElement('clear-board');
+            clearElem.addEventListener('click', () => { this.newGame(); });
             let loadSgfElem = util_1.getElement('load-sgf-input');
             loadSgfElem.addEventListener('change', () => {
                 let files = Array.prototype.slice.call(loadSgfElem.files);
@@ -271,12 +286,13 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
                 let reader = new FileReader();
                 reader.onload = () => {
-                    this.board.clear();
                     this.newGame();
                     let sgf = reader.result.replace(/\n/g, '\\n');
                     this.board.enabled = false;
                     this.board.showSearch = false;
-                    this.gtp.send(`playsgf ${sgf}`).finally(() => {
+                    this.gtp.send(`playsgf ${sgf}`).catch((error) => {
+                        window.alert(error);
+                    }).finally(() => {
                         this.board.enabled = true;
                         this.board.showSearch = this.showSearch;
                     });
@@ -291,7 +307,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     !position.isMainLine && position.parent != null) {
                     position = position.parent;
                 }
-                this.selectPosition(position);
+                if (position != this.activePosition) {
+                    this.selectPosition(position);
+                }
             });
             this.moveElem.addEventListener('keypress', (e) => {
                 if (e.key < '0' || e.key > '9') {
@@ -309,7 +327,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     position = position.children[0];
                 }
                 if (position.moveNum == moveNum) {
-                    this.selectPosition(position);
+                    if (position != this.activePosition) {
+                        this.selectPosition(position);
+                    }
                 }
             });
         }
@@ -328,27 +348,26 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.selectPosition(position);
         }
         selectPosition(position) {
-            if (position != this.activePosition) {
-                this.activePosition = position;
-                this.board.setPosition(position);
-                this.winrateGraph.setActive(position);
-                this.variationTree.setActive(position);
-                let moveNumStr = position.moveNum.toString();
-                if (this.moveElem.innerText != moveNumStr) {
-                    this.moveElem.innerText = moveNumStr;
-                    if (document.activeElement == this.moveElem) {
-                        this.moveElem.blur();
-                    }
+            this.activePosition = position;
+            this.board.setPosition(position);
+            this.winrateGraph.setActive(position);
+            this.variationTree.setActive(position);
+            this.commentElem.innerText = position.comment;
+            let moveNumStr = position.moveNum.toString();
+            if (this.moveElem.innerText != moveNumStr) {
+                this.moveElem.innerText = moveNumStr;
+                if (document.activeElement == this.moveElem) {
+                    this.moveElem.blur();
                 }
-                this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
             }
+            this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
         }
         newGame() {
             super.newGame();
             this.variationTree.newGame(this.rootPosition);
             this.winrateGraph.newGame(this.rootPosition);
+            this.board.newGame(this.rootPosition);
             this.log.clear();
-            this.board.clear();
         }
         onPositionUpdate(position, update) {
             this.winrateGraph.update(position);

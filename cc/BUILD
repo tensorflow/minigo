@@ -79,6 +79,7 @@ minigo_cc_library(
         "color.cc",
         "coord.cc",
         "group.cc",
+        "move.cc",
     ],
     hdrs = [
         "algorithm.h",
