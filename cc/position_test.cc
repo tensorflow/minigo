@@ -160,7 +160,7 @@ TEST(PositionTest, TestCaptureStone) {
 
   board.PlayMove("J2", Color::kWhite);
 
-  std::array<int, 2> expected_captures = {0, 1};
+  std::array<int, 2> expected_captures = {{0, 1}};
   EXPECT_EQ(expected_captures, board.num_captures());
 
   EXPECT_EQ(CleanBoardString(R"(
@@ -191,7 +191,7 @@ TEST(PositionTest, TestCaptureMany1) {
 
   board.PlayMove("E6", Color::kBlack);
 
-  std::array<int, 2> expected_captures = {2, 0};
+  std::array<int, 2> expected_captures = {{2, 0}};
   EXPECT_EQ(expected_captures, board.num_captures());
 
   EXPECT_EQ(CleanBoardString(R"(
@@ -218,7 +218,7 @@ TEST(PositionTest, TestCaptureMany2) {
 
   board.PlayMove("C7", Color::kBlack);
 
-  std::array<int, 2> expected_captures = {4, 0};
+  std::array<int, 2> expected_captures = {{4, 0}};
   EXPECT_EQ(expected_captures, board.num_captures());
 
   EXPECT_EQ(CleanBoardString(R"(
@@ -246,7 +246,7 @@ TEST(PositionTest, TestCaptureMultipleGroups) {
 
   board.PlayMove("A9", Color::kBlack);
 
-  std::array<int, 2> expected_captures = {2, 0};
+  std::array<int, 2> expected_captures = {{2, 0}};
   EXPECT_EQ(expected_captures, board.num_captures());
 
   EXPECT_EQ(CleanBoardString(R"(
@@ -448,7 +448,7 @@ TEST(PositionTest, PlayGame) {
       XXXXXXXXX)"),
             board.ToSimpleString());
 
-  std::array<int, 2> expected_captures = {10, 2};
+  std::array<int, 2> expected_captures = {{10, 2}};
   EXPECT_EQ(expected_captures, board.num_captures());
   EXPECT_EQ(-0.5, board.CalculateScore(kDefaultKomi));
 }

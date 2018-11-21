@@ -150,7 +150,6 @@ class TfDualNet : public DualNet {
   ThreadSafeQueue<InferenceData> inference_queue_;
   std::vector<std::thread> worker_threads_;
   std::atomic<bool> running_;
-  int device_count_;
 };
 
 TfDualNet::TfDualNet(std::string graph_path)

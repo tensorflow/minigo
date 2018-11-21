@@ -14,6 +14,7 @@
 
 #include "cc/random.h"
 
+#include <array>
 #include <algorithm>
 #include <functional>
 

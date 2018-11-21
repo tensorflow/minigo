@@ -93,7 +93,7 @@ TEST(CoordTest, Multithreading) {
   }
 
   absl::Mutex m;
-  std::map<int, int> popped GUARDED_BY(&m);
+  std::map<int, int> popped;
 
   // Pop the ints off the queue on multiple threads.
   std::vector<std::thread> threads;

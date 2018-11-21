@@ -98,11 +98,11 @@ TEST(DualNetTest, TestSetFeatures) {
   DualNet::BoardFeatures features;
   DualNet::SetFeatures(history, board.to_play(), &features);
 
-  //                  B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7 C
-  StoneFeatures b9 = {1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-  StoneFeatures h9 = {0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-  StoneFeatures a8 = {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-  StoneFeatures j9 = {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+  //                   B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7 C
+  StoneFeatures b9 = {{1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  StoneFeatures h9 = {{0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  StoneFeatures a8 = {{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  StoneFeatures j9 = {{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
 
   EXPECT_EQ(b9, GetStoneFeatures(features, Coord::FromString("B9")));
   EXPECT_EQ(h9, GetStoneFeatures(features, Coord::FromString("H9")));
@@ -130,8 +130,8 @@ TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   BoardFeatures features;
   DualNet::SetFeatures(history, board.to_play(), &features);
 
-  //                  W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
-  StoneFeatures j2 = {0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  //                   W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
+  StoneFeatures j2 = {{0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   EXPECT_EQ(j2, GetStoneFeatures(features, Coord::FromString("J2")));
 }
 
