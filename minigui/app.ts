@@ -27,6 +27,7 @@ interface PositionJson {
   move?: string;
   gameOver: boolean;
   comment?: string;
+  caps?: number[];
 }
 
 interface PositionUpdateJson {
@@ -135,6 +136,11 @@ abstract class App {
 
     if (j.comment) {
       position.comment = j.comment;
+    }
+
+    if (j.captures !== undefined) {
+      position.captures[0] = j.captures[0];
+      position.captures[1] = j.captures[1];
     }
 
     if (position.toPlay != toPlay) {

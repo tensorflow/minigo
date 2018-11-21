@@ -160,6 +160,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.showConsole = false;
             this.moveElem = util_1.getElement('move');
             this.commentElem = util_1.getElement('comment');
+            this.searchElem = util_1.getElement('toggle-search');
             this.connect().then(() => {
                 this.board = new ExploreBoard('main-board', this.rootPosition, this.gtp);
                 this.board.onClick((p) => {
@@ -232,6 +233,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     }
                 }
                 switch (e.key) {
+                    case ' ':
+                        this.toggleSearch();
+                        break;
                     case 'ArrowUp':
                     case 'ArrowLeft':
                         this.goBack(1);
@@ -265,17 +269,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.goForward(1);
                 }
             });
-            let searchElem = util_1.getElement('toggle-search');
-            searchElem.addEventListener('click', () => {
-                this.showSearch = !this.showSearch;
-                this.board.showSearch = this.showSearch;
-                if (this.showSearch) {
-                    searchElem.innerText = 'Hide search';
-                }
-                else {
-                    searchElem.innerText = 'Show search';
-                }
-            });
+            this.searchElem.addEventListener('click', () => { this.toggleSearch(); });
             let clearElem = util_1.getElement('clear-board');
             clearElem.addEventListener('click', () => { this.newGame(); });
             let loadSgfElem = util_1.getElement('load-sgf-input');
@@ -404,6 +398,16 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 this.log.log(util_1.toPrettyResult(result));
                 this.log.scroll();
             });
+        }
+        toggleSearch() {
+            this.showSearch = !this.showSearch;
+            this.board.showSearch = this.showSearch;
+            if (this.showSearch) {
+                this.searchElem.innerText = 'Hide search';
+            }
+            else {
+                this.searchElem.innerText = 'Show search';
+            }
         }
     }
     new ExploreApp();

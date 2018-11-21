@@ -88,8 +88,9 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                     }
                 }
             });
-            parent.addEventListener('resize', () => {
+            window.addEventListener('resize', () => {
                 this.resizeCanvas();
+                this.scrollIntoView();
                 this.draw();
             });
         }
@@ -102,7 +103,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
         setActive(position) {
             if (this.activeNode != null && this.activeNode.position != position) {
                 this.activeNode = this.lookupNode(position);
-                this.scrollIntoViw();
+                this.scrollIntoView();
                 this.draw();
             }
         }
@@ -119,8 +120,8 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 }
             }
             if (childNode == null) {
-                let x = parentNode.x + SPACE * parentNode.children.length;
-                let y = parentNode.y + SPACE;
+                let x = parentNode.x + SPACE;
+                let y = parentNode.y + SPACE * parentNode.children.length;
                 childNode = new Node(parentNode, childPosition, x, y);
                 this.layout();
             }
@@ -188,21 +189,21 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                     return;
                 }
                 for (let child of node.children) {
-                    let x = child.x;
+                    let y = child.y;
                     if (child != node.children[0]) {
-                        x -= SPACE;
+                        y -= SPACE;
                     }
                     if (drawMainline == child.isMainline) {
-                        ctx.moveTo(pr * x, pr * node.y);
+                        ctx.moveTo(pr * node.x, pr * y);
                         ctx.lineTo(pr * child.x, pr * child.y);
                     }
                     drawEdges(child, drawMainline);
                 }
                 if (node.children.length > 1 && !drawMainline) {
                     let lastChild = node.children[node.children.length - 1];
-                    if (lastChild.x - SPACE > node.x) {
+                    if (lastChild.y - SPACE > node.y) {
                         ctx.moveTo(pr * node.x, pr * node.y);
-                        ctx.lineTo(pr * (lastChild.x - SPACE), pr * node.y);
+                        ctx.lineTo(pr * node.x, pr * (lastChild.y - SPACE));
                     }
                 }
             };
@@ -247,7 +248,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             }
             ctx.restore();
         }
-        scrollIntoViw() {
+        scrollIntoView() {
             if (this.activeNode == null) {
                 return;
             }
@@ -270,19 +271,19 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             if (this.rootNode == null) {
                 return;
             }
-            let rightNode = [this.rootNode];
+            let bottomNode = [this.rootNode];
             let traverse = (node, depth) => {
                 let parent = node.parent;
-                node.x = parent.x;
-                for (let i = 0; i < 2 && depth + i < rightNode.length; ++i) {
-                    node.x = Math.max(node.x, rightNode[depth + i].x + SPACE);
+                node.y = parent.y;
+                for (let i = 0; i < 2 && depth + i < bottomNode.length; ++i) {
+                    node.y = Math.max(node.y, bottomNode[depth + i].y + SPACE);
                 }
-                rightNode[depth] = node;
+                bottomNode[depth] = node;
                 for (let child of node.children) {
                     traverse(child, depth + 1);
                 }
                 if (node == parent.children[0]) {
-                    parent.x = Math.max(parent.x, node.x);
+                    parent.y = Math.max(parent.y, node.y);
                 }
                 this.maxX = Math.max(this.maxX, node.x);
                 this.maxY = Math.max(this.maxY, node.y);

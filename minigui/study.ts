@@ -203,6 +203,7 @@ class ExploreApp extends App {
   private showConsole = false;
   private moveElem = getElement('move');
   private commentElem = getElement('comment');
+  private searchElem = getElement('toggle-search');
 
   constructor() {
     super();
@@ -301,6 +302,9 @@ class ExploreApp extends App {
       }
 
       switch (e.key) {
+        case ' ':
+          this.toggleSearch();
+          break;
         case 'ArrowUp':
         case 'ArrowLeft':
           this.goBack(1);
@@ -337,16 +341,7 @@ class ExploreApp extends App {
     });
 
     // Toggle search display.
-    let searchElem = getElement('toggle-search');
-    searchElem.addEventListener('click', () => {
-      this.showSearch = !this.showSearch;
-      this.board.showSearch = this.showSearch;
-      if (this.showSearch) {
-        searchElem.innerText = 'Hide search';
-      } else {
-        searchElem.innerText = 'Show search';
-      }
-    });
+    this.searchElem.addEventListener('click', () => { this.toggleSearch(); });
 
     // Clear the board and start a new game.
     let clearElem = getElement('clear-board');
@@ -502,6 +497,16 @@ class ExploreApp extends App {
       this.log.log(toPrettyResult(result));
       this.log.scroll();
     });
+  }
+
+  private toggleSearch() {
+    this.showSearch = !this.showSearch;
+    this.board.showSearch = this.showSearch;
+    if (this.showSearch) {
+      this.searchElem.innerText = 'Hide search';
+    } else {
+      this.searchElem.innerText = 'Show search';
+    }
   }
 }
 

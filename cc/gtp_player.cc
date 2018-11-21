@@ -885,6 +885,11 @@ void GtpPlayer::ReportPosition(MctsNode* node) {
       {"stones", oss.str()},
       {"gameOver", node->game_over()},
   };
+  const auto& captures = node->position.num_captures();
+  if (captures[0] != 0 || captures[1] != 0) {
+    j["caps"].push_back(captures[0]);
+    j["caps"].push_back(captures[1]);
+  }
   if (node->parent != nullptr) {
     j["parentId"] = GetAuxInfo(node->parent)->id;
     if (node->N() > 0) {

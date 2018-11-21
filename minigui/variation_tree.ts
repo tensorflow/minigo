@@ -140,8 +140,9 @@ class VariationTree extends View {
       }
     });
 
-    parent.addEventListener('resize', () => {
+    window.addEventListener('resize', () => {
       this.resizeCanvas();
+      this.scrollIntoView();
       this.draw();
     });
   }
@@ -156,7 +157,7 @@ class VariationTree extends View {
   setActive(position: Position) {
     if (this.activeNode != null && this.activeNode.position != position) {
       this.activeNode = this.lookupNode(position);
-      this.scrollIntoViw();
+      this.scrollIntoView();
       this.draw();
     }
   }
@@ -177,8 +178,8 @@ class VariationTree extends View {
       }
     }
     if (childNode == null) {
-      let x = parentNode.x + SPACE * parentNode.children.length;
-      let y = parentNode.y + SPACE;
+      let x = parentNode.x + SPACE;
+      let y = parentNode.y + SPACE * parentNode.children.length;
       childNode = new Node(parentNode, childPosition, x, y);
       this.layout();
     }
@@ -265,27 +266,27 @@ class VariationTree extends View {
       }
 
       // Draw edges from parent to all children.
-      // The first child's edge is vertical.
+      // The first child's edge is horizontal.
       // The remaining childrens' edges slope at 45 degrees.
       for (let child of node.children) {
-        let x = child.x;
+        let y = child.y;
         if (child != node.children[0]) {
-          x -= SPACE;
+          y -= SPACE;
         }
         if (drawMainline == child.isMainline) {
-          ctx.moveTo(pr * x, pr * node.y);
+          ctx.moveTo(pr * node.x, pr * y);
           ctx.lineTo(pr * child.x, pr * child.y);
         }
         drawEdges(child, drawMainline);
       }
 
-      // If a node has two or more children, draw a horizontal line to
+      // If a node has two or more children, draw a vertical line to
       // connect the tops of all of the sloping edges.
       if (node.children.length > 1 && !drawMainline) {
         let lastChild = node.children[node.children.length - 1];
-        if (lastChild.x - SPACE > node.x) {
+        if (lastChild.y - SPACE > node.y) {
           ctx.moveTo(pr * node.x, pr * node.y);
-          ctx.lineTo(pr * (lastChild.x - SPACE), pr * node.y);
+          ctx.lineTo(pr * node.x, pr * (lastChild.y - SPACE));
         }
       }
     };
@@ -342,7 +343,7 @@ class VariationTree extends View {
     ctx.restore();
   }
 
-  private scrollIntoViw() {
+  private scrollIntoView() {
     if (this.activeNode == null) {
       return;
     }
@@ -365,17 +366,17 @@ class VariationTree extends View {
       return;
     }
 
-    // Right-most node at each depth in the tree.
-    let rightNode: Node[] = [this.rootNode];
+    // Bottom-most node at each depth in the tree.
+    let bottomNode: Node[] = [this.rootNode];
 
     // We want to lay the nodes in the tree out such that the main line of each
-    // node (the chain of first children of all descendants) is a vertical line.
-    // We do this by incrementally building a new tree of layout data in
+    // node (the chain of first children of all descendants) is a horizontal
+    // line. We do this by incrementally building a new tree of layout data in
     // traversal order of the game tree, satisfying the following constraints at
     // each step:
-    //  1) A newly inserted node's x coordinate is greater than all other nodes
+    //  1) A newly inserted node's y coordinate is greater than all other nodes
     //     at the same depth. This is enforced pre-traversal.
-    //  2) A newly inserted node's x coordinate is greater or equal to the x
+    //  2) A newly inserted node's y coordinate is greater or equal to the y
     //     coordinate of its first child. This is enforced post-traversal.
     let traverse = (node: Node, depth: number) => {
       // Tell the compiler that node.parent is guaranteed to be non-null.
@@ -383,11 +384,11 @@ class VariationTree extends View {
 
       // Satisfy constraint 1. In order to make the layout less cramped, we
       // actually check both the current depth and the next depth.
-      node.x = parent.x;
-      for (let i = 0; i < 2 && depth + i < rightNode.length; ++i) {
-        node.x = Math.max(node.x, rightNode[depth + i].x + SPACE);
+      node.y = parent.y;
+      for (let i = 0; i < 2 && depth + i < bottomNode.length; ++i) {
+        node.y = Math.max(node.y, bottomNode[depth + i].y + SPACE);
       }
-      rightNode[depth] = node;
+      bottomNode[depth] = node;
 
       for (let child of node.children) {
         traverse(child, depth + 1);
@@ -395,7 +396,7 @@ class VariationTree extends View {
 
       // Satisfy constraint 2.
       if (node == parent.children[0]) {
-        parent.x = Math.max(parent.x, node.x);
+        parent.y = Math.max(parent.y, node.y);
       }
 
       this.maxX = Math.max(this.maxX, node.x);

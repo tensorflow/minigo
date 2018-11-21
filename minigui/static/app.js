@@ -68,6 +68,10 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             if (j.comment) {
                 position.comment = j.comment;
             }
+            if (j.captures !== undefined) {
+                position.captures[0] = j.captures[0];
+                position.captures[1] = j.captures[1];
+            }
             if (position.toPlay != toPlay) {
                 throw new Error(`expected ${position.toPlay}, got ${toPlay}`);
             }

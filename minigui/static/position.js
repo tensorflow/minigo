@@ -26,6 +26,7 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             this.childN = null;
             this.childQ = null;
             this.children = [];
+            this.captures = [0, 0];
             this.comment = "";
             this.moveNum = parent != null ? parent.moveNum + 1 : 0;
             if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {

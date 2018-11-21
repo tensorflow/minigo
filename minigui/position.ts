@@ -46,6 +46,10 @@ class Position {
   // children[0] is the main line. Subsequent children are variations.
   children: Position[] = [];
 
+  // captures[0] is the number of stones that black has captured.
+  // captures[1] is the number of stones that white has captured.
+  captures: number[] = [0, 0];
+
   comment = "";
 
   constructor(public id: string,
