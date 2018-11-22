@@ -151,6 +151,7 @@ class VariationTree extends View {
     this.rootNode = new Node(null, rootPosition, PAD, PAD);
     this.activeNode = this.rootNode;
     this.layout();
+    this.scrollIntoView();
     this.draw();
   }
 

@@ -26,9 +26,10 @@
         color: #eee;
       }
 
-      .text {
-        border-radius: 0.6vh;
-        width: 11vh;
+      .comment-head {
+        border-radius: 0.6vh 0.6vh 0 0;
+        border-bottom: 1px dashed #715e36;
+        width: 39vh;
         height: 4vh;
         font-family: sans-serif;
         font-size: 1.4vh;
@@ -36,7 +37,7 @@
         align-items: center;
         justify-content: left;
         color: #eee;
-        display: inline-flex;
+        display: flex;
         padding-left: 1vh;
       }
 
@@ -72,7 +73,7 @@
 
       #tree {
         width: 39vh;
-        height: 25vh;
+        height: 18vh;
         background-color: #2c241e;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
         overflow: hidden;
@@ -85,10 +86,16 @@
         overflow: hidden;
       }
 
-      .label { display: inline-flex; cursor: default; }
+      .item { display: inline-flex; flex: 1; cursor: default; }
 
-      #move { display: inline-flex; flex: 1; }
+      #move {
+        display: inline-flex;
+        flex: 1;
+        cursor: text;
+        margin-right: 1vh;
+      }
       #move:focus { outline: none }
+      #move:hover { background-color: #111; }
     </style>
   </head>
 
@@ -126,17 +133,22 @@
         <div class="sp-3vh"></div>
 
         <div class="fs-0" style="display:flex">
-          <div class="text">
-            <div class="label">Move:&nbsp;</div>
-            <div id="move" contenteditable="true">0</div>
-          </div>
-          <div class="sp-3vh"></div>
-          <div class="text">Reads:&nbsp;<div id="reads">0</div></div>
-          <div class="sp-3vh"></div>
+          <div style="display:flex; width:28vh"></div>
           <div id="main-line" class="button">To main line</div>
         </div>
 
         <div class="sp-3vh"></div>
+
+        <div class="comment-head">
+          <div style="display:inline-flex; flex:7;">
+            <div class="item">Move:&nbsp;<span id="move" contenteditable="true">0</span></div>
+            <div class="item">Reads:&nbsp;<span id="reads">0</span></div>
+          </div>
+          <div style="display:inline-flex; flex:3;">
+            <div class="item">B:&nbsp;<span id="b-caps">0</span></div>
+            <div class="item">W:&nbsp;<span id="w-caps">0</span></div>
+          </div>
+        </div>
 
         <div id="comment"></div>
 

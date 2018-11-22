@@ -98,6 +98,7 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             this.rootNode = new Node(null, rootPosition, PAD, PAD);
             this.activeNode = this.rootNode;
             this.layout();
+            this.scrollIntoView();
             this.draw();
         }
         setActive(position) {

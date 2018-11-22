@@ -204,6 +204,8 @@ class ExploreApp extends App {
   private moveElem = getElement('move');
   private commentElem = getElement('comment');
   private searchElem = getElement('toggle-search');
+  private blackCapturesElem = getElement('b-caps');
+  private whiteCapturesElem = getElement('w-caps');
 
   constructor() {
     super();
@@ -255,7 +257,8 @@ class ExploreApp extends App {
           this.gtp.send('ponder time 10');
         }
       });
-      this.gtp.send('ponder time 10');
+      console.log('NOT PONDERING');
+      // this.gtp.send('ponder time 10');
     });
   }
 
@@ -333,9 +336,17 @@ class ExploreApp extends App {
       if (this.showConsole || e.target == this.commentElem) {
         return;
       }
-      if (e.deltaY < 0) {
+
+      let delta: number;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        delta = e.deltaX;
+      } else {
+        delta = e.deltaY;
+      }
+
+      if (delta < 0) {
         this.goBack(1);
-      } else if (e.deltaY > 0) {
+      } else if (delta > 0) {
         this.goForward(1);
       }
     });
@@ -396,6 +407,9 @@ class ExploreApp extends App {
         return false;
       }
     });
+    this.moveElem.addEventListener('blur', () => {
+      this.moveElem.innerText = this.activePosition.moveNum.toString();
+    });
     this.moveElem.addEventListener('input', () => {
       let moveNum = parseInt(this.moveElem.innerText);
       if (isNaN(moveNum)) {
@@ -435,6 +449,8 @@ class ExploreApp extends App {
     this.winrateGraph.setActive(position);
     this.variationTree.setActive(position);
     this.commentElem.innerText = position.comment;
+    this.blackCapturesElem.innerText = this.activePosition.captures[0].toString();
+    this.whiteCapturesElem.innerText = this.activePosition.captures[1].toString();
     let moveNumStr = position.moveNum.toString();
     if (this.moveElem.innerText != moveNumStr) {
       this.moveElem.innerText = moveNumStr;

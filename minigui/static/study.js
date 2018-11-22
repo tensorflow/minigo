@@ -161,6 +161,8 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.moveElem = util_1.getElement('move');
             this.commentElem = util_1.getElement('comment');
             this.searchElem = util_1.getElement('toggle-search');
+            this.blackCapturesElem = util_1.getElement('b-caps');
+            this.whiteCapturesElem = util_1.getElement('w-caps');
             this.connect().then(() => {
                 this.board = new ExploreBoard('main-board', this.rootPosition, this.gtp);
                 this.board.onClick((p) => {
@@ -195,7 +197,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         this.gtp.send('ponder time 10');
                     }
                 });
-                this.gtp.send('ponder time 10');
+                console.log('NOT PONDERING');
             });
         }
         initEventListeners() {
@@ -262,10 +264,17 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 if (this.showConsole || e.target == this.commentElem) {
                     return;
                 }
-                if (e.deltaY < 0) {
+                let delta;
+                if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                    delta = e.deltaX;
+                }
+                else {
+                    delta = e.deltaY;
+                }
+                if (delta < 0) {
                     this.goBack(1);
                 }
-                else if (e.deltaY > 0) {
+                else if (delta > 0) {
                     this.goForward(1);
                 }
             });
@@ -311,6 +320,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     return false;
                 }
             });
+            this.moveElem.addEventListener('blur', () => {
+                this.moveElem.innerText = this.activePosition.moveNum.toString();
+            });
             this.moveElem.addEventListener('input', () => {
                 let moveNum = parseInt(this.moveElem.innerText);
                 if (isNaN(moveNum)) {
@@ -347,6 +359,8 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.winrateGraph.setActive(position);
             this.variationTree.setActive(position);
             this.commentElem.innerText = position.comment;
+            this.blackCapturesElem.innerText = this.activePosition.captures[0].toString();
+            this.whiteCapturesElem.innerText = this.activePosition.captures[1].toString();
             let moveNumStr = position.moveNum.toString();
             if (this.moveElem.innerText != moveNumStr) {
                 this.moveElem.innerText = moveNumStr;

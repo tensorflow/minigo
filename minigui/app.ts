@@ -138,9 +138,9 @@ abstract class App {
       position.comment = j.comment;
     }
 
-    if (j.captures !== undefined) {
-      position.captures[0] = j.captures[0];
-      position.captures[1] = j.captures[1];
+    if (j.caps !== undefined) {
+      position.captures[0] = j.caps[0];
+      position.captures[1] = j.caps[1];
     }
 
     if (position.toPlay != toPlay) {
