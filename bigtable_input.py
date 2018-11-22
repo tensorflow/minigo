@@ -2,6 +2,7 @@
 """
 
 import collections
+import math
 import operator
 import os
 import re
@@ -133,6 +134,9 @@ class GameQueue:
           instance_name:  string name of CBT instance in project.
           table_name:  string name of CBT table in instance.
         """
+        self.project_name = project_name,
+        self.instance_name = instance_name
+        self.table_name = table_name
         self.bt_table = bigtable.Client(
             project_name).instance(
                 instance_name).table(
@@ -270,10 +274,24 @@ class GameQueue:
             ds = rds.apply(
                 tf.contrib.data.parallel_interleave(
                     lambda x: ds.shard(shards, x),
-                    cycle_length=shards, block_length=1024))
+                    cycle_length=shards, block_length=1024,
+                    sloppy=True))
             ds = ds.shuffle(shards * 1024 * 2)
         ds = ds.take(moves)
         return ds
+
+    def moves_from_last_n_games(self, n, moves, shuffle,
+                                column_family, column):
+      self.wait_for_fresh_games()
+      latest_game = int(self.latest_game_number())
+      utils.dbg('Latest game in %s: %s' % (self.table_name, latest_game))
+      if latest_game == 0:
+          raise ValueError('Cannot find a latest game in the table')
+
+      start = int(max(0, latest_game - n))
+      ds = self.moves_from_games(start, latest_game, moves, shuffle,
+                                   column_family, column)
+      return ds
 
     def _write_move_counts(self, sess, h):
         """Add move counts from the given histogram to the table.
@@ -325,16 +343,27 @@ class GameQueue:
 # PROJECT:  the GCP project in which the Cloud Bigtable is located.
 # CBT_INSTANCE:  identifier of Cloud Bigtable instance in PROJECT.
 # CBT_TABLE:  identifier of Cloud Bigtable table in CBT_INSTANCE.
-_games = GameQueue(os.environ['PROJECT'],
-                   os.environ['CBT_INSTANCE'],
-                   os.environ['CBT_TABLE'])
+#
+# The CBT_TABLE is expected to be accompanied by one with an "-nr"
+# suffix, for "no-resign".
+_project_name = os.environ['PROJECT']
+_instance_name = os.environ['CBT_INSTANCE']
+_table_name = os.environ['CBT_TABLE']
+
+_games = GameQueue(_project_name,
+                   _instance_name,
+                   _table_name)
+_games_nr = GameQueue(_project_name,
+                      _instance_name,
+                      _table_name + '-nr')
 
 
 def get_unparsed_moves_from_last_n_games(n,
                                          moves=2**21,
                                          shuffle=True,
                                          column_family='tfexample',
-                                         column='example'):
+                                         column='example',
+                                         values_only=True):
     """Get a dataset of serialized TFExamples from the last N games.
 
     Args:
@@ -344,21 +373,39 @@ def get_unparsed_moves_from_last_n_games(n,
       column_family:  name of the column family containing move examples.
       column:  name of the column containing move examples.
       shuffle:  if True, shuffle the selected move examples.
+      values_only: if True, return only column values, no row keys.
 
     Returns:
       A dataset containing no more than `moves` examples, sampled
         randomly from the last `n` games in the table.
     """
-    _games.wait_for_fresh_games()
-    latest_game = int(_games.latest_game_number())
-    utils.dbg('Latest game: %s' % latest_game)
-    if latest_game == 0:
-        raise ValueError('Cannot find a latest game in the table')
-
-    start = int(max(0, latest_game - n))
-    ds = _games.moves_from_games(start, latest_game, moves, shuffle,
-                                 column_family, column)
-    return ds.map(lambda row_name, s: s)
+    # The prefixes and suffixes below have the following meanings:
+    #   ct_: count
+    #   fr_: fraction
+    #    _r: resign (ordinary)
+    #   _nr: no-resign
+    ct_r, ct_nr = 9, 1
+    ct_total = ct_r + ct_nr
+    fr_r = ct_r / ct_total
+    fr_nr = ct_nr / ct_total
+    resign = _games.moves_from_last_n_games(
+        math.ceil(n * fr_r),
+        math.ceil(moves * fr_r),
+        shuffle,
+        column_family, column)
+    no_resign = _games_nr.moves_from_last_n_games(
+        math.floor(n * fr_nr),
+        math.floor(moves * fr_nr),
+        shuffle,
+        column_family, column)
+    selection = np.array([0] * ct_r + [1] * ct_nr, dtype=np.int64)
+    choice = tf.data.Dataset.from_tensor_slices(selection).repeat().take(moves)
+    ds = tf.contrib.data.choose_from_datasets([resign, no_resign], choice)
+    if shuffle:
+        ds = ds.shuffle(len(selection) * 2)
+    if values_only:
+        ds = ds.map(lambda row_name, s: s)
+    return ds
 
 
 def count_elements_in_dataset(ds, batch_size=1*1024, parallel_batch=8):
