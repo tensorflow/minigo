@@ -206,6 +206,7 @@ class ExploreApp extends App {
   private searchElem = getElement('toggle-search');
   private blackCapturesElem = getElement('b-caps');
   private whiteCapturesElem = getElement('w-caps');
+  private readsElem = getElement('reads');
 
   constructor() {
     super();
@@ -257,8 +258,7 @@ class ExploreApp extends App {
           this.gtp.send('ponder time 10');
         }
       });
-      console.log('NOT PONDERING');
-      // this.gtp.send('ponder time 10');
+      this.gtp.send('ponder time 10');
     });
   }
 
@@ -451,6 +451,7 @@ class ExploreApp extends App {
     this.commentElem.innerText = position.comment;
     this.blackCapturesElem.innerText = this.activePosition.captures[0].toString();
     this.whiteCapturesElem.innerText = this.activePosition.captures[1].toString();
+    this.readsElem.innerText = this.formatNumReads(position.n);
     let moveNumStr = position.moveNum.toString();
     if (this.moveElem.innerText != moveNumStr) {
       this.moveElem.innerText = moveNumStr;
@@ -480,7 +481,7 @@ class ExploreApp extends App {
       return;
     }
     this.board.update(update);
-    getElement('reads').innerText = this.formatNumReads(position.n);
+    this.readsElem.innerText = this.formatNumReads(position.n);
   }
 
   protected formatNumReads(numReads: number) {

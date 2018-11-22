@@ -163,6 +163,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.searchElem = util_1.getElement('toggle-search');
             this.blackCapturesElem = util_1.getElement('b-caps');
             this.whiteCapturesElem = util_1.getElement('w-caps');
+            this.readsElem = util_1.getElement('reads');
             this.connect().then(() => {
                 this.board = new ExploreBoard('main-board', this.rootPosition, this.gtp);
                 this.board.onClick((p) => {
@@ -197,7 +198,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         this.gtp.send('ponder time 10');
                     }
                 });
-                console.log('NOT PONDERING');
+                this.gtp.send('ponder time 10');
             });
         }
         initEventListeners() {
@@ -361,6 +362,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.commentElem.innerText = position.comment;
             this.blackCapturesElem.innerText = this.activePosition.captures[0].toString();
             this.whiteCapturesElem.innerText = this.activePosition.captures[1].toString();
+            this.readsElem.innerText = this.formatNumReads(position.n);
             let moveNumStr = position.moveNum.toString();
             if (this.moveElem.innerText != moveNumStr) {
                 this.moveElem.innerText = moveNumStr;
@@ -383,7 +385,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 return;
             }
             this.board.update(update);
-            util_1.getElement('reads').innerText = this.formatNumReads(position.n);
+            this.readsElem.innerText = this.formatNumReads(position.n);
         }
         formatNumReads(numReads) {
             if (numReads < 1000) {
