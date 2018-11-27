@@ -19,6 +19,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
+#include "cc/file/path.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
 

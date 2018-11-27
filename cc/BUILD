@@ -13,50 +13,11 @@ load(
     "minigo_cc_test_9_only",
 )
 
-# cc_library(
-#     name = "tensorflow",
-#     srcs = [
-#         "tensorflow/libtensorflow_framework.so",
-#         "tensorflow/libtensorflow_cc.so",
-#     ],
-#     hdrs = glob(
-#         ["tensorflow/**/*"],
-#         exclude = [
-#             "**/*.a",
-#             "**/*.so",
-#             "**/*.so*",
-#             "tensorflow/flatbuffers/**",
-#             "tensorflow/tensorflow/contrib/lite/**",
-#         ],
-#     ),
-#     includes = [
-#         "tensorflow",
-#         "tensorflow/external/eigen_archive",
-#         "tensorflow/external/nsync/public",
-#         "tensorflow/external/protobuf_archive/src",
-#         "tensorflow/external/zlib_archive",
-#     ],
-#     tags = ["manual"],
-# )
-cc_import(
-    name = "tensorflow_framework",
-    interface_library = "tensorflow/libtensorflow_framework.so.if.lib",
-    shared_library = "tensorflow/libtensorflow_framework.so",
-    tags = ["manual"],
-)
-
-cc_import(
-    name = "tensorflow_cc",
-    interface_library = "tensorflow/libtensorflow_cc.so.if.lib",
-    shared_library = "tensorflow/libtensorflow_cc.so",
-    tags = ["manual"],
-)
-
 cc_library(
     name = "tensorflow",
-    deps = [
-        ":tensorflow_framework",
-        ":tensorflow_cc",
+    srcs = [
+        "tensorflow/libtensorflow_cc.so",
+        "tensorflow/libtensorflow_framework.so",
     ],
     hdrs = glob(
         ["tensorflow/**/*"],

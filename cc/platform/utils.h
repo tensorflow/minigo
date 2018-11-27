@@ -17,15 +17,13 @@
 
 #if defined(_MSC_VER)
 
-#define MG_PLATFORM_MSC
 #define MG_ALIGN(x) __declspec(align(x))
 #define MG_WARN_UNUSED_RESULT _Check_return_
 
-#elif defined(__GNU_C__)
+#elif defined(__GNUC__)
 
-#define MG_PLATFORM_GCC
 #define MG_ALIGN(x) __attribute__((aligned(x)))
-#define MG_WARN_UNUSED_RESULT __attribute__((warn_unused_result)) 
+#define MG_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 
 #endif
 
