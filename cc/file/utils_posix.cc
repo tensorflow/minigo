@@ -78,9 +78,13 @@ bool WriteFile(std::string path, absl::string_view contents) {
     std::cerr << "Error opening " << path << " for write" << std::endl;
     return false;
   }
-  bool ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
-  if (!ok) {
-    std::cerr << "Error writing " << path << std::endl;
+
+  bool ok = true;
+  if (!contents.empty()) {
+    ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
+    if (!ok) {
+      std::cerr << "Error writing " << path << std::endl;
+    }
   }
   fclose(f);
   return ok;
@@ -128,6 +132,10 @@ bool ListDir(std::string directory, std::vector<std::string>* files) {
   }
   files->clear();
   while (dirent* dp = readdir(dirp)) {
+    absl::string_view p(dp->d_name);
+    if (p == "." || p == "..") {
+      continue;
+    }
     files->push_back(dp->d_name);
   }
   closedir(dirp);

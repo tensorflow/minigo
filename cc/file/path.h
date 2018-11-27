@@ -73,10 +73,6 @@ inline absl::string_view Stem(absl::string_view path) {
 // On OSX and Linux, all back slashes are replaced with forward slashes.
 std::string NormalizeSlashes(std::string path);
 
-inline std::string NormalizeSlashes(absl::string_view path) {
-  return NormalizeSlashes(std::string(path));
-}
-
 }  // namespace file
 }  // namespace minigo
 

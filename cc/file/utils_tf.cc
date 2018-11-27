@@ -65,10 +65,12 @@ bool WriteFile(std::string path, absl::string_view contents) {
   // *sigh* absl::string_view doesn't automatically convert to
   // tensorflow::StringPiece even though I'm pretty sure they're exactly the
   // same.
-  status = file->Append({contents.data(), contents.size()});
-  if (!status.ok()) {
-    std::cerr << "Error writing to " << path << ": " << status << std::endl;
-    return false;
+  if (!contents.empty()) {
+    status = file->Append({contents.data(), contents.size()});
+    if (!status.ok()) {
+      std::cerr << "Error writing to " << path << ": " << status << std::endl;
+      return false;
+    }
   }
 
   status = file->Close();

@@ -111,7 +111,7 @@ minigo_cc_library(
         "//cc:base",
         "//cc:check",
         "//cc:tf_lite",
-        "//cc/platform:utils",
+        "//cc/platform",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],

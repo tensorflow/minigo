@@ -16,25 +16,23 @@ load(
 cc_library(
     name = "tensorflow",
     srcs = [
-        "tensorflow/libtensorflow_cc.so",
         "tensorflow/libtensorflow_framework.so",
-    ],
+    ] + select({
+        "//cc/config:enable_tpu": ["tensorflow/libgrpc_runtime.so"],
+        "//conditions:default": ["tensorflow/libtensorflow_cc.so"],
+    }),
     hdrs = glob(
         ["tensorflow/**/*"],
         exclude = [
             "**/*.a",
             "**/*.so",
-            "**/*.so*",
             "tensorflow/flatbuffers/**",
             "tensorflow/tensorflow/contrib/lite/**",
         ],
     ),
     includes = [
         "tensorflow",
-        "tensorflow/external/eigen_archive",
         "tensorflow/external/nsync/public",
-        "tensorflow/external/protobuf_archive/src",
-        "tensorflow/external/zlib_archive",
     ],
     tags = ["manual"],
 )
@@ -99,7 +97,7 @@ minigo_cc_library(
     deps = [
         ":check",
         ":inline_vector",
-        "//cc/platform:utils",
+        "//cc/platform",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -420,7 +418,7 @@ minigo_cc_binary(
         "//cc/dual_net:batching_dual_net",
         "//cc/dual_net:factory",
         "//cc/file",
-        "//cc/platform:utils",
+        "//cc/platform",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",

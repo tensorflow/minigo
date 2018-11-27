@@ -73,9 +73,11 @@ bool WriteFile(std::string path, absl::string_view contents) {
     std::cerr << "Error opening " << path << " for write" << std::endl;
     return false;
   }
-  bool ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
-  if (!ok) {
-    std::cerr << "Error writing " << path << std::endl;
+  if (!contents.empty()) {
+    bool ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
+    if (!ok) {
+      std::cerr << "Error writing " << path << std::endl;
+    }
   }
   fclose(f);
   return ok;
@@ -103,9 +105,9 @@ bool ReadFile(std::string path, std::string* contents) {
 bool GetModTime(std::string path, uint64_t* mtime_usec) {
   path = NormalizeSlashes(path);
 
-  auto h = CreateFileA(
-      path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-      nullptr, OPEN_EXISTING, 0, nullptr);
+  auto h =
+      CreateFile(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                 nullptr, OPEN_EXISTING, 0, nullptr);
   if (h == INVALID_HANDLE_VALUE) {
     return false;
   }
@@ -147,4 +149,3 @@ bool ListDir(std::string directory, std::vector<std::string>* files) {
 
 }  // namespace file
 }  // namespace minigo
-

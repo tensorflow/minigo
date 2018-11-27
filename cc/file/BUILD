@@ -4,13 +4,12 @@ package(
 
 licenses(["notice"])  # Apache License 2.0
 
-
 cc_library(
     name = "path",
     srcs = ["path.cc"],
     hdrs = ["path.h"],
     deps = [
-        "//cc/platform:utils",
+        "//cc/platform",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -22,7 +21,7 @@ cc_library(
     deps = [
         ":path",
         "//cc:tensorflow",
-        "//cc/platform:utils",
+        "//cc/platform",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -31,13 +30,12 @@ cc_library(
     name = "utils_no_tf",
     srcs = select({
         "@bazel_tools//src/conditions:windows": ["utils_windows.cc"],
-        # TODO(tommadams): rename utils_posix.cc
-        "//conditions:default": ["utils_stdio.cc"],
+        "//conditions:default": ["utils_posix.cc"],
     }),
     hdrs = ["utils.h"],
     deps = [
         ":path",
-        "//cc/platform:utils",
+        "//cc/platform",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -48,4 +46,25 @@ cc_library(
         "//cc/config:enable_tf": [":utils_tf"],
         "//conditions:default": [":utils_no_tf"],
     }),
+)
+
+cc_test(
+    name = "path_test",
+    srcs = ["path_test.cc"],
+    deps = [
+        ":file",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "utils_test",
+    srcs = ["utils_test.cc"],
+    deps = [
+        ":file",
+        "//cc:base",
+        "//cc:check",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
 )
