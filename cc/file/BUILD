@@ -24,6 +24,7 @@ cc_library(
         "//cc/platform",
         "@com_google_absl//absl/strings",
     ],
+    tags = ["manual"],
 )
 
 cc_library(

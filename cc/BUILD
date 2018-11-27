@@ -14,7 +14,7 @@ load(
 )
 
 cc_library(
-    name = "tensorflow",
+    name = "tensorflow_dynamic",
     srcs = [
         "tensorflow/libtensorflow_framework.so",
     ] + select({
@@ -37,6 +37,23 @@ cc_library(
     tags = ["manual"],
 )
 
+# TODO(tommadams): Set this up for windows compilation.
+cc_library(
+    name = "tensorflow_static",
+    srcs = [],
+    hdrs = [],
+    tags = ["manual"],
+)
+
+cc_library(
+    name = "tensorflow",
+    deps = select({
+      "@bazel_tools//src/conditions:windows": ["tensorflow_static"],
+      "//conditions:default": ["tensorflow_dynamic"],
+    }),
+    tags = ["manual"],
+)
+
 cc_library(
     name = "tf_lite",
     srcs = [
@@ -51,6 +68,7 @@ cc_library(
     ),
     includes = ["tensorflow"],
     linkopts = ["-ldl"],
+    tags = ["manual"],
 )
 
 cc_library(
@@ -62,6 +80,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    tags = ["manual"],
 )
 
 cc_library(
@@ -71,6 +90,7 @@ cc_library(
         "@local_config_tensorrt//:nvparsers",
         "@local_config_tensorrt//:tensorrt_headers",
     ],
+    tags = ["manual"],
 )
 
 minigo_cc_library(

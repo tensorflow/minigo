@@ -73,8 +73,9 @@ bool WriteFile(std::string path, absl::string_view contents) {
     std::cerr << "Error opening " << path << " for write" << std::endl;
     return false;
   }
+  bool ok = true;
   if (!contents.empty()) {
-    bool ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
+    ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
     if (!ok) {
       std::cerr << "Error writing " << path << std::endl;
     }
@@ -130,7 +131,7 @@ bool GetModTime(std::string path, uint64_t* mtime_usec) {
 }
 
 bool ListDir(std::string directory, std::vector<std::string>* files) {
-  directory = NormalizeSlashes(directory);
+  directory = JoinPath(NormalizeSlashes(directory), "*");
 
   WIN32_FIND_DATA ffd;
   auto h = FindFirstFile(directory.c_str(), &ffd);
@@ -140,6 +141,10 @@ bool ListDir(std::string directory, std::vector<std::string>* files) {
 
   files->clear();
   do {
+    absl::string_view p(ffd.cFileName);
+    if (p == "." || p == "..") {
+      continue;
+    }
     files->push_back(ffd.cFileName);
   } while (FindNextFile(h, &ffd));
   FindClose(h);
