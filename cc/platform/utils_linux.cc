@@ -13,8 +13,13 @@
 // limitations under the License.
 
 #include <sys/sysinfo.h>
+#include <unistd.h>
 
 namespace minigo {
+
+bool FdSupportsAnsiColors(int fd) {
+  return isatty(fd);
+}
 
 int GetNumLogicalCpus() {
  return get_nprocs();

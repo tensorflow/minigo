@@ -20,6 +20,7 @@
 #include <utility>
 
 #include "cc/check.h"
+#include "cc/platform/utils.h"
 
 namespace minigo {
 
@@ -100,7 +101,7 @@ class inline_vector {
 
  private:
   int size_ = 0;
-  uint8_t __attribute__((aligned(alignof(T)))) storage_[Capacity * sizeof(T)];
+  uint8_t MG_ALIGN(alignof(T)) storage_[Capacity * sizeof(T)];
 };
 
 }  // namespace minigo

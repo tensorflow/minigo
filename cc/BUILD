@@ -13,26 +13,67 @@ load(
     "minigo_cc_test_9_only",
 )
 
+# cc_library(
+#     name = "tensorflow",
+#     srcs = [
+#         "tensorflow/libtensorflow_framework.so",
+#         "tensorflow/libtensorflow_cc.so",
+#     ],
+#     hdrs = glob(
+#         ["tensorflow/**/*"],
+#         exclude = [
+#             "**/*.a",
+#             "**/*.so",
+#             "**/*.so*",
+#             "tensorflow/flatbuffers/**",
+#             "tensorflow/tensorflow/contrib/lite/**",
+#         ],
+#     ),
+#     includes = [
+#         "tensorflow",
+#         "tensorflow/external/eigen_archive",
+#         "tensorflow/external/nsync/public",
+#         "tensorflow/external/protobuf_archive/src",
+#         "tensorflow/external/zlib_archive",
+#     ],
+#     tags = ["manual"],
+# )
+cc_import(
+    name = "tensorflow_framework",
+    interface_library = "tensorflow/libtensorflow_framework.so.if.lib",
+    shared_library = "tensorflow/libtensorflow_framework.so",
+    tags = ["manual"],
+)
+
+cc_import(
+    name = "tensorflow_cc",
+    interface_library = "tensorflow/libtensorflow_cc.so.if.lib",
+    shared_library = "tensorflow/libtensorflow_cc.so",
+    tags = ["manual"],
+)
+
 cc_library(
     name = "tensorflow",
-    srcs = [
-        "tensorflow/libtensorflow_framework.so",
-    ] + select({
-        "//cc/config:enable_tpu": ["tensorflow/libgrpc_runtime.so"],
-        "//conditions:default": ["tensorflow/libtensorflow_cc.so"],
-    }),
+    deps = [
+        ":tensorflow_framework",
+        ":tensorflow_cc",
+    ],
     hdrs = glob(
         ["tensorflow/**/*"],
         exclude = [
             "**/*.a",
             "**/*.so",
+            "**/*.so*",
             "tensorflow/flatbuffers/**",
             "tensorflow/tensorflow/contrib/lite/**",
         ],
     ),
     includes = [
         "tensorflow",
+        "tensorflow/external/eigen_archive",
         "tensorflow/external/nsync/public",
+        "tensorflow/external/protobuf_archive/src",
+        "tensorflow/external/zlib_archive",
     ],
     tags = ["manual"],
 )
@@ -90,10 +131,14 @@ minigo_cc_library(
         "move.h",
         "stone.h",
     ],
-    linkopts = ["-lm"],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": ["ws2_32.lib"],
+        "//conditions:default": ["-lm"],
+    }),
     deps = [
         ":check",
         ":inline_vector",
+        "//cc/platform:utils",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -414,6 +459,7 @@ minigo_cc_binary(
         "//cc/dual_net:batching_dual_net",
         "//cc/dual_net:factory",
         "//cc/file",
+        "//cc/platform:utils",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",

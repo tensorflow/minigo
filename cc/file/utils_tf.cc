@@ -17,6 +17,7 @@
 #include <iostream>
 #include <memory>
 
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
@@ -24,7 +25,31 @@
 namespace minigo {
 namespace file {
 
-bool WriteFile(const std::string& path, absl::string_view contents) {
+bool RecursivelyCreateDir(std::string path) {
+  path = NormalizeSlashes(path);
+
+  tensorflow::Status status;
+
+  // GCS doesn't support empty directories (it pretends to by creating an
+  // empty file in them) and files can be written without having to first
+  // create a directory: just return success immediately.
+  if (absl::StartsWith(path, "gs://")) {
+    return true;
+  }
+
+  auto* env = tensorflow::Env::Default();
+  status = env->RecursivelyCreateDir(path);
+  if (!status.ok()) {
+    std::cerr << "Error creating " << path << ": " << status << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+bool WriteFile(std::string path, absl::string_view contents) {
+  path = NormalizeSlashes(path);
+
   tensorflow::Status status;
   auto* env = tensorflow::Env::Default();
 
@@ -53,7 +78,9 @@ bool WriteFile(const std::string& path, absl::string_view contents) {
   return true;
 }
 
-bool ReadFile(const std::string& path, std::string* contents) {
+bool ReadFile(std::string path, std::string* contents) {
+  path = NormalizeSlashes(path);
+
   tensorflow::Status status;
   auto* env = tensorflow::Env::Default();
 
@@ -85,7 +112,9 @@ bool ReadFile(const std::string& path, std::string* contents) {
   return true;
 }
 
-bool GetModTime(const std::string& path, uint64_t* mtime_usec) {
+bool GetModTime(std::string path, uint64_t* mtime_usec) {
+  path = NormalizeSlashes(path);
+
   tensorflow::Status status;
   auto* env = tensorflow::Env::Default();
   tensorflow::FileStatistics stat;
@@ -100,7 +129,9 @@ bool GetModTime(const std::string& path, uint64_t* mtime_usec) {
   return true;
 }
 
-bool ListDir(const std::string& directory, std::vector<std::string>* files) {
+bool ListDir(std::string directory, std::vector<std::string>* files) {
+  directory = NormalizeSlashes(directory);
+
   tensorflow::Status status;
   auto* env = tensorflow::Env::Default();
 

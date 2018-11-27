@@ -12,23 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <sys/sysctl.h>
-#include <unistd.h>
-
-#include "cc/check.h"
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 namespace minigo {
 
 bool FdSupportsAnsiColors(int fd) {
-  return isatty(fd);
+  return false;
 }
 
 int GetNumLogicalCpus() {
-  int nproc = 0;
-  size_t len;
-  MG_CHECK(sysctlbyname("hw.logicalcpu", &nproc, &len, nullptr, 0) == 0);
-  MG_CHECK(len == sizeof(nproc));
-  return nproc;
+  SYSTEM_INFO sysinfo;
+  GetSystemInfo(&sysinfo);
+  return sysinfo.dwNumberOfProcessors;
 }
 
 }  // namespace minigo
+

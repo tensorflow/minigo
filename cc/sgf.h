@@ -26,6 +26,7 @@
 #include "cc/color.h"
 #include "cc/coord.h"
 #include "cc/move.h"
+#include "cc/platform/utils.h"
 
 namespace minigo {
 namespace sgf {
@@ -60,7 +61,7 @@ class Ast {
   };
 
   // Parses the SGF file.
-  __attribute__((warn_unused_result)) bool Parse(std::string contents);
+  MG_WARN_UNUSED_RESULT bool Parse(std::string contents);
 
   // Returns a non-empty string containing error information if the most recent
   // call to Parse returned false.

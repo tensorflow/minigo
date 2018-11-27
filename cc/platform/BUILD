@@ -8,6 +8,7 @@ cc_library(
     name = "utils",
     srcs = select({
         "@bazel_tools//src/conditions:darwin": ["utils_osx.cc"],
+        "@bazel_tools//src/conditions:windows": ["utils_windows.cc"],
         "//conditions:default": ["utils_linux.cc"],
     }),
     hdrs = [

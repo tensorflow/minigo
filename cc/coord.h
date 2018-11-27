@@ -32,7 +32,7 @@ class Coord {
   static constexpr uint16_t kPass = kN * kN;
   static constexpr uint16_t kResign = kPass + 1;
   static constexpr uint16_t kInvalid = 0xffff;
-  static constexpr char kKgsColumns[] = "ABCDEFGHJKLMNOPQRST";
+  static const char kKgsColumns[20];
 
   Coord(uint16_t value) : value_(value) {}  // NOLINT(runtime/explicit)
 

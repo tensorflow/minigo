@@ -14,8 +14,6 @@
 
 #include "cc/file/utils.h"
 
-#include <dirent.h>
-#include <sys/stat.h>
 #include <cstdio>
 #include <iostream>
 #include <string>
@@ -24,32 +22,28 @@
 #include "absl/strings/string_view.h"
 #include "cc/file/path.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 namespace minigo {
 namespace file {
 
 namespace {
 
 bool MaybeCreateDir(const std::string& path) {
-  int ret = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
-  if (ret == 0) {
+  if (CreateDirectory(path.c_str(), nullptr)) {
     return true;
   }
 
-  if (errno != EEXIST) {
+  if (GetLastError() != ERROR_ALREADY_EXISTS) {
     return false;
   }
 
-  if (path == "/") {
-    return true;
-  }
-
-  struct stat st;
-  ret = stat(path.c_str(), &st);
-  if (ret != 0) {
+  auto attribs = GetFileAttributes(path.c_str());
+  if (attribs == INVALID_FILE_ATTRIBUTES) {
     return false;
   }
-
-  return S_ISDIR(st.st_mode);
+  return (attribs & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 bool RecursivelyCreateDirNormalized(const std::string& path) {
@@ -57,13 +51,14 @@ bool RecursivelyCreateDirNormalized(const std::string& path) {
     return true;
   }
 
-  if (!RecursivelyCreateDir(std::string(Dirname(path)))) {
+  if (!RecursivelyCreateDirNormalized(std::string(Dirname(path)))) {
     return false;
   }
 
   // Creates the directory knowing the parent already exists.
   return MaybeCreateDir(path);
 }
+
 }  // namespace
 
 bool RecursivelyCreateDir(std::string path) {
@@ -108,31 +103,48 @@ bool ReadFile(std::string path, std::string* contents) {
 bool GetModTime(std::string path, uint64_t* mtime_usec) {
   path = NormalizeSlashes(path);
 
-  struct stat s;
-  int result = stat(path.c_str(), &s);
-  if (result != 0) {
-    std::cerr << "Error statting " << path << ": " << result << std::endl;
+  auto h = CreateFileA(
+      path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+      nullptr, OPEN_EXISTING, 0, nullptr);
+  if (h == INVALID_HANDLE_VALUE) {
     return false;
   }
-  *mtime_usec = static_cast<uint64_t>(s.st_mtime) * 1000 * 1000;
-  return true;
+  FILETIME t;
+  bool success = GetFileTime(h, nullptr, nullptr, &t);
+  CloseHandle(h);
+
+  if (success) {
+    // FILETIME represents time in 100-nanosecond intervals. Convert to
+    // microseconds.
+    auto lo = static_cast<uint64_t>(t.dwLowDateTime);
+    auto hi = static_cast<uint64_t>(t.dwHighDateTime) << 32;
+    auto usec = (lo + hi) / 10;
+
+    // Also, the Windows & Unix epochs are different.
+    *mtime_usec = usec - 11644473600000000ull;
+  }
+
+  return success;
 }
 
 bool ListDir(std::string directory, std::vector<std::string>* files) {
   directory = NormalizeSlashes(directory);
 
-  DIR* dirp = opendir(directory.c_str());
-  if (dirp == nullptr) {
-    std::cerr << "Could not open directory " << directory << std::endl;
+  WIN32_FIND_DATA ffd;
+  auto h = FindFirstFile(directory.c_str(), &ffd);
+  if (h == INVALID_HANDLE_VALUE) {
     return false;
   }
+
   files->clear();
-  while (dirent* dp = readdir(dirp)) {
-    files->push_back(dp->d_name);
-  }
-  closedir(dirp);
+  do {
+    files->push_back(ffd.cFileName);
+  } while (FindNextFile(h, &ffd));
+  FindClose(h);
 
   return true;
 }
+
 }  // namespace file
 }  // namespace minigo
+

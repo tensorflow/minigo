@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <stdio.h>
-#include <unistd.h>
 #include <cstring>
 #include <functional>
 #include <iostream>
@@ -45,6 +44,7 @@
 #include "cc/gtp_player.h"
 #include "cc/init.h"
 #include "cc/mcts_player.h"
+#include "cc/platform/utils.h"
 #include "cc/random.h"
 #include "cc/sgf.h"
 #include "cc/tf_utils.h"
@@ -349,7 +349,7 @@ class SelfPlayer {
   void ThreadRun(int thread_id) {
     // Only print the board using ANSI colors if stderr is sent to the
     // terminal.
-    const bool use_ansi_colors = isatty(fileno(stderr));
+    const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
 
     GameOptions game_options;
     std::vector<std::string> bigtable_spec =

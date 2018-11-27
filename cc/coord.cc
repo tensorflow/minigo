@@ -24,7 +24,7 @@ namespace minigo {
 
 constexpr uint16_t Coord::kPass;
 constexpr uint16_t Coord::kInvalid;
-constexpr char Coord::kKgsColumns[];
+const char Coord::kKgsColumns[20] = "ABCDEFGHJKLMNOPQRST";
 
 namespace {
 

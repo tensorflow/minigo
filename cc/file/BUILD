@@ -4,23 +4,48 @@ package(
 
 licenses(["notice"])  # Apache License 2.0
 
+
 cc_library(
-    name = "file",
-    srcs = [
-        "path.cc",
-        "utils_shared.cc",
-    ] + select({
-        "//cc/config:enable_tf": ["utils_tf.cc"],
+    name = "path",
+    srcs = ["path.cc"],
+    hdrs = ["path.h"],
+    deps = [
+        "//cc/platform:utils",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "utils_tf",
+    srcs = ["utils_tf.cc"],
+    hdrs = ["utils.h"],
+    deps = [
+        ":path",
+        "//cc:tensorflow",
+        "//cc/platform:utils",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "utils_no_tf",
+    srcs = select({
+        "@bazel_tools//src/conditions:windows": ["utils_windows.cc"],
+        # TODO(tommadams): rename utils_posix.cc
         "//conditions:default": ["utils_stdio.cc"],
     }),
-    hdrs = [
-        "path.h",
-        "utils.h",
-    ],
+    hdrs = ["utils.h"],
     deps = [
+        ":path",
+        "//cc/platform:utils",
         "@com_google_absl//absl/strings",
-    ] + select({
-        "//cc/config:enable_tf": ["//cc:tensorflow"],
-        "//conditions:default": [],
+    ],
+)
+
+cc_library(
+    name = "file",
+    deps = [":path"] + select({
+        "//cc/config:enable_tf": [":utils_tf"],
+        "//conditions:default": [":utils_no_tf"],
     }),
 )

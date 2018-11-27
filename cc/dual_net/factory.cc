@@ -53,21 +53,7 @@
 #endif  // MG_DEFAULT_ENGINE
 
 // Inference engine flags.
-DEFINE_string(engine, MG_DEFAULT_ENGINE,
-              "The inference engine to use. Accepted values: \"fake\""
-#ifdef MG_ENABLE_TF_DUAL_NET
-              " \"tf\""
-#endif
-#ifdef MG_ENABLE_LITE_DUAL_NET
-              " \"lite\""
-#endif
-#ifdef MG_ENABLE_TPU_DUAL_NET
-              " \"tpu\""
-#endif
-#ifdef MG_ENABLE_TRT_DUAL_NET
-              " \"trt\""
-#endif
-);
+DEFINE_string(engine, MG_DEFAULT_ENGINE, "The inference engine to use.");
 
 // TPU flags.
 DEFINE_string(
