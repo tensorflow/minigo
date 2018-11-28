@@ -72,6 +72,8 @@ DualNet::InputLayout DualNet::GetInputLayout() const {
 
 void DualNet::Reserve(size_t) {}
 
-int DualNet::GetBufferCount() const { return 1; }
+DualNetFactory::~DualNetFactory() = default;
+
+int DualNetFactory::GetBufferCount() const { return 1; }
 
 }  // namespace minigo

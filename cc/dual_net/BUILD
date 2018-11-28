@@ -65,7 +65,6 @@ minigo_cc_library(
         "//cc:check",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
     ] + factory_engine_deps,
 )
 
@@ -77,6 +76,7 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:check",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -145,6 +145,7 @@ minigo_cc_library(
         "//cc:cuda",
         "//cc:tensorrt",
         "//cc:thread_safe_queue",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
     ],
@@ -160,6 +161,7 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:check",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

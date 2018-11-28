@@ -15,8 +15,6 @@
 #include "cc/dual_net/factory.h"
 
 #include "absl/memory/memory.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 #include "cc/dual_net/fake_dual_net.h"
 #include "gflags/gflags.h"
 
@@ -62,14 +60,16 @@ DEFINE_string(
 
 namespace minigo {
 
-std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
+std::unique_ptr<DualNetFactory> NewDualNetFactory() {
+  std::unique_ptr<DualNetFactory> factory;
+
   if (FLAGS_engine == "fake") {
-    return absl::make_unique<FakeDualNet>();
+    factory = absl::make_unique<FakeDualNetFactory>();
   }
 
   if (FLAGS_engine == "tf") {
 #ifdef MG_ENABLE_TF_DUAL_NET
-    return NewTfDualNet(model_path);
+    factory = absl::make_unique<TfDualNetFactory>();
 #else
     MG_FATAL() << "Binary wasn't compiled with tf inference support";
 #endif  // MG_ENABLE_TF_DUAL_NET
@@ -77,7 +77,7 @@ std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
 
   if (FLAGS_engine == "lite") {
 #ifdef MG_ENABLE_LITE_DUAL_NET
-    return NewLiteDualNet(model_path);
+    factory = absl::make_unique<LiteDualNetFactory>();
 #else
     MG_FATAL() << "Binary wasn't compiled with lite inference support";
 #endif  // MG_ENABLE_LITE_DUAL_NET
@@ -85,7 +85,7 @@ std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
 
   if (FLAGS_engine == "tpu") {
 #ifdef MG_ENABLE_TPU_DUAL_NET
-    return absl::make_unique<TpuDualNet>(model_path, FLAGS_tpu_name);
+    factory = absl::make_unique<TpuDualNetFactory>(FLAGS_tpu_name);
 #else
     MG_FATAL() << "Binary wasn't compiled with tpu inference support";
 #endif  // MG_ENABLE_TPU_DUAL_NET
@@ -93,14 +93,17 @@ std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
 
   if (FLAGS_engine == "trt") {
 #ifdef MG_ENABLE_TRT_DUAL_NET
-    return NewTrtDualNet(model_path);
+    factory = absl::make_unique<TrtDualNetFactory>();
 #else
     MG_FATAL() << "Binary wasn't compiled with trt inference support";
 #endif  // MG_ENABLE_TRT_DUAL_NET
   }
 
-  MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
-  return nullptr;
+  if (factory == nullptr) {
+    MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
+  }
+
+  return factory;
 }
 
 }  // namespace minigo

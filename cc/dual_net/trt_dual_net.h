@@ -5,7 +5,17 @@
 
 namespace minigo {
 
-std::unique_ptr<DualNet> NewTrtDualNet(const std::string& model_path);
+class TrtDualNetFactory : public DualNetFactory {
+ public:
+  TrtDualNetFactory();
+
+  int GetBufferCount() const override;
+
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+
+ private:
+  int device_count_;
+};
 
 }  // namespace minigo
 

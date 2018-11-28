@@ -132,11 +132,12 @@ class TrtDualNet : public DualNet {
   };
 
  public:
-  TrtDualNet(std::string graph_path)
-      : graph_path_(graph_path),
+  TrtDualNet(std::string graph_path, int device_count)
+      : graph_path_(std::move(graph_path)),
         runtime_(nvinfer1::createInferRuntime(logger_)),
         parser_(nvuffparser::createUffParser()),
-        batch_capacity_(0) {
+        batch_capacity_(0),
+        device_count_(device_count) {
     MG_CHECK(runtime_);
     MG_CHECK(parser_);
 
@@ -162,10 +163,7 @@ class TrtDualNet : public DualNet {
                             nvinfer1::DataType::kFLOAT))
         << ". File path: '" << graph_path << "'";
 
-    MG_CHECK(cudaGetDeviceCount(&device_count_) == cudaSuccess);
-    MG_CHECK(device_count_ > 0) << "No CUDA devices found.";
-
-    // TODO(csigg): Use bilder->platformHasFastFp16() instead.
+    // TODO(csigg): Use builder->platformHasFastFp16() instead.
     bool enable_fp16_mode = true;
     for (int device_id = 0; device_id < device_count_; ++device_id) {
       enable_fp16_mode &= DeviceHasNativeReducedPrecision(device_id);
@@ -265,8 +263,6 @@ class TrtDualNet : public DualNet {
     }
   }
 
-  int GetBufferCount() const override { return device_count_ * 2; }
-
   InputLayout GetInputLayout() const override {
     // TensorRT requires the input to be in NCHW layout.
     return InputLayout::kNCHW;
@@ -291,8 +287,16 @@ class TrtDualNet : public DualNet {
 
 }  // namespace
 
-std::unique_ptr<DualNet> NewTrtDualNet(const std::string& model_path) {
-  return absl::make_unique<TrtDualNet>(model_path);
+TrtDualNetFactory::TrtDualNetFactory() : device_count_(0) {
+  MG_CHECK(cudaGetDeviceCount(&device_count_) == cudaSuccess);
+  MG_CHECK(device_count_ > 0) << "No CUDA devices found.";
+}
+
+int TrtDualNetFactory::GetBufferCount() const { return device_count_ * 2; }
+
+std::unique_ptr<DualNet> TrtDualNetFactory::NewDualNet(
+    const std::string& model) {
+  return absl::make_unique<TrtDualNet>(model);
 }
 
 }  // namespace minigo

@@ -206,7 +206,9 @@ void minigo::LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
 }
 }  // namespace
 
-std::unique_ptr<DualNet> NewLiteDualNet(const std::string& model_path) {
-  return absl::make_unique<LiteDualNet>(model_path);
+std::unique_ptr<DualNet> LiteDualNetFactory::NewDualNet(
+    const std::string& model) {
+  return absl::make_unique<LiteDualNet>(model);
 }
+
 }  // namespace minigo

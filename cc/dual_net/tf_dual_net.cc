@@ -14,6 +14,7 @@
 
 #include "cc/dual_net/tf_dual_net.h"
 
+#include <algorithm>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -51,8 +52,8 @@ namespace {
 class TfDualNet : public DualNet {
   class TfWorker {
    public:
-    explicit TfWorker(const tensorflow::GraphDef& graph_def)
-        : batch_capacity_(0) {
+    TfWorker(const tensorflow::GraphDef& graph_def) : batch_capacity_(0) {
+      std::cerr << "### TfWorker()" << std::endl;
       tensorflow::SessionOptions options;
       options.config.mutable_gpu_options()->set_allow_growth(true);
       session_.reset(tensorflow::NewSession(options));
@@ -122,14 +123,12 @@ class TfDualNet : public DualNet {
   };
 
  public:
-  explicit TfDualNet(std::string graph_path);
+  TfDualNet(std::string graph_path, int device_count);
 
   ~TfDualNet() override;
 
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override;
-
-  int GetBufferCount() const override { return worker_threads_.size(); }
 
  private:
   static void PlaceOnDevice(tensorflow::GraphDef* graph_def,
@@ -152,8 +151,10 @@ class TfDualNet : public DualNet {
   std::atomic<bool> running_;
 };
 
-TfDualNet::TfDualNet(std::string graph_path)
+TfDualNet::TfDualNet(std::string graph_path, int device_count)
     : graph_path_(graph_path), running_(true) {
+  std::cerr << "### TfDualNet(" << graph_path << ", " << device_count << ")"
+            << std::endl;
   GraphDef graph_def;
 
   // If we can't find the specified graph, try adding a .pb extension.
@@ -176,24 +177,17 @@ TfDualNet::TfDualNet(std::string graph_path)
     }
   };
 
-  // Create two worker threads per device.
-#if MINIGO_ENABLE_GPU
-  if (tensorflow::ValidateGPUMachineManager().ok()) {
-    int device_count = tensorflow::GPUMachineManager()->VisibleDeviceCount();
-    for (int device_id = 0; device_id < device_count; ++device_id) {
-      auto device = std::to_string(device_id);
-      PlaceOnDevice(&graph_def, "/gpu:" + device);
-      worker_threads_.emplace_back(functor, graph_def);
-      worker_threads_.emplace_back(functor, graph_def);
-    }
+  // Create two worker threads per device (or two threads for CPU inference if
+  // there are no accelerator devices present).
+  // The number of threads created here must match the value returned by
+  // TfDualNetFactory::GetBufferCount().
+  for (int i = 0; i < std::max(device_count, 1); ++i) {
     if (device_count > 0) {
-      return;
+      PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
+    worker_threads_.emplace_back(functor, graph_def);
+    worker_threads_.emplace_back(functor, graph_def);
   }
-#endif
-
-  worker_threads_.emplace_back(functor, graph_def);
-  worker_threads_.emplace_back(functor, graph_def);
 }
 
 TfDualNet::~TfDualNet() {
@@ -218,8 +212,23 @@ void TfDualNet::RunMany(std::vector<const BoardFeatures*> features,
 }
 }  // namespace
 
-std::unique_ptr<DualNet> NewTfDualNet(const std::string& graph_path) {
-  return absl::make_unique<TfDualNet>(graph_path);
+TfDualNetFactory::TfDualNetFactory() : device_count_(0) {
+#if MINIGO_ENABLE_GPU
+  if (tensorflow::ValidateGPUMachineManager().ok()) {
+    device_count_ = tensorflow::GPUMachineManager()->VisibleDeviceCount();
+  }
+#endif
+}
+
+int TfDualNetFactory::GetBufferCount() const {
+  // The buffer count needs to match the number of worker_threads_ that
+  // TfDualNet will create.
+  return 2 * std::max(device_count_, 1);
+}
+
+std::unique_ptr<DualNet> TfDualNetFactory::NewDualNet(
+    const std::string& model) {
+  return absl::make_unique<TfDualNet>(model, device_count_);
 }
 
 }  // namespace minigo

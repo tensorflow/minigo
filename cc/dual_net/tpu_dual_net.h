@@ -40,8 +40,6 @@ class TpuDualNet : public DualNet {
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override;
 
-  int GetBufferCount() const override;
-
  private:
   class Worker {
    public:
@@ -68,6 +66,18 @@ class TpuDualNet : public DualNet {
 
   ThreadSafeQueue<std::unique_ptr<Worker>> workers_;
   std::string graph_path_;
+};
+
+class TpuDualNetFactory : public DualNetFactory {
+ public:
+  explicit TpuDualNetFactory(std::string tpu_name);
+
+  int GetBufferCount() const override;
+
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+
+ private:
+  std::string tpu_name_;
 };
 
 }  // namespace minigo

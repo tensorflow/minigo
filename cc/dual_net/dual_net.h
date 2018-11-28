@@ -81,10 +81,18 @@ class DualNet {
   // RunMany() calls with up to 'capacity' features.
   virtual void Reserve(size_t capacity);
 
-  // Returns the ideal number of inference requests in flight.
+  virtual InputLayout GetInputLayout() const;
+};
+
+class DualNetFactory {
+ public:
+  virtual ~DualNetFactory();
+
+  // Returns the ideal number of inference requests in flight for DualNet
+  // instances created by this factory.
   virtual int GetBufferCount() const;
 
-  virtual InputLayout GetInputLayout() const;
+  virtual std::unique_ptr<DualNet> NewDualNet(const std::string& model) = 0;
 };
 
 }  // namespace minigo

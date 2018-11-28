@@ -22,7 +22,10 @@
 
 namespace minigo {
 
-std::unique_ptr<DualNet> NewLiteDualNet(const std::string& model_path);
+class LiteDualNetFactory : public DualNetFactory {
+ public:
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+};
 
 }  // namespace minigo
 

@@ -40,6 +40,12 @@ using tensorflow::TensorShape;
 
 namespace minigo {
 
+namespace {
+// Use double buffering: one running the current set of batches, the other
+// filling up the next set of batches.
+constexpr int kBufferCount = 2;
+}  // namespace
+
 TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
                            const std::string& tpu_name, int num_replicas)
     : num_replicas_(num_replicas), batch_capacity_(0) {
@@ -152,7 +158,7 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
             << graph_path << std::endl;
   MG_CHECK(num_replicas > 0);
 
-  for (int i = 0; i < GetBufferCount(); ++i) {
+  for (int i = 0; i < kBufferCount; ++i) {
     workers_.Push(absl::make_unique<TpuDualNet::Worker>(graph_def, tpu_name,
                                                         num_replicas));
   }
@@ -168,7 +174,7 @@ TpuDualNet::TpuDualNet(const std::string& graph_path,
   // so explicitly run inference once during construction.
   std::cerr << "Running warm-up inferences" << std::endl;
   std::vector<std::thread> threads;
-  for (int i = 0; i < GetBufferCount(); ++i) {
+  for (int i = 0; i < kBufferCount; ++i) {
     threads.emplace_back([this]() {
       BoardFeatures features;
       Output output;
@@ -198,10 +204,14 @@ void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
   }
 }
 
-int TpuDualNet::GetBufferCount() const {
-  // Double buffering: one running the current set of batches, the other filling
-  // up the next set of batches.
-  return 2;
+TpuDualNetFactory::TpuDualNetFactory(std::string tpu_name)
+    : tpu_name_(std::move(tpu_name)) {}
+
+int TpuDualNetFactory::GetBufferCount() const { return kBufferCount; }
+
+std::unique_ptr<DualNet> TpuDualNetFactory::NewDualNet(
+    const std::string& model) {
+  return absl::make_unique<TpuDualNet>(model);
 }
 
 }  // namespace minigo

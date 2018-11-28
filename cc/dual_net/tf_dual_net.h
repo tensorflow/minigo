@@ -22,7 +22,17 @@
 
 namespace minigo {
 
-std::unique_ptr<DualNet> NewTfDualNet(const std::string& graph_path);
+class TfDualNetFactory : public DualNetFactory {
+ public:
+  TfDualNetFactory();
+
+  int GetBufferCount() const override;
+
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+
+ private:
+  int device_count_;
+};
 
 }  // namespace minigo
 

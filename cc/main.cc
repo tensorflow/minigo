@@ -117,6 +117,9 @@ DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
+DEFINE_string(checkpoint_glob, "",
+              "A glob to monitor for newly trained models. When a new model is "
+              "found, it is loaded and used for further inferences.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
@@ -146,19 +149,25 @@ DEFINE_double(holdout_pct, 0.03,
 namespace minigo {
 namespace {
 
-std::unique_ptr<DualNetFactory> NewDualNetFactory(const std::string& model_path,
-                                                  int num_parallel_games) {
-  auto dual_net = NewDualNet(model_path);
-  // Calculate batch size suiteable for a DualNet which handles inference
+// Ceates a DualNetFactory from the FLAGs and wraps the result in a
+// BatchingDualNetFactory if the calculated batch size is greated than 1.
+std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
+    int num_parallel_games) {
+  auto factory = NewDualNetFactory();
+
+  // Calculate batch size suitable for a DualNet which handles inference
   // requests from num_parallel_games each with at most virtual_losses features
   // each so that the maximum number of features in flight results in
   // buffer_count batches.
-  int buffer_count = dual_net->GetBufferCount();
-  size_t batch_size =
+  int buffer_count = factory->GetBufferCount();
+  int batch_size =
       std::max((FLAGS_virtual_losses * num_parallel_games + buffer_count - 1) /
                    buffer_count,
                FLAGS_virtual_losses);
-  return NewBatchingFactory(std::move(dual_net), batch_size);
+  if (batch_size > FLAGS_virtual_losses) {
+    factory = NewBatchingDualNetFactory(std::move(factory), batch_size);
+  }
+  return factory;
 }
 
 std::string GetOutputName(absl::Time now, size_t i) {
@@ -302,7 +311,7 @@ class SelfPlayer {
     auto start_time = absl::Now();
     {
       absl::MutexLock lock(&mutex_);
-      dual_net_factory_ = NewDualNetFactory(FLAGS_model, FLAGS_parallel_games);
+      dual_net_factory_ = NewBatchingDualNetFactory(FLAGS_parallel_games);
     }
     for (int i = 0; i < FLAGS_parallel_games; ++i) {
       threads_.emplace_back(std::bind(&SelfPlayer::ThreadRun, this, i));
@@ -371,8 +380,9 @@ class SelfPlayer {
         MG_CHECK(old_model == FLAGS_model)
             << "Manually changing the model during selfplay is not supported.";
         game_options.Init(thread_id, &rnd_);
-        player = absl::make_unique<MctsPlayer>(dual_net_factory_->New(),
-                                               game_options.player_options);
+        player = absl::make_unique<MctsPlayer>(
+            dual_net_factory_->NewDualNet(FLAGS_model),
+            game_options.player_options);
       }
 
       // Play the game.
@@ -542,13 +552,13 @@ class Evaluator {
   };
 
   struct Model {
-    Model(const std::string& model_path)
-        : name(file::Stem(model_path)),
-          factory(NewDualNetFactory(model_path, FLAGS_parallel_games)),
+    explicit Model(const std::string& model)
+        : model_path(model),
+          name(file::Stem(model)),
           black_wins(0),
           white_wins(0) {}
+    std::string model_path;
     std::string name;
-    std::unique_ptr<DualNetFactory> factory;
     std::atomic<int> black_wins;
     std::atomic<int> white_wins;
   };
@@ -556,6 +566,7 @@ class Evaluator {
  public:
   void Run() {
     auto start_time = absl::Now();
+    auto factory = NewBatchingDualNetFactory(FLAGS_parallel_games);
 
     auto prev_model = absl::make_unique<Model>(FLAGS_model);
     auto cur_model = absl::make_unique<Model>(FLAGS_model_two);
@@ -576,8 +587,8 @@ class Evaluator {
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
       threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
-                                      cur_model.get(), prev_model.get(),
-                                      swap_models));
+                                      factory.get(), cur_model.get(),
+                                      prev_model.get(), swap_models));
     }
 
     for (auto& t : threads_) {
@@ -614,8 +625,8 @@ class Evaluator {
   }
 
  private:
-  void ThreadRun(int thread_id, Model* model, Model* other_model,
-                 bool swap_models) {
+  void ThreadRun(int thread_id, DualNetFactory* factory, Model* model,
+                 Model* other_model, bool swap_models) {
     if (swap_models) {
       std::swap(model, other_model);
       // Wait for the barrier so that games with swapped models lag one move
@@ -656,8 +667,8 @@ class Evaluator {
     auto* black = player.get();
     auto* white = other_player.get();
 
-    auto* factory = model->factory.get();
-    auto* other_factory = other_model->factory.get();
+    std::string model_path = model->model_path;
+    std::string other_model_path = other_model->model_path;
 
     while (!player->root()->game_over()) {
       // Create the DualNet for a single move and dispose it again. This
@@ -665,11 +676,12 @@ class Evaluator {
       // inference queue from being flushed if it's not sending any requests.
       // The number of requests per move can be smaller than num_readouts at the
       // end of a game.
-      dual_net = factory->New();
+      dual_net = factory->NewDualNet(model_path);
       // Wait for all threads to create their DualNet. This prevents runaway
       // threads from flushing the batching queue prematurely. It actually
       // forces all players to move in lock-step to achieve optimal batching.
       barrier_->Wait();
+
       auto move = player->SuggestMove();
       dual_net.reset();
       if (player->options().verbose) {
@@ -680,7 +692,7 @@ class Evaluator {
       if (player->options().verbose) {
         std::cerr << player->root()->position.ToPrettyString();
       }
-      std::swap(factory, other_factory);
+      std::swap(model_path, other_model_path);
       std::swap(player, other_player);
     }
     // Notify the barrier that this thread is no longer participating.
@@ -741,8 +753,9 @@ void Gtp() {
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   options.ponder_limit = FLAGS_ponder_limit;
   options.courtesy_pass = FLAGS_courtesy_pass;
-  auto dual_net_factory = NewDualNetFactory(FLAGS_model, 1);
-  auto player = absl::make_unique<GtpPlayer>(dual_net_factory->New(), options);
+  auto dual_net_factory = NewBatchingDualNetFactory(1);
+  auto player = absl::make_unique<GtpPlayer>(
+      dual_net_factory->NewDualNet(FLAGS_model), options);
   player->Run();
 }
 
@@ -770,7 +783,7 @@ void Puzzle() {
     games.emplace_back(std::move(moves));
   }
 
-  auto factory = NewDualNetFactory(FLAGS_model, parallel_games);
+  auto factory = NewBatchingDualNetFactory(parallel_games);
   std::cerr << "DualNet factory created from " << FLAGS_model << " in "
             << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
             << std::endl;
@@ -784,7 +797,7 @@ void Puzzle() {
   for (const auto& moves : games) {
     std::vector<std::unique_ptr<MctsPlayer>> players(moves.size());
     for (auto& player : players) {
-      player.reset(new MctsPlayer(factory->New(), options));
+      player.reset(new MctsPlayer(factory->NewDualNet(FLAGS_model), options));
     }
     for (const auto& move : moves) {
       puzzles.emplace_back(std::move(players.back()), move);

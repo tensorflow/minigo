@@ -127,6 +127,13 @@ class MctsPlayer {
 
   virtual ~MctsPlayer();
 
+  // TODO(tommadams): restructure the DualNetFactory code so that automatically
+  // loading new models as they are trained is performed automatically by a
+  // DualNet & DualNetFactory wrapper instances.
+  void SetNetwork(std::unique_ptr<DualNet> network) {
+    network_ = std::move(network);
+  }
+
   void InitializeGame(const Position& position);
 
   virtual void NewGame();

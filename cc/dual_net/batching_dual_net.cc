@@ -1,8 +1,9 @@
 #include "cc/dual_net/batching_dual_net.h"
 
-#include <future>
 #include <queue>
+#include <utility>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/memory/memory.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
@@ -45,6 +46,11 @@ class BatchingService {
     MaybeRunBatches();
   }
 
+  size_t num_clients() const {
+    absl::MutexLock lock(&mutex_);
+    return num_clients_;
+  }
+
   void RunMany(std::vector<const DualNet::BoardFeatures*> features,
                std::vector<DualNet::Output*> outputs, std::string* model) {
     size_t num_features = features.size();
@@ -65,8 +71,6 @@ class BatchingService {
 
     notification.WaitForNotification();
   }
-
-  int GetBufferCount() const { return dual_net_->GetBufferCount(); }
 
   DualNet::InputLayout GetInputLayout() const {
     return dual_net_->GetInputLayout();
@@ -130,7 +134,7 @@ class BatchingService {
 
   std::unique_ptr<DualNet> dual_net_;
 
-  absl::Mutex mutex_;
+  mutable absl::Mutex mutex_;
 
   size_t num_clients_ GUARDED_BY(&mutex_);
 
@@ -159,8 +163,6 @@ class BatchingDualNet : public DualNet {
     service_->RunMany(std::move(features), std::move(outputs), model);
   };
 
-  int GetBufferCount() const override { return service_->GetBufferCount(); }
-
   InputLayout GetInputLayout() const override {
     return service_->GetInputLayout();
   }
@@ -171,22 +173,50 @@ class BatchingDualNet : public DualNet {
 
 class BatchingFactory : public DualNetFactory {
  public:
-  BatchingFactory(std::unique_ptr<DualNet> dual_net, size_t batch_size)
-      : service_(std::move(dual_net), batch_size) {}
+  BatchingFactory(std::unique_ptr<DualNetFactory> impl, size_t batch_size)
+      : impl_(std::move(impl)), batch_size_(batch_size) {}
 
- private:
-  std::unique_ptr<DualNet> New() override {
-    return absl::make_unique<BatchingDualNet>(&service_);
+  int GetBufferCount() const override { return impl_->GetBufferCount(); }
+
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override {
+    absl::MutexLock lock(&mutex_);
+
+    // Find or create a service for the requested model.
+    auto it = services_.find(model);
+    if (it == services_.end()) {
+      auto service = absl::make_unique<BatchingService>(
+          impl_->NewDualNet(model), batch_size_);
+      it = services_.emplace(model, std::move(service)).first;
+    }
+
+    // Create a new client of the service.
+    auto dual_net = absl::make_unique<BatchingDualNet>(it->second.get());
+
+    // Take this opportunity to delete any services that have no clients.
+    for (auto it = services_.begin();; it != services_.end()) {
+      if (it->second->num_clients() == 0) {
+        services_.erase(it++);
+      } else {
+        ++it;
+      }
+    }
+
+    return dual_net;
   }
 
-  BatchingService service_;
+ private:
+  absl::Mutex mutex_;
+  std::unique_ptr<DualNetFactory> impl_;
+  absl::flat_hash_map<std::string, std::unique_ptr<BatchingService>> services_
+      GUARDED_BY(&mutex_);
+  const size_t batch_size_;
 };
+
 }  // namespace
 
-DualNetFactory::~DualNetFactory() = default;
-
-std::unique_ptr<DualNetFactory> NewBatchingFactory(
-    std::unique_ptr<DualNet> dual_net, size_t batch_size) {
-  return absl::make_unique<BatchingFactory>(std::move(dual_net), batch_size);
+std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
+    std::unique_ptr<DualNetFactory> impl, size_t batch_size) {
+  return absl::make_unique<BatchingFactory>(std::move(impl), batch_size);
 }
+
 }  // namespace minigo

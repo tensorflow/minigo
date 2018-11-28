@@ -14,6 +14,7 @@
 
 #include "cc/dual_net/fake_dual_net.h"
 
+#include "absl/memory/memory.h"
 #include "cc/check.h"
 
 namespace minigo {
@@ -41,6 +42,11 @@ void FakeDualNet::RunMany(std::vector<const DualNet::BoardFeatures*> features,
   if (model != nullptr) {
     *model = "FakeDualNet";
   }
+}
+
+std::unique_ptr<DualNet> FakeDualNetFactory::NewDualNet(
+    const std::string& model) {
+  return absl::make_unique<FakeDualNet>();
 }
 
 }  // namespace minigo

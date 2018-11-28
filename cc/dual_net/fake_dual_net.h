@@ -34,6 +34,11 @@ class FakeDualNet : public DualNet {
   float value_;
 };
 
+class FakeDualNetFactory : public DualNetFactory {
+ public:
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+};
+
 }  // namespace minigo
 
 #endif  // CC_DUAL_NET_FAKE_DUAL_NET_H_
