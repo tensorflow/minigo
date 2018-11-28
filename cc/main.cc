@@ -568,8 +568,8 @@ class Evaluator {
     auto start_time = absl::Now();
     auto factory = NewBatchingDualNetFactory(FLAGS_parallel_games);
 
-    auto prev_model = absl::make_unique<Model>(FLAGS_model);
-    auto cur_model = absl::make_unique<Model>(FLAGS_model_two);
+    Model prev_model(FLAGS_model);
+    Model cur_model(FLAGS_model_two);
 
     std::cerr << "DualNet factories created from " << FLAGS_model << "\n  and "
               << FLAGS_model_two << " in "
@@ -587,8 +587,8 @@ class Evaluator {
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
       threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
-                                      factory.get(), cur_model.get(),
-                                      prev_model.get(), swap_models));
+                                      factory.get(), &cur_model, &prev_model,
+                                      swap_models));
     }
 
     for (auto& t : threads_) {
@@ -599,8 +599,7 @@ class Evaluator {
               << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
               << std::endl;
 
-    auto name_length =
-        std::max(prev_model->name.size(), cur_model->name.size());
+    auto name_length = std::max(prev_model.name.size(), cur_model.name.size());
     auto format_name = [&](const std::string& name) {
       return absl::StrFormat("%-*s", name_length, name);
     };
@@ -616,11 +615,11 @@ class Evaluator {
 
     std::cerr << format_name("Wins")
               << "        Total         Black         White" << std::endl;
-    print_result(*prev_model);
-    print_result(*cur_model);
+    print_result(prev_model);
+    print_result(cur_model);
     std::cerr << format_name("") << "              "
-              << format_wins(prev_model->black_wins + cur_model->black_wins)
-              << format_wins(prev_model->white_wins + cur_model->white_wins);
+              << format_wins(prev_model.black_wins + cur_model.black_wins)
+              << format_wins(prev_model.white_wins + cur_model.white_wins);
     std::cerr << std::endl;
   }
 
@@ -728,7 +727,7 @@ class Evaluator {
                                 output_name);
     }
 
-    std::cerr << "Thread " << thread_id << " stopping" << std::endl;
+    std::cerr << absl::StrCat("Thread ", thread_id, " stopping\n");
   }
 
   MctsPlayer::Options options_;

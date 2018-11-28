@@ -184,8 +184,14 @@ class BatchingFactory : public DualNetFactory {
     // Find or create a service for the requested model.
     auto it = services_.find(model);
     if (it == services_.end()) {
-      auto service = absl::make_unique<BatchingService>(
-          impl_->NewDualNet(model), batch_size_);
+      std::unique_ptr<BatchingService> service;
+      if (model == cached_model_) {
+        service = std::move(cached_service_);
+        cached_model_ = "";
+      } else {
+        service = absl::make_unique<BatchingService>(impl_->NewDualNet(model),
+                                                     batch_size_);
+      }
       it = services_.emplace(model, std::move(service)).first;
     }
 
@@ -193,8 +199,11 @@ class BatchingFactory : public DualNetFactory {
     auto dual_net = absl::make_unique<BatchingDualNet>(it->second.get());
 
     // Take this opportunity to delete any services that have no clients.
-    for (auto it = services_.begin();; it != services_.end()) {
+    it = services_.begin();
+    while (it != services_.end()) {
       if (it->second->num_clients() == 0) {
+        cached_model_ = it->first;
+        cached_service_ = std::move(it->second);
         services_.erase(it++);
       } else {
         ++it;
@@ -207,8 +216,18 @@ class BatchingFactory : public DualNetFactory {
  private:
   absl::Mutex mutex_;
   std::unique_ptr<DualNetFactory> impl_;
+
+  // Map from model to BatchingService for that model. Once a service no longer
+  // has clients, it's model to the cached_service_ and finally deleted.
   absl::flat_hash_map<std::string, std::unique_ptr<BatchingService>> services_
       GUARDED_BY(&mutex_);
+
+  // The most recent BatchingService that no longer has clients. We don't delete
+  // a service that no longer has clients immediately, because a common pattern
+  // is to delete a DualNet, then create a new one with the same model.
+  std::string cached_model_;
+  std::unique_ptr<BatchingService> cached_service_;
+
   const size_t batch_size_;
 };
 
