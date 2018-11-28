@@ -1,8 +1,8 @@
 Minigo: A minimalist Go engine modeled after AlphaGo Zero, built on MuGo
 ==================================================
 
-This is a pure Python implementation of a neural-network based Go AI, using
-TensorFlow. While inspired by DeepMind's AlphaGo algorithm, this project is not
+This is an implementation of a neural-network based Go AI, using TensorFlow.
+While inspired by DeepMind's AlphaGo algorithm, this project is not
 a DeepMind project nor is it affiliated with the official AlphaGo project.
 
 ### This is NOT an official version of AlphaGo ###
