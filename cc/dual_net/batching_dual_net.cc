@@ -226,7 +226,7 @@ class BatchingFactory : public DualNetFactory {
   std::unique_ptr<DualNetFactory> impl_;
 
   // Map from model to BatchingService for that model. Once a service no longer
-  // has clients, it's model to the cached_service_ and finally deleted.
+  // has clients, its model to the cached_service_ and finally deleted.
   absl::flat_hash_map<std::string, std::unique_ptr<BatchingService>> services_
       GUARDED_BY(&mutex_);
 
