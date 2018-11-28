@@ -20,13 +20,15 @@ class BatchingService {
   };
 
  public:
-  BatchingService(std::unique_ptr<DualNet> dual_net, size_t batch_size)
+  BatchingService(std::unique_ptr<DualNet> dual_net, size_t batch_size,
+                  std::string model)
       : dual_net_(std::move(dual_net)),
         num_clients_(0),
         queue_counter_(0),
         run_counter_(0),
         num_runs_(0),
-        batch_size_(batch_size) {
+        batch_size_(batch_size),
+        model_(std::move(model)) {
     dual_net_->Reserve(batch_size);
   }
 
@@ -78,6 +80,10 @@ class BatchingService {
 
  private:
   void MaybeRunBatches() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    // std::cerr << "### " << model_
+    //           << "  qc-rc:" << (queue_counter_ - run_counter_)
+    //           << "  bs:" << batch_size_ << "  iq:" << inference_queue_.size()
+    //           << "  nc:" << num_clients_ << std::endl;
     while (size_t batch_size =
                std::min(queue_counter_ - run_counter_, batch_size_)) {
       // Stop if we won't fill a batch and more clients will send requests.
@@ -148,6 +154,8 @@ class BatchingService {
   size_t num_runs_ GUARDED_BY(&mutex_);
 
   const size_t batch_size_;
+
+  const std::string model_;
 };
 
 class BatchingDualNet : public DualNet {
@@ -190,7 +198,7 @@ class BatchingFactory : public DualNetFactory {
         cached_model_ = "";
       } else {
         service = absl::make_unique<BatchingService>(impl_->NewDualNet(model),
-                                                     batch_size_);
+                                                     batch_size_, model);
       }
       it = services_.emplace(model, std::move(service)).first;
     }

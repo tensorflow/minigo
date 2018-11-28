@@ -491,48 +491,6 @@ class SelfPlayer {
 };
 
 class Evaluator {
-  // A barrier that blocks threads until the number of waiting threads reaches
-  // the 'count' threshold. This implementation has different semantics than
-  // absl::Barrier: it can be reused and allows decrementing the threshold to
-  // handle the tail of a work queue where some threads exit early.
-  class Barrier {
-   public:
-    explicit Barrier(size_t count)
-        : count_(count), num_waiting_(0), generation_(0) {}
-
-    void Wait() {
-      absl::MutexLock lock(&mutex_);
-      if (++num_waiting_ == count_) {
-        IncrementGeneration();
-      } else {
-        auto generation = generation_;
-        while (generation != generation_) {
-          cond_var_.Wait(&mutex_);
-        }
-      }
-    }
-
-    void DecrementCount() {
-      absl::MutexLock lock(&mutex_);
-      if (num_waiting_ == --count_) {
-        IncrementGeneration();
-      }
-    }
-
-   private:
-    void IncrementGeneration() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-      ++generation_;
-      num_waiting_ = 0;
-      cond_var_.SignalAll();
-    }
-
-    absl::Mutex mutex_;
-    absl::CondVar cond_var_;
-    size_t count_ GUARDED_BY(&mutex_);
-    size_t num_waiting_ GUARDED_BY(&mutex_);
-    size_t generation_ GUARDED_BY(&mutex_);
-  };
-
   // References a pointer to an actual DualNet. Allows updating the pointer
   // after the MctsPlayer has been constructed.
   class WrappedDualNet : public DualNet {
@@ -569,7 +527,7 @@ class Evaluator {
     auto factory = NewBatchingDualNetFactory(FLAGS_parallel_games);
 
     Model prev_model(FLAGS_model);
-    Model cur_model(FLAGS_model_two);
+    Model curr_model(FLAGS_model_two);
 
     std::cerr << "DualNet factories created from " << FLAGS_model << "\n  and "
               << FLAGS_model_two << " in "
@@ -582,24 +540,21 @@ class Evaluator {
     options_.random_symmetry = true;
 
     int num_games = FLAGS_parallel_games;
-    barrier_ = absl::make_unique<Barrier>(num_games);
-
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
+      auto* model = swap_models ? &curr_model : &prev_model;
+      auto* other_model = swap_models ? &prev_model : &curr_model;
       threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
-                                      factory.get(), &cur_model, &prev_model,
-                                      swap_models));
+                                      factory.get(), model, other_model));
     }
-
     for (auto& t : threads_) {
       t.join();
     }
 
     std::cerr << "Evaluated " << num_games << " games, total time "
-              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-              << std::endl;
+              << (absl::Now() - start_time) << std::endl;
 
-    auto name_length = std::max(prev_model.name.size(), cur_model.name.size());
+    auto name_length = std::max(prev_model.name.size(), curr_model.name.size());
     auto format_name = [&](const std::string& name) {
       return absl::StrFormat("%-*s", name_length, name);
     };
@@ -616,24 +571,16 @@ class Evaluator {
     std::cerr << format_name("Wins")
               << "        Total         Black         White" << std::endl;
     print_result(prev_model);
-    print_result(cur_model);
+    print_result(curr_model);
     std::cerr << format_name("") << "              "
-              << format_wins(prev_model.black_wins + cur_model.black_wins)
-              << format_wins(prev_model.white_wins + cur_model.white_wins);
+              << format_wins(prev_model.black_wins + curr_model.black_wins)
+              << format_wins(prev_model.white_wins + curr_model.white_wins);
     std::cerr << std::endl;
   }
 
  private:
   void ThreadRun(int thread_id, DualNetFactory* factory, Model* model,
-                 Model* other_model, bool swap_models) {
-    if (swap_models) {
-      std::swap(model, other_model);
-      // Wait for the barrier so that games with swapped models lag one move
-      // behind the other games, and the per-model inferences of all games run
-      // in sync.
-      barrier_->Wait();
-    }
-
+                 Model* other_model) {
     // The player and other_player reference this pointer.
     std::unique_ptr<DualNet> dual_net;
 
@@ -676,10 +623,6 @@ class Evaluator {
       // The number of requests per move can be smaller than num_readouts at the
       // end of a game.
       dual_net = factory->NewDualNet(model_path);
-      // Wait for all threads to create their DualNet. This prevents runaway
-      // threads from flushing the batching queue prematurely. It actually
-      // forces all players to move in lock-step to achieve optimal batching.
-      barrier_->Wait();
 
       auto move = player->SuggestMove();
       dual_net.reset();
@@ -694,8 +637,6 @@ class Evaluator {
       std::swap(model_path, other_model_path);
       std::swap(player, other_player);
     }
-    // Notify the barrier that this thread is no longer participating.
-    barrier_->DecrementCount();
 
     MG_CHECK(player->result() == other_player->result());
     if (player->result() > 0) {
@@ -731,7 +672,6 @@ class Evaluator {
   }
 
   MctsPlayer::Options options_;
-  std::unique_ptr<Barrier> barrier_;
   std::vector<std::thread> threads_;
 };
 
