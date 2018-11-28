@@ -16,6 +16,7 @@
 #define CC_TF_UTILS_H_
 
 #include <string>
+#include <vector>
 
 #include "cc/mcts_player.h"
 

@@ -32,9 +32,12 @@
 #include "tensorflow/core/platform/logging.h"
 
 using google::cloud::bigtable::bigendian64_t;
+using google::cloud::bigtable::BulkMutation;
+using google::cloud::bigtable::ClientOptions;
 using google::cloud::bigtable::CreateDefaultDataClient;
 using google::cloud::bigtable::ReadModifyWriteRule;
 using google::cloud::bigtable::SetCell;
+using google::cloud::bigtable::SingleRowMutation;
 using google::cloud::bigtable::Table;
 
 using tensorflow::io::RecordReaderOptions;
@@ -46,7 +49,6 @@ namespace tf_utils {
 const char kGameRowFormat[] = "g_%010d";
 const char kPrefixAndMoveFormat[] = "%s_m_%03d";
 
-using google::cloud::bigtable::BulkMutation;
 
 // Fetches the tensorflow Examples from a MctsPlayer.
 // Linked from tf_utils.cc
@@ -58,10 +60,10 @@ void UpdateMoveCountForGame(BulkMutation& game_batch,
   auto move_count_str = absl::StrCat(move_count);
   auto count_row =
       absl::StrCat("ct_", game_prefix.substr(2), "_", move_count_str);
-  google::cloud::bigtable::SingleRowMutation zero_row_mut(zero_row);
+  SingleRowMutation zero_row_mut(zero_row);
   zero_row_mut.emplace_back(SetCell("metadata", "move_count", move_count_str));
   game_batch.emplace_back(std::move(zero_row_mut));
-  google::cloud::bigtable::SingleRowMutation count_row_mut(count_row);
+  SingleRowMutation count_row_mut(count_row);
   count_row_mut.emplace_back(SetCell("metadata", "move_count", move_count_str));
   game_batch.emplace_back(std::move(count_row_mut));
 }
@@ -76,7 +78,7 @@ void WriteTfExamples(Table& table, const std::string& row_prefix,
     example.SerializeToString(&data);
     auto row_name =
         absl::StrFormat(kPrefixAndMoveFormat, row_prefix, move_number);
-    google::cloud::bigtable::SingleRowMutation row_mutation(row_name);
+    SingleRowMutation row_mutation(row_name);
     row_mutation.emplace_back(SetCell("tfexample", "example", data));
     row_mutation.emplace_back(
         SetCell("metadata", "move", std::to_string(move_number)));
@@ -93,11 +95,10 @@ void WriteGameExamples(const std::string& gcp_project_name,
                        const MctsPlayer& player) {
   auto examples = MakeExamples(player);
   Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
-                                      google::cloud::bigtable::ClientOptions()),
+                                      ClientOptions()),
               table_name);
   // This will be everything from a single game, so retrieve the game
   // counter from the Bigtable and increment it atomically.
-  using namespace google::cloud::bigtable;
   uint64_t game_counter = IncrementGameCounter(
       gcp_project_name, instance_name, table_name, 1);
 
@@ -108,7 +109,7 @@ void WriteGameExamples(const std::string& gcp_project_name,
   if (FindBleakestMove(player, &bleakest_move, &bleakest_q)) {
     auto bleak_row_name =
         absl::StrFormat(kPrefixAndMoveFormat, row_prefix, bleakest_move);
-    google::cloud::bigtable::SingleRowMutation row_mutation(bleak_row_name);
+    SingleRowMutation row_mutation(bleak_row_name);
     row_mutation.emplace_back(
         SetCell("metadata", "bleakest_q", absl::StrCat(bleakest_q)));
     table.Apply(std::move(row_mutation));
@@ -120,14 +121,16 @@ void WriteGameExamples(const std::string& gcp_project_name,
 
 uint64_t IncrementGameCounter(const std::string& gcp_project_name,
                               const std::string& instance_name,
-                              const std::string& table_name, size_t delta) {
+                              const std::string& table_name,
+                              size_t delta) {
   Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
-                                      google::cloud::bigtable::ClientOptions()),
+                                      ClientOptions()),
               table_name);
-  using namespace google::cloud::bigtable;
   auto rule =
       ReadModifyWriteRule::IncrementAmount("metadata", "game_counter", delta);
   auto row = table.ReadModifyWriteRow("table_state", rule);
+
+  // TODO(sethtroisi): Investigate if row.cells().size() == 1.
   for (auto const& cell : row.cells()) {
     if (cell.family_name() == "metadata" &&
         cell.column_qualifier() == "game_counter") {
@@ -143,7 +146,7 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
                          const std::string& table_name,
                          const std::vector<std::string>& paths,
                          int64_t game_counter) {
-  auto client_options = google::cloud::bigtable::ClientOptions();
+  auto client_options = ClientOptions();
   auto channel_args = client_options.channel_arguments();
   channel_args.SetUserAgentPrefix("minigo_to_cbt");
   channel_args.SetInt(GRPC_ARG_ENABLE_CENSUS, 0);
@@ -186,7 +189,7 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
     game_id.erase(0, game_id.rfind('/') + 1);
 
     auto zero_row = absl::StrFormat(kPrefixAndMoveFormat, row_prefix, 0);
-    google::cloud::bigtable::SingleRowMutation zero_row_mutation(zero_row);
+    SingleRowMutation zero_row_mutation(zero_row);
     zero_row_mutation.emplace_back(SetCell("metadata", "game_id", game_id));
     game_batch.emplace_back(std::move(zero_row_mutation));
 
@@ -195,7 +198,7 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
     while (reader.ReadRecord(&data).ok()) {
       auto row_name =
           absl::StrFormat(kPrefixAndMoveFormat, row_prefix, move_number);
-      google::cloud::bigtable::SingleRowMutation row_mutation(row_name);
+      SingleRowMutation row_mutation(row_name);
       row_mutation.emplace_back(SetCell("tfexample", "example", data));
       row_mutation.emplace_back(
           SetCell("metadata", "move", std::to_string(move_number)));
