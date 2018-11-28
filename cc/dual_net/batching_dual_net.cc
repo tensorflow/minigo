@@ -206,7 +206,7 @@ class BatchingFactory : public DualNetFactory {
     // Create a new client of the service.
     auto dual_net = absl::make_unique<BatchingDualNet>(it->second.get());
 
-    // Take this opportunity to delete any services that have no clients.
+    // Take this opportunity to prune any services that have no clients.
     it = services_.begin();
     while (it != services_.end()) {
       if (it->second->num_clients() == 0) {

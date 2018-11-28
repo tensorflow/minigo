@@ -14,6 +14,7 @@
 
 #include <array>
 #include <deque>
+#include <map>
 #include <vector>
 
 #include "cc/dual_net/dual_net.h"
@@ -137,19 +138,17 @@ TEST(DualNetTest, TestStoneFeaturesWithCapture) {
 
 // Checks that the different backends produce the same result.
 TEST(DualNetTest, TestBackendsEqual) {
-  using Function = std::unique_ptr<DualNet> (*)(const std::string&);
-  std::vector<std::pair<std::string, Function>> factories;
+  std::map<std::string, std::unique_ptr<DualNetFactory>> factories;
 
 #if MG_ENABLE_TF_DUAL_NET
-  factories.emplace_back("TfDualNet", &NewTfDualNet);
+  factories.emplace("TfDualNet", absl::make_unique<TfDualNetFactory>());
 #endif
 #if MG_ENABLE_LITE_DUAL_NET
-  factories.emplace_back("LiteDualNet", &NewLiteDualNet);
+  factories.emplace("LiteDualNet", absl::make_unique<LiteDualNetFactory>());
 #endif
 #if MG_ENABLE_TRT_DUAL_NET
-  factories.emplace_back("TrtDualNet", &NewTrtDualNet);
+  factories.emplace("TrtDualNet", absl::make_unique<TrtDualNetFactory>());
 #endif
-  // Note: InferenceServer is not supported.
 
   DualNet::BoardFeatures nhwc_features;
   Random().Uniform(0.0f, 1.0f, absl::MakeSpan(nhwc_features));
@@ -169,11 +168,11 @@ TEST(DualNetTest, TestBackendsEqual) {
     return oss.str();
   };
 
-  for (const auto& pair : factories) {
-    const auto& name = pair.first;
+  for (const auto& kv : factories) {
+    const auto& name = kv.first;
     std::cerr << "Running " << name << std::endl;
 
-    auto dual_net = pair.second("cc/dual_net/test_model");
+    auto dual_net = kv.second->NewDualNet("cc/dual_net/test_model");
 
     auto* features = dual_net->GetInputLayout() == DualNet::InputLayout::kNHWC
                          ? &nhwc_features

@@ -61,15 +61,13 @@ DEFINE_string(
 namespace minigo {
 
 std::unique_ptr<DualNetFactory> NewDualNetFactory() {
-  std::unique_ptr<DualNetFactory> factory;
-
   if (FLAGS_engine == "fake") {
-    factory = absl::make_unique<FakeDualNetFactory>();
+    return absl::make_unique<FakeDualNetFactory>();
   }
 
   if (FLAGS_engine == "tf") {
 #ifdef MG_ENABLE_TF_DUAL_NET
-    factory = absl::make_unique<TfDualNetFactory>();
+    return absl::make_unique<TfDualNetFactory>();
 #else
     MG_FATAL() << "Binary wasn't compiled with tf inference support";
 #endif  // MG_ENABLE_TF_DUAL_NET
@@ -77,7 +75,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory() {
 
   if (FLAGS_engine == "lite") {
 #ifdef MG_ENABLE_LITE_DUAL_NET
-    factory = absl::make_unique<LiteDualNetFactory>();
+    return absl::make_unique<LiteDualNetFactory>();
 #else
     MG_FATAL() << "Binary wasn't compiled with lite inference support";
 #endif  // MG_ENABLE_LITE_DUAL_NET
@@ -85,7 +83,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory() {
 
   if (FLAGS_engine == "tpu") {
 #ifdef MG_ENABLE_TPU_DUAL_NET
-    factory = absl::make_unique<TpuDualNetFactory>(FLAGS_tpu_name);
+    return absl::make_unique<TpuDualNetFactory>(FLAGS_tpu_name);
 #else
     MG_FATAL() << "Binary wasn't compiled with tpu inference support";
 #endif  // MG_ENABLE_TPU_DUAL_NET
@@ -93,17 +91,14 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory() {
 
   if (FLAGS_engine == "trt") {
 #ifdef MG_ENABLE_TRT_DUAL_NET
-    factory = absl::make_unique<TrtDualNetFactory>();
+    return absl::make_unique<TrtDualNetFactory>();
 #else
     MG_FATAL() << "Binary wasn't compiled with trt inference support";
 #endif  // MG_ENABLE_TRT_DUAL_NET
   }
 
-  if (factory == nullptr) {
-    MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
-  }
-
-  return factory;
+  MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
+  return nullptr;
 }
 
 }  // namespace minigo
