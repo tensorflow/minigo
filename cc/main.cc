@@ -627,6 +627,15 @@ class Evaluator {
     // The player and other_player reference this pointer.
     std::unique_ptr<DualNet> dual_net;
 
+    std::vector<std::string> bigtable_spec =
+        absl::StrSplit(FLAGS_output_bigtable, ',');
+    bool use_bigtable = bigtable_spec.size() == 3;
+    if (!FLAGS_output_bigtable.empty() && !use_bigtable) {
+      MG_FATAL()
+          << "Bigtable output must be of the form: project,instance,table";
+      return;
+    }
+
     auto player_options = options_;
     // If an random seed was explicitly specified, make sure we use a
     // different seed for each thread.
@@ -691,11 +700,20 @@ class Evaluator {
     }
 
     // Write SGF.
+    std::string output_name = "NO_SGF_SAVED";
     if (!FLAGS_sgf_dir.empty()) {
-      std::string output_name =
-          absl::StrCat(GetOutputName(absl::Now(), thread_id), "-",
-                       black->name(), "-", white->name());
+      output_name = absl::StrCat(GetOutputName(absl::Now(), thread_id), "-",
+                                 black->name(), "-", white->name());
       WriteSgf(FLAGS_sgf_dir, output_name, *black, *white, true);
+    }
+
+    if (use_bigtable) {
+      const auto& gcp_project_name = bigtable_spec[0];
+      const auto& instance_name = bigtable_spec[1];
+      const auto& table_name = bigtable_spec[2];
+      tf_utils::WriteEvalRecord(gcp_project_name, instance_name, table_name,
+                                *player, black->name(), white->name(),
+                                output_name);
     }
 
     std::cerr << "Thread " << thread_id << " stopping" << std::endl;

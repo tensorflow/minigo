@@ -47,6 +47,7 @@ namespace minigo {
 namespace tf_utils {
 
 const char kGameRowFormat[] = "g_%010d";
+const char kEvalGameRowFormat[] = "e_%010d";
 const char kPrefixAndMoveFormat[] = "%s_m_%03d";
 
 
@@ -100,7 +101,7 @@ void WriteGameExamples(const std::string& gcp_project_name,
   // This will be everything from a single game, so retrieve the game
   // counter from the Bigtable and increment it atomically.
   uint64_t game_counter = IncrementGameCounter(
-      gcp_project_name, instance_name, table_name, 1);
+      gcp_project_name, instance_name, table_name, "game_counter", 1);
 
   auto row_prefix = absl::StrFormat(kGameRowFormat, game_counter);
   WriteTfExamples(table, row_prefix, examples);
@@ -119,25 +120,55 @@ void WriteGameExamples(const std::string& gcp_project_name,
             << examples.size() << std::endl;
 }
 
+void WriteEvalRecord(const std::string& gcp_project_name,
+                     const std::string& instance_name,
+                     const std::string& table_name,
+                     const MctsPlayer& player,
+                     const std::string& black_player_name,
+                     const std::string& white_player_name,
+                     const std::string& sgf_name) {
+  Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
+                                      ClientOptions()),
+              table_name);
+
+  // Retrieve the game counter from the Bigtable and increment it atomically.
+  uint64_t game_counter = IncrementGameCounter(
+      gcp_project_name, instance_name, table_name, "eval_game_counter", 1);
+
+  auto row_name = absl::StrFormat(kEvalGameRowFormat, game_counter);
+  SingleRowMutation row_mutation(
+      row_name, SetCell("metadata", "black", black_player_name),
+      SetCell("metadata", "white", white_player_name),
+      SetCell("metadata", "black_won", absl::StrCat(player.result() > 0)),
+      SetCell("metadata", "white_won", absl::StrCat(player.result() < 0)),
+      SetCell("metadata", "result", player.result_string()),
+      SetCell("metadata", "length", absl::StrCat(player.history().size())),
+      SetCell("metadata", "sgf", sgf_name));
+
+  table.Apply(std::move(row_mutation));
+  std::cerr << "Bigtable eval row written to " << row_name << std::endl;
+}
+
 uint64_t IncrementGameCounter(const std::string& gcp_project_name,
                               const std::string& instance_name,
                               const std::string& table_name,
+                              const std::string& counter_name,
                               size_t delta) {
   Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
                                       ClientOptions()),
               table_name);
   auto rule =
-      ReadModifyWriteRule::IncrementAmount("metadata", "game_counter", delta);
+      ReadModifyWriteRule::IncrementAmount("metadata", counter_name, delta);
   auto row = table.ReadModifyWriteRow("table_state", rule);
 
   // TODO(sethtroisi): Investigate if row.cells().size() == 1.
   for (auto const& cell : row.cells()) {
     if (cell.family_name() == "metadata" &&
-        cell.column_qualifier() == "game_counter") {
+        cell.column_qualifier() == counter_name) {
       return cell.value_as<bigendian64_t>().get();
     }
   }
-  MG_FATAL() << "Failed to increment table_state=metadata:game_counter";
+  MG_FATAL() << "Failed to increment table_state=metadata:" << counter_name;
   return 0;
 }
 

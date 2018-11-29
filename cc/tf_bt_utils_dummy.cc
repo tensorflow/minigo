@@ -28,9 +28,23 @@ void WriteGameExamples(const std::string& gcp_project_name,
                 "Please recompile, passing --define=bt=1 to bazel build.";
 }
 
+void WriteEvalRecord(const std::string& gcp_project_name,
+                     const std::string& instance_name,
+                     const std::string& table_name,
+                     const MctsPlayer& player,
+                     const std::string& black_player_name,
+                     const std::string& white_player_name,
+                     const std::string& sgf_name) {
+  MG_FATAL() << "Can't write eval record to Bigtable without Bigtable "
+                "support enabled. "
+                "Please recompile, passing --define=bt=1 to bazel build.";
+}
+
 uint64_t IncrementGameCounter(const std::string& gcp_project_name,
                               const std::string& instance_name,
-                              const std::string& table_name, size_t delta) {
+                              const std::string& table_name,
+                              const std::string& counter_name,
+                              size_t delta) {
   MG_FATAL() << "Can't increment a Bigtable game counter without Bigtable "
                 "support enabled. "
                 "Please recompile, passing --define=bt=1 to bazel build.";

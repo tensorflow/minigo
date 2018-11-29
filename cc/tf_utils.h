@@ -40,11 +40,22 @@ void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
                        const std::string& table_name, const MctsPlayer& player);
 
+// Writes information about an eval game to the specified Bigtable.
+void WriteEvalRecord(const std::string& gcp_project_name,
+                     const std::string& instance_name,
+                     const std::string& table_name,
+                     const MctsPlayer& player,
+                     const std::string& black_player_name,
+                     const std::string& white_player_name,
+                     const std::string& sgf_name);
+
 // Atomically increment the game counter in the given Bigtable by the given
 // delta.  Returns the new value.  Prior value will be returned - delta.
 uint64_t IncrementGameCounter(const std::string& gcp_project_name,
                               const std::string& instance_name,
-                              const std::string& table_name, size_t delta);
+                              const std::string& table_name,
+                              const std::string& counter_name,
+                              size_t delta);
 
 // Port Minigo games from the given GCS files, which must be in
 // `.tfrecord.zz` format.  If game_counter is >=0, use that

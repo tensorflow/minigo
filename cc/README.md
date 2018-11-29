@@ -170,6 +170,33 @@ it can run on all eight cores of a Cloud TPU. To take advantage of this
 parallelism when running selfplay, `virtual_losses * parallel_games` must be at
 least 8, ideally 128 or higher.
 
+## Bigtable
+
+Minigo supports writing eval and selfplay results to
+[Bigtable](https://cloud.google.com/bigtable/).
+
+Build `//cc:main` with `--define=bt=1` and run with
+`--mode={eval,selfplay} --output_bigtable=<PROJECT>,<INSTANCE>,<TABLE>`.
+
+For eval this would look something like
+```
+bazel-bin/cc/main
+    --mode=eval \
+    --model <MODEL> --model_two <MODEL> \
+    --sgf_dir data/t/ \
+    --output_bigtable <PROJECT>,minigo-instance,games \
+    --parallel_games 4 --num_readouts 32
+```
+
+See number of eval games with
+```
+cbt -project <PROJECT> -instance minigo-instance read games columns="metadata:eval_game_counter"
+```
+See eval results with
+```
+cbt -project <PROJECT> -instance minigo-instance read games prefix="e_"
+```
+
 ## Style guide
 
 The C++ code follows

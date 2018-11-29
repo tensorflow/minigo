@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
   auto const& table = bigtable_spec[2];
 
   uint64_t final_game_counter = minigo::tf_utils::IncrementGameCounter(
-      project, instance, table, total_games);
+      project, instance, table, "game_counter", total_games);
   uint64_t game_counter = final_game_counter - total_games;
   std::cout << "Initial game counter: " << game_counter << std::endl
             << "Final game counter will be: " << final_game_counter
