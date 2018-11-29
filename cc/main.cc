@@ -39,6 +39,7 @@
 #include "cc/constants.h"
 #include "cc/dual_net/batching_dual_net.h"
 #include "cc/dual_net/factory.h"
+#include "cc/dual_net/reloading_dual_net.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
 #include "cc/gtp_player.h"
@@ -164,8 +165,17 @@ std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
       std::max((FLAGS_virtual_losses * num_parallel_games + buffer_count - 1) /
                    buffer_count,
                FLAGS_virtual_losses);
-  if (batch_size > FLAGS_virtual_losses) {
+  // We have to force batching on in eval mode, even if parallel_games == 1
+  // because it assumes that creating a new model instance is cheap.
+  // TODO(tommadams): fix the batching code so that eval mode doesn't have to
+  // continually create and destroy DualNet instances.
+  if (batch_size > FLAGS_virtual_losses || FLAGS_mode == "eval") {
     factory = NewBatchingDualNetFactory(std::move(factory), batch_size);
+  }
+
+  if (FLAGS_model.find("%d") != std::string::npos) {
+    factory = absl::make_unique<ReloadingDualNetFactory>(std::move(factory),
+                                                         absl::Seconds(3));
   }
   return factory;
 }

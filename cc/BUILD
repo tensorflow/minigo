@@ -47,11 +47,11 @@ cc_library(
 
 cc_library(
     name = "tensorflow",
-    deps = select({
-      "@bazel_tools//src/conditions:windows": ["tensorflow_static"],
-      "//conditions:default": ["tensorflow_dynamic"],
-    }),
     tags = ["manual"],
+    deps = select({
+        "@bazel_tools//src/conditions:windows": ["tensorflow_static"],
+        "//conditions:default": ["tensorflow_dynamic"],
+    }),
 )
 
 cc_library(
@@ -73,6 +73,7 @@ cc_library(
 
 cc_library(
     name = "cuda",
+    tags = ["manual"],
     deps = select({
         "//cc/config:enable_gpu": [
             "@local_config_cuda//:cuda_headers",
@@ -80,17 +81,16 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["manual"],
 )
 
 cc_library(
     name = "tensorrt",
+    tags = ["manual"],
     deps = [
         "@local_config_tensorrt//:nv_infer",
         "@local_config_tensorrt//:nvparsers",
         "@local_config_tensorrt//:tensorrt_headers",
     ],
-    tags = ["manual"],
 )
 
 minigo_cc_library(
@@ -437,6 +437,7 @@ minigo_cc_binary(
         ":zobrist",
         "//cc/dual_net:batching_dual_net",
         "//cc/dual_net:factory",
+        "//cc/dual_net:reloading_dual_net",
         "//cc/file",
         "//cc/platform",
         "@com_github_gflags_gflags//:gflags",

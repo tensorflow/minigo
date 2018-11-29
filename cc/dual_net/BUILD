@@ -81,6 +81,24 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
+    name = "reloading_dual_net",
+    srcs = ["reloading_dual_net.cc"],
+    hdrs = ["reloading_dual_net.h"],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:position",
+        "//cc/file",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+minigo_cc_library(
     name = "tf_dual_net",
     srcs = ["tf_dual_net.cc"],
     hdrs = ["tf_dual_net.h"],

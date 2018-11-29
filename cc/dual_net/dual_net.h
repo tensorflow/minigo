@@ -84,6 +84,8 @@ class DualNet {
   virtual InputLayout GetInputLayout() const;
 };
 
+// Factory that creates DualNet instances.
+// All implementations are required to be thread safe.
 class DualNetFactory {
  public:
   virtual ~DualNetFactory();
