@@ -470,7 +470,7 @@ minigo_cc_binary(
 minigo_cc_binary(
     name = "tpu_test",
     srcs = ["tpu_test.cc"],
-    visibility = ["//visibility:public"],
+    tags = ["manual"],
     deps = [
         ":tensorflow",
         "@com_github_gflags_gflags//:gflags",
