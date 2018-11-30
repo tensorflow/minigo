@@ -468,6 +468,19 @@ minigo_cc_binary(
 )
 
 minigo_cc_binary(
+    name = "tpu_test",
+    srcs = ["tpu_test.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":tensorflow",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
+minigo_cc_binary(
     name = "position_benchmark",
     srcs = ["position_benchmark.cc"],
     deps = [

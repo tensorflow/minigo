@@ -165,18 +165,33 @@ std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
       std::max((FLAGS_virtual_losses * num_parallel_games + buffer_count - 1) /
                    buffer_count,
                FLAGS_virtual_losses);
-  // We have to force batching on in eval mode, even if parallel_games == 1
-  // because it assumes that creating a new model instance is cheap.
-  // TODO(tommadams): fix the batching code so that eval mode doesn't have to
-  // continually create and destroy DualNet instances.
-  if (batch_size > FLAGS_virtual_losses || FLAGS_mode == "eval") {
-    factory = NewBatchingDualNetFactory(std::move(factory), batch_size);
-  }
 
+  // If the model path contains a pattern, wrap the implementation factory in a
+  // ReloadingDualNetFactory to automatically reload the latest model that
+  // matches the pattern.
   if (FLAGS_model.find("%d") != std::string::npos) {
     factory = absl::make_unique<ReloadingDualNetFactory>(std::move(factory),
                                                          absl::Seconds(3));
   }
+
+  // If we're playing multiple games in parallel, wrap the implementation
+  // factory in a BatchingDualNetFactory so that we batch up the parallel
+  // inferences.
+  //
+  // Note: it's more efficient to perform the reload wrapping before the batch
+  // wrapping because this way, we only need to reload the single
+  // implementation DualNet when a new model is found. If we performed batch
+  // wrapping before reload wrapping, the reload code would need to update all
+  // the BatchingDualNet wrappers.
+  //
+  // TODO(tommadams): we have to force batching on in eval mode, even if
+  // parallel_games == 1 because eval mode assumes that creating a new model
+  // instance is cheap. Fix the batching code so that eval mode doesn't have
+  // to continually create and destroy DualNet instances.
+  if (batch_size > FLAGS_virtual_losses || FLAGS_mode == "eval") {
+    factory = NewBatchingDualNetFactory(std::move(factory), batch_size);
+  }
+
   return factory;
 }
 

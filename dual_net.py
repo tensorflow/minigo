@@ -535,7 +535,7 @@ def freeze_graph_tpu(model_path):
     with sess.graph.as_default():
         # Replicate the inference function for each TPU core.
         replicated_features = []
-        for i in range(FLAGS.parallel_tpus):
+        for i in range(FLAGS.num_tpu_cores):
             features = tf.placeholder(
                 tf.float32, [None, go.N, go.N,
                              features_lib.NEW_FEATURES_PLANES],

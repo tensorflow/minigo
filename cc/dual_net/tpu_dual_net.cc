@@ -127,8 +127,8 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
   batch_capacity_ = capacity;
 }
 
-TpuDualNet::TpuDualNet(const std::string& graph_path,
-                       const std::string& tpu_name)
+TpuDualNet::TpuDualNet(const std::string& tpu_name,
+                       const std::string& graph_path)
     : graph_path_(graph_path) {
   // If we can't find the specified graph, try adding a .pb extension.
   auto* env = Env::Default();
@@ -211,7 +211,7 @@ int TpuDualNetFactory::GetBufferCount() const { return kBufferCount; }
 
 std::unique_ptr<DualNet> TpuDualNetFactory::NewDualNet(
     const std::string& model) {
-  return absl::make_unique<TpuDualNet>(model);
+  return absl::make_unique<TpuDualNet>(tpu_name_, model);
 }
 
 }  // namespace minigo
