@@ -113,6 +113,13 @@ class ReloadingDualNetUpdater {
   // created by the factory_.
   std::unique_ptr<ReloadingDualNet> NewReloadingDualNet();
 
+  // Exposed for testing.
+  static bool ParseModelPathPattern(const std::string& pattern,
+                                    std::string* directory,
+                                    std::string* basename_pattern);
+  static bool MatchBasename(const std::string& basename,
+                            const std::string& pattern, int* generation);
+
  private:
   std::string directory_;
   std::string basename_pattern_;

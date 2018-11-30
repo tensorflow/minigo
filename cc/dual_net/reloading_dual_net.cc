@@ -26,27 +26,55 @@ namespace minigo {
 
 // ReloadingDualNetUpdater methods follow.
 
-ReloadingDualNetUpdater::ReloadingDualNetUpdater(const std::string& pattern,
-                                                 DualNetFactory* factory_impl)
-    : factory_impl_(factory_impl) {
+bool ReloadingDualNetUpdater::ParseModelPathPattern(
+    const std::string& pattern, std::string* directory,
+    std::string* basename_pattern) {
   auto pair = file::SplitPath(pattern);
 
-  directory_ = std::string(pair.first);
-  MG_CHECK(directory_.find('%') == std::string::npos &&
-           directory_.find('*') == std::string::npos)
-      << "invalid pattern \"" << pattern
-      << "\": directory part must not contain '*' or '%'";
+  *directory = std::string(pair.first);
+  if (directory->find('%') != std::string::npos ||
+      directory->find('*') != std::string::npos) {
+    std::cerr << "invalid pattern \"" << pattern
+              << "\": directory part must not contain '*' or '%'" << std::endl;
+    return false;
+  }
+  if (directory->empty()) {
+    std::cerr << "directory not be empty" << std::endl;
+    return false;
+  }
 
-  basename_pattern_ = std::string(pair.second);
-  auto it = basename_pattern_.find('%');
-  MG_CHECK(it != std::string::npos && basename_pattern_.find("%d") == it &&
-           basename_pattern_.rfind("%d") == it)
-      << "invalid pattern \"" << pattern
-      << "\": basename must contain exactly one \"%d\" and no other matchers";
+  *basename_pattern = std::string(pair.second);
+  auto it = basename_pattern->find('%');
+  if (it == std::string::npos || basename_pattern->find("%d") != it ||
+      basename_pattern->rfind("%d") != it) {
+    std::cerr << "invalid pattern \"" << pattern << "\": basename must contain "
+              << " exactly one \"%d\" and no other matchers" << std::endl;
+    return false;
+  }
 
   // Append "%n" to the end of the basename pattern. This is used when calling
   // sscanf to ensure we match the model's full basename and not just a prefix.
-  basename_pattern_ = absl::StrCat(pair.second, "%n");
+  *basename_pattern = absl::StrCat(pair.second, "%n");
+  return true;
+}
+
+bool ReloadingDualNetUpdater::MatchBasename(const std::string& basename,
+                                            const std::string& pattern,
+                                            int* generation) {
+  int gen = 0;
+  int n = 0;
+  if (sscanf(basename.c_str(), pattern.c_str(), &gen, &n) != 1 ||
+      n != static_cast<int>(basename.size())) {
+    return false;
+  }
+  *generation = gen;
+  return true;
+}
+
+ReloadingDualNetUpdater::ReloadingDualNetUpdater(const std::string& pattern,
+                                                 DualNetFactory* factory_impl)
+    : factory_impl_(factory_impl) {
+  MG_CHECK(ParseModelPathPattern(pattern, &directory_, &basename_pattern_));
 
   // Wait for at least one matching model to be found.
   if (!Poll()) {
@@ -67,17 +95,15 @@ bool ReloadingDualNetUpdater::Poll() {
 
   // Find the file basename that contains the largest integer.
   const std::string* latest_basename = nullptr;
-  int latest_gen = -1;
+  int latest_generation = -1;
   for (const auto& basename : basenames) {
-    int gen = 0;
-    int n = 0;
-    if (sscanf(basename.c_str(), basename_pattern_.c_str(), &gen, &n) != 1 ||
-        n != static_cast<int>(basename.size())) {
+    int generation = 0;
+    if (!MatchBasename(basename, basename_pattern_, &generation)) {
       continue;
     }
-    if (latest_basename == nullptr || gen > latest_gen) {
+    if (latest_basename == nullptr || generation > latest_generation) {
       latest_basename = &basename;
-      latest_gen = gen;
+      latest_generation = generation;
     }
   }
 

@@ -186,6 +186,17 @@ minigo_cc_library(
     ],
 )
 
+minigo_cc_test(
+    name = "reloading_dual_net_test",
+    size = "small",
+    srcs = ["reloading_dual_net_test.cc"],
+    deps = [
+        ":reloading_dual_net",
+        "//cc/file",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 minigo_cc_test_9_only(
     name = "dual_net_test",
     size = "small",
