@@ -47,7 +47,8 @@ void WriteEvalRecord(const std::string& gcp_project_name,
                      const MctsPlayer& player,
                      const std::string& black_player_name,
                      const std::string& white_player_name,
-                     const std::string& sgf_name);
+                     const std::string& sgf_name,
+                     const std::string& tag);
 
 // Atomically increment the game counter in the given Bigtable by the given
 // delta.  Returns the new value.  Prior value will be returned - delta.

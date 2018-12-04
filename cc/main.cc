@@ -70,6 +70,8 @@ DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed. "
               "This seed is used to control the moves played, not whether a "
               "game has resignation disabled or is a holdout.");
+DEFINE_double(holdout_pct, 0.03,
+              "Fraction of games to hold out for validation.");
 
 // Tree search flags.
 DEFINE_int32(num_readouts, 100,
@@ -134,8 +136,7 @@ DEFINE_string(output_bigtable, "",
 DEFINE_string(sgf_dir, "",
               "SGF directory for selfplay and puzzles. If empty in selfplay "
               "mode, no SGF is written.");
-DEFINE_double(holdout_pct, 0.03,
-              "Fraction of games to hold out for validation.");
+DEFINE_string(bigtable_tag, "", "Used in Bigtable metadata");
 
 // Self play flags:
 //   --inject_noise=true
@@ -690,7 +691,7 @@ class Evaluator {
       const auto& table_name = bigtable_spec[2];
       tf_utils::WriteEvalRecord(gcp_project_name, instance_name, table_name,
                                 *player, black->name(), white->name(),
-                                output_name);
+                                output_name, FLAGS_bigtable_tag);
     }
 
     std::cerr << absl::StrCat("Thread ", thread_id, " stopping\n");

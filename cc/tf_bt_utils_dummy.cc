@@ -34,7 +34,8 @@ void WriteEvalRecord(const std::string& gcp_project_name,
                      const MctsPlayer& player,
                      const std::string& black_player_name,
                      const std::string& white_player_name,
-                     const std::string& sgf_name) {
+                     const std::string& sgf_name,
+                     const std::string& tag) {
   MG_FATAL() << "Can't write eval record to Bigtable without Bigtable "
                 "support enabled. "
                 "Please recompile, passing --define=bt=1 to bazel build.";

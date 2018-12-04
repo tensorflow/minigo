@@ -126,7 +126,8 @@ void WriteEvalRecord(const std::string& gcp_project_name,
                      const MctsPlayer& player,
                      const std::string& black_player_name,
                      const std::string& white_player_name,
-                     const std::string& sgf_name) {
+                     const std::string& sgf_name,
+                     const std::string& tag) {
   Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
                                       ClientOptions()),
               table_name);
@@ -143,7 +144,8 @@ void WriteEvalRecord(const std::string& gcp_project_name,
       SetCell("metadata", "white_won", absl::StrCat(player.result() < 0)),
       SetCell("metadata", "result", player.result_string()),
       SetCell("metadata", "length", absl::StrCat(player.history().size())),
-      SetCell("metadata", "sgf", sgf_name));
+      SetCell("metadata", "sgf", sgf_name),
+      SetCell("metadata", "tag", tag));
 
   table.Apply(std::move(row_mutation));
   std::cerr << "Bigtable eval row written to " << row_name << std::endl;
