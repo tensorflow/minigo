@@ -16,6 +16,12 @@ http_archive(
     url = "https://github.com/GoogleCloudPlatform/google-cloud-cpp/archive/v0.2.0.zip",
 )
 
+http_archive(
+    name = "com_google_protobuf",
+    strip_prefix = "protobuf-3.6.0",
+    url = "https://github.com/google/protobuf/archive/v3.6.0.tar.gz",
+)
+
 new_http_archive(
     name = "com_google_benchmark",
     build_file = "cc/benchmark.BUILD",
