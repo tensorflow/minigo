@@ -18,6 +18,7 @@
 #include <thread>
 
 #include "absl/memory/memory.h"
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -130,6 +131,9 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
 TpuDualNet::TpuDualNet(const std::string& tpu_name,
                        const std::string& graph_path)
     : graph_path_(graph_path) {
+  // Make sure tpu_name looks like a valid name.
+  MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
+
   // If we can't find the specified graph, try adding a .pb extension.
   auto* env = Env::Default();
   if (!env->FileExists(graph_path_).ok()) {
