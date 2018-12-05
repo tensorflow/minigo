@@ -5,6 +5,13 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/memory/memory.h"
+// DO NOT CHECK IN
+// DO NOT CHECK IN
+// DO NOT CHECK IN
+#include "absl/strings/str_cat.h"
+// DO NOT CHECK IN
+// DO NOT CHECK IN
+// DO NOT CHECK IN
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 #include "cc/check.h"
@@ -80,10 +87,10 @@ class BatchingService {
 
  private:
   void MaybeRunBatches() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-    // std::cerr << "### " << model_
-    //           << "  qc-rc:" << (queue_counter_ - run_counter_)
-    //           << "  bs:" << batch_size_ << "  iq:" << inference_queue_.size()
-    //           << "  nc:" << num_clients_ << std::endl;
+    std::cerr << absl::StrCat(
+        "### ", model_, "  qc-rc:", queue_counter_ - run_counter_,
+        "  bs:", batch_size_, "  iq:", inference_queue_.size(),
+        "  nc:", num_clients_, "\n");
     while (size_t batch_size =
                std::min(queue_counter_ - run_counter_, batch_size_)) {
       // Stop if we won't fill a batch and more clients will send requests.

@@ -517,32 +517,11 @@ class SelfPlayer {
 };
 
 class Evaluator {
-  // References a pointer to an actual DualNet. Allows updating the pointer
-  // after the MctsPlayer has been constructed.
-  class WrappedDualNet : public DualNet {
-   public:
-    explicit WrappedDualNet(const std::unique_ptr<DualNet>* dual_net)
-        : dual_net_(dual_net) {
-      MG_CHECK(dual_net);
-    }
-
-   private:
-    void RunMany(std::vector<const BoardFeatures*> features,
-                 std::vector<Output*> outputs, std::string* model) override {
-      dual_net_->get()->RunMany(std::move(features), std::move(outputs), model);
-    };
-
-    const std::unique_ptr<DualNet>* const dual_net_;
-  };
-
   struct Model {
-    explicit Model(const std::string& model)
-        : model_path(model),
-          name(file::Stem(model)),
-          black_wins(0),
-          white_wins(0) {}
-    std::string model_path;
-    std::string name;
+    explicit Model(const std::string& path)
+        : path(path), name(file::Stem(path)), black_wins(0), white_wins(0) {}
+    const std::string path;
+    const std::string name;
     std::atomic<int> black_wins;
     std::atomic<int> white_wins;
   };
@@ -552,8 +531,8 @@ class Evaluator {
     auto start_time = absl::Now();
     auto factory = NewBatchingDualNetFactory(FLAGS_parallel_games);
 
-    Model prev_model(FLAGS_model);
-    Model curr_model(FLAGS_model_two);
+    Model model_a(FLAGS_model);
+    Model model_b(FLAGS_model_two);
 
     std::cerr << "DualNet factories created from " << FLAGS_model << "\n  and "
               << FLAGS_model_two << " in "
@@ -568,10 +547,10 @@ class Evaluator {
     int num_games = FLAGS_parallel_games;
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
-      auto* model = swap_models ? &curr_model : &prev_model;
-      auto* other_model = swap_models ? &prev_model : &curr_model;
       threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
-                                      factory.get(), model, other_model));
+                                      factory.get(),
+                                      swap_models ? &model_a : &model_b,
+                                      swap_models ? &model_b : &model_a));
     }
     for (auto& t : threads_) {
       t.join();
@@ -580,7 +559,7 @@ class Evaluator {
     std::cerr << "Evaluated " << num_games << " games, total time "
               << (absl::Now() - start_time) << std::endl;
 
-    auto name_length = std::max(prev_model.name.size(), curr_model.name.size());
+    auto name_length = std::max(model_a.name.size(), model_b.name.size());
     auto format_name = [&](const std::string& name) {
       return absl::StrFormat("%-*s", name_length, name);
     };
@@ -596,17 +575,17 @@ class Evaluator {
 
     std::cerr << format_name("Wins")
               << "        Total         Black         White" << std::endl;
-    print_result(prev_model);
-    print_result(curr_model);
+    print_result(model_a);
+    print_result(model_b);
     std::cerr << format_name("") << "              "
-              << format_wins(prev_model.black_wins + curr_model.black_wins)
-              << format_wins(prev_model.white_wins + curr_model.white_wins);
+              << format_wins(model_a.black_wins + model_b.black_wins)
+              << format_wins(model_a.white_wins + model_b.white_wins);
     std::cerr << std::endl;
   }
 
  private:
-  void ThreadRun(int thread_id, DualNetFactory* factory, Model* model,
-                 Model* other_model) {
+  void ThreadRun(int thread_id, DualNetFactory* factory, Model* black_model,
+                 Model* white_model) {
     // The player and other_player reference this pointer.
     std::unique_ptr<DualNet> dual_net;
 
@@ -626,53 +605,41 @@ class Evaluator {
       player_options.random_seed += 1299283 * thread_id;
     }
 
-    player_options.verbose = thread_id == 0;
-    player_options.name = model->name;
-    auto player = absl::make_unique<MctsPlayer>(
-        absl::make_unique<WrappedDualNet>(&dual_net), player_options);
+    const bool verbose = thread_id == 0;
+    player_options.verbose = verbose;
+    player_options.name = black_model->name;
+    auto black = absl::make_unique<MctsPlayer>(
+        factory->NewDualNet(black_model->path), player_options);
 
     player_options.verbose = false;
-    player_options.name = other_model->name;
-    auto other_player = absl::make_unique<MctsPlayer>(
-        absl::make_unique<WrappedDualNet>(&dual_net), player_options);
+    player_options.name = white_model->name;
+    auto white = absl::make_unique<MctsPlayer>(
+        factory->NewDualNet(white_model->path), player_options);
 
-    auto* black = player.get();
-    auto* white = other_player.get();
-
-    std::string model_path = model->model_path;
-    std::string other_model_path = other_model->model_path;
-
-    while (!player->root()->game_over() && !player->root()->at_move_limit()) {
-      // Create the DualNet for a single move and dispose it again. This
-      // is required because a BatchingDualNet instance can prevent the
-      // inference queue from being flushed if it's not sending any requests.
-      // The number of requests per move can be smaller than num_readouts at the
-      // end of a game.
-      dual_net = factory->NewDualNet(model_path);
-
-      auto move = player->SuggestMove();
-      dual_net.reset();
-      if (player->options().verbose) {
-        std::cerr << player->root()->Describe() << "\n";
+    auto* curr_player = black.get();
+    auto* next_player = white.get();
+    while (!curr_player->root()->game_over()) {
+      auto move = curr_player->SuggestMove();
+      if (curr_player->options().verbose) {
+        std::cerr << curr_player->root()->Describe() << "\n";
       }
-      MG_CHECK(player->PlayMove(move));
-      MG_CHECK(other_player->PlayMove(move));
-      if (player->options().verbose) {
-        std::cerr << player->root()->position.ToPrettyString();
+      curr_player->PlayMove(move);
+      next_player->PlayMove(move);
+      if (curr_player->options().verbose) {
+        std::cerr << curr_player->root()->position.ToPrettyString();
       }
-      std::swap(model_path, other_model_path);
-      std::swap(player, other_player);
+      std::swap(curr_player, next_player);
     }
 
-    MG_CHECK(player->result() == other_player->result());
-    if (player->result() > 0) {
-      ++model->black_wins;
+    MG_CHECK(curr_player->result() == next_player->result());
+    if (curr_player->result() > 0) {
+      ++black_model->black_wins;
     }
-    if (player->result() < 0) {
-      ++other_model->white_wins;
+    if (curr_player->result() < 0) {
+      ++white_model->white_wins;
     }
 
-    if (black->options().verbose) {
+    if (verbose) {
       std::cerr << black->result_string() << "\n";
       std::cerr << "Black was: " << black->name() << "\n";
     }
@@ -690,7 +657,7 @@ class Evaluator {
       const auto& instance_name = bigtable_spec[1];
       const auto& table_name = bigtable_spec[2];
       tf_utils::WriteEvalRecord(gcp_project_name, instance_name, table_name,
-                                *player, black->name(), white->name(),
+                                *curr_player, black->name(), white->name(),
                                 output_name, FLAGS_bigtable_tag);
     }
 
