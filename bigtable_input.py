@@ -371,6 +371,29 @@ _games_nr = GameQueue(_project_name,
                       _instance_name,
                       _table_name + '-nr')
 
+def get_fresh_moves(n, fresh_fraction=0.05, minimum_fresh=18000):
+    """Get a dataset of serialized TFExamples from the last N games.
+
+    This top level wrapper returns the dataset of shuffled moves, using the
+    'require_fresh_games' function to block until enough new games have been
+    played.  The number of fresh games required is the larger of:
+       - The fraction of the total window size
+       - The `minimum_fresh` parameter
+    Args:
+      n:  an integer indicating how many past games should be sourced.
+      moves:  an integer indicating how many moves should be sampled
+        from those N games.
+      minimum_fresh:  an integer indicating the lower bound on the number of new
+      games.
+    """
+    latest_game = int(_games.latest_game_number())
+    if n > latest_game:
+        _games.require_fresh_games(minimum_fresh)
+    else:
+        _games.require_fresh_games(
+                math.ceil(n * .9) * math.ceil(fresh_fraction * n))
+
+    return get_unparsed_moves_from_last_n_games(n)
 
 def get_unparsed_moves_from_last_n_games(n,
                                          moves=2**21,

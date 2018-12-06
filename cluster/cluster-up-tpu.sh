@@ -20,7 +20,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/common.sh
 source ${SCRIPT_DIR}/utils.sh
 
-export NUM_NODES=128
+export NUM_NODES=8
 
 ZONE=us-central1-f
 
@@ -30,6 +30,7 @@ echo "--------------------------------------"
 echo "Using Project:      ${PROJECT}"
 echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
+echo "Service account:    ${SERVICE_ACCOUNT}"
 
 echo "Overriding num nodes to: $NUM_NODES"
 

@@ -7,21 +7,24 @@
 # Network architecture flags
 --conv_width=256
 --fc_width=256
---trunk_layers=19
+--trunk_layers=20
 
 # Training-related flags
 --train_batch_size=256
---lr_rates=0.01,0.001,0.0001
+--lr_rates=0.02
+--lr_rates=0.002
+--lr_rates=0.0005
 --l2_strength=0.0001
---sgd_momentum=0.9
+--sgd_momentum=0.95
+--steps_to_train=1024
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)
 --inject_noise=true
 --soft_pick=true
 --random_symmetry=true
---virtual_losses=2
+--virtual_losses=8
 --parallel_games=32
 --num_readouts=800
---disable_resign_pct=0.10
+--disable_resign_pct=0.00
 --resign_threshold=-0.999

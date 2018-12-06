@@ -496,13 +496,13 @@ def bootstrap():
 
 
 def export_model(model_path):
-    """Take the latest checkpoint and export it to model_path for selfplay.
+    """Take the latest checkpoint and export it to model_path.
 
     Assumes that all relevant model files are prefixed by the same name.
     (For example, foo.index, foo.meta and foo.data-00000-of-00001).
 
     Args:
-        model_path: The path (can be a gs:// path) to export model to
+        model_path: The path (can be a gs:// path) to export model
     """
     estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.work_dir,
                                        params=FLAGS.flag_values_dict())
@@ -513,8 +513,13 @@ def export_model(model_path):
         destination_path = model_path + suffix
         print("Copying {} to {}".format(filename, destination_path))
         tf.gfile.Copy(filename, destination_path)
-    # also export a .pb for C++ inference
-    freeze_graph(model_path)
+
+
+def freeze_latest_checkpoint_tpu():
+    estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.work_dir,
+                                       params=FLAGS.flag_values_dict())
+    latest_checkpoint = estimator.latest_checkpoint()
+    freeze_graph_tpu(latest_checkpoint)
 
 
 def freeze_graph(model_path):

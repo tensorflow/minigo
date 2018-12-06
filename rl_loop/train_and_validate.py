@@ -52,20 +52,27 @@ def train():
     new_model_num = model_num + 1
     new_model_name = shipname.generate(new_model_num)
     print("New model will be {}".format(new_model_name))
-    training_file = os.path.join(
-        fsdb.golden_chunk_dir(), str(new_model_num) + '.tfrecord.zz')
-    while not gfile.Exists(training_file):
-        print("Waiting for", training_file)
-        time.sleep(1 * 60)
     save_file = os.path.join(fsdb.models_dir(), new_model_name)
 
     cmd = ['python3', 'train.py', training_file,
            '--use_tpu',
+           '--use_bt',
            '--tpu_name={}'.format(TPU_NAME),
            '--flagfile=rl_loop/distributed_flags',
            '--export_path={}'.format(save_file)]
 
-    return mask_flags.run(cmd)
+    completed_process = mask_flags.run(cmd)
+    if completed_process.returncode > 0:
+        print("Training failed!")
+        return completed_process
+
+    # Persist the checkpoint two ways:
+    # Freeze the .ckpt file in the work_dir for the TPU selfplayers
+    # Freeze a non-tpu version of the graph for later GPU use.
+    dual_net.freeze_latest_checkpoint_tpu()
+    dual_net.freeze_graph(save_file)
+
+    return completed_process
 
 
 def validate_holdout_selfplay():
@@ -101,7 +108,7 @@ def loop(unused_argv):
         with utils.timer("Train"):
             completed_process = train()
         if completed_process.returncode > 0:
-            print("Training failed! Skipping validation...")
+            print("Skipping validation...")
             continue
         with utils.timer("Validate"):
             validate_pro()

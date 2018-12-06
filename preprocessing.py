@@ -242,7 +242,7 @@ def get_tpu_bt_input_tensors(batch_size, num_repeats=1,
                              fresh_fraction=0.05,
                              random_rotation=True):
     import bigtable_input
-    dataset = bigtable_input.get_unparsed_moves_from_last_n_games(number_of_games)
+    dataset = bigtable_input.get_fresh_moves(number_of_games, fresh_fraction)
     dataset = dataset.repeat(num_repeats)
     dataset = dataset.batch(batch_size)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
