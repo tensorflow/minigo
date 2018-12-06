@@ -25,6 +25,7 @@ import time
 import numpy as np
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
+from google.cloud.bigtable import column_family
 import tensorflow as tf
 import utils
 
@@ -39,6 +40,7 @@ ROWCOUNT_PREFIX = 'ct_{:0>10}_'
 #### Column Families
 
 METADATA = 'metadata'
+TFEXAMPLE = 'tfexample'
 
 #### Column Qualifiers
 
@@ -152,13 +154,28 @@ class GameQueue:
         self.instance_name = instance_name
         self.table_name = table_name
         self.bt_table = bigtable.Client(
-            project_name).instance(
+            project_name, admin=True).instance(
                 instance_name).table(
                     table_name)
         self.tf_table = tf.contrib.cloud.BigtableClient(
             project_name,
             instance_name).table(
                 table_name)
+
+    def create(self):
+        """Create the table underlying the queue.
+
+        Create the 'metadata' and 'tfexample' column families
+        and their properties.
+        """
+        if self.bt_table.exists():
+            print('Table already exists')
+            return
+
+        max_versions_rule = column_family.MaxVersionsGCRule(1)
+        self.bt_table.create(column_families={
+            METADATA: max_versions_rule,
+            TFEXAMPLE: max_versions_rule})
 
     def latest_game_number(self):
         """Return the number of the next game to be written."""
@@ -167,6 +184,8 @@ class GameQueue:
             TABLE_STATE,
             filter_=row_filters.ColumnRangeFilter(
                 METADATA, game_counter, game_counter))
+        if table_state is None:
+            return 0
         return cbt_intvalue(table_state.cell_value(METADATA, game_counter))
 
     def bleakest_moves(self, start_game, end_game):
@@ -398,7 +417,7 @@ def get_fresh_moves(n, fresh_fraction=0.05, minimum_fresh=18000):
 def get_unparsed_moves_from_last_n_games(n,
                                          moves=2**21,
                                          shuffle=True,
-                                         column_family='tfexample',
+                                         column_family=TFEXAMPLE,
                                          column='example',
                                          values_only=True):
     """Get a dataset of serialized TFExamples from the last N games.
