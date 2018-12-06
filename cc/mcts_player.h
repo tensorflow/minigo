@@ -164,6 +164,7 @@ class MctsPlayer {
   const std::vector<History>& history() const { return history_; }
   const std::string& name() const { return options_.name; }
   const std::vector<InferenceInfo>& inferences() const { return inferences_; }
+  DualNet* network() { return network_.get(); }
 
  protected:
   // Path in the game tree from leaf to root.
@@ -198,8 +199,6 @@ class MctsPlayer {
   Random* rnd() { return &rnd_; }
 
   std::string FormatScore(float score) const;
-
-  DualNet* network() { return network_.get(); }
 
   // Run inference for the given leaf nodes & incorportate the inference output.
   virtual void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);

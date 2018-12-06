@@ -74,6 +74,7 @@ class DualNet {
   virtual ~DualNet();
 
   // Runs inference on a batch of input features.
+  // TODO(tommadams): rename model -> model_name.
   virtual void RunMany(std::vector<const BoardFeatures*> features,
                        std::vector<Output*> outputs, std::string* model) = 0;
 
@@ -94,7 +95,16 @@ class DualNetFactory {
   // instances created by this factory.
   virtual int GetBufferCount() const;
 
+  // TODO(tommadams): rename model to model_path
   virtual std::unique_ptr<DualNet> NewDualNet(const std::string& model) = 0;
+
+  // TODO(tommadams): StartGame and EndGame are only required by the
+  // BatchingDualNetFactory; after main.cc has been split into multiple
+  // binaries (selfplay, gtp, eval, etc) refactor those binaries to work with
+  // the BatchingDualNetFactory subclass rather than the abstract DualNetFactory
+  // and remove StartGame and EndGame from this base class.
+  virtual void StartGame(DualNet* black, DualNet* white);
+  virtual void EndGame(DualNet* black, DualNet* white);
 };
 
 }  // namespace minigo

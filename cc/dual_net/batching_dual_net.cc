@@ -1,5 +1,6 @@
 #include "cc/dual_net/batching_dual_net.h"
 
+#include <atomic>
 #include <queue>
 #include <utility>
 
@@ -8,7 +9,13 @@
 // DO NOT CHECK IN
 // DO NOT CHECK IN
 // DO NOT CHECK IN
+#include <sys/syscall.h>
+#include <unistd.h>
+#define gettid() syscall(SYS_gettid)
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
+#include "cc/file/path.h"
 // DO NOT CHECK IN
 // DO NOT CHECK IN
 // DO NOT CHECK IN
@@ -18,18 +25,15 @@
 
 namespace minigo {
 namespace {
-class BatchingService {
-  struct InferenceData {
-    std::vector<const DualNet::BoardFeatures*> features;
-    std::vector<DualNet::Output*> outputs;
-    std::string* model;
-    absl::Notification* notification;
-  };
 
+/*
+class BatchingService {
  public:
-  BatchingService(std::unique_ptr<DualNet> dual_net, size_t batch_size,
+  BatchingService(BatchingDualNetFactory* factory,
+                  std::unique_ptr<DualNet> dual_net, size_t batch_size,
                   std::string model)
-      : dual_net_(std::move(dual_net)),
+      : factory_(factory),
+        dual_net_(std::move(dual_net)),
         num_clients_(0),
         queue_counter_(0),
         run_counter_(0),
@@ -52,7 +56,7 @@ class BatchingService {
   void DecrementClientCount() {
     absl::MutexLock lock(&mutex_);
     --num_clients_;
-    MaybeRunBatches();
+    factory_->MaybeRunBatches();
   }
 
   size_t num_clients() const {
@@ -75,7 +79,7 @@ class BatchingService {
       inference_queue_.push(
           {std::move(features), std::move(outputs), model, &notification});
 
-      MaybeRunBatches();
+      factory_->MaybeRunBatches();
     }
 
     notification.WaitForNotification();
@@ -164,93 +168,285 @@ class BatchingService {
 
   const std::string model_;
 };
+*/
+
+class BatchingDualNet;
+class BatchingDualNetFactory;
+struct ModelBatcher;
 
 class BatchingDualNet : public DualNet {
  public:
-  explicit BatchingDualNet(BatchingService* service) : service_(service) {
-    service_->IncrementClientCount();
-  }
-
-  ~BatchingDualNet() override { service_->DecrementClientCount(); }
+  BatchingDualNet(BatchingDualNetFactory* factory,
+                  std::shared_ptr<ModelBatcher> batcher);
 
   void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, std::string* model) override {
-    service_->RunMany(std::move(features), std::move(outputs), model);
-  };
+               std::vector<Output*> outputs, std::string* model) override;
+  InputLayout GetInputLayout() const override;
 
-  InputLayout GetInputLayout() const override {
-    return service_->GetInputLayout();
-  }
+  void SetOtherBatcher(std::shared_ptr<ModelBatcher> batcher);
 
- protected:
-  BatchingService* service_;
+  // protected:
+  BatchingDualNetFactory* factory_;
+  std::shared_ptr<ModelBatcher> batcher_;
+  std::shared_ptr<ModelBatcher> other_batcher_ = nullptr;
 };
 
-class BatchingFactory : public DualNetFactory {
+class BatchingDualNetFactory : public DualNetFactory {
  public:
-  BatchingFactory(std::unique_ptr<DualNetFactory> impl, size_t batch_size)
-      : impl_(std::move(impl)), batch_size_(batch_size) {}
-
-  int GetBufferCount() const override { return impl_->GetBufferCount(); }
-
-  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override {
-    absl::MutexLock lock(&mutex_);
-
-    // Find or create a service for the requested model.
-    auto it = services_.find(model);
-    if (it == services_.end()) {
-      std::unique_ptr<BatchingService> service;
-      if (model == cached_model_) {
-        service = std::move(cached_service_);
-        cached_model_ = "";
-      } else {
-        service = absl::make_unique<BatchingService>(impl_->NewDualNet(model),
-                                                     batch_size_, model);
-      }
-      it = services_.emplace(model, std::move(service)).first;
-    }
-
-    // Create a new client of the service.
-    auto dual_net = absl::make_unique<BatchingDualNet>(it->second.get());
-
-    // Take this opportunity to prune any services that have no clients.
-    it = services_.begin();
-    while (it != services_.end()) {
-      if (it->second->num_clients() == 0) {
-        cached_model_ = it->first;
-        cached_service_ = std::move(it->second);
-        services_.erase(it++);
-      } else {
-        ++it;
-      }
-    }
-
-    return dual_net;
-  }
+  BatchingDualNetFactory(std::unique_ptr<DualNetFactory> factory_impl,
+                         size_t batch_size);
+  int GetBufferCount() const;
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model);
+  void StartGame(DualNet* black, DualNet* white);
+  void EndGame(DualNet* black, DualNet* white);
 
  private:
   absl::Mutex mutex_;
-  std::unique_ptr<DualNetFactory> impl_;
+  std::unique_ptr<DualNetFactory> factory_impl_;
 
-  // Map from model to BatchingService for that model. Once a service no longer
-  // has clients, its model to the cached_service_ and finally deleted.
-  absl::flat_hash_map<std::string, std::unique_ptr<BatchingService>> services_
+  // Map from model to BatchingService for that model.
+  absl::flat_hash_map<std::string, std::shared_ptr<ModelBatcher>> batchers_
       GUARDED_BY(&mutex_);
-
-  // The most recent BatchingService that no longer has clients. We don't delete
-  // a service that no longer has clients immediately, because a common pattern
-  // is to delete a DualNet, then create a new one with the same model.
-  std::string cached_model_;
-  std::unique_ptr<BatchingService> cached_service_;
 
   const size_t batch_size_;
 };
+
+struct InferenceData {
+  std::vector<const DualNet::BoardFeatures*> features;
+  std::vector<DualNet::Output*> outputs;
+  std::string* model_name;
+  absl::Notification* notification;
+};
+
+struct ModelBatcher {
+  // TODO(tommadams): remove model_path and add a DualNet::path() method.
+  ModelBatcher(std::string model_path, std::unique_ptr<DualNet> model_impl,
+               size_t batch_size)
+      : model_impl(std::move(model_impl)),
+        batch_size(batch_size),
+        model_path(std::move(model_path)) {}
+
+  void StartGame() LOCKS_EXCLUDED(&mutex) {
+    absl::MutexLock lock(&mutex);
+    num_active_games += 1;
+  }
+
+  void EndGame() LOCKS_EXCLUDED(&mutex) {
+    absl::MutexLock lock(&mutex);
+    num_active_games -= 1;
+    MaybeRunBatchesLocked();
+  }
+
+  void MaybeRunBatches() LOCKS_EXCLUDED(&mutex) {
+    absl::MutexLock lock(&mutex);
+    MaybeRunBatchesLocked();
+  }
+
+  DualNet::InputLayout GetInputLayout() const {
+    return model_impl->GetInputLayout();
+  }
+
+  void RunMany(ModelBatcher* other_batcher,
+               std::vector<const DualNet::BoardFeatures*> features,
+               std::vector<DualNet::Output*> outputs, std::string* model_name) {
+    MG_CHECK(features.size() == outputs.size());
+
+    // -----------------------------------------------
+    absl::Notification notification;
+    {
+      mutex.Lock();
+      inference_queue.push(
+          {std::move(features), std::move(outputs), model_name, &notification});
+      if (other_batcher != nullptr) {
+        if (other_batcher == this) {
+          num_waiting += 1;
+          mutex.Unlock();
+        } else {
+          mutex.Unlock();
+          absl::MutexLock other_lock(&other_batcher->mutex);
+          other_batcher->num_waiting += 1;
+          other_batcher->MaybeRunBatchesLocked();
+        }
+      }
+      MaybeRunBatches();
+    }
+
+    notification.WaitForNotification();
+
+    {
+      mutex.Lock();
+      if (other_batcher != nullptr) {
+        if (other_batcher == this) {
+          num_waiting -= 1;
+          mutex.Unlock();
+        } else {
+          mutex.Unlock();
+          absl::MutexLock other_lock(&other_batcher->mutex);
+          other_batcher->num_waiting -= 1;
+        }
+      }
+    }
+  }
+
+  // TODO(tommadams): make this private
+  void MaybeRunBatchesLocked() EXCLUSIVE_LOCKS_REQUIRED(&mutex) {
+    while (inference_queue.size() >= batch_size ||
+           inference_queue.size() + num_waiting >= num_active_games) {
+      auto str = absl::StrCat(
+          "### ", absl::StrFormat("%x", gettid()), "  ", file::Stem(model_path),
+          "  iq:", inference_queue.size(), "  bs:", batch_size,
+          "  nw:", num_waiting, "  ng:", num_active_games);
+      if (inference_queue.empty()) {
+        std::cerr << absl::StrCat(str, "  NO\n");
+        return;
+      }
+      std::cerr << absl::StrCat(str, "  YES\n");
+      RunBatch();
+    }
+  }
+
+  void RunBatch() EXCLUSIVE_LOCKS_REQUIRED(&mutex) {
+    std::vector<const DualNet::BoardFeatures*> features;
+    std::vector<DualNet::Output*> outputs;
+    features.reserve(batch_size);
+    outputs.reserve(batch_size);
+
+    std::vector<InferenceData> inferences;
+
+    while (!inference_queue.empty() && inferences.size() < batch_size) {
+      auto& inference = inference_queue.front();
+      size_t num_features = inference.features.size();
+
+      std::copy_n(inference.features.begin(), num_features,
+                  std::back_inserter(features));
+      std::copy_n(inference.outputs.begin(), num_features,
+                  std::back_inserter(outputs));
+      inferences.push_back(std::move(inference));
+
+      inference_queue.pop();
+    }
+
+    // Unlock the mutex while running inference.
+    mutex.Unlock();
+
+    std::vector<std::string> parts = {"### BATCH",
+                                      absl::StrFormat("%x", gettid())};
+    std::string model_name;
+    model_impl->RunMany(std::move(features), std::move(outputs), &model_name);
+    for (const auto& inference : inferences) {
+      if (inference.model_name != nullptr) {
+        *inference.model_name = model_name;
+        parts.emplace_back(file::Stem(model_name));
+      }
+      inference.notification->Notify();
+    }
+    parts.push_back("\n");
+    std::cerr << absl::StrJoin(parts, " ");
+    mutex.Lock();
+  }
+
+  absl::Mutex mutex;
+  std::unique_ptr<DualNet> model_impl;
+  const size_t batch_size;
+  std::queue<InferenceData> inference_queue GUARDED_BY(&mutex);
+  size_t num_waiting = 0;
+  size_t num_active_games = 0 GUARDED_BY(&mutex);
+  const std::string model_path;
+};
+
+BatchingDualNet::BatchingDualNet(BatchingDualNetFactory* factory,
+                                 std::shared_ptr<ModelBatcher> batcher)
+    : factory_(factory), batcher_(std::move(batcher)) {}
+
+void BatchingDualNet::RunMany(std::vector<const BoardFeatures*> features,
+                              std::vector<Output*> outputs,
+                              std::string* model) {
+  batcher_->RunMany(other_batcher_.get(), std::move(features),
+                    std::move(outputs), model);
+};
+
+DualNet::InputLayout BatchingDualNet::GetInputLayout() const {
+  return batcher_->GetInputLayout();
+}
+
+void BatchingDualNet::SetOtherBatcher(
+    std::shared_ptr<ModelBatcher> other_batcher) {
+  if (other_batcher == nullptr) {
+    MG_CHECK(other_batcher_ != nullptr);
+  } else {
+    MG_CHECK(other_batcher_ == nullptr);
+  }
+  other_batcher_ = std::move(other_batcher);
+}
+
+BatchingDualNetFactory::BatchingDualNetFactory(
+    std::unique_ptr<DualNetFactory> factory_impl, size_t batch_size)
+    : factory_impl_(std::move(factory_impl)), batch_size_(batch_size) {}
+
+int BatchingDualNetFactory::GetBufferCount() const {
+  return factory_impl_->GetBufferCount();
+}
+
+std::unique_ptr<DualNet> BatchingDualNetFactory::NewDualNet(
+    const std::string& model_path) {
+  absl::MutexLock lock(&mutex_);
+
+  // Find or create a service for the requested model.
+  auto it = batchers_.find(model_path);
+  if (it == batchers_.end()) {
+    auto batcher = std::make_shared<ModelBatcher>(
+        model_path, factory_impl_->NewDualNet(model_path), batch_size_);
+    it = batchers_.emplace(model_path, std::move(batcher)).first;
+  }
+
+  auto result = absl::make_unique<BatchingDualNet>(this, it->second);
+
+  // Take this opportunity to prune any services that have no clients.
+  it = batchers_.begin();
+  while (it != batchers_.end()) {
+    // If the factory is the only one left with a reference to the batcher,
+    // delete it.
+    if (it->second.use_count() == 1) {
+      batchers_.erase(it++);
+    } else {
+      ++it;
+    }
+  }
+
+  return result;
+}
+
+void BatchingDualNetFactory::StartGame(DualNet* black, DualNet* white) {
+  auto* b = dynamic_cast<BatchingDualNet*>(black);
+  auto* w = dynamic_cast<BatchingDualNet*>(white);
+  MG_CHECK(b != nullptr && w != nullptr);
+
+  if (b->batcher_ != w->batcher_) {
+    b->SetOtherBatcher(w->batcher_);
+    w->SetOtherBatcher(b->batcher_);
+  }
+  b->batcher_->StartGame();
+  w->batcher_->StartGame();
+}
+
+void BatchingDualNetFactory::EndGame(DualNet* black, DualNet* white) {
+  auto* b = dynamic_cast<BatchingDualNet*>(black);
+  auto* w = dynamic_cast<BatchingDualNet*>(white);
+  MG_CHECK(b != nullptr && w != nullptr);
+
+  if (b->batcher_ != w->batcher_) {
+    b->SetOtherBatcher(nullptr);
+    w->SetOtherBatcher(nullptr);
+  }
+  b->batcher_->EndGame();
+  w->batcher_->EndGame();
+}
 
 }  // namespace
 
 std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
     std::unique_ptr<DualNetFactory> impl, size_t batch_size) {
-  return absl::make_unique<BatchingFactory>(std::move(impl), batch_size);
+  return absl::make_unique<BatchingDualNetFactory>(std::move(impl), batch_size);
 }
 
 }  // namespace minigo
