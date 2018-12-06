@@ -24,12 +24,21 @@ import sgf_wrapper
 from utils import logged_timer
 
 
-def parse_sgf(sgf_path):
-    with open(sgf_path) as f:
-        sgf_contents = f.read()
+def final_position_sgf(sgf_path):
+    for pwc in sgf_wrapper.replay_sgf_file(sgf_path):
+        pass
+
+    return pwc.position.play_move(pwc.next_move)
+
+
+def parse_sgf_to_examples(sgf_path):
+    """Return supervised examples from positions
+
+    NOTE: last move is not played because no p.next_move after.
+    """
 
     return zip(*[(p.position, p.next_move, p.result)
-                 for p in sgf_wrapper.replay_sgf(sgf_contents)])
+                 for p in sgf_wrapper.replay_sgf_file(sgf_path)])
 
 
 def check_year(props, year):

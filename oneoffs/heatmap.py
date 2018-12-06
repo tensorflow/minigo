@@ -94,8 +94,7 @@ def positions_from_sgfs(sgf_files, include_empty=True):
 
     for sgf in sgf_files:
         sgf_name = os.path.basename(sgf).replace(".sgf", "")
-        sgf_positions, moves, _ = oneoff_utils.parse_sgf(sgf)
-        final = sgf_positions[-1].play_move(moves[-1])
+        final = oneoff_utils.final_position_sgf(sgf)
         positions.append((sgf_name, final))
     return positions
 
