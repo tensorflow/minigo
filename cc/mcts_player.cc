@@ -421,6 +421,7 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
   }
 }
 
+// &q is the bleakest move from the perspective of the winner, i.e., negative.
 bool FindBleakestMove(const MctsPlayer& player, int* move, float* q) {
   if (player.options().resign_enabled) {
     return false;
@@ -442,7 +443,7 @@ bool FindBleakestMove(const MctsPlayer& player, int* move, float* q) {
     }
   }
   *move = int(bleakest_move);
-  *q = history[bleakest_move].node->Q();
+  *q = bleakest_eval;
   return true;
 }
 

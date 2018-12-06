@@ -244,6 +244,8 @@ class MctsPlayer {
 // it could have been.)
 //
 // Returns true if the bleakest move was found and returned; false otherwise.
+// Q is returned from the winners perspective, which means we don't have to
+// reference the result to transform this into a sortable list of evaluations.
 bool FindBleakestMove(const MctsPlayer& player, int* move, float* q);
 
 }  // namespace minigo
