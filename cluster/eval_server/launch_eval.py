@@ -25,6 +25,7 @@ import fire
 from absl import flags
 from tensorflow import gfile
 
+
 def launch_eval_job(tag, m1_path, m2_path, job_name, completions=5):
     """Launches an evaluator job.
     tag: name for later reference
@@ -33,42 +34,14 @@ def launch_eval_job(tag, m1_path, m2_path, job_name, completions=5):
     names (e.g. 'minigo-cc-evaluator-v5-123-v7-456')
     completions: the number of completions desired
     """
-    if not all([m1_path, m2_path, job_name]):
-        print("Provide all of m1_path, m2_path, job_name "
-              "params")
-        return
     if not re.match(tag, r'[a-z0-9-]*$')
         print("{} is not a valid tag".format(tag))
         return
 
-    api_instance = get_api()
-
-    raw_job_conf = open("cluster/evaluator/cc-evaluator.yaml").read()
-
     bucket_path = "gs://minigo-pub/experiments/eval/" + tag
 
-    os.environ['BUCKET_NAME'] = bucket_path
+    ######## WRITE DOWN TO BUCKET ########
 
-    os.environ['MODEL_BLACK'] = m1_path
-    os.environ['MODEL_WHITE'] = m2_path
-    os.environ['JOBNAME'] = job_name + '-bw'
-    env_job_conf = os.path.expandvars(raw_job_conf)
-
-    job_conf = yaml.load(env_job_conf)
-    job_conf['spec']['completions'] = completions
-
-    resp = api_instance.create_namespaced_job('default', body=job_conf)
-
-    os.environ['MODEL_WHITE'] = m1_path
-    os.environ['MODEL_BLACK'] = m2_path
-    os.environ['JOBNAME'] = job_name + '-wb'
-    env_job_conf = os.path.expandvars(raw_job_conf)
-    job_conf = yaml.load(env_job_conf)
-    job_conf['spec']['completions'] = completions
-
-    resp = api_instance.create_namespaced_job('default', body=job_conf)
-
-    #####
     TS=str(int(time.time()))
     with gfile.Gfile(os.path.join(bucket_path, 'commands_' + TS)) as commands:
         commands.write(str(sys.argv) + "\n")
