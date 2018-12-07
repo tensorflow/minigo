@@ -172,9 +172,7 @@ minigo_cc_library(
 minigo_cc_library(
     name = "batching_dual_net",
     srcs = ["batching_dual_net.cc"],
-    hdrs = [
-        "batching_dual_net.h",
-    ],
+    hdrs = ["batching_dual_net.h"],
     deps = [
         ":dual_net",
         # DO NOT CHECK IN
@@ -190,6 +188,19 @@ minigo_cc_library(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
+    ],
+)
+
+minigo_cc_test(
+    name = "batching_dual_net_test",
+    size = "small",
+    srcs = ["batching_dual_net_test.cc"],
+    deps = [
+        ":batching_dual_net",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

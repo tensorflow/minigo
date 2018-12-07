@@ -679,40 +679,79 @@ void SelfPlay() {
   std::string a = "saved_models/eval_a.pb";
   std::string b = "saved_models/eval_b.pb";
   std::string c = "saved_models/eval_c.pb";
-  std::vector<std::pair<std::string, std::string>> games = {
-      {a, a},
-      {a, b},
-      {a, b},
-      {a, c},
-  };
+  std::string d = "saved_models/eval_d.pb";
+  std::vector<std::pair<std::string, std::string>> model_pairs = {
+      // clang-format off
+      // {a, a},
+      // {a, b},
+      // {a, b},
+      // {a, c},
+      /*
+      {a, b}, {a, b}, {a, b}, {a, b},
+      {a, b}, {a, b}, {a, b}, {a, b},
+      {a, b}, {a, b}, {a, b}, {a, b},
+      {a, b}, {a, b}, {a, b}, {a, b},
+      {a, b}, {a, b}, {a, b}, {a, b},
 
-  auto model_factory = NewBatchingDualNetFactory(games.size());
+      {c, d}, {c, d}, {c, d}, {c, d},
+      {c, d}, {c, d}, {c, d}, {c, d},
+      {c, d}, {c, d}, {c, d}, {c, d},
+      {c, d}, {c, d}, {c, d}, {c, d},
+      {c, d}, {c, d}, {c, d}, {c, d},
+      */
+      // {a, c}, {a, c}, {a, c}, {a, c},
+      // {a, c}, {a, c}, {a, c}, {a, c},
+      // clang-format on
+  };
+  for (int i = 0; i < 10; ++i) {
+    model_pairs.emplace_back(a, b);
+  }
+
+  auto model_factory = NewBatchingDualNetFactory(model_pairs.size());
   MctsPlayer::Options player_options;
   ParseMctsPlayerOptionsFromFlags(&player_options);
+  player_options.verbose = false;
 
-  std::vector<std::thread> threads;
-  for (const auto& game : games) {
-    threads.emplace_back([&]() {
-      std::cerr << absl::StrCat("### GAME ", absl::StrFormat("%x", gettid()),
-                                file::Stem(game.first), " vs ",
-                                file::Stem(game.second), "\n");
-      auto curr = absl::make_unique<MctsPlayer>(
-          model_factory->NewDualNet(game.first), player_options);
-      auto next = absl::make_unique<MctsPlayer>(
-          model_factory->NewDualNet(game.second), player_options);
-      model_factory->StartGame(curr->network(), next->network());
-      while (!curr->root()->game_over()) {
-        auto move = curr->SuggestMove();
-        curr->PlayMove(move);
-        next->PlayMove(move);
-        std::swap(curr, next);
+  struct Game {
+    std::string bn;
+    std::string wn;
+    std::unique_ptr<MctsPlayer> black;
+    std::unique_ptr<MctsPlayer> white;
+    std::thread thread;
+  };
+  std::vector<Game> games;
+  for (const auto& p : model_pairs) {
+    Game g;
+    g.bn = p.first;
+    g.wn = p.second;
+    games.push_back(std::move(g));
+  }
+
+  for (auto& g : games) {
+    g.thread = std::thread([&]() mutable {
+      while (true) {
+        g.black = absl::make_unique<MctsPlayer>(model_factory->NewDualNet(g.bn),
+                                                player_options);
+        g.white = absl::make_unique<MctsPlayer>(model_factory->NewDualNet(g.wn),
+                                                player_options);
+        auto* curr = g.black.get();
+        auto* next = g.white.get();
+        model_factory->StartGame(g.black->network(), g.white->network());
+        while (!curr->root()->game_over()) {
+          auto move = curr->SuggestMove();
+          curr->PlayMove(move);
+          next->PlayMove(move);
+          std::swap(curr, next);
+        }
+        std::cerr << absl::StrCat("### DONE ", g.bn, " vs ", g.wn, "\n");
+        model_factory->EndGame(g.black->network(), g.white->network());
       }
-      model_factory->EndGame(curr->network(), next->network());
     });
   }
-  for (auto& t : threads) {
-    t.join();
+  for (auto& g : games) {
+    g.thread.join();
   }
+  std::cerr << "ALL DONE\n";
 }
 
 void Eval() {

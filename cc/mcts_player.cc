@@ -82,10 +82,10 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
   temperature_cutoff_ = !options_.soft_pick ? -1 : (((kN * kN / 12) / 2) * 2);
   root_ = &game_root_;
 
-  if (options_.verbose) {
-    std::cerr << "MctsPlayer options: " << options_ << "\n";
-    std::cerr << "Random seed used: " << rnd_.seed() << "\n";
-  }
+  //   if (options_.verbose) {
+  //     std::cerr << "MctsPlayer options: " << options_ << "\n";
+  //     std::cerr << "Random seed used: " << rnd_.seed() << "\n";
+  //   }
 
   InitializeGame({&bv_, &gv_, Color::kBlack});
 }
