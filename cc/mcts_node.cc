@@ -109,13 +109,7 @@ Coord MctsNode::GetMostVisitedMove() const {
   int best_N = -1;
   for (int i = 0; i < kNumMoves; ++i) {
     int cn = child_N(i);
-    // In cases like Minigui's Study mode, where we can add nodes directly into
-    // the tree without calling TreeSearch, and where we can freely change the
-    // current root around, it's possible to end up in a situation where none of
-    // the children of the game root have been visited (N == 0).
-    // TODO(tommadams): consider returning Coord::kInvalid in these cases
-    // instead of a node with 0 visits.
-    if (cn >= best_N && children.contains(i)) {
+    if (cn >= best_N) {
       if (cn > best_N) {
         moves.clear();
         best_N = cn;
@@ -186,10 +180,25 @@ std::vector<Coord> MctsNode::MostVisitedPath() const {
   std::vector<Coord> path;
   const auto* node = this;
   while (!node->children.empty()) {
-    Coord next_kid = node->GetMostVisitedMove();
-    path.push_back(next_kid);
-    auto it = node->children.find(next_kid);
-    MG_CHECK(it != node->children.end());
+    Coord c = node->GetMostVisitedMove();
+
+    if (node->child_N(c) == 0) {
+      // In cases where nodes have been added to the tree manually (after the
+      // user has played a move, loading an SGF game), it's possible that no
+      // children have been visited. Break before adding a spurious node to the
+      // path.
+      break;
+    }
+
+    path.push_back(c);
+
+    auto it = node->children.find(c);
+    if (it == node->children.end()) {
+      // When we reach the move limit, last node will have children with visit
+      // counts but no children.
+      break;
+    }
+
     node = it->second.get();
   }
   return path;
@@ -311,7 +320,7 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
 }
 
 void MctsNode::IncorporateEndGameResult(float value, MctsNode* up_to) {
-  MG_DCHECK(game_over() || position.n() == kMaxSearchDepth);
+  MG_DCHECK(game_over() || at_move_limit());
   MG_DCHECK(!HasFlag(Flag::kExpanded));
   BackupValue(value, up_to);
 }

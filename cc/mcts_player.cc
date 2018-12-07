@@ -224,7 +224,7 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
   int num_selected = 0;
   for (int i = 0; i < max_iterations; ++i) {
     auto* leaf = root->SelectLeaf();
-    if (leaf->game_over() || leaf->position.n() >= kMaxSearchDepth) {
+    if (leaf->game_over() || leaf->at_move_limit()) {
       float value = leaf->position.CalculateScore(options_.komi) > 0 ? 1 : -1;
       leaf->IncorporateEndGameResult(value, root);
     } else {
@@ -282,7 +282,7 @@ bool MctsPlayer::PlayMove(Coord c) {
   }
 
   // Handle consecutive passing or termination by move limit.
-  if (root_->game_over() || root_->position.n() >= kMaxSearchDepth) {
+  if (root_->game_over() || root_->at_move_limit()) {
     float score = root_->position.CalculateScore(options_.komi);
     result_string_ = FormatScore(score);
     result_ = score < 0 ? -1 : score > 0 ? 1 : 0;

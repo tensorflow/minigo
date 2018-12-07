@@ -413,7 +413,7 @@ class SelfPlayer {
 
       // Play the game.
       auto start_time = absl::Now();
-      while (!player->root()->game_over()) {
+      while (!player->root()->game_over() && !player->root()->at_move_limit()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
           const auto& position = player->root()->position;
@@ -423,7 +423,7 @@ class SelfPlayer {
                     << " O: " << position.num_captures()[1] << std::endl;
           std::cerr << player->root()->Describe() << std::endl;
         }
-        player->PlayMove(move);
+        MG_CHECK(player->PlayMove(move));
       }
 
       {
@@ -642,7 +642,7 @@ class Evaluator {
     std::string model_path = model->model_path;
     std::string other_model_path = other_model->model_path;
 
-    while (!player->root()->game_over()) {
+    while (!player->root()->game_over() && !player->root()->at_move_limit()) {
       // Create the DualNet for a single move and dispose it again. This
       // is required because a BatchingDualNet instance can prevent the
       // inference queue from being flushed if it's not sending any requests.
@@ -655,8 +655,8 @@ class Evaluator {
       if (player->options().verbose) {
         std::cerr << player->root()->Describe() << "\n";
       }
-      player->PlayMove(move);
-      other_player->PlayMove(move);
+      MG_CHECK(player->PlayMove(move));
+      MG_CHECK(other_player->PlayMove(move));
       if (player->options().verbose) {
         std::cerr << player->root()->position.ToPrettyString();
       }
@@ -768,7 +768,7 @@ void Puzzle() {
       puzzles.emplace_back(std::move(players.back()), move);
       players.pop_back();
       for (auto& player : players) {
-        player->PlayMove(move.c);
+        MG_CHECK(player->PlayMove(move.c));
       }
     }
   }

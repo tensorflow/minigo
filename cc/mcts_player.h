@@ -149,14 +149,14 @@ class MctsPlayer {
   //   -1.0 if white won.
   // Check fails if the game is not yet over.
   float result() const {
-    MG_CHECK(root_->game_over());
+    MG_CHECK(root_->game_over() || root_->at_move_limit());
     return result_;
   }
 
   // Return a text description of the game result, e.g. "B+R", "W+1.5".
   // Check fails if the game is not yet over.
   const std::string& result_string() const {
-    MG_CHECK(root_->game_over());
+    MG_CHECK(root_->game_over() || root_->at_move_limit());
     return result_string_;
   }
 
