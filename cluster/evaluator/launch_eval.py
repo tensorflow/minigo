@@ -43,6 +43,7 @@ def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=5):
 
     raw_job_conf = open("cluster/evaluator/cc-evaluator.yaml").read()
 
+    # TODO(should this read bucket_name from fsdb?
     os.environ['BUCKET_NAME'] = bucket_name
 
     os.environ['MODEL_BLACK'] = m1_path
