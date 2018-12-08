@@ -679,10 +679,10 @@ void SelfPlay() {
   std::string d = "saved_models/eval_d.pb";
   std::vector<std::pair<std::string, std::string>> model_pairs = {
       // clang-format off
-      // {a, a},
-      // {a, b},
-      // {a, b},
-      // {a, c},
+      {a, a},
+      {a, b},
+      {a, b},
+      {a, c},
       /*
       {a, b}, {a, b}, {a, b}, {a, b},
       {a, b}, {a, b}, {a, b}, {a, b},
@@ -700,9 +700,9 @@ void SelfPlay() {
       // {a, c}, {a, c}, {a, c}, {a, c},
       // clang-format on
   };
-  for (int i = 0; i < 10; ++i) {
-    model_pairs.emplace_back(a, b);
-  }
+  //   for (int i = 0; i < 10; ++i) {
+  //     model_pairs.emplace_back(a, b);
+  //   }
 
   auto model_factory = NewBatchingDualNetFactory(model_pairs.size());
   MctsPlayer::Options player_options;
@@ -726,7 +726,8 @@ void SelfPlay() {
 
   for (auto& g : games) {
     g.thread = std::thread([&]() mutable {
-      while (true) {
+      // while (true) {
+      {
         g.black = absl::make_unique<MctsPlayer>(model_factory->NewDualNet(g.bn),
                                                 player_options);
         g.white = absl::make_unique<MctsPlayer>(model_factory->NewDualNet(g.wn),
