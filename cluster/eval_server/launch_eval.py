@@ -46,13 +46,12 @@ def launch_eval_job(tag, m1_path, m2_path, job_name, completions):
 
     ######## WRITE DOWN TO BUCKET ########
 
+    # TODO confirm details
+
     metadata_path = os.path.join(bucket_path, 'metadata')
     assert not gfile.Exists(metadata_path), "Already exists"
 
     TS=str(int(time.time()))
-    with gfile.GFile(os.path.join(bucket_path, 'commands_' + TS), "w") as commands:
-        commands.write(str(sys.argv) + "\n")
-
     metadata = {
         'timestamp': TS,
         'date': datetime.datetime.now().isoformat(' '),
@@ -61,8 +60,12 @@ def launch_eval_job(tag, m1_path, m2_path, job_name, completions):
         'job_name': job_name,
         'completions': completions,
     }
+
     with gfile.GFile(metadata_path, "w") as metadata_file:
         json.dump(metadata, metadata_file)
+
+    with gfile.GFile(os.path.join(bucket_path, 'commands_' + TS), "w") as commands:
+        commands.write(str(sys.argv) + "\n")
 
     # TODO(sethtroisi): Support patching in launch_eval.py
 
