@@ -185,11 +185,8 @@ std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
   // implementation DualNet when a new model is found. If we performed batch
   // wrapping before reload wrapping, the reload code would need to update all
   // the BatchingDualNet wrappers.
-  int buffer_count = model_factory->GetBufferCount();
-  int batch_size = std::max(num_parallel_games / buffer_count, 1);
-  if (batch_size > 1) {
-    model_factory =
-        NewBatchingDualNetFactory(std::move(model_factory), batch_size);
+  if (num_parallel_games > 1) {
+    model_factory = NewBatchingDualNetFactory(std::move(model_factory));
   }
 
   return model_factory;

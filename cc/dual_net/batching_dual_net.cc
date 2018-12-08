@@ -70,6 +70,8 @@ class BatchingDualNetFactory : public DualNetFactory {
 };
 
 struct InferenceData {
+  ModelBatcher* batcher;
+  ModelBatcher* other_batcher;
   std::vector<const DualNet::BoardFeatures*> features;
   std::vector<DualNet::Output*> outputs;
   std::string* model_name;
@@ -104,38 +106,25 @@ struct ModelBatcher {
                std::vector<DualNet::Output*> outputs, std::string* model_name) {
     MG_CHECK(features.size() == outputs.size());
 
-    // -----------------------------------------------
     absl::Notification notification;
 
     {
+      // TODO(tommadams): Make this block a method.
       absl::MutexLock lock(&mutex);
-      inference_queue.push(
-          {std::move(features), std::move(outputs), model_name, &notification});
-      if (other_batcher == this) {
-        // Two player game. Players are using the same model.
-        num_waiting += 1;
+      inference_queue.push({this, other_batcher, std::move(features),
+                            std::move(outputs), model_name, &notification});
+      if (other_batcher != nullptr) {
+        other_batcher->num_waiting += 1;
       }
       MaybeRunBatchesLocked();
     }
 
-    if (other_batcher != nullptr && other_batcher != this) {
-      // Two player game. Players are using different models.
+    if (other_batcher != nullptr) {
       absl::MutexLock lock(&other_batcher->mutex);
-      other_batcher->num_waiting += 1;
       other_batcher->MaybeRunBatchesLocked();
     }
 
     notification.WaitForNotification();
-
-    if (other_batcher == this) {
-      // Two player game. Players are using the same model.
-      absl::MutexLock lock(&mutex);
-      num_waiting -= 1;
-    } else if (other_batcher != nullptr) {
-      // Two player game. Players are using different models.
-      absl::MutexLock lock(&other_batcher->mutex);
-      other_batcher->num_waiting -= 1;
-    }
   }
 
   // TODO(tommadams): make this private
@@ -146,11 +135,6 @@ struct ModelBatcher {
       if (inference_queue.empty()) {
         return;
       }
-      auto str =
-          absl::StrCat(absl::StrFormat("%x", gettid()), " MRB ",
-                       file::Stem(model_path), " iq:", inference_queue.size(),
-                       " nw:", num_waiting, " nc:", num_active_clients);
-      std::cerr << absl::StrCat(str, "  YES\n");
       RunBatch();
     }
   }
@@ -177,23 +161,33 @@ struct ModelBatcher {
       inference_queue.pop();
     }
 
-    std::vector<std::string> parts = {absl::StrFormat("%x", gettid()), "RUN",
-                                      absl::StrCat(num_active_clients)};
     std::string model_name;
 
-    // Unlock the mutex while running inference.
+    // Unlock the mutex while running inference. This allows more inferences
+    // to be enqueued while inference is running.
     mutex.Unlock();
 
     model_impl->RunMany(std::move(features), std::move(outputs), &model_name);
-    for (const auto& inference : inferences) {
+
+    for (auto& inference : inferences) {
       if (inference.model_name != nullptr) {
         *inference.model_name = model_name;
-        parts.emplace_back(file::Stem(model_name));
       }
+      // For all two player games, tell the batcher of the opponent model that
+      // it isn't blocked on this inference any more.
+      if (inference.other_batcher != nullptr) {
+        inference.other_batcher->num_waiting -= 1;
+      }
+    }
+
+    // Unblock all the waiting BatchingDualNets. Notify must be called after
+    // decrementing the num_waiting counts to avoid the other_batcher launching
+    // a batch too early.
+    for (auto& inference : inferences) {
       inference.notification->Notify();
     }
-    parts.push_back("\n");
-    std::cerr << absl::StrJoin(parts, " ");
+
+    // Lock the mutex again.
     mutex.Lock();
   }
 
@@ -206,7 +200,7 @@ struct ModelBatcher {
   // are currently waiting for the other player to play a move. These clients
   // are not going to make an inference request until it's their turn and the
   // batcher shouldn't wait for them to make a request.
-  size_t num_waiting = 0 GUARDED_BY(&mutex);
+  std::atomic<size_t> num_waiting{0};
 
   // Number of clients of this batcher that are currently playing a game.
   size_t num_active_clients = 0 GUARDED_BY(&mutex);

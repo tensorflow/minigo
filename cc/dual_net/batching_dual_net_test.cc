@@ -26,45 +26,19 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-// DO NOT CHECK IN
-// DO NOT CHECK IN
-// DO NOT CHECK IN
-#include <sys/syscall.h>
-#include <unistd.h>
-#include "absl/strings/str_cat.h"
-#include "absl/strings/str_format.h"
-#include "absl/strings/string_view.h"
-#define gettid() syscall(SYS_gettid)
-// DO NOT CHECK IN
-// DO NOT CHECK IN
-// DO NOT CHECK IN
-//
 namespace minigo {
 namespace {
 
 class WaitingDualNet;
 class WaitingDualNetFactory;
 
-template <typename Format, typename... Args>
-void Log(Format format, const Args&... args) {
-  std::cerr << absl::StrCat(absl::StrFormat("%x ", gettid()),
-                            absl::StrFormat(format, args...), "\n");
-}
-
 struct EvaluatedBatch {
-  EvaluatedBatch(std::string model, size_t size)
-      : model(std::move(model)), size(size) {}
-  std::string model;
-  size_t size;
+  EvaluatedBatch() = default;
+  EvaluatedBatch(std::string model_path, size_t size)
+      : model_path(std::move(model_path)), size(size) {}
+  std::string model_path;
+  size_t size = 0;
 };
-
-bool operator==(const EvaluatedBatch& a, const EvaluatedBatch& b) {
-  return a.model == b.model && a.size == b.size;
-}
-
-std::ostream& operator<<(std::ostream& os, const EvaluatedBatch& x) {
-  return os << "{" << x.model << ", " << x.size << "}";
-}
 
 // Why doesn't absl have this already?
 class Semaphore {
@@ -72,19 +46,15 @@ class Semaphore {
   void Post() {
     absl::MutexLock lock(&mutex_);
     ++count_;
-    // Log("SEM Post %p %d", this, count_);
     cond_var_.Signal();
   }
 
   void Wait() {
     absl::MutexLock lock(&mutex_);
-    // Log("SEM Wait %p %d", this, count_);
     while (count_ == 0) {
-      // Log("SEM Waiting %p", this);
       cond_var_.Wait(&mutex_);
     }
     --count_;
-    // Log("SEM Got %p %d", this, count_);
   }
 
  private:
@@ -126,11 +96,15 @@ class WaitingDualNetFactory : public DualNetFactory {
   int GetBufferCount() const override;
   std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) override;
 
-  // Notify the given model that it should run eval.
-  void Notify(const std::string& model_path) const;
+  // Notifies the batcher for the given model_path, so that it can run a single
+  // batch of inferences.
+  // CHECK fails if batches_ is empty.
+  // CHECK fails if the front element in the batches_ queue doesn't match the
+  // given model_path or expected_batch_size.
+  void FlushBatch(const std::string& model_path, size_t expected_batch_size);
 
+  // Called by WaitingDualNet::RunMany.
   void PushEvaluatedBatch(const std::string& model, size_t size);
-  EvaluatedBatch PopEvaluatedBatch();
 
  private:
   const int buffer_count_;
@@ -145,24 +119,17 @@ WaitingDualNet::WaitingDualNet(WaitingDualNetFactory* factory,
 
 void WaitingDualNet::RunMany(std::vector<const BoardFeatures*> features,
                              std::vector<Output*> outputs, std::string* model) {
-  // Log("RunMany WAIT %p", &before_);
   before_.Wait();
-  // Log("RunMany WAITED %p", &before_);
   factory_->PushEvaluatedBatch(model_, features.size());
   if (model != nullptr) {
     *model = model_;
   }
-  // Log("RunMany POST %p", &after_);
   after_.Post();
-  // Log("RunMany DONE");
 }
 
 void WaitingDualNet::Notify() {
-  // Log("Notify POST %p", &before_);
   before_.Post();
-  // Log("Notify WAIT %p", &after_);
   after_.Wait();
-  // Log("Notify DONE");
 }
 
 WaitingDualNetFactory::WaitingDualNetFactory(int buffer_count)
@@ -178,7 +145,9 @@ std::unique_ptr<DualNet> WaitingDualNetFactory::NewDualNet(
   return model;
 }
 
-void WaitingDualNetFactory::Notify(const std::string& model_path) const {
+void WaitingDualNetFactory::FlushBatch(const std::string& model_path,
+                                       size_t expected_batch_size) {
+  // Find the model for the given model_path.
   WaitingDualNet* model;
   {
     absl::MutexLock lock(&mutex_);
@@ -186,22 +155,29 @@ void WaitingDualNetFactory::Notify(const std::string& model_path) const {
     MG_CHECK(it != models_.end());
     model = it->second;
   }
+
+  // Notify it, letting it run a single batch.
   model->Notify();
+
+  // The model should now have pushed a batch on to the batches_ queue: pop it
+  // off or die trying.
+  EvaluatedBatch batch;
+  {
+    absl::MutexLock lock(&mutex_);
+    MG_CHECK(!batches_.empty());
+    batch = std::move(batches_.front());
+    batches_.pop();
+  }
+
+  // Check the popped batch matches the expected batch.
+  MG_CHECK(batch.model_path == model_path);
+  MG_CHECK(batch.size == expected_batch_size);
 }
 
 void WaitingDualNetFactory::PushEvaluatedBatch(const std::string& model,
                                                size_t size) {
   absl::MutexLock lock(&mutex_);
-  Log("BATCH %s %d", model, (int)size);
   batches_.emplace(model, size);
-}
-
-EvaluatedBatch WaitingDualNetFactory::PopEvaluatedBatch() {
-  absl::MutexLock lock(&mutex_);
-  MG_CHECK(!batches_.empty());
-  auto batch = std::move(batches_.front());
-  batches_.pop();
-  return batch;
 }
 
 class BatchingDualNetTest : public ::testing::Test {
@@ -224,12 +200,8 @@ class BatchingDualNetTest : public ::testing::Test {
     batching_factory_->EndGame(black, white);
   }
 
-  void Notify(const std::string& model_path) const {
-    waiting_factory_->Notify(model_path);
-  }
-
-  EvaluatedBatch PopEvaluatedBatch() {
-    return waiting_factory_->PopEvaluatedBatch();
+  void FlushBatch(const std::string& model_path, size_t expected_batch_size) {
+    waiting_factory_->FlushBatch(model_path, expected_batch_size);
   }
 
  private:
@@ -238,51 +210,88 @@ class BatchingDualNetTest : public ::testing::Test {
   std::unique_ptr<DualNetFactory> batching_factory_;
 };
 
-// Simulate self play, where one player plays each game.
-// Batching is configured to use a single buffer.
-TEST_F(BatchingDualNetTest, SelfPlaySingleBuffer) {
-  InitFactory(1);
+TEST_F(BatchingDualNetTest, SelfPlay) {
+  constexpr int kNumGames = 6;
 
   struct Game {
+    DualNet::BoardFeatures features;
+    DualNet::Output output;
     std::unique_ptr<DualNet> model;
     std::thread thread;
   };
 
-  constexpr int kNumGames = 4;
-  constexpr int kNumReads = 2;
+  // Test single, double and triple buffering.
+  for (int buffer_count = 1; buffer_count <= 3; ++buffer_count) {
+    InitFactory(buffer_count);
+    int expected_batch_size = kNumGames / buffer_count;
 
-  std::vector<Game> games;
-  for (int i = 0; i < kNumGames; ++i) {
-    Game game;
-    game.model = NewDualNet("a");
-    StartGame(game.model.get(), game.model.get());
-    games.push_back(std::move(game));
-  }
+    std::vector<Game> games;
+    for (int i = 0; i < kNumGames; ++i) {
+      Game game;
+      game.model = NewDualNet("a");
+      StartGame(game.model.get(), game.model.get());
+      games.push_back(std::move(game));
+    }
 
-  for (auto& game : games) {
-    game.thread = std::thread([this, &game] {
-      DualNet::BoardFeatures features;
-      DualNet::Output output;
-      for (int i = 0; i < kNumReads; ++i) {
-        Log("RunMany(%d)", i);
-        game.model->RunMany({&features}, {&output}, nullptr);
-      }
+    for (auto& game : games) {
+      game.thread = std::thread([this, &game] {
+        game.model->RunMany({&game.features}, {&game.output}, nullptr);
+      });
+    }
+
+    for (int i = 0; i < kNumGames / expected_batch_size; ++i) {
+      FlushBatch("a", expected_batch_size);
+    }
+
+    for (auto& game : games) {
       EndGame(game.model.get(), game.model.get());
-      Log("END");
-    });
+      game.thread.join();
+    }
   }
-
-  for (int i = 0; i < kNumReads; ++i) {
-    Notify("a");
-    EXPECT_EQ(EvaluatedBatch("a", 4), PopEvaluatedBatch());
-  }
-
-  Log("JOINING");
-  for (auto& game : games) {
-    game.thread.join();
-  }
-  Log("JOINED");
 }
 
+TEST_F(BatchingDualNetTest, EvalDoubleBuffer) {
+  constexpr int kNumGames = 6;
+
+  struct Game {
+    DualNet::BoardFeatures features;
+    DualNet::Output output;
+    std::unique_ptr<DualNet> black;
+    std::unique_ptr<DualNet> white;
+    std::thread thread;
+  };
+
+  // Test single, double and triple buffering.
+  for (int buffer_count = 1; buffer_count <= 3; ++buffer_count) {
+    InitFactory(buffer_count);
+    int expected_batch_size = kNumGames / buffer_count;
+
+    std::vector<Game> games;
+    for (int i = 0; i < kNumGames; ++i) {
+      Game game;
+      game.black = NewDualNet("black");
+      game.white = NewDualNet("white");
+      StartGame(game.black.get(), game.white.get());
+      games.push_back(std::move(game));
+    }
+
+    for (auto& game : games) {
+      game.thread = std::thread([this, &game] {
+        game.black->RunMany({&game.features}, {&game.output}, nullptr);
+        game.white->RunMany({&game.features}, {&game.output}, nullptr);
+      });
+    }
+
+    for (int i = 0; i < kNumGames / expected_batch_size; ++i) {
+      FlushBatch("black", expected_batch_size);
+      FlushBatch("white", expected_batch_size);
+    }
+
+    for (auto& game : games) {
+      EndGame(game.black.get(), game.black.get());
+      game.thread.join();
+    }
+  }
+}
 }  // namespace
 }  // namespace minigo
