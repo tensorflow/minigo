@@ -34,6 +34,11 @@ class ModelBatcher {
   ModelBatcher(std::unique_ptr<DualNet> model_impl, size_t buffering)
       : model_impl_(std::move(model_impl)), buffering_(buffering) {}
 
+  ~ModelBatcher() {
+    std::cerr << "Ran " << num_batches_ << " batches with an average size of "
+              << static_cast<float>(num_inferences_) / num_batches_ << ".\n";
+  }
+
   void StartGame() LOCKS_EXCLUDED(&mutex_) {
     absl::MutexLock lock(&mutex_);
     num_active_clients_ += 1;
@@ -133,6 +138,9 @@ class ModelBatcher {
       queue_.pop();
     }
 
+    num_batches_ += 1;
+    num_inferences_ += features.size();
+
     // Unlock the mutex while running inference. This allows more inferences
     // to be enqueued while inference is running.
     mutex_.Unlock();
@@ -173,6 +181,10 @@ class ModelBatcher {
 
   // Number of clients of this batcher that are currently playing a game.
   size_t num_active_clients_ = 0 GUARDED_BY(&mutex_);
+
+  // Stats that get reported when the ModelBatcher is destroyed.
+  size_t num_batches_ = 0 GUARDED_BY(&mutex_);
+  size_t num_inferences_ = 0 GUARDED_BY(&mutex_);
 };
 
 // The BatchingDualNet is a thin client for a ModelBatcher, which does all
