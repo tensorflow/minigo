@@ -715,8 +715,6 @@ void Puzzle() {
       // model's suggested move to the actual move played in the game.
       for (size_t move_to_predict = 0; move_to_predict < moves.size();
            ++move_to_predict) {
-        std::cerr << absl::StrCat(move_to_predict, "/", moves.size(), "\n");
-
         // Reset the game and play up to the position to be tested.
         player->NewGame();
         for (size_t i = 0; i < move_to_predict; ++i) {
