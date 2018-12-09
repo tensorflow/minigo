@@ -175,13 +175,6 @@ minigo_cc_library(
     hdrs = ["batching_dual_net.h"],
     deps = [
         ":dual_net",
-        # DO NOT CHECK IN
-        # DO NOT CHECK IN
-        # DO NOT CHECK IN
-        "//cc/file",
-        # DO NOT CHECK IN
-        # DO NOT CHECK IN
-        # DO NOT CHECK IN
         "//cc:base",
         "//cc:check",
         "@com_google_absl//absl/container:flat_hash_map",
