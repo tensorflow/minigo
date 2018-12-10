@@ -294,22 +294,15 @@ class GameQueue:
         # of the total moves, then trimming the result.
         total_moves = self.count_moves_in_game_range(start_game, end_game)
         probability = moves / (total_moves * 0.99)
-        utils.dbg('Row range: %s - %s; total moves: %d; probability %.3f' % (
-            start_row, end_row, total_moves, probability))
+        utils.dbg('Row range: %s - %s; total moves: %d; probability %.3f; moves %d' % (
+            start_row, end_row, total_moves, probability, moves))
         shards = 8
         ds = self.tf_table.parallel_scan_range(start_row, end_row,
                                                probability=probability,
-                                               num_parallel_scans=shards,
                                                columns=[(column_family, column)])
         if shuffle:
-            rds = tf.data.Dataset.from_tensor_slices(
-                tf.random_shuffle(tf.range(0, shards, dtype=tf.int64)))
-            ds = rds.apply(
-                tf.contrib.data.parallel_interleave(
-                    lambda x: ds.shard(shards, x),
-                    cycle_length=shards, block_length=1024,
-                    sloppy=True))
-            ds = ds.shuffle(shards * 1024 * 2)
+            utils.dbg('Doing a complete shuffle of %d moves' % moves)
+            ds = ds.shuffle(moves)
         ds = ds.take(moves)
         return ds
 
