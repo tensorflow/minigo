@@ -515,13 +515,6 @@ def export_model(model_path):
         tf.gfile.Copy(filename, destination_path)
 
 
-def freeze_latest_checkpoint_tpu():
-    estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.work_dir,
-                                       params=FLAGS.flag_values_dict())
-    latest_checkpoint = estimator.latest_checkpoint()
-    freeze_graph_tpu(latest_checkpoint)
-
-
 def freeze_graph(model_path):
     n = DualNetwork(model_path)
     out_graph = tf.graph_util.convert_variables_to_constants(
@@ -533,8 +526,16 @@ def freeze_graph(model_path):
 def freeze_graph_tpu(model_path):
     """Custom freeze_graph implementation for Cloud TPU."""
 
+    assert model_path
     assert FLAGS.tpu_name
-    sess = tf.Session(FLAGS.tpu_name)
+    if FLAGS.tpu_name.startswith('grpc://'):
+        tpu_grpc_url = FLAGS.tpu_name
+    else:
+        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+            FLAGS.tpu_name, zone=None, project=None)
+        tpu_grpc_url = tpu_cluster_resolver.get_master()
+    sess = tf.Session(tpu_grpc_url)
+
 
     output_names = []
     with sess.graph.as_default():

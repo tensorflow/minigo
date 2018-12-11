@@ -4,7 +4,7 @@
 # Network architecture flags
 --conv_width=256
 --fc_width=256
---trunk_layers=20
+--trunk_layers=19
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)

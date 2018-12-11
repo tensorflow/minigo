@@ -20,10 +20,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${SCRIPT_DIR}/common.sh
 source ${SCRIPT_DIR}/utils.sh
 
-export NUM_NODES=8
-
-ZONE=us-central1-f
-
+export NUM_NODES=128
 
 echo "TPU Cluster Creation"
 echo "--------------------------------------"
@@ -42,7 +39,7 @@ check_gcloud_exists
 gcloud beta container clusters create \
     --project=$PROJECT \
     --zone=$ZONE \
-    --cluster-version=1.10 \
+    --cluster-version=1.11 \
     --scopes=cloud-platform \
     --network=$CLUSTER_NAME \
     --enable-ip-alias \

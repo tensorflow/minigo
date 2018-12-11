@@ -37,7 +37,7 @@ import rl_loop.fsdb as fsdb
 FLAGS = flags.FLAGS
 RESIGN_FLAG_REGEX = re.compile(r'--resign_threshold=([-\d.]+)')
 
-def get_95_percentile_bleak(n_back=1000):
+def get_95_percentile_bleak(n_back=500):
     """Gets the 95th percentile of bleakest_eval from bigtable"""
     end_game = int(bigtable_input._games_nr.latest_game_number())
     start_game = end_game - n_back if end_game >= n_back else 0
@@ -62,7 +62,6 @@ def update_flagfile(flags_path, new_threshold):
     lines = re.sub(RESIGN_FLAG_REGEX, "--resign_threshold={:.3f}".format(new_threshold), lines)
 
     print("Updated percentile from {} to {:.3f}".format(old_threshold, new_threshold))
-    print(lines)
     with tf.gfile.GFile(flags_path, 'w') as f:
         f.write(lines)
 

@@ -56,9 +56,9 @@ def validate(*tf_records):
                 FLAGS.train_batch_size, tf_records, filter_amount=0.05,
                 shuffle_examples=False)
 
-    steps = FLAGS.examples_to_validate / FLAGS.train_batch_size
+    steps = FLAGS.examples_to_validate // FLAGS.train_batch_size
     if FLAGS.use_tpu:
-        steps /= FLAGS.num_tpu_cores
+        steps //= FLAGS.num_tpu_cores
 
     estimator = dual_net.get_estimator()
     with utils.logged_timer("Validating"):
