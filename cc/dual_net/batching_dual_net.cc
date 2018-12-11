@@ -23,7 +23,6 @@ class ModelBatcher {
   // A single inference request from a client, possibly containing multiple
   // individual inferences because of virtual losses.
   struct InferenceRequest {
-    ModelBatcher* batcher;
     ModelBatcher* other_batcher;
     std::vector<const DualNet::BoardFeatures*> features;
     std::vector<DualNet::Output*> outputs;
@@ -63,7 +62,7 @@ class ModelBatcher {
 
     {
       absl::MutexLock lock(&mutex_);
-      queue_.push({this, other_batcher, std::move(features), std::move(outputs),
+      queue_.push({other_batcher, std::move(features), std::move(outputs),
                    model_name, &notification});
       if (other_batcher != nullptr) {
         other_batcher->num_waiting_ += 1;
