@@ -15,6 +15,6 @@ cc_library(
         "utils.h",
     ],
     deps = [
-        "//cc:check",
+        "//cc:logging",
     ],
 )

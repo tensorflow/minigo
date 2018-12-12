@@ -22,7 +22,7 @@
 
 #include "absl/strings/str_format.h"
 #include "cc/algorithm.h"
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 

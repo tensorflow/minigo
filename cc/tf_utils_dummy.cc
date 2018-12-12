@@ -14,7 +14,7 @@
 
 #include "cc/tf_utils.h"
 
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 namespace tf_utils {
@@ -22,7 +22,7 @@ namespace tf_utils {
 void WriteGameExamples(const std::string& output_dir,
                        const std::string& output_name,
                        const MctsPlayer& player) {
-  MG_FATAL()
+  MG_LOG(FATAL)
       << "Can't write TensorFlow examples without TensorFlow support enabled. "
          "Please recompile, passing --define=tf=1 to bazel build.";
 }

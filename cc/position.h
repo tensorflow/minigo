@@ -17,16 +17,15 @@
 
 #include <array>
 #include <cstdint>
-#include <iostream>
 #include <memory>
 #include <string>
 
-#include "cc/check.h"
 #include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/coord.h"
 #include "cc/group.h"
 #include "cc/inline_vector.h"
+#include "cc/logging.h"
 #include "cc/stone.h"
 #include "cc/zobrist.h"
 
@@ -189,7 +188,6 @@ class Position {
   MoveType ClassifyMove(Coord c) const;
 
   std::string ToSimpleString() const;
-  std::string ToGroupString() const;
   std::string ToPrettyString(bool use_ansi_colors = true) const;
 
   Color to_play() const { return to_play_; }

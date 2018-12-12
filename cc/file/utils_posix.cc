@@ -17,12 +17,12 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <cstdio>
-#include <iostream>
 #include <string>
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "cc/file/path.h"
+#include "cc/logging.h"
 
 namespace minigo {
 namespace file {
@@ -75,7 +75,7 @@ bool WriteFile(std::string path, absl::string_view contents) {
 
   FILE* f = fopen(path.c_str(), "wb");
   if (f == nullptr) {
-    std::cerr << "Error opening " << path << " for write" << std::endl;
+    MG_LOG(ERROR) << "error opening " << path << " for write";
     return false;
   }
 
@@ -83,7 +83,7 @@ bool WriteFile(std::string path, absl::string_view contents) {
   if (!contents.empty()) {
     ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
     if (!ok) {
-      std::cerr << "Error writing " << path << std::endl;
+      MG_LOG(ERROR) << "error writing " << path;
     }
   }
   fclose(f);
@@ -95,7 +95,7 @@ bool ReadFile(std::string path, std::string* contents) {
 
   FILE* f = fopen(path.c_str(), "rb");
   if (f == nullptr) {
-    std::cerr << "Error opening " << path << " for read" << std::endl;
+    MG_LOG(ERROR) << "error opening " << path << " for read";
     return false;
   }
   fseek(f, 0, SEEK_END);
@@ -103,7 +103,7 @@ bool ReadFile(std::string path, std::string* contents) {
   fseek(f, 0, SEEK_SET);
   bool ok = fread(&(*contents)[0], contents->size(), 1, f) == 1;
   if (!ok) {
-    std::cerr << "Error reading " << path << std::endl;
+    MG_LOG(ERROR) << "error reading " << path;
   }
   fclose(f);
   return ok;
@@ -115,7 +115,7 @@ bool GetModTime(std::string path, uint64_t* mtime_usec) {
   struct stat s;
   int result = stat(path.c_str(), &s);
   if (result != 0) {
-    std::cerr << "Error statting " << path << ": " << result << std::endl;
+    MG_LOG(ERROR) << "error statting " << path << ": " << result;
     return false;
   }
   *mtime_usec = static_cast<uint64_t>(s.st_mtime) * 1000 * 1000;
@@ -127,7 +127,7 @@ bool ListDir(std::string directory, std::vector<std::string>* files) {
 
   DIR* dirp = opendir(directory.c_str());
   if (dirp == nullptr) {
-    std::cerr << "Could not open directory " << directory << std::endl;
+    MG_LOG(ERROR) << "could not open directory " << directory;
     return false;
   }
   files->clear();

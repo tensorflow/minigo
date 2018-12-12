@@ -34,7 +34,6 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "cc/check.h"
 #include "cc/constants.h"
 #include "cc/dual_net/batching_dual_net.h"
 #include "cc/dual_net/factory.h"
@@ -43,6 +42,7 @@
 #include "cc/file/utils.h"
 #include "cc/gtp_player.h"
 #include "cc/init.h"
+#include "cc/logging.h"
 #include "cc/mcts_player.h"
 #include "cc/platform/utils.h"
 #include "cc/random.h"
@@ -315,9 +315,8 @@ class SelfPlayer {
     for (auto& t : threads_) {
       t.join();
     }
-    std::cerr << "Played " << FLAGS_parallel_games << " games, total time "
-              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-              << std::endl;
+    MG_LOG(INFO) << "Played " << FLAGS_parallel_games << " games, total time "
+                 << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
   }
 
  private:
@@ -361,7 +360,7 @@ class SelfPlayer {
         absl::StrSplit(FLAGS_output_bigtable, ',');
     bool use_bigtable = bigtable_spec.size() == 3;
     if (!FLAGS_output_bigtable.empty() && !use_bigtable) {
-      MG_FATAL()
+      MG_LOG(FATAL)
           << "Bigtable output must be of the form: project,instance,table";
       return;
     }
@@ -388,11 +387,12 @@ class SelfPlayer {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
           const auto& position = player->root()->position;
-          std::cerr << player->root()->position.ToPrettyString(use_ansi_colors);
-          std::cerr << "Move: " << position.n()
-                    << " Captures X: " << position.num_captures()[0]
-                    << " O: " << position.num_captures()[1] << std::endl;
-          std::cerr << player->root()->Describe() << std::endl;
+          MG_LOG(INFO) << player->root()->position.ToPrettyString(
+              use_ansi_colors);
+          MG_LOG(INFO) << "Move: " << position.n()
+                       << " Captures X: " << position.num_captures()[0]
+                       << " O: " << position.num_captures()[1];
+          MG_LOG(INFO) << player->root()->Describe();
         }
         MG_CHECK(player->PlayMove(move));
       }
@@ -438,7 +438,7 @@ class SelfPlayer {
       }
     } while (game_options.run_forever);
 
-    std::cerr << "Thread " << thread_id << " stopping" << std::endl;
+    MG_LOG(INFO) << "Thread " << thread_id << " stopping";
   }
 
   void MaybeReloadFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
@@ -447,11 +447,12 @@ class SelfPlayer {
     }
     uint64_t new_flags_timestamp;
     MG_CHECK(file::GetModTime(FLAGS_flags_path, &new_flags_timestamp));
-    std::cerr << "flagfile:" << FLAGS_flags_path
-              << " old_ts:" << absl::FromUnixMicros(flags_timestamp_)
-              << " new_ts:" << absl::FromUnixMicros(new_flags_timestamp);
-    if (new_flags_timestamp == flags_timestamp_) {
-      std::cerr << " skipping" << std::endl;
+    bool skip = new_flags_timestamp == flags_timestamp_;
+    MG_LOG(INFO) << "flagfile:" << FLAGS_flags_path
+                 << " old_ts:" << absl::FromUnixMicros(flags_timestamp_)
+                 << " new_ts:" << absl::FromUnixMicros(new_flags_timestamp)
+                 << (skip ? " skipping" : "");
+    if (skip) {
       return;
     }
 
@@ -461,7 +462,7 @@ class SelfPlayer {
 
     std::vector<std::string> lines =
         absl::StrSplit(contents, '\n', absl::SkipEmpty());
-    std::cerr << " loaded flags:" << absl::StrJoin(lines, " ") << std::endl;
+    MG_LOG(INFO) << " loaded flags:" << absl::StrJoin(lines, " ");
 
     for (absl::string_view line : lines) {
       std::pair<absl::string_view, absl::string_view> line_comment =
@@ -474,8 +475,8 @@ class SelfPlayer {
       std::pair<std::string, std::string> flag_value =
           absl::StrSplit(line, absl::MaxSplits('=', 1));
       flag_value.first = flag_value.first.substr(2);
-      std::cerr << "Setting command line flag: --" << flag_value.first << "="
-                << flag_value.second << std::endl;
+      MG_LOG(INFO) << "Setting command line flag: --" << flag_value.first << "="
+                   << flag_value.second;
       gflags::SetCommandLineOption(flag_value.first.c_str(),
                                    flag_value.second.c_str());
     }
@@ -509,10 +510,9 @@ class Evaluator {
     Model model_a(FLAGS_model);
     Model model_b(FLAGS_model_two);
 
-    std::cerr << "DualNet factories created from " << FLAGS_model << "\n  and "
-              << FLAGS_model_two << " in "
-              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-              << std::endl;
+    MG_LOG(INFO) << "DualNet factories created from " << FLAGS_model
+                 << "\n  and " << FLAGS_model_two << " in "
+                 << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
 
     ParseMctsPlayerOptionsFromFlags(&options_);
     options_.inject_noise = false;
@@ -531,8 +531,8 @@ class Evaluator {
       t.join();
     }
 
-    std::cerr << "Evaluated " << num_games << " games, total time "
-              << (absl::Now() - start_time) << std::endl;
+    MG_LOG(INFO) << "Evaluated " << num_games << " games, total time "
+                 << (absl::Now() - start_time);
 
     auto name_length = std::max(model_a.name.size(), model_b.name.size());
     auto format_name = [&](const std::string& name) {
@@ -542,20 +542,19 @@ class Evaluator {
       return absl::StrFormat(" %5d %6.2f%%", wins, wins * 100.0f / num_games);
     };
     auto print_result = [&](const Model& model) {
-      std::cerr << format_name(model.name)
-                << format_wins(model.black_wins + model.white_wins)
-                << format_wins(model.black_wins)
-                << format_wins(model.white_wins) << std::endl;
+      MG_LOG(INFO) << format_name(model.name)
+                   << format_wins(model.black_wins + model.white_wins)
+                   << format_wins(model.black_wins)
+                   << format_wins(model.white_wins);
     };
 
-    std::cerr << format_name("Wins")
-              << "        Total         Black         White" << std::endl;
+    MG_LOG(INFO) << format_name("Wins")
+                 << "        Total         Black         White";
     print_result(model_a);
     print_result(model_b);
-    std::cerr << format_name("") << "              "
-              << format_wins(model_a.black_wins + model_b.black_wins)
-              << format_wins(model_a.white_wins + model_b.white_wins);
-    std::cerr << std::endl;
+    MG_LOG(INFO) << format_name("") << "              "
+                 << format_wins(model_a.black_wins + model_b.black_wins)
+                 << format_wins(model_a.white_wins + model_b.white_wins);
   }
 
  private:
@@ -568,7 +567,7 @@ class Evaluator {
         absl::StrSplit(FLAGS_output_bigtable, ',');
     bool use_bigtable = bigtable_spec.size() == 3;
     if (!FLAGS_output_bigtable.empty() && !use_bigtable) {
-      MG_FATAL()
+      MG_LOG(FATAL)
           << "Bigtable output must be of the form: project,instance,table";
       return;
     }
@@ -603,7 +602,7 @@ class Evaluator {
       curr_player->PlayMove(move);
       next_player->PlayMove(move);
       if (curr_player->options().verbose) {
-        std::cerr << curr_player->root()->position.ToPrettyString();
+        MG_LOG(INFO) << curr_player->root()->position.ToPrettyString();
       }
       std::swap(curr_player, next_player);
     }
@@ -618,8 +617,8 @@ class Evaluator {
     }
 
     if (verbose) {
-      std::cerr << black->result_string() << "\n";
-      std::cerr << "Black was: " << black->name() << "\n";
+      MG_LOG(INFO) << black->result_string();
+      MG_LOG(INFO) << "Black was: " << black->name();
     }
 
     // Write SGF.
@@ -639,7 +638,7 @@ class Evaluator {
                                 output_name, FLAGS_bigtable_tag);
     }
 
-    std::cerr << absl::StrCat("Thread ", thread_id, " stopping\n");
+    MG_LOG(INFO) << "Thread " << thread_id << " stopping";
   }
 
   MctsPlayer::Options options_;
@@ -675,9 +674,8 @@ void Puzzle() {
   auto start_time = absl::Now();
 
   auto model_factory = NewDualNetFactory();
-  std::cerr << "DualNet factory created from " << FLAGS_model << " in "
-            << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-            << std::endl;
+  MG_LOG(INFO) << "DualNet factory created from " << FLAGS_model << " in "
+               << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
 
   MctsPlayer::Options options;
   ParseMctsPlayerOptionsFromFlags(&options);
@@ -736,12 +734,10 @@ void Puzzle() {
     thread.join();
   }
 
-  std::cerr << absl::StreamFormat(
-                   "Solved %d of %d puzzles (%3.1f%%), total time %f sec.",
-                   correct_moves, total_moves,
-                   correct_moves * 100.0f / total_moves,
-                   absl::ToDoubleSeconds(absl::Now() - start_time))
-            << std::endl;
+  MG_LOG(INFO) << absl::StreamFormat(
+      "Solved %d of %d puzzles (%3.1f%%), total time %f sec.", correct_moves,
+      total_moves, correct_moves * 100.0f / total_moves,
+      absl::ToDoubleSeconds(absl::Now() - start_time));
 }
 
 }  // namespace
@@ -761,8 +757,7 @@ int main(int argc, char* argv[]) {
   } else if (FLAGS_mode == "puzzle") {
     minigo::Puzzle();
   } else {
-    std::cerr << "Unrecognized mode \"" << FLAGS_mode << "\"\n";
-    return 1;
+    MG_LOG(FATAL) << "Unrecognized mode \"" << FLAGS_mode << "\"";
   }
 
   return 0;

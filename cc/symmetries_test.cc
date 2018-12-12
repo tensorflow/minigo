@@ -15,7 +15,6 @@
 #include "cc/symmetries.h"
 
 #include <array>
-#include <iostream>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

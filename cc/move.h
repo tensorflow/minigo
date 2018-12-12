@@ -15,7 +15,6 @@
 #ifndef CC_MOVE_H_
 #define CC_MOVE_H_
 
-#include <iostream>
 #include <string>
 
 #include "cc/color.h"

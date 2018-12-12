@@ -16,12 +16,12 @@
 #define CC_COORD_H_
 
 #include <cstdint>
-#include <iostream>
+#include <ostream>
 #include <string>
 
 #include "absl/strings/string_view.h"
-#include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 
 namespace minigo {
 

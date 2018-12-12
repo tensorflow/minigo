@@ -35,11 +35,11 @@
 #include "absl/strings/strip.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "cc/check.h"
 #include "cc/constants.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
 #include "cc/init.h"
+#include "cc/logging.h"
 #include "cc/tf_utils.h"
 #include "gflags/gflags.h"
 #include "tensorflow/core/platform/env.h"
@@ -60,11 +60,11 @@ void wait_for_children(std::set<int>* pids, size_t maximum_children) {
     int status;
     int child_pid = wait(&status);
     if (status != 0) {
-      MG_FATAL() << "Child pid " << child_pid << " did not succeed";
+      MG_LOG(FATAL) << "Child pid " << child_pid << " did not succeed";
     }
     auto where = pids->find(child_pid);
     if (where == pids->end()) {
-      MG_FATAL() << "Child pid " << child_pid << " not found";
+      MG_LOG(FATAL) << "Child pid " << child_pid << " not found";
     } else {
       pids->erase(where);
     }
@@ -78,7 +78,8 @@ int main(int argc, char* argv[]) {
       absl::StrSplit(FLAGS_output_bigtable, ',');
   bool use_bigtable = bigtable_spec.size() == 3;
   if (!FLAGS_output_bigtable.empty() && !use_bigtable) {
-    MG_FATAL() << "Bigtable output must be of the form: project,instance,table";
+    MG_LOG(FATAL)
+        << "Bigtable output must be of the form: project,instance,table";
     return 1;
   }
 

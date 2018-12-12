@@ -15,7 +15,7 @@
 #include "cc/dual_net/fake_dual_net.h"
 
 #include "absl/memory/memory.h"
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 

@@ -170,7 +170,7 @@ TEST(DualNetTest, TestBackendsEqual) {
 
   for (const auto& kv : factories) {
     const auto& name = kv.first;
-    std::cerr << "Running " << name << std::endl;
+    MG_LOG(INFO) << "Running " << name;
 
     auto dual_net = kv.second->NewDualNet("cc/dual_net/test_model");
 
@@ -193,7 +193,7 @@ TEST(DualNetTest, TestBackendsEqual) {
     EXPECT_EQ(std::equal(output.policy.begin(), output.policy.end(),
                          ref_output.policy.begin(), pred),
               true)
-        << name << ": " << policy_string(output.policy) << std::endl
+        << name << ": " << policy_string(output.policy) << "\n"
         << ref_name << ": " << policy_string(ref_output.policy);
     EXPECT_NEAR(output.value, ref_output.value, 0.0001f)
         << name << " vs " << ref_name;

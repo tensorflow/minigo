@@ -19,7 +19,7 @@
 #include <new>
 #include <utility>
 
-#include "cc/check.h"
+#include "cc/logging.h"
 #include "cc/platform/utils.h"
 
 namespace minigo {

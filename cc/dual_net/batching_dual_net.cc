@@ -8,7 +8,7 @@
 #include "absl/memory/memory.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 namespace {
@@ -34,8 +34,9 @@ class ModelBatcher {
       : model_impl_(std::move(model_impl)), buffering_(buffering) {}
 
   ~ModelBatcher() {
-    std::cerr << "Ran " << num_batches_ << " batches with an average size of "
-              << static_cast<float>(num_inferences_) / num_batches_ << ".\n";
+    MG_LOG(INFO) << "Ran " << num_batches_
+                 << " batches with an average size of "
+                 << static_cast<float>(num_inferences_) / num_batches_;
   }
 
   void StartGame() LOCKS_EXCLUDED(&mutex_) {

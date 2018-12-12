@@ -69,7 +69,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory() {
 #ifdef MG_ENABLE_TF_DUAL_NET
     return absl::make_unique<TfDualNetFactory>();
 #else
-    MG_FATAL() << "Binary wasn't compiled with tf inference support";
+    MG_LOG(FATAL) << "Binary wasn't compiled with tf inference support";
 #endif  // MG_ENABLE_TF_DUAL_NET
   }
 
@@ -77,7 +77,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory() {
 #ifdef MG_ENABLE_LITE_DUAL_NET
     return absl::make_unique<LiteDualNetFactory>();
 #else
-    MG_FATAL() << "Binary wasn't compiled with lite inference support";
+    MG_LOG(FATAL) << "Binary wasn't compiled with lite inference support";
 #endif  // MG_ENABLE_LITE_DUAL_NET
   }
 
@@ -85,7 +85,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory() {
 #ifdef MG_ENABLE_TPU_DUAL_NET
     return absl::make_unique<TpuDualNetFactory>(FLAGS_tpu_name);
 #else
-    MG_FATAL() << "Binary wasn't compiled with tpu inference support";
+    MG_LOG(FATAL) << "Binary wasn't compiled with tpu inference support";
 #endif  // MG_ENABLE_TPU_DUAL_NET
   }
 
@@ -93,11 +93,11 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory() {
 #ifdef MG_ENABLE_TRT_DUAL_NET
     return absl::make_unique<TrtDualNetFactory>();
 #else
-    MG_FATAL() << "Binary wasn't compiled with trt inference support";
+    MG_LOG(FATAL) << "Binary wasn't compiled with trt inference support";
 #endif  // MG_ENABLE_TRT_DUAL_NET
   }
 
-  MG_FATAL() << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
+  MG_LOG(FATAL) << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
   return nullptr;
 }
 

@@ -15,13 +15,11 @@
 #include <sys/sysctl.h>
 #include <unistd.h>
 
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 
-bool FdSupportsAnsiColors(int fd) {
-  return isatty(fd);
-}
+bool FdSupportsAnsiColors(int fd) { return isatty(fd); }
 
 int GetNumLogicalCpus() {
   int nproc = 0;

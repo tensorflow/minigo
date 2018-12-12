@@ -115,25 +115,10 @@ minigo_cc_library(
         "//conditions:default": ["-lm"],
     }),
     deps = [
-        ":check",
         ":inline_vector",
+        ":logging",
         "//cc/platform",
         "@com_google_absl//absl/strings",
-    ],
-)
-
-minigo_cc_library(
-    name = "check",
-    srcs = [
-        "check.cc",
-    ],
-    hdrs = [
-        "check.h",
-    ],
-    deps = [
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/debugging:stacktrace",
-        "@com_google_absl//absl/debugging:symbolize",
     ],
 )
 
@@ -169,7 +154,20 @@ minigo_cc_library(
     name = "inline_vector",
     hdrs = ["inline_vector.h"],
     deps = [
-        ":check",
+        ":logging",
+        "//cc/platform",
+    ],
+)
+
+minigo_cc_library(
+    name = "logging",
+    srcs = ["logging.cc"],
+    hdrs = ["logging.h"],
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_absl//absl/debugging:symbolize",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -185,7 +183,6 @@ minigo_cc_library(
     ],
     deps = [
         ":base",
-        ":check",
         ":position",
         ":random",
         ":symmetries",
@@ -211,7 +208,6 @@ minigo_cc_library(
     ],
     deps = [
         ":base",
-        ":check",
         ":inline_vector",
         ":tiny_set",
         ":zobrist",
@@ -235,7 +231,6 @@ minigo_cc_library(
     hdrs = ["sgf.h"],
     deps = [
         ":base",
-        ":check",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -246,7 +241,7 @@ minigo_cc_library(
     name = "symmetries",
     hdrs = ["symmetries.h"],
     deps = [
-        ":check",
+        ":base",
     ],
 )
 
@@ -273,7 +268,6 @@ minigo_cc_library(
     hdrs = ["tf_utils.h"],
     deps = [
                ":base",
-               ":check",
                ":mcts",
                "//cc/file",
                "//cc/dual_net",
@@ -313,7 +307,6 @@ minigo_cc_library(
     hdrs = ["test_utils.h"],
     deps = [
         ":base",
-        ":check",
         ":mcts",
         ":position",
         "@com_google_absl//absl/strings",
@@ -412,6 +405,7 @@ minigo_cc_test(
     size = "small",
     srcs = ["thread_safe_queue_test.cc"],
     deps = [
+        ":logging",
         ":thread_safe_queue",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
@@ -427,7 +421,6 @@ minigo_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
-        ":check",
         ":gtp_player",
         ":init",
         ":mcts",
@@ -455,7 +448,6 @@ minigo_cc_binary(
     tags = ["manual"],
     deps = [
         ":base",
-        ":check",
         ":init",
         ":tf_utils",
         "//cc/file",

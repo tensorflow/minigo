@@ -23,8 +23,8 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
-#include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -64,17 +64,17 @@ TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
 }
 
 TpuDualNet::Worker::~Worker() {
-  std::cerr << "Closing session" << std::endl;
+  MG_LOG(INFO) << "Closing session";
   TF_CHECK_OK(session_->Close());
 }
 
 void TpuDualNet::Worker::InitializeTpu() {
-  std::cerr << "Initializing TPU" << std::endl;
+  MG_LOG(INFO) << "Initializing TPU";
   TF_CHECK_OK(session_->Run({}, {}, {"ConfigureDistributedTPU"}, nullptr));
 }
 
 void TpuDualNet::Worker::ShutdownTpu() {
-  std::cerr << "Shutting down TPU" << std::endl;
+  MG_LOG(INFO) << "Shutting down TPU";
   TF_CHECK_OK(session_->Run({}, {}, {"ShutdownDistributedTPU"}, nullptr));
 }
 
@@ -139,8 +139,7 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
   if (!env->FileExists(graph_path_).ok()) {
     auto alt_path = absl::StrCat(graph_path_, ".pb");
     if (env->FileExists(alt_path).ok()) {
-      std::cerr << graph_path << " doesn't exist, using " << alt_path
-                << std::endl;
+      MG_LOG(INFO) << graph_path << " doesn't exist, using " << alt_path;
       graph_path_ = alt_path;
     }
   }
@@ -158,8 +157,8 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
       num_replicas = std::max(num_replicas, replica + 1);
     }
   }
-  std::cerr << "Found " << num_replicas << " model replicas in graph "
-            << graph_path << std::endl;
+  MG_LOG(INFO) << "Found " << num_replicas << " model replicas in graph "
+               << graph_path;
   MG_CHECK(num_replicas > 0);
 
   for (int i = 0; i < kBufferCount; ++i) {
@@ -176,7 +175,7 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
   // Tensorflow lazily initializes the first time Session::Run is called,
   // which can take hundreds of milliseconds. This interfers with time control,
   // so explicitly run inference once during construction.
-  std::cerr << "Running warm-up inferences" << std::endl;
+  MG_LOG(INFO) << "Running warm-up inferences";
   std::vector<std::thread> threads;
   for (int i = 0; i < kBufferCount; ++i) {
     threads.emplace_back([this]() {

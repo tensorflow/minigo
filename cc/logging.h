@@ -12,63 +12,75 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_CHECK_H_
-#define CC_CHECK_H_
+#ifndef CC_LOGGING_H_
+#define CC_LOGGING_H_
 
-#include <iostream>
+#include <sstream>
 
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
 
 namespace minigo {
-
-// MG_CHECK(cond) and MG_DCHECK(cond) halt the program, printing the current
-// the given condition `cond` is not true. MG_CHECK is always enabled, MG_DCHECK
-// is only enabled for debug builds (i.e. when NDEBUG is not defined).
-// Ideally we'd use glog's CHECK macro, which serves the same purpose.
-// Unfortunately TensorFlow's public headers define conflicting macros, which
-// makes depending on both TensorFlow and glog difficult, so we avoid using
-// glog altogether and define our own macros.
-
 namespace internal {
+
+enum class LogLevel {
+  INFO,
+  WARNING,
+  ERROR,
+  FATAL,
+};
+
+// Simple thread-safe logging implementation to replace directly logging to
+// stderr.
+class LogStream {
+ public:
+  LogStream(const char* file, int line, LogLevel level);
+  ~LogStream();
+
+  template <typename T>
+  LogStream& operator<<(const T& t) {
+    stream_ << t;
+    return *this;
+  }
+
+ private:
+  std::stringstream stream_;
+  const char* file_;
+  int line_;
+  LogLevel level_;
+};
 
 void ABSL_ATTRIBUTE_NOINLINE CheckFail(const char* cond, const char* file,
                                        int line);
+
 class CheckFailStream {
  public:
-  CheckFailStream(const char* cond, const char* file, int line)
-      : cond_(cond), file_(file), line_(line) {}
-
-  ~CheckFailStream() {
-    std::cerr << std::endl;
-    CheckFail(cond_, file_, line_);
-  }
+  CheckFailStream(const char* cond, const char* file, int line);
+  ~CheckFailStream();
 
   template <typename T>
   CheckFailStream& operator<<(const T& t) {
-    std::cerr << t;
+    impl_ << t;
     return *this;
   }
 
   operator bool() { return true; }
 
  private:
-  const char* cond_;
-  const char* file_;
-  int line_;
+  LogStream impl_;
 };
 
 }  // namespace internal
-
 }  // namespace minigo
+
+#define MG_LOG(level)                               \
+  ::minigo::internal::LogStream(__FILE__, __LINE__, \
+                                ::minigo::internal::LogLevel::level)
 
 #define MG_CHECK(cond) \
   (cond)               \
-      ? 0              \
+      ? false          \
       : true & ::minigo::internal::CheckFailStream(#cond, __FILE__, __LINE__)
-
-#define MG_FATAL() \
-  ::minigo::internal::CheckFailStream("FATAL", __FILE__, __LINE__)
 
 #ifndef NDEBUG
 #define MG_DCHECK MG_CHECK
@@ -76,4 +88,4 @@ class CheckFailStream {
 #define MG_DCHECK(cond) MG_CHECK(true)
 #endif
 
-#endif  // CC_CHECK_H_
+#endif  // CC_LOGGING_H_

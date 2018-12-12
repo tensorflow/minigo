@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 

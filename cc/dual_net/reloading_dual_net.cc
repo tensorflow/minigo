@@ -34,12 +34,12 @@ bool ReloadingDualNetUpdater::ParseModelPathPattern(
   *directory = std::string(pair.first);
   if (directory->find('%') != std::string::npos ||
       directory->find('*') != std::string::npos) {
-    std::cerr << "invalid pattern \"" << pattern
-              << "\": directory part must not contain '*' or '%'" << std::endl;
+    MG_LOG(ERROR) << "invalid pattern \"" << pattern
+                  << "\": directory part must not contain '*' or '%'";
     return false;
   }
   if (directory->empty()) {
-    std::cerr << "directory not be empty" << std::endl;
+    MG_LOG(ERROR) << "directory not be empty";
     return false;
   }
 
@@ -47,8 +47,9 @@ bool ReloadingDualNetUpdater::ParseModelPathPattern(
   auto it = basename_pattern->find('%');
   if (it == std::string::npos || basename_pattern->find("%d") != it ||
       basename_pattern->rfind("%d") != it) {
-    std::cerr << "invalid pattern \"" << pattern << "\": basename must contain "
-              << " exactly one \"%d\" and no other matchers" << std::endl;
+    MG_LOG(ERROR) << "invalid pattern \"" << pattern
+                  << "\": basename must contain "
+                  << " exactly one \"%d\" and no other matchers";
     return false;
   }
 
@@ -78,8 +79,8 @@ ReloadingDualNetUpdater::ReloadingDualNetUpdater(const std::string& pattern,
 
   // Wait for at least one matching model to be found.
   if (!Poll()) {
-    std::cerr << "Waiting for model that matches pattern \"" << pattern << "\""
-              << std::endl;
+    MG_LOG(INFO) << "Waiting for model that matches pattern \"" << pattern
+                 << "\"";
     do {
       absl::SleepFor(absl::Seconds(1));
     } while (!Poll());
@@ -124,8 +125,7 @@ bool ReloadingDualNetUpdater::Poll() {
 
     // Create new model instances for all registered ReloadingDualNets.
     latest_model_path_ = std::move(path);
-    std::cerr << "Loading new model \"" << latest_model_path_ << "\""
-              << std::endl;
+    MG_LOG(INFO) << "Loading new model \"" << latest_model_path_ << "\"";
     for (auto* model : models_) {
       model->UpdateImpl(factory_impl_, latest_model_path_);
     }

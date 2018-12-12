@@ -62,7 +62,6 @@ minigo_cc_library(
         ":dual_net",
         ":fake_dual_net",
         "//cc:base",
-        "//cc:check",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
     ] + factory_engine_deps,
@@ -75,7 +74,6 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
-        "//cc:check",
         "@com_google_absl//absl/memory",
     ],
 )
@@ -110,7 +108,6 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
-        "//cc:check",
         "//cc:tensorflow",
         "//cc:thread_safe_queue",
         "@com_google_absl//absl/memory",
@@ -127,7 +124,6 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
-        "//cc:check",
         "//cc:tf_lite",
         "//cc/platform",
         "@com_google_absl//absl/memory",
@@ -143,7 +139,6 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
-        "//cc:check",
         "//cc:tensorflow",
         "//cc:thread_safe_queue",
         "@com_google_absl//absl/memory",
@@ -159,7 +154,6 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
-        "//cc:check",
         "//cc:cuda",
         "//cc:tensorrt",
         "//cc:thread_safe_queue",
@@ -176,7 +170,6 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
-        "//cc:check",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",

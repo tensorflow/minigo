@@ -21,8 +21,8 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
-#include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 #include "cc/thread_safe_queue.h"
 #include "cuda/include/cuda_runtime_api.h"
 #include "tensorrt/include/NvInfer.h"
@@ -53,13 +53,13 @@ class TrtDualNet : public DualNet {
     void log(nvinfer1::ILogger::Severity severity, const char* msg) override {
       switch (severity) {
         case Severity::kINTERNAL_ERROR:
-          std::cerr << "TensorRT internal error: " << msg << std::endl;
+          MG_LOG(ERROR) << "TensorRT internal error: " << msg;
           break;
         case Severity::kERROR:
-          std::cerr << "TensorRT error: " << msg << std::endl;
+          MG_LOG(ERROR) << "TensorRT error: " << msg;
           break;
         case Severity::kWARNING:
-          std::cerr << "TensorRT warning: " << msg << std::endl;
+          MG_LOG(WARNING) << "TensorRT warning: " << msg;
           break;
         default:
           break;

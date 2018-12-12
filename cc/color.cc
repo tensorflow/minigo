@@ -35,7 +35,7 @@ absl::string_view ColorToCode(Color color) {
     case Color::kWhite:
       return kWhiteCode;
     default:
-      MG_FATAL() << "<" << static_cast<int>(color) << ">";
+      MG_LOG(FATAL) << "<" << static_cast<int>(color) << ">";
       return "BAD";
   }
 }

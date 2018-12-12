@@ -15,7 +15,6 @@
 #ifndef CC_SGF_H_
 #define CC_SGF_H_
 
-#include <iostream>
 #include <memory>
 #include <string>
 #include <utility>
@@ -25,6 +24,7 @@
 #include "absl/types/span.h"
 #include "cc/color.h"
 #include "cc/coord.h"
+#include "cc/logging.h"
 #include "cc/move.h"
 #include "cc/platform/utils.h"
 
