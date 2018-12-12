@@ -21,6 +21,7 @@ cc_library(
     tags = ["manual"],
     deps = [
         ":path",
+        "//cc:logging",
         "//cc:tensorflow",
         "//cc/platform",
         "@com_google_absl//absl/strings",
@@ -36,6 +37,7 @@ cc_library(
     hdrs = ["utils.h"],
     deps = [
         ":path",
+        "//cc:logging",
         "//cc/platform",
         "@com_google_absl//absl/strings",
     ],

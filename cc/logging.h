@@ -30,8 +30,11 @@ enum class LogLevel {
   FATAL,
 };
 
-// Simple thread-safe logging implementation to replace directly logging to
-// stderr.
+// A simple thread-safe logging stream that replaces logging directly to
+// stderr, which is not thread-safe.
+// All logging is written to stderr.
+// For log levels other than INFO, the line is prefixed with the log level and
+// source code location of the message.
 class LogStream {
  public:
   LogStream(const char* file, int line, LogLevel level);
@@ -77,6 +80,9 @@ class CheckFailStream {
   ::minigo::internal::LogStream(__FILE__, __LINE__, \
                                 ::minigo::internal::LogLevel::level)
 
+// MG_CHECK(cond) and MG_DCHECK(cond) halt the program, printing the current
+// the given condition `cond` is not true. MG_CHECK is always enabled, MG_DCHECK
+// is only enabled for debug builds (i.e. when NDEBUG is not defined).
 #define MG_CHECK(cond) \
   (cond)               \
       ? false          \

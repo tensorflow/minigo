@@ -60,6 +60,7 @@ minigo_cc_library(
     copts = factory_engine_copts,
     deps = [
         ":dual_net",
+        "//cc:logging",
         ":fake_dual_net",
         "//cc:base",
         "@com_github_gflags_gflags//:gflags",
@@ -74,6 +75,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:logging",
         "@com_google_absl//absl/memory",
     ],
 )
@@ -85,6 +87,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:logging",
         "//cc:position",
         "//cc/file",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -108,6 +111,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:logging",
         "//cc:tensorflow",
         "//cc:thread_safe_queue",
         "@com_google_absl//absl/memory",
@@ -124,6 +128,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:logging",
         "//cc:tf_lite",
         "//cc/platform",
         "@com_google_absl//absl/memory",
@@ -139,6 +144,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:logging",
         "//cc:tensorflow",
         "//cc:thread_safe_queue",
         "@com_google_absl//absl/memory",
@@ -155,6 +161,7 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:cuda",
+        "//cc:logging",
         "//cc:tensorrt",
         "//cc:thread_safe_queue",
         "@com_google_absl//absl/memory",
@@ -170,6 +177,7 @@ minigo_cc_library(
     deps = [
         ":dual_net",
         "//cc:base",
+        "//cc:logging",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -196,6 +204,7 @@ minigo_cc_test(
     srcs = ["reloading_dual_net_test.cc"],
     deps = [
         ":reloading_dual_net",
+        "//cc:logging",
         "//cc/file",
         "@com_google_googletest//:gtest_main",
     ],
@@ -210,6 +219,7 @@ minigo_cc_test_9_only(
     deps = [
         ":dual_net",
         ":factory",
+        "//cc:logging",
         "//cc:position",
         "//cc:test_utils",
         "@com_google_googletest//:gtest_main",

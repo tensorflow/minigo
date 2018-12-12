@@ -31,11 +31,6 @@ absl::Mutex* mutex() {
 }
 }  // namespace
 
-// A simple thread-safe logging stream that replaces logging directly to
-// stderr, which is not thread-safe.
-// All logging is written to stderr.
-// For log levels other than INFO, the line is prefixed with the log level and
-// source code location of the message.
 LogStream::LogStream(const char* file, int line, LogLevel level)
     : line_(line), level_(level) {
   char c;

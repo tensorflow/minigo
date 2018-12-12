@@ -183,6 +183,7 @@ minigo_cc_library(
     ],
     deps = [
         ":base",
+        ":logging",
         ":position",
         ":random",
         ":symmetries",
@@ -200,15 +201,12 @@ minigo_cc_library(
 
 minigo_cc_library(
     name = "position",
-    srcs = [
-        "position.cc",
-    ],
-    hdrs = [
-        "position.h",
-    ],
+    srcs = ["position.cc"],
+    hdrs = ["position.h"],
     deps = [
         ":base",
         ":inline_vector",
+        ":logging",
         ":tiny_set",
         ":zobrist",
         "@com_google_absl//absl/strings:str_format",
@@ -231,6 +229,7 @@ minigo_cc_library(
     hdrs = ["sgf.h"],
     deps = [
         ":base",
+        ":logging",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -241,7 +240,7 @@ minigo_cc_library(
     name = "symmetries",
     hdrs = ["symmetries.h"],
     deps = [
-        ":base",
+        ":logging",
     ],
 )
 
@@ -268,6 +267,7 @@ minigo_cc_library(
     hdrs = ["tf_utils.h"],
     deps = [
                ":base",
+               ":logging",
                ":mcts",
                "//cc/file",
                "//cc/dual_net",
@@ -307,6 +307,7 @@ minigo_cc_library(
     hdrs = ["test_utils.h"],
     deps = [
         ":base",
+        ":logging",
         ":mcts",
         ":position",
         "@com_google_absl//absl/strings",
@@ -423,6 +424,7 @@ minigo_cc_binary(
         ":base",
         ":gtp_player",
         ":init",
+        ":logging",
         ":mcts",
         ":random",
         ":sgf",
@@ -449,6 +451,7 @@ minigo_cc_binary(
     deps = [
         ":base",
         ":init",
+        ":logging",
         ":tf_utils",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
