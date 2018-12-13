@@ -14,8 +14,6 @@
 
 #include "cc/dual_net/lite_dual_net.h"
 
-#include <fstream>
-
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -66,10 +64,6 @@ class LiteDualNet : public DualNet {
 
 minigo::LiteDualNet::LiteDualNet(std::string graph_path)
     : graph_path_(graph_path), batch_capacity_(0) {
-  if (!std::ifstream(graph_path).good()) {
-    absl::StrAppend(&graph_path, ".tflite");
-  }
-
   model_ = FlatBufferModel::BuildFromFile(graph_path.c_str());
   MG_CHECK(model_ != nullptr);
 

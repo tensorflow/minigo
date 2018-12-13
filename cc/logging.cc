@@ -89,6 +89,7 @@ CheckFailStream::~CheckFailStream() {
   void* stack[64];
   int depth = absl::GetStackTrace(stack, 64, 1);
   char buffer[256];
+  impl_ << '\n';
   for (int i = 0; i < depth; ++i) {
     impl_ << "  " << stack[i] << "  ";
     if (absl::Symbolize(stack[i], buffer, 256)) {

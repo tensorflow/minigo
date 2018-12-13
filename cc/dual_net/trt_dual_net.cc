@@ -15,7 +15,6 @@
 #include "cc/dual_net/trt_dual_net.h"
 
 #include <bitset>
-#include <fstream>
 #include <thread>
 
 #include "absl/memory/memory.h"
@@ -154,10 +153,6 @@ class TrtDualNet : public DualNet {
     MG_CHECK(builder_);
     network_ = builder_->createNetwork();
     MG_CHECK(network_);
-
-    if (!std::ifstream(graph_path).good()) {
-      graph_path = absl::StrCat(graph_path, ".uff");
-    }
 
     MG_CHECK(parser_->parse(graph_path.c_str(), *network_,
                             nvinfer1::DataType::kFLOAT))

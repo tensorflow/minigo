@@ -134,17 +134,20 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
   // Make sure tpu_name looks like a valid name.
   MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
 
-  // If we can't find the specified graph, try adding a .pb extension.
   auto* env = Env::Default();
-  if (!env->FileExists(graph_path_).ok()) {
-    auto alt_path = absl::StrCat(graph_path_, ".pb");
-    if (env->FileExists(alt_path).ok()) {
-      MG_LOG(INFO) << graph_path << " doesn't exist, using " << alt_path;
-      graph_path_ = alt_path;
-    }
-  }
   GraphDef graph_def;
   TF_CHECK_OK(ReadBinaryProto(env, graph_path_, &graph_def));
+
+  // Check that we're actually loading a TPU model.
+  bool found_tpu_op = false;
+  for (const auto& node : graph_def.node()) {
+    if (absl::StartsWithIgnoreCase(node.name(), "tpu")) {
+      found_tpu_op = true;
+      break;
+    }
+  }
+  MG_CHECK(found_tpu_op) << "didn't find any ops starting with \"tpu\" this "
+                            "model looks like it wasn't compiled for TPU";
 
   // Count the number of times the model is replicated. There should be eight,
   // one replica for each TPU core.
