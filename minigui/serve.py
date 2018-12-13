@@ -54,11 +54,6 @@ flags.DEFINE_string(
     "Which python interpreter to use for the engine. "
     "Defaults to `python` and only applies for the when --engine=py")
 
-flags.DEFINE_boolean(
-    "inject_noise", False,
-    "If true, inject noise into the root position at the start of each "
-    "tree search.")
-
 flags.DEFINE_integer(
     "num_readouts", 400,
     "Number of searches to add to the MCTS search tree before playing a move.")
@@ -88,17 +83,13 @@ def _open_pipes():
                        "--verbose=2"]
     else:
         GTP_COMMAND = [
-            "bazel-bin/cc/main",
+            "bazel-bin/cc/gtp",
             "--model=%s" % FLAGS.model,
             "--num_readouts=%d" % FLAGS.num_readouts,
-            "--soft_pick=false",
-            "--inject_noise=%s" % FLAGS.inject_noise,
-            "--disable_resign_pct=0",
             "--courtesy_pass=true",
             "--engine=%s" % FLAGS.engine,
             "--virtual_losses=%d" % FLAGS.virtual_losses,
-            "--resign_threshold=%f" % FLAGS.resign_threshold,
-            "--mode=gtp"]
+            "--resign_threshold=%f" % FLAGS.resign_threshold]
 
     return subprocess.Popen(GTP_COMMAND,
                             stdin=subprocess.PIPE,

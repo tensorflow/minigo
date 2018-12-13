@@ -417,6 +417,22 @@ minigo_cc_test(
 )
 
 minigo_cc_binary(
+    name = "gtp",
+    srcs = ["gtp.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base",
+        ":gtp_player",
+        ":init",
+        ":zobrist",
+        "//cc/dual_net:factory",
+        "//cc/file",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+minigo_cc_binary(
     name = "main",
     srcs = ["main.cc"],
     visibility = ["//visibility:public"],

@@ -54,13 +54,6 @@
 // Game options flags.
 DEFINE_string(mode, "",
               "Mode to run in: \"selfplay\", \"eval\", \"gtp\" or \"puzzle\".");
-DEFINE_int32(
-    ponder_limit, 0,
-    "If non-zero and in GTP mode, the number times of times to perform tree "
-    "search while waiting for the opponent to play.");
-DEFINE_bool(
-    courtesy_pass, false,
-    "If true and in GTP mode, we will always pass if the opponent passes.");
 DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
 DEFINE_double(komi, minigo::kDefaultKomi, "Komi.");
 DEFINE_double(disable_resign_pct, 0.1,
@@ -126,9 +119,6 @@ DEFINE_string(model_two, "",
               "When running 'eval' mode, provide a path to a second minigo "
               "model, also serialized as a GraphDef proto.");
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
-DEFINE_string(checkpoint_glob, "",
-              "A glob to monitor for newly trained models. When a new model is "
-              "found, it is loaded and used for further inferences.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
@@ -663,21 +653,6 @@ void Eval() {
   evaluator.Run();
 }
 
-void Gtp() {
-  GtpPlayer::Options options;
-  ParseMctsPlayerOptionsFromFlags(&options);
-
-  options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
-  options.ponder_limit = FLAGS_ponder_limit;
-  options.courtesy_pass = FLAGS_courtesy_pass;
-  auto model_factory = NewDualNetFactory();
-  auto player = absl::make_unique<GtpPlayer>(
-      model_factory->NewDualNet(FLAGS_model), options);
-  model_factory->StartGame(player->network(), player->network());
-  player->Run();
-  model_factory->EndGame(player->network(), player->network());
-}
-
 }  // namespace
 }  // namespace minigo
 
@@ -690,8 +665,6 @@ int main(int argc, char* argv[]) {
     minigo::SelfPlay();
   } else if (FLAGS_mode == "eval") {
     minigo::Eval();
-  } else if (FLAGS_mode == "gtp") {
-    minigo::Gtp();
   } else {
     MG_LOG(FATAL) << "Unrecognized mode \"" << FLAGS_mode << "\"";
   }
