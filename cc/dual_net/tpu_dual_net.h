@@ -50,9 +50,6 @@ class TpuDualNet : public DualNet {
     void RunMany(std::vector<const DualNet::BoardFeatures*> features,
                  std::vector<DualNet::Output*> outputs);
 
-    void InitializeTpu();
-    void ShutdownTpu();
-
    private:
     void Reserve(size_t capacity);
 
@@ -71,12 +68,14 @@ class TpuDualNet : public DualNet {
 class TpuDualNetFactory : public DualNetFactory {
  public:
   explicit TpuDualNetFactory(std::string tpu_name);
+  ~TpuDualNetFactory() override;
 
   int GetBufferCount() const override;
 
   std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
 
  private:
+  std::unique_ptr<tensorflow::Session> main_session_;
   std::string tpu_name_;
 };
 

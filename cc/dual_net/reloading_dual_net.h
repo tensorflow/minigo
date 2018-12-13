@@ -47,10 +47,7 @@ class ReloadingDualNet : public DualNet {
   // Replaces the wrapped implementation with a new one constructed from the
   // given factory & model.
   // Called by ReloadingDualNetUpdater::Poll when it finds a new model.
-  // TODO(tommadams): It would be a lot cleaner to just pass in the new model
-  // but TpuDualNet currently requires that we delete the old TpuDualNet
-  // instance before creating a new one.
-  void UpdateImpl(DualNetFactory* factory, const std::string& model);
+  void UpdateImpl(std::unique_ptr<DualNet> model_impl);
 
  private:
   ReloadingDualNetUpdater* updater_;

@@ -27,6 +27,7 @@
 #include "cc/logging.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
+#include "tensorflow/core/platform/protobuf.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 
@@ -35,6 +36,7 @@ using tensorflow::Env;
 using tensorflow::GraphDef;
 using tensorflow::NewSession;
 using tensorflow::ReadBinaryProto;
+using tensorflow::Session;
 using tensorflow::SessionOptions;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
@@ -45,18 +47,59 @@ namespace {
 // Use double buffering: one running the current set of batches, the other
 // filling up the next set of batches.
 constexpr int kBufferCount = 2;
+
+// A GraphDef containing the ops required to initialize and shutdown a TPU.
+// This proto was generated from the script oneoffs/generate_tpu_graph_def.py.
+constexpr auto kTpuOpsGraphDef = R"(
+node {
+  name: "ConfigureDistributedTPU"
+  op: "ConfigureDistributedTPU"
+  device: "/device:TPU_SYSTEM:0"
+  attr {
+    key: "embedding_config"
+    value {
+      s: ""
+    }
+  }
+  attr {
+    key: "is_global_init"
+    value {
+      b: false
+    }
+  }
+  attr {
+    key: "tpu_embedding_config"
+    value {
+      s: ""
+    }
+  }
+}
+node {
+  name: "ShutdownDistributedTPU"
+  op: "ShutdownDistributedTPU"
+  device: "/device:TPU_SYSTEM:0"
+}
+library {
+}
+)";
+
+std::unique_ptr<Session> CreateSession(const GraphDef& graph_def,
+                                       const std::string& tpu_name) {
+  SessionOptions options;
+  options.target = tpu_name;
+  options.config.set_allow_soft_placement(true);
+  options.config.set_log_device_placement(true);
+  std::unique_ptr<Session> session(NewSession(options));
+  TF_CHECK_OK(session->Create(graph_def));
+  return session;
+}
+
 }  // namespace
 
 TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
                            const std::string& tpu_name, int num_replicas)
     : num_replicas_(num_replicas), batch_capacity_(0) {
-  SessionOptions options;
-  options.target = tpu_name;
-  options.config.set_allow_soft_placement(true);
-  options.config.set_log_device_placement(true);
-  session_.reset(NewSession(options));
-  TF_CHECK_OK(session_->Create(graph_def));
-
+  session_ = CreateSession(graph_def, tpu_name);
   for (int i = 0; i < num_replicas_; ++i) {
     output_names_.push_back(absl::StrCat("policy_output_", i));
     output_names_.push_back(absl::StrCat("value_output_", i));
@@ -64,18 +107,8 @@ TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
 }
 
 TpuDualNet::Worker::~Worker() {
-  MG_LOG(INFO) << "Closing session";
+  MG_LOG(INFO) << "Closing worker session";
   TF_CHECK_OK(session_->Close());
-}
-
-void TpuDualNet::Worker::InitializeTpu() {
-  MG_LOG(INFO) << "Initializing TPU";
-  TF_CHECK_OK(session_->Run({}, {}, {"ConfigureDistributedTPU"}, nullptr));
-}
-
-void TpuDualNet::Worker::ShutdownTpu() {
-  MG_LOG(INFO) << "Shutting down TPU";
-  TF_CHECK_OK(session_->Run({}, {}, {"ShutdownDistributedTPU"}, nullptr));
 }
 
 void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
@@ -169,11 +202,6 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
                                                         num_replicas));
   }
 
-  // Use one of the workers to initialize the TPU.
-  auto worker = workers_.Pop();
-  worker->InitializeTpu();
-  workers_.Push(std::move(worker));
-
   // Run warm-up inferences on all sessions.
   // Tensorflow lazily initializes the first time Session::Run is called,
   // which can take hundreds of milliseconds. This interfers with time control,
@@ -192,12 +220,7 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
   }
 }
 
-TpuDualNet::~TpuDualNet() {
-  // Use one of the workers to shutdown the TPU.
-  auto worker = workers_.Pop();
-  worker->ShutdownTpu();
-  workers_.Push(std::move(worker));
-}
+TpuDualNet::~TpuDualNet() = default;
 
 void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
                          std::vector<Output*> outputs, std::string* model) {
@@ -211,7 +234,24 @@ void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
 }
 
 TpuDualNetFactory::TpuDualNetFactory(std::string tpu_name)
-    : tpu_name_(std::move(tpu_name)) {}
+    : tpu_name_(std::move(tpu_name)) {
+  // Create a session containing ops for initializing & shutting down a TPU.
+  GraphDef graph_def;
+  ::tensorflow::protobuf::TextFormat::ParseFromString(
+      kTpuOpsGraphDef, &graph_def);
+  main_session_ = CreateSession(graph_def, tpu_name_);
+
+  MG_LOG(INFO) << "Initializing TPU " << tpu_name_;
+  TF_CHECK_OK(main_session_->Run({}, {}, {"ConfigureDistributedTPU"}, nullptr));
+}
+
+TpuDualNetFactory::~TpuDualNetFactory() {
+  MG_LOG(INFO) << "Shutting down TPU " << tpu_name_;
+  TF_CHECK_OK(main_session_->Run({}, {}, {"ShutdownDistributedTPU"}, nullptr));
+
+  MG_LOG(INFO) << "Closing main session";
+  TF_CHECK_OK(main_session_->Close());
+}
 
 int TpuDualNetFactory::GetBufferCount() const { return kBufferCount; }
 

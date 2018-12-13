@@ -127,7 +127,7 @@ bool ReloadingDualNetUpdater::Poll() {
     latest_model_path_ = std::move(path);
     MG_LOG(INFO) << "Loading new model \"" << latest_model_path_ << "\"";
     for (auto* model : models_) {
-      model->UpdateImpl(factory_impl_, latest_model_path_);
+      model->UpdateImpl(factory_impl_->NewDualNet(latest_model_path_));
     }
   }
   return true;
@@ -172,19 +172,9 @@ void ReloadingDualNet::Reserve(size_t capacity) {
   model_impl_->Reserve(capacity);
 }
 
-void ReloadingDualNet::UpdateImpl(DualNetFactory* factory,
-                                  const std::string& model) {
+void ReloadingDualNet::UpdateImpl(std::unique_ptr<DualNet> model_impl) {
   absl::MutexLock lock(&mutex_);
-
-  // !!! HACK !!!
-  // Delete the old model first, otherwise TpuDualNet doesn't work
-  // properly: it needs to shutdown the TPU before reinitializing and loading
-  // the new model, otherwise the TPU keeps evaluating using the old model for
-  // some reason.
-  // TODO(tommadams): Figure out what's going on here and fix it.
-  model_impl_ = nullptr;
-
-  model_impl_ = factory->NewDualNet(model);
+  model_impl_ = std::move(model_impl);
 }
 
 // ReloadingDualNetFactory methods follow.
