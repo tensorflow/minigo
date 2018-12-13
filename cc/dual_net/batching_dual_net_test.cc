@@ -63,7 +63,7 @@ class Semaphore {
   int count_ = 0;
 };
 
-// DualNet implementation whos RunMany method blocks until Notify is called.
+// DualNet implementation whose RunMany method blocks until Notify is called.
 // This is used in tests where multiple BatchingDualNet clients are running in
 // parallel and we want to control the evaluation order of the implementation
 // models.
