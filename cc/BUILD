@@ -445,6 +445,29 @@ minigo_cc_binary(
 )
 
 minigo_cc_binary(
+    name = "puzzle",
+    srcs = ["puzzle.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base",
+        ":init",
+        ":logging",
+        ":mcts",
+        ":sgf",
+        ":zobrist",
+        "//cc/dual_net:batching_dual_net",
+        "//cc/dual_net:factory",
+        "//cc/file",
+        "//cc/platform",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+minigo_cc_binary(
     name = "tfrzz_to_cbt",
     srcs = ["tfrzz_to_cbt.cc"],
     tags = ["manual"],
