@@ -32,11 +32,17 @@ def main(unused_argv):
         tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
             FLAGS.tpu_name, zone=None, project=None)
         tpu_grpc_url = tpu_cluster_resolver.get_master()
+
     sess = tf.Session(tpu_grpc_url)
     with sess.graph.as_default():
       tf.contrib.tpu.initialize_system()
       tf.contrib.tpu.shutdown_system()
-    print(sess.graph.as_graph_def())
+
+    output_names = ['ConfigureDistributedTPU', 'ShutdownDistributedTPU']
+    model_def = tf.graph_util.convert_variables_to_constants(
+        sess, sess.graph.as_graph_def(), output_names)
+    print(model_def)
+
 
 
 if __name__ == "__main__":
