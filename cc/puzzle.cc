@@ -63,13 +63,12 @@ void Puzzle() {
   auto model_factory = NewBatchingDualNetFactory(NewDualNetFactory());
 
   MctsPlayer::Options options;
+  options.game_options.resign_enabled = false;
   options.inject_noise = false;
   options.soft_pick = false;
   options.random_symmetry = true;
-  options.resign_threshold = -1;
   options.value_init_penalty = FLAGS_value_init_penalty;
   options.batch_size = FLAGS_virtual_losses;
-  options.komi = kDefaultKomi;
   options.random_seed = FLAGS_seed;
   options.num_readouts = FLAGS_num_readouts;
   options.verbose = false;
@@ -111,7 +110,7 @@ void Puzzle() {
         // Reset the game and play up to the position to be tested.
         player->NewGame();
         for (size_t i = 0; i < move_to_predict; ++i) {
-          player->PlayMove(moves[i].c);
+          player->PlayMove(moves[i].c, nullptr);
         }
 
         // Check if we predict the move that was played.

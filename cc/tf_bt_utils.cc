@@ -20,7 +20,6 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "cc/constants.h"
-#include "cc/mcts_player.h"
 #include "google/cloud/bigtable/data_client.h"
 #include "google/cloud/bigtable/read_modify_write_rule.h"
 #include "google/cloud/bigtable/table.h"
@@ -52,7 +51,8 @@ const char kPrefixAndMoveFormat[] = "%s_m_%03d";
 
 // Fetches the tensorflow Examples from a MctsPlayer.
 // Linked from tf_utils.cc
-std::vector<tensorflow::Example> MakeExamples(const MctsPlayer& player);
+// TODO(tommadams): Move this declaration into a header file.
+std::vector<tensorflow::Example> MakeExamples(const Game& game);
 
 void UpdateMoveCountForGame(BulkMutation& game_batch,
                             const std::string& game_prefix, int move_count) {
@@ -91,9 +91,8 @@ void WriteTfExamples(Table& table, const std::string& row_prefix,
 
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
-                       const std::string& table_name,
-                       const MctsPlayer& player) {
-  auto examples = MakeExamples(player);
+                       const std::string& table_name, const Game& game) {
+  auto examples = MakeExamples(game);
   Table table(
       CreateDefaultDataClient(gcp_project_name, instance_name, ClientOptions()),
       table_name);
@@ -106,7 +105,7 @@ void WriteGameExamples(const std::string& gcp_project_name,
   WriteTfExamples(table, row_prefix, examples);
   int bleakest_move = 0;
   float bleakest_q = 0.0;
-  if (FindBleakestMove(player, &bleakest_move, &bleakest_q)) {
+  if (game.FindBleakestMove(&bleakest_move, &bleakest_q)) {
     auto bleak_row_name =
         absl::StrFormat(kPrefixAndMoveFormat, row_prefix, bleakest_move);
     SingleRowMutation row_mutation(bleak_row_name);
@@ -121,9 +120,7 @@ void WriteGameExamples(const std::string& gcp_project_name,
 
 void WriteEvalRecord(const std::string& gcp_project_name,
                      const std::string& instance_name,
-                     const std::string& table_name, const MctsPlayer& player,
-                     const std::string& black_player_name,
-                     const std::string& white_player_name,
+                     const std::string& table_name, const Game& game,
                      const std::string& sgf_name, const std::string& tag) {
   Table table(
       CreateDefaultDataClient(gcp_project_name, instance_name, ClientOptions()),
@@ -135,12 +132,12 @@ void WriteEvalRecord(const std::string& gcp_project_name,
 
   auto row_name = absl::StrFormat(kEvalGameRowFormat, game_counter);
   SingleRowMutation row_mutation(
-      row_name, SetCell("metadata", "black", black_player_name),
-      SetCell("metadata", "white", white_player_name),
-      SetCell("metadata", "black_won", absl::StrCat(player.result() > 0)),
-      SetCell("metadata", "white_won", absl::StrCat(player.result() < 0)),
-      SetCell("metadata", "result", player.result_string()),
-      SetCell("metadata", "length", absl::StrCat(player.history().size())),
+      row_name, SetCell("metadata", "black", game.black_name()),
+      SetCell("metadata", "white", game.black_name()),
+      SetCell("metadata", "black_won", absl::StrCat(game.result() > 0)),
+      SetCell("metadata", "white_won", absl::StrCat(game.result() < 0)),
+      SetCell("metadata", "result", game.result_string()),
+      SetCell("metadata", "length", absl::StrCat(game.moves().size())),
       SetCell("metadata", "sgf", sgf_name), SetCell("metadata", "tag", tag));
 
   table.Apply(std::move(row_mutation));

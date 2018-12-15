@@ -101,7 +101,7 @@ std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(int n) {
   // Always use a deterministic random seed.
   MctsPlayer::Options options;
   options.random_seed = 17;
-  options.komi = 2.5;
+  options.game_options.komi = 2.5;
   // Don't apply random symmetries. If we did, the probabilities we set in
   // the FakeDualNet won't be chosen correctly (since the board position will be
   // randomly transformed).
@@ -230,7 +230,8 @@ TEST(MctsPlayerTest, PickMoveSoft) {
 TEST(MctsPlayerTest, DontPassIfLosing) {
   auto player = CreateAlmostDonePlayer(0);
   auto* root = player->root();
-  EXPECT_EQ(-0.5, root->position.CalculateScore(player->options().komi));
+  EXPECT_EQ(-0.5,
+            root->position.CalculateScore(player->options().game_options.komi));
 
   for (int i = 0; i < 20; ++i) {
     player->TreeSearch(1);
@@ -369,38 +370,42 @@ TEST(MctsPlayerTest, OnlyCheckGameEndOnce) {
 
 TEST(MctsPlayerTest, ExtractDataNormalEnd) {
   auto player = absl::make_unique<TestablePlayer>(MctsPlayer::Options());
+  Game game("b", "w", player->options().game_options);
+
   player->TreeSearch(1);
-  player->PlayMove(Coord::kPass);
+  player->PlayMove(Coord::kPass, &game);
   player->TreeSearch(1);
-  player->PlayMove(Coord::kPass);
+  player->PlayMove(Coord::kPass, &game);
 
   auto* root = player->root();
   EXPECT_TRUE(root->game_over());
   EXPECT_EQ(Color::kBlack, root->position.to_play());
 
-  ASSERT_EQ(2, player->history().size());
+  ASSERT_EQ(2, game.num_moves());
 
   // White wins by komi
-  EXPECT_EQ(-1, player->result());
-  EXPECT_EQ("W+7.5", player->result_string());
+  EXPECT_EQ(-1, game.result());
+  EXPECT_EQ("W+7.5", game.result_string());
 }
 
 TEST(MctsPlayerTest, ExtractDataResignEnd) {
   auto player = absl::make_unique<TestablePlayer>(MctsPlayer::Options());
+  Game game("b", "w", player->options().game_options);
   player->TreeSearch(1);
-  player->PlayMove({0, 0});
+  player->PlayMove({0, 0}, &game);
   player->TreeSearch(1);
-  player->PlayMove(Coord::kPass);
+  player->PlayMove(Coord::kPass, &game);
   player->TreeSearch(1);
-  player->PlayMove(Coord::kResign);
+  player->PlayMove(Coord::kResign, &game);
 
   auto* root = player->root();
 
   // Black is winning on the board.
-  EXPECT_LT(0, root->position.CalculateScore(player->options().komi));
+  EXPECT_LT(0,
+            root->position.CalculateScore(player->options().game_options.komi));
 
-  EXPECT_EQ(-1, player->result());
-  EXPECT_EQ("W+R", player->result_string());
+  EXPECT_EQ(-1, game.result());
+  EXPECT_EQ("W+R", game.result_string());
 }
 
 // Fake DualNet implementation used to verify that MctsPlayer symmetries work
@@ -492,7 +497,7 @@ TEST(MctsPlayerTest, ResetRoot) {
   auto* game_root = player->root();
 
   auto c = Coord(12);
-  player->PlayMove(c);
+  player->PlayMove(c, nullptr);
 
   EXPECT_EQ(c, player->root()->move);
   player->ResetRoot();
@@ -501,28 +506,29 @@ TEST(MctsPlayerTest, ResetRoot) {
 
 TEST(MctsPlayerTest, UndoMove) {
   auto player = absl::make_unique<TestablePlayer>(MctsPlayer::Options());
+  Game game("b", "w", player->options().game_options);
 
   // Can't undo without first playing a move.
-  EXPECT_FALSE(player->UndoMove());
+  EXPECT_FALSE(player->UndoMove(&game));
 
-  player->PlayMove(Coord::kPass);
-  player->PlayMove(Coord::kPass);
+  player->PlayMove(Coord::kPass, &game);
+  player->PlayMove(Coord::kPass, &game);
 
   auto* root = player->root();
-  EXPECT_TRUE(root->game_over());
+  EXPECT_TRUE(game.game_over());
   EXPECT_EQ(Color::kBlack, root->position.to_play());
-  ASSERT_EQ(2, player->history().size());
-  EXPECT_EQ(-1, player->result());
-  EXPECT_EQ("W+7.5", player->result_string());
+  ASSERT_EQ(2, game.num_moves());
+  EXPECT_EQ(-1, game.result());
+  EXPECT_EQ("W+7.5", game.result_string());
 
   // Undo the last pass, the game should no longer be over.
-  EXPECT_TRUE(player->UndoMove());
+  EXPECT_TRUE(player->UndoMove(&game));
 
   root = player->root();
   EXPECT_FALSE(root->game_over());
   EXPECT_EQ(Coord::kPass, root->move);
   EXPECT_EQ(Color::kWhite, root->position.to_play());
-  ASSERT_EQ(1, player->history().size());
+  EXPECT_EQ(1, game.num_moves());
 }
 
 }  // namespace

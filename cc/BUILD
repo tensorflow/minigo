@@ -123,6 +123,19 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
+    name = "game",
+    srcs = ["game.cc"],
+    hdrs = ["game.h"],
+    deps = [
+        ":base",
+        ":position",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
+minigo_cc_library(
     name = "gtp_player",
     srcs = ["gtp_player.cc"],
     hdrs = ["gtp_player.h"],
@@ -183,6 +196,7 @@ minigo_cc_library(
     ],
     deps = [
         ":base",
+        ":game",
         ":logging",
         ":position",
         ":random",
@@ -268,7 +282,7 @@ minigo_cc_library(
     deps = [
                ":base",
                ":logging",
-               ":mcts",
+               ":game",
                "//cc/file",
                "//cc/dual_net",
                "@com_google_absl//absl/strings:str_format",
@@ -438,7 +452,6 @@ minigo_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
-        ":gtp_player",
         ":init",
         ":logging",
         ":mcts",

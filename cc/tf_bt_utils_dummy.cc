@@ -21,8 +21,7 @@ namespace tf_utils {
 
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
-                       const std::string& table_name,
-                       const MctsPlayer& player) {
+                       const std::string& table_name, const Game& game) {
   MG_LOG(FATAL)
       << "Can't write TensorFlow examples to Bigtable without Bigtable "
          "support enabled. "
@@ -31,9 +30,7 @@ void WriteGameExamples(const std::string& gcp_project_name,
 
 void WriteEvalRecord(const std::string& gcp_project_name,
                      const std::string& instance_name,
-                     const std::string& table_name, const MctsPlayer& player,
-                     const std::string& black_player_name,
-                     const std::string& white_player_name,
+                     const std::string& table_name, const Game& game,
                      const std::string& sgf_name, const std::string& tag) {
   MG_LOG(FATAL) << "Can't write eval record to Bigtable without Bigtable "
                    "support enabled. "

@@ -124,8 +124,6 @@ class MctsNode {
   // Remove all children from the node except c.
   void PruneChildren(Coord c);
 
-  // TODO(tommadams): Validate returning by value has the same performance as
-  // passing a pointer to the output array.
   std::array<float, kNumMoves> CalculateChildActionScore() const;
 
   bool HasPositionBeenPlayedBefore(zobrist::Hash stone_hash) const;

@@ -46,7 +46,8 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
       courtesy_pass_(options.courtesy_pass),
       ponder_read_limit_(options.ponder_limit),
-      num_eval_reads_(options.num_eval_reads) {
+      num_eval_reads_(options.num_eval_reads),
+      game_(options.name, options.name, options.game_options) {
   if (ponder_read_limit_ > 0) {
     ponder_type_ = PonderType::kReadLimited;
   }
@@ -133,8 +134,8 @@ Coord GtpPlayer::SuggestMove() {
   return MctsPlayer::SuggestMove();
 }
 
-bool GtpPlayer::PlayMove(Coord c) {
-  if (!MctsPlayer::PlayMove(c)) {
+bool GtpPlayer::PlayMove(Coord c, Game* game) {
+  if (!MctsPlayer::PlayMove(c, game)) {
     return false;
   }
   RefreshPendingWinRateEvals();
@@ -373,11 +374,11 @@ GtpPlayer::Response GtpPlayer::HandleFinalScore(absl::string_view cmd,
   if (!root()->game_over()) {
     // Game isn't over yet, calculate the current score using Tromp-Taylor
     // scoring.
-    return Response::Ok(
-        FormatScore(root()->position.CalculateScore(options().komi)));
+    return Response::Ok(Game::FormatScore(
+        root()->position.CalculateScore(options().game_options.komi)));
   } else {
     // Game is over, we have the result available.
-    return Response::Ok(result_string());
+    return Response::Ok(game_.result_string());
   }
 }
 
@@ -390,7 +391,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
 
   auto c = SuggestMove();
   MG_LOG(INFO) << root()->Describe();
-  MG_CHECK(PlayMove(c));
+  MG_CHECK(PlayMove(c, &game_));
 
   // Begin pondering again if requested.
   if (ponder_type_ != PonderType::kOff) {
@@ -440,7 +441,7 @@ GtpPlayer::Response GtpPlayer::HandleKomi(absl::string_view cmd, CmdArgs args) {
   }
 
   double x;
-  if (!absl::SimpleAtod(args[0], &x) || x != options().komi) {
+  if (!absl::SimpleAtod(args[0], &x) || x != options().game_options.komi) {
     return Response::Error("unacceptable komi");
   }
 
@@ -515,7 +516,7 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
     return Response::Error("illegal move");
   }
 
-  if (!PlayMove(c)) {
+  if (!PlayMove(c, &game_)) {
     return Response::Error("illegal move");
   }
   ReportPosition(root());
@@ -671,7 +672,7 @@ GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
   // Rewind to the start & play the sequence of moves.
   ResetRoot();
   for (const auto& move : moves) {
-    MG_CHECK(PlayMove(move));
+    MG_CHECK(PlayMove(move, &game_));
   }
 
   return Response::Ok();
@@ -683,7 +684,7 @@ GtpPlayer::Response GtpPlayer::HandleUndo(absl::string_view cmd, CmdArgs args) {
     return response;
   }
 
-  if (!UndoMove()) {
+  if (!UndoMove(&game_)) {
     return Response::Error("cannot undo");
   }
 
@@ -756,11 +757,11 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
                 "move was also a pass");
           }
           MG_LOG(WARNING) << "Inserting pass move";
-          MG_CHECK(PlayMove(Coord::kPass));
+          MG_CHECK(PlayMove(Coord::kPass, &game_));
           ReportPosition(root());
         }
 
-        if (!PlayMove(node.move.c)) {
+        if (!PlayMove(node.move.c, &game_)) {
           return Response::Error("error playing ", node.move.ToSgf());
         }
 
@@ -776,7 +777,7 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
             return response;
           }
         }
-        UndoMove();
+        UndoMove(&game_);
         return Response::Ok();
       };
 
@@ -794,7 +795,7 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
     for (const auto& move : trees[0]->ExtractMainLine()) {
       // We already validated that all the moves could be played in traverse(),
       // so if PlayMove fails here, something has gone seriously awry.
-      MG_CHECK(PlayMove(move.c));
+      MG_CHECK(PlayMove(move.c, &game_));
     }
     ReportPosition(root());
   }

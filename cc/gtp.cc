@@ -67,16 +67,15 @@ namespace {
 
 void Gtp() {
   GtpPlayer::Options options;
+  options.game_options.resign_threshold = FLAGS_resign_threshold;
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   options.ponder_limit = FLAGS_ponder_limit;
   options.courtesy_pass = FLAGS_courtesy_pass;
   options.inject_noise = false;
   options.soft_pick = false;
   options.random_symmetry = true;
-  options.resign_threshold = FLAGS_resign_threshold;
   options.value_init_penalty = FLAGS_value_init_penalty;
   options.batch_size = FLAGS_virtual_losses;
-  options.komi = kDefaultKomi;
   options.num_readouts = FLAGS_num_readouts;
   options.seconds_per_move = FLAGS_seconds_per_move;
   options.time_limit = FLAGS_time_limit;

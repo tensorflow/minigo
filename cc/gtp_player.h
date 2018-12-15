@@ -60,7 +60,7 @@ class GtpPlayer : public MctsPlayer {
 
   void NewGame() override;
   Coord SuggestMove() override;
-  bool PlayMove(Coord c) override;
+  bool PlayMove(Coord c, Game* game) override;
 
  protected:
   void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry) override;
@@ -220,6 +220,8 @@ class GtpPlayer : public MctsPlayer {
   // Number of times to perform tree search for each position when evaluating
   // its win rate.
   int num_eval_reads_;
+
+  Game game_;
 
   ThreadSafeQueue<std::string> stdin_queue_;
 };

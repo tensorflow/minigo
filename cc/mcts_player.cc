@@ -15,7 +15,6 @@
 #include "cc/mcts_player.h"
 
 #include <algorithm>
-#include <cmath>
 #include <sstream>
 #include <utility>
 
@@ -34,9 +33,10 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
   os << "name:" << options.name << " inject_noise:" << options.inject_noise
      << " soft_pick:" << options.soft_pick
      << " random_symmetry:" << options.random_symmetry
-     << " resign_threshold:" << options.resign_threshold
-     << " resign_enabled:" << options.resign_enabled
-     << " batch_size:" << options.batch_size << " komi:" << options.komi
+     << " resign_threshold:" << options.game_options.resign_threshold
+     << " resign_enabled:" << options.game_options.resign_enabled
+     << " batch_size:" << options.batch_size
+     << " komi:" << options.game_options.komi
      << " num_readouts:" << options.num_readouts
      << " seconds_per_move:" << options.seconds_per_move
      << " time_limit:" << options.time_limit
@@ -75,7 +75,8 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
       game_root_(&root_stats_, {&bv_, &gv_, Color::kBlack}),
       rnd_(options.random_seed),
       options_(options) {
-  options_.resign_threshold = -std::abs(options_.resign_threshold);
+  MG_CHECK(options.game_options.resign_threshold < 0);
+
   // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.
   // divide 2, multiply 2 guarentees that white and black do even number.
   temperature_cutoff_ = !options_.soft_pick ? -1 : (((kN * kN / 12) / 2) * 2);
@@ -111,17 +112,16 @@ void MctsPlayer::NewGame() {
   ResetRoot();
 }
 
-void MctsPlayer::ResetRoot() {
-  root_ = &game_root_;
-  history_.clear();
-}
+void MctsPlayer::ResetRoot() { root_ = &game_root_; }
 
-bool MctsPlayer::UndoMove() {
+bool MctsPlayer::UndoMove(Game* game) {
   if (root_ == &game_root_) {
     return false;
   }
   root_ = root_->parent;
-  history_.pop_back();
+  if (game != nullptr) {
+    game->UndoMove();
+  }
   return true;
 }
 
@@ -224,7 +224,9 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
   for (int i = 0; i < max_iterations; ++i) {
     auto* leaf = root->SelectLeaf();
     if (leaf->game_over() || leaf->at_move_limit()) {
-      float value = leaf->position.CalculateScore(options_.komi) > 0 ? 1 : -1;
+      float value =
+          leaf->position.CalculateScore(options_.game_options.komi) > 0 ? 1
+                                                                        : -1;
       leaf->IncorporateEndGameResult(value, root);
     } else {
       leaf->AddVirtualLoss(root);
@@ -237,11 +239,11 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
 }
 
 bool MctsPlayer::ShouldResign() const {
-  return options_.resign_enabled &&
-         root_->Q_perspective() < options_.resign_threshold;
+  return options_.game_options.resign_enabled &&
+         root_->Q_perspective() < options_.game_options.resign_threshold;
 }
 
-bool MctsPlayer::PlayMove(Coord c) {
+bool MctsPlayer::PlayMove(Coord c, Game* game) {
   if (root_->game_over()) {
     MG_LOG(ERROR) << "can't play move " << c << ", game is over";
     return false;
@@ -250,12 +252,8 @@ bool MctsPlayer::PlayMove(Coord c) {
   // Handle resignations.
   if (c == Coord::kResign) {
     root_ = root_->MaybeAddChild(c);
-    if (root_->position.to_play() == Color::kBlack) {
-      result_ = 1;
-      result_string_ = "B+R";
-    } else {
-      result_ = -1;
-      result_string_ = "W+R";
+    if (game != nullptr) {
+      game->SetGameOverBecauseOfResign(root_->position.to_play());
     }
     return true;
   }
@@ -265,7 +263,9 @@ bool MctsPlayer::PlayMove(Coord c) {
     return false;
   }
 
-  PushHistory(c);
+  if (game != nullptr) {
+    UpdateGame(c, game);
+  }
 
   root_ = root_->MaybeAddChild(c);
   if (options_.prune_orphaned_nodes) {
@@ -280,29 +280,20 @@ bool MctsPlayer::PlayMove(Coord c) {
   }
 
   // Handle consecutive passing or termination by move limit.
-  if (root_->game_over() || root_->at_move_limit()) {
-    float score = root_->position.CalculateScore(options_.komi);
-    result_string_ = FormatScore(score);
-    result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
+  if (game != nullptr) {
+    if (root_->game_over() || root_->at_move_limit()) {
+      game->SetGameOverBecauseOfPasses(
+          root_->position.CalculateScore(options_.game_options.komi));
+    }
   }
 
   return true;
 }
 
-std::string MctsPlayer::FormatScore(float score) const {
-  return absl::StrFormat("%c+%.1f", score > 0 ? 'B' : 'W', std::abs(score));
-}
-
-void MctsPlayer::PushHistory(Coord c) {
-  history_.emplace_back();
-  History& history = history_.back();
-  history.c = c;
-  history.comment = root_->Describe();
-  history.node = root_;
-
+void MctsPlayer::UpdateGame(Coord c, Game* game) {
+  // Record which model(s) were used when running tree search for this move.
+  std::vector<std::string> models;
   if (!inferences_.empty()) {
-    // Record which model(s) were used when running tree search for this move.
-    std::vector<std::string> models;
     for (auto it = inferences_.rbegin(); it != inferences_.rend(); ++it) {
       if (it->last_move < root_->position.n()) {
         break;
@@ -310,32 +301,39 @@ void MctsPlayer::PushHistory(Coord c) {
       models.push_back(it->model);
     }
     std::reverse(models.begin(), models.end());
-    auto model_comment = absl::StrCat("models:", absl::StrJoin(models, ","));
-    history.comment = absl::StrCat(model_comment, "\n", history.comment);
-    if (options_.verbose) {
-      MG_LOG(INFO) << model_comment;
-    }
+  }
+
+  // Build a comment for the move.
+  auto comment = root_->Describe();
+  if (!models.empty()) {
+    comment =
+        absl::StrCat("models:", absl::StrJoin(models, ","), "\n", comment);
   }
 
   // Convert child visit counts to a probability distribution, pi.
+  std::array<float, kNumMoves> search_pi;
   if (root_->position.n() < temperature_cutoff_) {
     // Squash counts before normalizing to match softpick behavior in PickMove.
     for (int i = 0; i < kNumMoves; ++i) {
-      history.search_pi[i] = std::pow(root_->child_N(i), kVisitCountSquash);
+      search_pi[i] = std::pow(root_->child_N(i), kVisitCountSquash);
     }
   } else {
     for (int i = 0; i < kNumMoves; ++i) {
-      history.search_pi[i] = root_->child_N(i);
+      search_pi[i] = root_->child_N(i);
     }
   }
   // Normalize counts.
   float sum = 0;
   for (int i = 0; i < kNumMoves; ++i) {
-    sum += history.search_pi[i];
+    sum += search_pi[i];
   }
   for (int i = 0; i < kNumMoves; ++i) {
-    history.search_pi[i] /= sum;
+    search_pi[i] /= sum;
   }
+
+  // Update the game history.
+  game->AddMove(root_->position.to_play(), c, root_->position.stones(),
+                std::move(comment), root_->Q(), search_pi, std::move(models));
 }
 
 void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
@@ -418,32 +416,6 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
         options_.value_init_penalty, raw_policy, output.value, root);
     leaf->RevertVirtualLoss(root);
   }
-}
-
-// &q is the bleakest move from the perspective of the winner, i.e., negative.
-bool FindBleakestMove(const MctsPlayer& player, int* move, float* q) {
-  if (player.options().resign_enabled) {
-    return false;
-  }
-  const auto& history = player.history();
-  if (history.empty()) {
-    return false;
-  }
-  // Find the move at which the game looked the bleakest from the perspective
-  // of the winner.
-  float result = player.result();
-  float bleakest_eval = history[0].node->Q() * result;
-  size_t bleakest_move = 0;
-  for (size_t i = 1; i < history.size(); ++i) {
-    float eval = history[i].node->Q() * result;
-    if (eval < bleakest_eval) {
-      bleakest_eval = eval;
-      bleakest_move = i;
-    }
-  }
-  *move = int(bleakest_move);
-  *q = bleakest_eval;
-  return true;
 }
 
 }  // namespace minigo

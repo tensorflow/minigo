@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-#include "cc/mcts_player.h"
+#include "cc/game.h"
 
 namespace minigo {
 namespace tf_utils {
@@ -31,32 +31,26 @@ namespace tf_utils {
 //   outcome: a single float containing the game result +/-1.
 // CHECK fails if the binary was not compiled with --define=tf=1.
 void WriteGameExamples(const std::string& output_dir,
-                       const std::string& output_name,
-                       const MctsPlayer& player);
+                       const std::string& output_name, const Game& game);
 
 // Writes a list of tensorflow Example protos to the specified
 // Bigtable, one example per row, starting at the given row cursor.
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
-                       const std::string& table_name, const MctsPlayer& player);
+                       const std::string& table_name, const Game& game);
 
 // Writes information about an eval game to the specified Bigtable.
 void WriteEvalRecord(const std::string& gcp_project_name,
                      const std::string& instance_name,
-                     const std::string& table_name,
-                     const MctsPlayer& player,
-                     const std::string& black_player_name,
-                     const std::string& white_player_name,
-                     const std::string& sgf_name,
-                     const std::string& tag);
+                     const std::string& table_name, const Game& game,
+                     const std::string& sgf_name, const std::string& tag);
 
 // Atomically increment the game counter in the given Bigtable by the given
 // delta.  Returns the new value.  Prior value will be returned - delta.
 uint64_t IncrementGameCounter(const std::string& gcp_project_name,
                               const std::string& instance_name,
                               const std::string& table_name,
-                              const std::string& counter_name,
-                              size_t delta);
+                              const std::string& counter_name, size_t delta);
 
 // Port Minigo games from the given GCS files, which must be in
 // `.tfrecord.zz` format.  If game_counter is >=0, use that

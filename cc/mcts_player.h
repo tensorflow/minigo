@@ -28,6 +28,7 @@
 #include "cc/algorithm.h"
 #include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
+#include "cc/game.h"
 #include "cc/mcts_node.h"
 #include "cc/position.h"
 #include "cc/random.h"
@@ -42,6 +43,9 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
 class MctsPlayer {
  public:
   struct Options {
+    // Game-level options.
+    Game::Options game_options;
+
     bool inject_noise = true;
     bool soft_pick = true;
     bool random_symmetry = true;
@@ -50,16 +54,8 @@ class MctsPlayer {
     // Default (0.0) is init-to-parent.
     float value_init_penalty = 0.0;
 
-    // We use a separate resign_enabled flag instead of setting the
-    // resign_threshold to -1 for games where resignation is diabled. This
-    // enables us to report games where the eventual winner would have
-    // incorrectly resigned early, had resignations been enabled.
-    bool resign_enabled = true;
-    float resign_threshold = -0.95;
-
     // TODO(tommadams): rename batch_size to virtual_losses.
     int batch_size = 8;
-    float komi = kDefaultKomi;
     std::string name = "minigo";
 
     // Seed used from random permutations.
@@ -137,7 +133,10 @@ class MctsPlayer {
 
   virtual Coord SuggestMove();
 
-  virtual bool PlayMove(Coord c);
+  // Plays the move at point c.
+  // If game is non-null, adds a new move to the game's move history and sets
+  // the game over state if appropriate.
+  virtual bool PlayMove(Coord c, Game* game);
 
   bool ShouldResign() const;
 
@@ -147,25 +146,7 @@ class MctsPlayer {
   MctsNode* root() { return root_; }
   const MctsNode* root() const { return root_; }
 
-  // Returns the result of the game:
-  //   +1.0 if black won.
-  //    0.0 if the game was drawn.
-  //   -1.0 if white won.
-  // Check fails if the game is not yet over.
-  float result() const {
-    MG_CHECK(root_->game_over() || root_->at_move_limit());
-    return result_;
-  }
-
-  // Return a text description of the game result, e.g. "B+R", "W+1.5".
-  // Check fails if the game is not yet over.
-  const std::string& result_string() const {
-    MG_CHECK(root_->game_over() || root_->at_move_limit());
-    return result_string_;
-  }
-
   const Options& options() const { return options_; }
-  const std::vector<History>& history() const { return history_; }
   const std::string& name() const { return options_.name; }
   const std::vector<InferenceInfo>& inferences() const { return inferences_; }
   DualNet* network() { return network_.get(); }
@@ -189,7 +170,7 @@ class MctsPlayer {
 
   // Moves the root_ node up to its parent, popping the last move off the game
   // history but preserving the game tree.
-  bool UndoMove();
+  bool UndoMove(Game* game);
 
   void TreeSearch();
 
@@ -202,13 +183,11 @@ class MctsPlayer {
 
   Random* rnd() { return &rnd_; }
 
-  std::string FormatScore(float score) const;
-
   // Run inference for the given leaf nodes & incorportate the inference output.
   virtual void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);
 
  private:
-  void PushHistory(Coord c);
+  void UpdateGame(Coord c, Game* game);
 
   std::unique_ptr<DualNet> network_;
   int temperature_cutoff_;
@@ -225,11 +204,6 @@ class MctsPlayer {
 
   Options options_;
 
-  float result_ = 0;
-  std::string result_string_;
-
-  std::vector<History> history_;
-
   std::string model_;
   std::vector<InferenceInfo> inferences_;
 
@@ -240,16 +214,6 @@ class MctsPlayer {
   std::vector<symmetry::Symmetry> symmetries_used_;
   std::vector<const Position::Stones*> recent_positions_;
 };
-
-// Get information on the bleakest move for a completed game, if the game has
-// history and was played with resign disabled.  (If resign was enabled,
-// bleakest-move calculation is not relevant, since quitters don't know how bad
-// it could have been.)
-//
-// Returns true if the bleakest move was found and returned; false otherwise.
-// Q is returned from the winners perspective, which means we don't have to
-// reference the result to transform this into a sortable list of evaluations.
-bool FindBleakestMove(const MctsPlayer& player, int* move, float* q);
 
 }  // namespace minigo
 

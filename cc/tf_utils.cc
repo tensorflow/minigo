@@ -22,7 +22,6 @@
 #include "cc/dual_net/dual_net.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
-#include "cc/mcts_player.h"
 #include "tensorflow/core/example/example.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/io/record_writer.h"
@@ -96,27 +95,26 @@ void WriteTfExamples(const std::string& path,
 
 }  // namespace
 
-std::vector<tensorflow::Example> MakeExamples(const MctsPlayer& player) {
+std::vector<tensorflow::Example> MakeExamples(const Game& game) {
   // Write the TensorFlow examples.
   std::vector<tensorflow::Example> examples;
-  examples.reserve(player.history().size());
+  examples.reserve(game.num_moves());
   DualNet::BoardFeatures features;
   std::vector<const Position::Stones*> recent_positions;
-  for (const auto& h : player.history()) {
-    h.node->GetMoveHistory(DualNet::kMoveHistory, &recent_positions);
-    DualNet::SetFeatures(recent_positions, h.node->position.to_play(),
-                         &features);
-    examples.push_back(MakeTfExample(features, h.search_pi, player.result()));
+  for (size_t i = 0; i < game.moves().size(); ++i) {
+    const auto* move = game.moves()[i].get();
+    game.GetStoneHistory(i, DualNet::kMoveHistory, &recent_positions);
+    DualNet::SetFeatures(recent_positions, move->color, &features);
+    examples.push_back(MakeTfExample(features, move->search_pi, game.result()));
   }
   return examples;
 }
 
 void WriteGameExamples(const std::string& output_dir,
-                       const std::string& output_name,
-                       const MctsPlayer& player) {
+                       const std::string& output_name, const Game& game) {
   MG_CHECK(file::RecursivelyCreateDir(output_dir));
   auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");
-  auto examples = MakeExamples(player);
+  auto examples = MakeExamples(game);
   WriteTfExamples(output_path, examples);
 }
 
