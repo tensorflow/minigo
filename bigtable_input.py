@@ -15,7 +15,9 @@
 """Read Minigo game examples from a Bigtable.
 """
 
+import bisect
 import collections
+import datetime
 import math
 import operator
 import os
@@ -65,11 +67,13 @@ TFEXAMPLE = 'tfexample'
 
 TABLE_STATE = b'table_state'
 WAIT_CELL = b'wait_for_game_number'
+GAME_COUNTER = b'game_counter'
 MOVE_COUNT = b'move_count'
 
 # Patterns
 
 _game_row_key = re.compile(r'g_(\d+)_m_(\d+)')
+_game_from_counter = re.compile(r'ct_(\d+)_')
 
 
 def cbt_intvalue(value):
@@ -186,7 +190,7 @@ class GameQueue:
         and their properties.
         """
         if self.bt_table.exists():
-            print('Table already exists')
+            utils.dbg('Table already exists')
             return
 
         max_versions_rule = column_family.MaxVersionsGCRule(1)
@@ -194,16 +198,96 @@ class GameQueue:
             METADATA: max_versions_rule,
             TFEXAMPLE: max_versions_rule})
 
+    @property
     def latest_game_number(self):
         """Return the number of the next game to be written."""
-        game_counter = b'game_counter'
         table_state = self.bt_table.read_row(
             TABLE_STATE,
             filter_=row_filters.ColumnRangeFilter(
-                METADATA, game_counter, game_counter))
+                METADATA, GAME_COUNTER, GAME_COUNTER))
         if table_state is None:
             return 0
-        return cbt_intvalue(table_state.cell_value(METADATA, game_counter))
+        return cbt_intvalue(table_state.cell_value(METADATA, GAME_COUNTER))
+
+    @latest_game_number.setter
+    def latest_game_number(self, latest):
+        table_state = self.bt_table.row(TABLE_STATE)
+        table_state.set_cell(METADATA, GAME_COUNTER, int(latest))
+        table_state.commit()
+
+    def games_by_time(self, start_game, end_game):
+        """Given a range of games, return the games sorted by time.
+
+        Returns [(time, game_number), ...]
+
+        The time will be a `datetime.datetime` and the game
+        number is the integer used as the basis of the row ID.
+
+        Note that when a cluster of self-play nodes are writing
+        concurrently, the game numbers may be out of order.
+        """
+        move_count = b'move_count'
+        rows = self.bt_table.read_rows(
+            ROWCOUNT_PREFIX.format(start_game),
+            ROWCOUNT_PREFIX.format(end_game),
+            filter_=row_filters.ColumnRangeFilter(
+                METADATA, move_count, move_count))
+        def parse(r):
+            rk = str(r.row_key, 'utf-8')
+            game = _game_from_counter.match(rk).groups()[0]
+            return (r.cells[METADATA][move_count][0].timestamp, game)
+        return sorted([parse(r) for r in rows], key=operator.itemgetter(0))
+
+    def delete_row_range(self, format_str, start_game, end_game):
+        row_keys = make_single_array(
+            self.tf_table.keys_by_range_dataset(
+                format_str.format(start_game),
+                format_str.format(end_game)))
+        row_keys = list(row_keys)
+        utils.dbg('Deleting %d rows:  %s..%s' % (
+            len(row_keys), row_keys[0], row_keys[-1]))
+        rows = [self.bt_table.row(k) for k in row_keys]
+        batch = []
+        def mutate_batch():
+            nonlocal batch
+            utils.dbg('...deleting batch %s..%s' % (
+                batch[0].row_key, batch[-1].row_key))
+            self.bt_table.mutate_rows(batch)
+            batch = []
+        while rows:
+            r = rows.pop()
+            r.delete()
+            batch.append(r)
+            if len(batch) >= google.cloud.bigtable.row.MAX_MUTATIONS:
+                mutate_batch()
+        mutate_batch()
+
+    def trim_games_since(self, t, max_games=500000):
+        """Trim off the games since the given time.
+
+        Search back no more than max_games for this time point, locate
+        the game there, and remove all games since that game,
+        resetting the latest game counter.
+
+        If `t` is a `datetime.timedelta`, then the target time will be
+        found by subtracting that delta from the time of the last
+        game.  Otherwise, it will be the target time.
+        """
+        latest = self.latest_game_number
+        gbt = self.games_by_time(int(latest - max_games), latest)
+        most_recent = gbt[-1]
+        if isinstance(t, datetime.timedelta):
+            target = most_recent[0] - t
+        else:
+            target = t
+        i = bisect.bisect_right(gbt, (target,))
+        when, which = gbt[i]
+        utils.dbg('Most recent:  %s  %s' % most_recent)
+        utils.dbg('     Target:  %s  %s' % (when, which))
+        which = int(which)
+        self.delete_row_range(ROW_PREFIX, which, latest)
+        self.delete_row_range(ROWCOUNT_PREFIX, which, latest)
+        self.latest_game_number = which + 1
 
     def bleakest_moves(self, start_game, end_game):
         """Given a range of games, return the bleakest moves.
@@ -234,7 +318,7 @@ class GameQueue:
         `self.wait_for_fresh_games()` to block until the game
         counter has reached this number.
         """
-        latest = self.latest_game_number()
+        latest = self.latest_game_number
         table_state = self.bt_table.row(TABLE_STATE)
         table_state.set_cell(METADATA, WAIT_CELL, int(latest + number_fresh))
         table_state.commit()
@@ -265,12 +349,12 @@ class GameQueue:
                       'in table_state')
             return
         wait_until_game = cbt_intvalue(value)
-        latest_game = self.latest_game_number()
+        latest_game = self.latest_game_number
         while latest_game < wait_until_game:
             utils.dbg('Latest game {} not yet at required game {}'.
                       format(latest_game, wait_until_game))
             time.sleep(poll_interval)
-            latest_game = self.latest_game_number()
+            latest_game = self.latest_game_number
 
     def count_moves_in_game_range(self, game_begin, game_end):
         """Count the total moves in a game range.
@@ -326,7 +410,7 @@ class GameQueue:
     def moves_from_last_n_games(self, n, moves, shuffle,
                                 column_family, column):
       self.wait_for_fresh_games()
-      latest_game = int(self.latest_game_number())
+      latest_game = self.latest_game_number
       utils.dbg('Latest game in %s: %s' % (self.table_name, latest_game))
       if latest_game == 0:
           raise ValueError('Cannot find a latest game in the table')
@@ -398,7 +482,7 @@ def set_fresh_watermark(games, window_size, fresh_fraction=0.05, minimum_fresh=2
       minimum_fresh:  an integer indicating the lower bound on the number of new
       games.
     """
-    latest_game = int(games.latest_game_number())
+    latest_game = games.latest_game_number
     if n > latest_game: # How to handle the case when the window is not yet 'full'
         games.require_fresh_games(int(minimum_fresh * .9))
     else:
