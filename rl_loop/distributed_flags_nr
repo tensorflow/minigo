@@ -1,0 +1,18 @@
+# this file is the subset of flags used by the set of clusters that will do
+# selfplay with resignation disabled (AKA 'calibration' games).
+#
+# Network architecture flags
+--conv_width=256
+--fc_width=256
+--trunk_layers=19
+
+# Selfplay related flags.
+# These flags can be overwritten by --flags_path (see cc/main.cc for details)
+--inject_noise=true
+--soft_pick=true
+--random_symmetry=true
+--virtual_losses=8
+--parallel_games=8
+--num_readouts=800
+--disable_resign_pct=1.00
+--resign_threshold=-0.99999

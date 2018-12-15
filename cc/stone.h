@@ -17,9 +17,9 @@
 
 #include <cstdint>
 
-#include "cc/check.h"
 #include "cc/color.h"
 #include "cc/group.h"
+#include "cc/logging.h"
 
 namespace minigo {
 

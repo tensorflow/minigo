@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tpu-player-deployment
+  name: tpu-player-deployment-nr
 spec:
-  replicas: 128
+  replicas: 64
   selector:
     matchLabels:
       app: tpu-player
@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: minigo-tpu-player-container
-        image: gcr.io/tensor-go/minigo-tpu-player:v14
+        image: gcr.io/tensor-go/minigo-tpu-player:v14-nr
         imagePullPolicy: Always
         resources:
           limits:

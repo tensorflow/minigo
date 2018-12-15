@@ -14,14 +14,11 @@
 
 #include "cc/dual_net/lite_dual_net.h"
 
-#include <fstream>
-#include <iostream>
-
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 #include "cc/platform/utils.h"
 #include "tensorflow/contrib/lite/context.h"
 #include "tensorflow/contrib/lite/interpreter.h"
@@ -67,10 +64,6 @@ class LiteDualNet : public DualNet {
 
 minigo::LiteDualNet::LiteDualNet(std::string graph_path)
     : graph_path_(graph_path), batch_capacity_(0) {
-  if (!std::ifstream(graph_path).good()) {
-    absl::StrAppend(&graph_path, ".tflite");
-  }
-
   model_ = FlatBufferModel::BuildFromFile(graph_path.c_str());
   MG_CHECK(model_ != nullptr);
 
@@ -147,7 +140,7 @@ void minigo::LiteDualNet::RunMany(
       return RunMany(features, outputs, input_->data.uint8, policy_->data.uint8,
                      value_->data.uint8);
     default:
-      MG_FATAL() << "Unsupported input type";
+      MG_LOG(FATAL) << "Unsupported input type";
   }
 }
 

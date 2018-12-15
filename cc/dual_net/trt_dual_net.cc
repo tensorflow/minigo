@@ -15,14 +15,13 @@
 #include "cc/dual_net/trt_dual_net.h"
 
 #include <bitset>
-#include <fstream>
 #include <thread>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
-#include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 #include "cc/thread_safe_queue.h"
 #include "cuda/include/cuda_runtime_api.h"
 #include "tensorrt/include/NvInfer.h"
@@ -53,13 +52,13 @@ class TrtDualNet : public DualNet {
     void log(nvinfer1::ILogger::Severity severity, const char* msg) override {
       switch (severity) {
         case Severity::kINTERNAL_ERROR:
-          std::cerr << "TensorRT internal error: " << msg << std::endl;
+          MG_LOG(ERROR) << "TensorRT internal error: " << msg;
           break;
         case Severity::kERROR:
-          std::cerr << "TensorRT error: " << msg << std::endl;
+          MG_LOG(ERROR) << "TensorRT error: " << msg;
           break;
         case Severity::kWARNING:
-          std::cerr << "TensorRT warning: " << msg << std::endl;
+          MG_LOG(WARNING) << "TensorRT warning: " << msg;
           break;
         default:
           break;
@@ -154,10 +153,6 @@ class TrtDualNet : public DualNet {
     MG_CHECK(builder_);
     network_ = builder_->createNetwork();
     MG_CHECK(network_);
-
-    if (!std::ifstream(graph_path).good()) {
-      graph_path = absl::StrCat(graph_path, ".uff");
-    }
 
     MG_CHECK(parser_->parse(graph_path.c_str(), *network_,
                             nvinfer1::DataType::kFLOAT))

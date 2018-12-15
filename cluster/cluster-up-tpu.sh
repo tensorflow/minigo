@@ -22,14 +22,12 @@ source ${SCRIPT_DIR}/utils.sh
 
 export NUM_NODES=128
 
-ZONE=us-central1-f
-
-
 echo "TPU Cluster Creation"
 echo "--------------------------------------"
 echo "Using Project:      ${PROJECT}"
 echo "Using Zone:         ${ZONE}"
 echo "Using Cluster Name: ${CLUSTER_NAME}"
+echo "Service account:    ${SERVICE_ACCOUNT}"
 
 echo "Overriding num nodes to: $NUM_NODES"
 
@@ -41,7 +39,7 @@ check_gcloud_exists
 gcloud beta container clusters create \
     --project=$PROJECT \
     --zone=$ZONE \
-    --cluster-version=1.10 \
+    --cluster-version=1.11 \
     --scopes=cloud-platform \
     --network=$CLUSTER_NAME \
     --enable-ip-alias \

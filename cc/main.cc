@@ -21,7 +21,6 @@
 #include <thread>
 #include <utility>
 #include <vector>
-
 #include "absl/base/thread_annotations.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/match.h"
@@ -35,7 +34,6 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "cc/check.h"
 #include "cc/constants.h"
 #include "cc/dual_net/batching_dual_net.h"
 #include "cc/dual_net/factory.h"
@@ -44,6 +42,7 @@
 #include "cc/file/utils.h"
 #include "cc/gtp_player.h"
 #include "cc/init.h"
+#include "cc/logging.h"
 #include "cc/mcts_player.h"
 #include "cc/platform/utils.h"
 #include "cc/random.h"
@@ -70,6 +69,8 @@ DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed. "
               "This seed is used to control the moves played, not whether a "
               "game has resignation disabled or is a holdout.");
+DEFINE_double(holdout_pct, 0.03,
+              "Fraction of games to hold out for validation.");
 
 // Tree search flags.
 DEFINE_int32(num_readouts, 100,
@@ -134,8 +135,7 @@ DEFINE_string(output_bigtable, "",
 DEFINE_string(sgf_dir, "",
               "SGF directory for selfplay and puzzles. If empty in selfplay "
               "mode, no SGF is written.");
-DEFINE_double(holdout_pct, 0.03,
-              "Fraction of games to hold out for validation.");
+DEFINE_string(bigtable_tag, "", "Used in Bigtable metadata");
 
 // Self play flags:
 //   --inject_noise=true
@@ -149,36 +149,6 @@ DEFINE_double(holdout_pct, 0.03,
 
 namespace minigo {
 namespace {
-
-// Ceates a DualNetFactory from the FLAGs and wraps the result in a
-// BatchingDualNetFactory if the calculated batch size is greated than 1.
-std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
-    int num_parallel_games) {
-  auto factory = NewDualNetFactory();
-
-  // Calculate batch size suitable for a DualNet which handles inference
-  // requests from num_parallel_games each with at most virtual_losses features
-  // each so that the maximum number of features in flight results in
-  // buffer_count batches.
-  int buffer_count = factory->GetBufferCount();
-  int batch_size =
-      std::max((FLAGS_virtual_losses * num_parallel_games + buffer_count - 1) /
-                   buffer_count,
-               FLAGS_virtual_losses);
-  // We have to force batching on in eval mode, even if parallel_games == 1
-  // because it assumes that creating a new model instance is cheap.
-  // TODO(tommadams): fix the batching code so that eval mode doesn't have to
-  // continually create and destroy DualNet instances.
-  if (batch_size > FLAGS_virtual_losses || FLAGS_mode == "eval") {
-    factory = NewBatchingDualNetFactory(std::move(factory), batch_size);
-  }
-
-  if (FLAGS_model.find("%d") != std::string::npos) {
-    factory = absl::make_unique<ReloadingDualNetFactory>(std::move(factory),
-                                                         absl::Seconds(3));
-  }
-  return factory;
-}
 
 std::string GetOutputName(absl::Time now, size_t i) {
   auto timestamp = absl::ToUnixSeconds(now);
@@ -321,7 +291,23 @@ class SelfPlayer {
     auto start_time = absl::Now();
     {
       absl::MutexLock lock(&mutex_);
-      dual_net_factory_ = NewBatchingDualNetFactory(FLAGS_parallel_games);
+      dual_net_factory_ = NewDualNetFactory();
+      // If the model path contains a pattern, wrap the implementation factory
+      // in a ReloadingDualNetFactory to automatically reload the latest model
+      // that matches the pattern.
+      if (FLAGS_model.find("%d") != std::string::npos) {
+        dual_net_factory_ = absl::make_unique<ReloadingDualNetFactory>(
+            std::move(dual_net_factory_), absl::Seconds(3));
+      }
+      // Note: it's more efficient to perform the reload wrapping before the
+      // batch wrapping because this way, we only need to reload the single
+      // implementation DualNet when a new model is found. If we performed batch
+      // wrapping before reload wrapping, the reload code would need to update
+      // all the BatchingDualNet wrappers.
+      if (FLAGS_parallel_games > 1) {
+        dual_net_factory_ =
+            NewBatchingDualNetFactory(std::move(dual_net_factory_));
+      }
     }
     for (int i = 0; i < FLAGS_parallel_games; ++i) {
       threads_.emplace_back(std::bind(&SelfPlayer::ThreadRun, this, i));
@@ -329,9 +315,8 @@ class SelfPlayer {
     for (auto& t : threads_) {
       t.join();
     }
-    std::cerr << "Played " << FLAGS_parallel_games << " games, total time "
-              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-              << std::endl;
+    MG_LOG(INFO) << "Played " << FLAGS_parallel_games << " games, total time "
+                 << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
   }
 
  private:
@@ -375,7 +360,7 @@ class SelfPlayer {
         absl::StrSplit(FLAGS_output_bigtable, ',');
     bool use_bigtable = bigtable_spec.size() == 3;
     if (!FLAGS_output_bigtable.empty() && !use_bigtable) {
-      MG_FATAL()
+      MG_LOG(FATAL)
           << "Bigtable output must be of the form: project,instance,table";
       return;
     }
@@ -397,18 +382,21 @@ class SelfPlayer {
 
       // Play the game.
       auto start_time = absl::Now();
-      while (!player->root()->game_over()) {
+      dual_net_factory_->StartGame(player->network(), player->network());
+      while (!player->root()->game_over() && !player->root()->at_move_limit()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
           const auto& position = player->root()->position;
-          std::cerr << player->root()->position.ToPrettyString(use_ansi_colors);
-          std::cerr << "Move: " << position.n()
-                    << " Captures X: " << position.num_captures()[0]
-                    << " O: " << position.num_captures()[1] << std::endl;
-          std::cerr << player->root()->Describe() << std::endl;
+          MG_LOG(INFO) << player->root()->position.ToPrettyString(
+              use_ansi_colors);
+          MG_LOG(INFO) << "Move: " << position.n()
+                       << " Captures X: " << position.num_captures()[0]
+                       << " O: " << position.num_captures()[1];
+          MG_LOG(INFO) << player->root()->Describe();
         }
-        player->PlayMove(move);
+        MG_CHECK(player->PlayMove(move));
       }
+      dual_net_factory_->EndGame(player->network(), player->network());
 
       {
         // Log the end game info with the shared mutex held to prevent the
@@ -450,7 +438,7 @@ class SelfPlayer {
       }
     } while (game_options.run_forever);
 
-    std::cerr << "Thread " << thread_id << " stopping" << std::endl;
+    MG_LOG(INFO) << "Thread " << thread_id << " stopping";
   }
 
   void MaybeReloadFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
@@ -459,11 +447,12 @@ class SelfPlayer {
     }
     uint64_t new_flags_timestamp;
     MG_CHECK(file::GetModTime(FLAGS_flags_path, &new_flags_timestamp));
-    std::cerr << "flagfile:" << FLAGS_flags_path
-              << " old_ts:" << absl::FromUnixMicros(flags_timestamp_)
-              << " new_ts:" << absl::FromUnixMicros(new_flags_timestamp);
-    if (new_flags_timestamp == flags_timestamp_) {
-      std::cerr << " skipping" << std::endl;
+    bool skip = new_flags_timestamp == flags_timestamp_;
+    MG_LOG(INFO) << "flagfile:" << FLAGS_flags_path
+                 << " old_ts:" << absl::FromUnixMicros(flags_timestamp_)
+                 << " new_ts:" << absl::FromUnixMicros(new_flags_timestamp)
+                 << (skip ? " skipping" : "");
+    if (skip) {
       return;
     }
 
@@ -473,7 +462,7 @@ class SelfPlayer {
 
     std::vector<std::string> lines =
         absl::StrSplit(contents, '\n', absl::SkipEmpty());
-    std::cerr << " loaded flags:" << absl::StrJoin(lines, " ") << std::endl;
+    MG_LOG(INFO) << " loaded flags:" << absl::StrJoin(lines, " ");
 
     for (absl::string_view line : lines) {
       std::pair<absl::string_view, absl::string_view> line_comment =
@@ -486,8 +475,8 @@ class SelfPlayer {
       std::pair<std::string, std::string> flag_value =
           absl::StrSplit(line, absl::MaxSplits('=', 1));
       flag_value.first = flag_value.first.substr(2);
-      std::cerr << "Setting command line flag: --" << flag_value.first << "="
-                << flag_value.second << std::endl;
+      MG_LOG(INFO) << "Setting command line flag: --" << flag_value.first << "="
+                   << flag_value.second;
       gflags::SetCommandLineOption(flag_value.first.c_str(),
                                    flag_value.second.c_str());
     }
@@ -501,32 +490,11 @@ class SelfPlayer {
 };
 
 class Evaluator {
-  // References a pointer to an actual DualNet. Allows updating the pointer
-  // after the MctsPlayer has been constructed.
-  class WrappedDualNet : public DualNet {
-   public:
-    explicit WrappedDualNet(const std::unique_ptr<DualNet>* dual_net)
-        : dual_net_(dual_net) {
-      MG_CHECK(dual_net);
-    }
-
-   private:
-    void RunMany(std::vector<const BoardFeatures*> features,
-                 std::vector<Output*> outputs, std::string* model) override {
-      dual_net_->get()->RunMany(std::move(features), std::move(outputs), model);
-    };
-
-    const std::unique_ptr<DualNet>* const dual_net_;
-  };
-
   struct Model {
-    explicit Model(const std::string& model)
-        : model_path(model),
-          name(file::Stem(model)),
-          black_wins(0),
-          white_wins(0) {}
-    std::string model_path;
-    std::string name;
+    explicit Model(const std::string& path)
+        : path(path), name(file::Stem(path)), black_wins(0), white_wins(0) {}
+    const std::string path;
+    const std::string name;
     std::atomic<int> black_wins;
     std::atomic<int> white_wins;
   };
@@ -534,15 +502,17 @@ class Evaluator {
  public:
   void Run() {
     auto start_time = absl::Now();
-    auto factory = NewBatchingDualNetFactory(FLAGS_parallel_games);
+    auto model_factory = NewDualNetFactory();
+    if (FLAGS_parallel_games > 1) {
+      model_factory = NewBatchingDualNetFactory(std::move(model_factory));
+    }
 
-    Model prev_model(FLAGS_model);
-    Model curr_model(FLAGS_model_two);
+    Model model_a(FLAGS_model);
+    Model model_b(FLAGS_model_two);
 
-    std::cerr << "DualNet factories created from " << FLAGS_model << "\n  and "
-              << FLAGS_model_two << " in "
-              << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-              << std::endl;
+    MG_LOG(INFO) << "DualNet factories created from " << FLAGS_model
+                 << "\n  and " << FLAGS_model_two << " in "
+                 << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
 
     ParseMctsPlayerOptionsFromFlags(&options_);
     options_.inject_noise = false;
@@ -552,19 +522,19 @@ class Evaluator {
     int num_games = FLAGS_parallel_games;
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
-      auto* model = swap_models ? &curr_model : &prev_model;
-      auto* other_model = swap_models ? &prev_model : &curr_model;
       threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
-                                      factory.get(), model, other_model));
+                                      model_factory.get(),
+                                      swap_models ? &model_a : &model_b,
+                                      swap_models ? &model_b : &model_a));
     }
     for (auto& t : threads_) {
       t.join();
     }
 
-    std::cerr << "Evaluated " << num_games << " games, total time "
-              << (absl::Now() - start_time) << std::endl;
+    MG_LOG(INFO) << "Evaluated " << num_games << " games, total time "
+                 << (absl::Now() - start_time);
 
-    auto name_length = std::max(prev_model.name.size(), curr_model.name.size());
+    auto name_length = std::max(model_a.name.size(), model_b.name.size());
     auto format_name = [&](const std::string& name) {
       return absl::StrFormat("%-*s", name_length, name);
     };
@@ -572,25 +542,24 @@ class Evaluator {
       return absl::StrFormat(" %5d %6.2f%%", wins, wins * 100.0f / num_games);
     };
     auto print_result = [&](const Model& model) {
-      std::cerr << format_name(model.name)
-                << format_wins(model.black_wins + model.white_wins)
-                << format_wins(model.black_wins)
-                << format_wins(model.white_wins) << std::endl;
+      MG_LOG(INFO) << format_name(model.name)
+                   << format_wins(model.black_wins + model.white_wins)
+                   << format_wins(model.black_wins)
+                   << format_wins(model.white_wins);
     };
 
-    std::cerr << format_name("Wins")
-              << "        Total         Black         White" << std::endl;
-    print_result(prev_model);
-    print_result(curr_model);
-    std::cerr << format_name("") << "              "
-              << format_wins(prev_model.black_wins + curr_model.black_wins)
-              << format_wins(prev_model.white_wins + curr_model.white_wins);
-    std::cerr << std::endl;
+    MG_LOG(INFO) << format_name("Wins")
+                 << "        Total         Black         White";
+    print_result(model_a);
+    print_result(model_b);
+    MG_LOG(INFO) << format_name("") << "              "
+                 << format_wins(model_a.black_wins + model_b.black_wins)
+                 << format_wins(model_a.white_wins + model_b.white_wins);
   }
 
  private:
-  void ThreadRun(int thread_id, DualNetFactory* factory, Model* model,
-                 Model* other_model) {
+  void ThreadRun(int thread_id, DualNetFactory* model_factory,
+                 Model* black_model, Model* white_model) {
     // The player and other_player reference this pointer.
     std::unique_ptr<DualNet> dual_net;
 
@@ -598,7 +567,7 @@ class Evaluator {
         absl::StrSplit(FLAGS_output_bigtable, ',');
     bool use_bigtable = bigtable_spec.size() == 3;
     if (!FLAGS_output_bigtable.empty() && !use_bigtable) {
-      MG_FATAL()
+      MG_LOG(FATAL)
           << "Bigtable output must be of the form: project,instance,table";
       return;
     }
@@ -610,55 +579,46 @@ class Evaluator {
       player_options.random_seed += 1299283 * thread_id;
     }
 
-    player_options.verbose = thread_id == 0;
-    player_options.name = model->name;
-    auto player = absl::make_unique<MctsPlayer>(
-        absl::make_unique<WrappedDualNet>(&dual_net), player_options);
+    const bool verbose = thread_id == 0;
+    player_options.verbose = verbose;
+    player_options.name = black_model->name;
+    auto black = absl::make_unique<MctsPlayer>(
+        model_factory->NewDualNet(black_model->path), player_options);
 
     player_options.verbose = false;
-    player_options.name = other_model->name;
-    auto other_player = absl::make_unique<MctsPlayer>(
-        absl::make_unique<WrappedDualNet>(&dual_net), player_options);
+    player_options.name = white_model->name;
+    auto white = absl::make_unique<MctsPlayer>(
+        model_factory->NewDualNet(white_model->path), player_options);
 
-    auto* black = player.get();
-    auto* white = other_player.get();
-
-    std::string model_path = model->model_path;
-    std::string other_model_path = other_model->model_path;
-
-    while (!player->root()->game_over()) {
-      // Create the DualNet for a single move and dispose it again. This
-      // is required because a BatchingDualNet instance can prevent the
-      // inference queue from being flushed if it's not sending any requests.
-      // The number of requests per move can be smaller than num_readouts at the
-      // end of a game.
-      dual_net = factory->NewDualNet(model_path);
-
-      auto move = player->SuggestMove();
-      dual_net.reset();
-      if (player->options().verbose) {
-        std::cerr << player->root()->Describe() << "\n";
+    auto* curr_player = black.get();
+    auto* next_player = white.get();
+    model_factory->StartGame(curr_player->network(), next_player->network());
+    while (!curr_player->root()->game_over() &&
+           !curr_player->root()->at_move_limit()) {
+      auto move = curr_player->SuggestMove();
+      if (curr_player->options().verbose) {
+        std::cerr << curr_player->root()->Describe() << "\n";
       }
-      player->PlayMove(move);
-      other_player->PlayMove(move);
-      if (player->options().verbose) {
-        std::cerr << player->root()->position.ToPrettyString();
+      curr_player->PlayMove(move);
+      next_player->PlayMove(move);
+      if (curr_player->options().verbose) {
+        MG_LOG(INFO) << curr_player->root()->position.ToPrettyString();
       }
-      std::swap(model_path, other_model_path);
-      std::swap(player, other_player);
+      std::swap(curr_player, next_player);
+    }
+    model_factory->EndGame(curr_player->network(), next_player->network());
+
+    MG_CHECK(curr_player->result() == next_player->result());
+    if (curr_player->result() > 0) {
+      ++black_model->black_wins;
+    }
+    if (curr_player->result() < 0) {
+      ++white_model->white_wins;
     }
 
-    MG_CHECK(player->result() == other_player->result());
-    if (player->result() > 0) {
-      ++model->black_wins;
-    }
-    if (player->result() < 0) {
-      ++other_model->white_wins;
-    }
-
-    if (black->options().verbose) {
-      std::cerr << black->result_string() << "\n";
-      std::cerr << "Black was: " << black->name() << "\n";
+    if (verbose) {
+      MG_LOG(INFO) << black->result_string();
+      MG_LOG(INFO) << "Black was: " << black->name();
     }
 
     // Write SGF.
@@ -674,11 +634,11 @@ class Evaluator {
       const auto& instance_name = bigtable_spec[1];
       const auto& table_name = bigtable_spec[2];
       tf_utils::WriteEvalRecord(gcp_project_name, instance_name, table_name,
-                                *player, black->name(), white->name(),
-                                output_name);
+                                *curr_player, black->name(), white->name(),
+                                output_name, FLAGS_bigtable_tag);
     }
 
-    std::cerr << absl::StrCat("Thread ", thread_id, " stopping\n");
+    MG_LOG(INFO) << "Thread " << thread_id << " stopping";
   }
 
   MctsPlayer::Options options_;
@@ -702,81 +662,82 @@ void Gtp() {
   options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   options.ponder_limit = FLAGS_ponder_limit;
   options.courtesy_pass = FLAGS_courtesy_pass;
-  auto dual_net_factory = NewBatchingDualNetFactory(1);
+  auto model_factory = NewDualNetFactory();
   auto player = absl::make_unique<GtpPlayer>(
-      dual_net_factory->NewDualNet(FLAGS_model), options);
+      model_factory->NewDualNet(FLAGS_model), options);
+  model_factory->StartGame(player->network(), player->network());
   player->Run();
+  model_factory->EndGame(player->network(), player->network());
 }
 
 void Puzzle() {
   auto start_time = absl::Now();
 
-  std::vector<std::string> sgf_files;
-  MG_CHECK(file::ListDir(FLAGS_sgf_dir, &sgf_files));
-
-  std::vector<std::vector<Move>> games;
-  int parallel_games = 0;
-  for (const auto& sgf_file : sgf_files) {
-    if (!absl::EndsWith(sgf_file, ".sgf")) {
-      continue;
-    }
-    auto path = file::JoinPath(FLAGS_sgf_dir, sgf_file);
-    std::string contents;
-    MG_CHECK(file::ReadFile(path, &contents));
-    sgf::Ast ast;
-    MG_CHECK(ast.Parse(contents));
-    auto trees = GetTrees(ast);
-    MG_CHECK(!trees.empty());
-    auto moves = trees[0]->ExtractMainLine();
-    parallel_games += moves.size();
-    games.emplace_back(std::move(moves));
-  }
-
-  auto factory = NewBatchingDualNetFactory(parallel_games);
-  std::cerr << "DualNet factory created from " << FLAGS_model << " in "
-            << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec."
-            << std::endl;
+  auto model_factory = NewDualNetFactory();
+  MG_LOG(INFO) << "DualNet factory created from " << FLAGS_model << " in "
+               << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
 
   MctsPlayer::Options options;
   ParseMctsPlayerOptionsFromFlags(&options);
   options.verbose = false;
 
-  using Pair = std::pair<std::unique_ptr<MctsPlayer>, Move>;
-  std::vector<Pair> puzzles;
-  for (const auto& moves : games) {
-    std::vector<std::unique_ptr<MctsPlayer>> players(moves.size());
-    for (auto& player : players) {
-      player.reset(new MctsPlayer(factory->NewDualNet(FLAGS_model), options));
+  std::atomic<size_t> total_moves(0);
+  std::atomic<size_t> correct_moves(0);
+
+  std::vector<std::thread> threads;
+  std::vector<std::string> basenames;
+  MG_CHECK(file::ListDir(FLAGS_sgf_dir, &basenames));
+  for (const auto& basename : basenames) {
+    if (!absl::EndsWith(basename, ".sgf")) {
+      continue;
     }
-    for (const auto& move : moves) {
-      puzzles.emplace_back(std::move(players.back()), move);
-      players.pop_back();
-      for (auto& player : players) {
-        player->PlayMove(move.c);
+    threads.emplace_back([&]() {
+      // Read the main line from the SGF.
+      auto path = file::JoinPath(FLAGS_sgf_dir, basename);
+      std::string contents;
+      MG_CHECK(file::ReadFile(path, &contents));
+      sgf::Ast ast;
+      MG_CHECK(ast.Parse(contents));
+      auto trees = GetTrees(ast);
+      MG_CHECK(!trees.empty());
+      auto moves = trees[0]->ExtractMainLine();
+
+      total_moves += moves.size();
+
+      // Create player.
+      auto player = absl::make_unique<MctsPlayer>(
+          model_factory->NewDualNet(FLAGS_model), options);
+      model_factory->StartGame(player->network(), player->network());
+
+      // Play through each game. For each position in the game, compare the
+      // model's suggested move to the actual move played in the game.
+      for (size_t move_to_predict = 0; move_to_predict < moves.size();
+           ++move_to_predict) {
+        // Reset the game and play up to the position to be tested.
+        player->NewGame();
+        for (size_t i = 0; i < move_to_predict; ++i) {
+          player->PlayMove(moves[i].c);
+        }
+
+        // Check if we predict the move that was played.
+        auto expected_move = moves[move_to_predict].c;
+        auto actual_move = player->SuggestMove();
+        if (actual_move == expected_move) {
+          ++correct_moves;
+        }
       }
-    }
+      model_factory->EndGame(player->network(), player->network());
+    });
   }
 
-  std::atomic<size_t> result(0);
-  std::vector<std::thread> threads;
-  for (auto& puzzle : puzzles) {
-    threads.emplace_back(std::bind(
-        [&](const Pair& pair) {
-          if (pair.first->SuggestMove() == pair.second.c) {
-            ++result;
-          }
-        },
-        std::move(puzzle)));
-  }
   for (auto& thread : threads) {
     thread.join();
   }
 
-  std::cerr << absl::StreamFormat(
-                   "Solved %d of %d puzzles (%3.1f%%), total time %f sec.",
-                   result, puzzles.size(), result * 100.0f / puzzles.size(),
-                   absl::ToDoubleSeconds(absl::Now() - start_time))
-            << std::endl;
+  MG_LOG(INFO) << absl::StreamFormat(
+      "Solved %d of %d puzzles (%3.1f%%), total time %f sec.", correct_moves,
+      total_moves, correct_moves * 100.0f / total_moves,
+      absl::ToDoubleSeconds(absl::Now() - start_time));
 }
 
 }  // namespace
@@ -796,8 +757,7 @@ int main(int argc, char* argv[]) {
   } else if (FLAGS_mode == "puzzle") {
     minigo::Puzzle();
   } else {
-    std::cerr << "Unrecognized mode \"" << FLAGS_mode << "\"\n";
-    return 1;
+    MG_LOG(FATAL) << "Unrecognized mode \"" << FLAGS_mode << "\"";
   }
 
   return 0;

@@ -17,7 +17,7 @@ endef
 
 tpu-image:
 	$(staging)
-	docker build --quiet --build-arg PROJECT=$(PROJECT) -f Dockerfile-tpu -t "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)" .
+	docker build --quiet --build-arg RUNMODE=$(RUNMODE) --build-arg CBT_OUTPUT=$(CBT_OUTPUT) --build-arg PROJECT=$(PROJECT) -f Dockerfile-tpu -t "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)" .
 
 py-image:
 	$(staging)

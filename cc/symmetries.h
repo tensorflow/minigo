@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <cstring>
 
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 namespace symmetry {
@@ -70,7 +70,7 @@ inline Symmetry Inverse(Symmetry sym) {
     case kFlipRot270:
       return kFlipRot270;
     default:
-      MG_FATAL() << static_cast<int>(sym);
+      MG_LOG(FATAL) << static_cast<int>(sym);
       return kNumSymmetries;
   }
 }
@@ -200,7 +200,7 @@ inline void ApplySymmetry(Symmetry sym, SrcIt src, DstIt dst) {
       FlipRot270<N, num_channels>(src, dst);
       break;
     default:
-      MG_FATAL() << static_cast<int>(sym);
+      MG_LOG(FATAL) << static_cast<int>(sym);
       break;
   }
 }

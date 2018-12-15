@@ -15,10 +15,10 @@
 #ifndef CC_COLOR_H_
 #define CC_COLOR_H_
 
-#include <iostream>
+#include <ostream>
 
 #include "absl/strings/string_view.h"
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 

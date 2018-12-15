@@ -50,7 +50,6 @@ const char kGameRowFormat[] = "g_%010d";
 const char kEvalGameRowFormat[] = "e_%010d";
 const char kPrefixAndMoveFormat[] = "%s_m_%03d";
 
-
 // Fetches the tensorflow Examples from a MctsPlayer.
 // Linked from tf_utils.cc
 std::vector<tensorflow::Example> MakeExamples(const MctsPlayer& player);
@@ -95,13 +94,13 @@ void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& table_name,
                        const MctsPlayer& player) {
   auto examples = MakeExamples(player);
-  Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
-                                      ClientOptions()),
-              table_name);
+  Table table(
+      CreateDefaultDataClient(gcp_project_name, instance_name, ClientOptions()),
+      table_name);
   // This will be everything from a single game, so retrieve the game
   // counter from the Bigtable and increment it atomically.
-  uint64_t game_counter = IncrementGameCounter(
-      gcp_project_name, instance_name, table_name, "game_counter", 1);
+  uint64_t game_counter = IncrementGameCounter(gcp_project_name, instance_name,
+                                               table_name, "game_counter", 1);
 
   auto row_prefix = absl::StrFormat(kGameRowFormat, game_counter);
   WriteTfExamples(table, row_prefix, examples);
@@ -116,20 +115,19 @@ void WriteGameExamples(const std::string& gcp_project_name,
     table.Apply(std::move(row_mutation));
   }
 
-  std::cerr << "Bigtable rows written to prefix " << row_prefix << " : "
-            << examples.size() << std::endl;
+  MG_LOG(INFO) << "Bigtable rows written to prefix " << row_prefix << " : "
+               << examples.size();
 }
 
 void WriteEvalRecord(const std::string& gcp_project_name,
                      const std::string& instance_name,
-                     const std::string& table_name,
-                     const MctsPlayer& player,
+                     const std::string& table_name, const MctsPlayer& player,
                      const std::string& black_player_name,
                      const std::string& white_player_name,
-                     const std::string& sgf_name) {
-  Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
-                                      ClientOptions()),
-              table_name);
+                     const std::string& sgf_name, const std::string& tag) {
+  Table table(
+      CreateDefaultDataClient(gcp_project_name, instance_name, ClientOptions()),
+      table_name);
 
   // Retrieve the game counter from the Bigtable and increment it atomically.
   uint64_t game_counter = IncrementGameCounter(
@@ -143,20 +141,19 @@ void WriteEvalRecord(const std::string& gcp_project_name,
       SetCell("metadata", "white_won", absl::StrCat(player.result() < 0)),
       SetCell("metadata", "result", player.result_string()),
       SetCell("metadata", "length", absl::StrCat(player.history().size())),
-      SetCell("metadata", "sgf", sgf_name));
+      SetCell("metadata", "sgf", sgf_name), SetCell("metadata", "tag", tag));
 
   table.Apply(std::move(row_mutation));
-  std::cerr << "Bigtable eval row written to " << row_name << std::endl;
+  MG_LOG(INFO) << "Bigtable eval row written to " << row_name;
 }
 
 uint64_t IncrementGameCounter(const std::string& gcp_project_name,
                               const std::string& instance_name,
                               const std::string& table_name,
-                              const std::string& counter_name,
-                              size_t delta) {
-  Table table(CreateDefaultDataClient(gcp_project_name, instance_name,
-                                      ClientOptions()),
-              table_name);
+                              const std::string& counter_name, size_t delta) {
+  Table table(
+      CreateDefaultDataClient(gcp_project_name, instance_name, ClientOptions()),
+      table_name);
   auto rule =
       ReadModifyWriteRule::IncrementAmount("metadata", counter_name, delta);
   auto row = table.ReadModifyWriteRow("table_state", rule);
@@ -168,7 +165,7 @@ uint64_t IncrementGameCounter(const std::string& gcp_project_name,
       return cell.value_as<bigendian64_t>().get();
     }
   }
-  MG_FATAL() << "Failed to increment table_state=metadata:" << counter_name;
+  MG_LOG(FATAL) << "Failed to increment table_state=metadata:" << counter_name;
   return 0;
 }
 
@@ -190,10 +187,10 @@ void PortGamesToBigtable(const std::string& gcp_project_name,
 
   if (game_counter < 0) {
     if (paths.size() != 1) {
-      MG_FATAL() << "Atomic game updates require batch size of 1 game";
+      MG_LOG(FATAL) << "Atomic game updates require batch size of 1 game";
       return;
     }
-    MG_FATAL() << "Have not yet implemented atomic game counter update.";
+    MG_LOG(FATAL) << "Have not yet implemented atomic game counter update.";
     return;
   }
 

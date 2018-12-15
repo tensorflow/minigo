@@ -20,8 +20,8 @@
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "cc/check.h"
 #include "cc/file/path.h"
+#include "cc/logging.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

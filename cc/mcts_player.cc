@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <sstream>
 #include <utility>
 
@@ -25,7 +24,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/time/clock.h"
-#include "cc/check.h"
+#include "cc/logging.h"
 #include "cc/random.h"
 #include "cc/symmetries.h"
 
@@ -83,8 +82,8 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
   root_ = &game_root_;
 
   if (options_.verbose) {
-    std::cerr << "MctsPlayer options: " << options_ << "\n";
-    std::cerr << "Random seed used: " << rnd_.seed() << "\n";
+    MG_LOG(INFO) << "MctsPlayer options: " << options_;
+    MG_LOG(INFO) << "Random seed used: " << rnd_.seed();
   }
 
   InitializeGame({&bv_, &gv_, Color::kBlack});
@@ -92,10 +91,10 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
 
 MctsPlayer::~MctsPlayer() {
   if (options_.verbose) {
-    std::cerr << "Inference history:" << std::endl;
+    MG_LOG(INFO) << "Inference history:";
     for (const auto& info : inferences_) {
-      std::cerr << info.model << " [" << info.first_move << ", "
-                << info.last_move << "]" << std::endl;
+      MG_LOG(INFO) << info.model << " [" << info.first_move << ", "
+                   << info.last_move << "]";
     }
   }
 }
@@ -167,11 +166,10 @@ Coord MctsPlayer::SuggestMove() {
   auto elapsed = absl::Now() - start;
   elapsed = elapsed * 100 / num_readouts;
   if (options_.verbose) {
-    std::cerr << "Milliseconds per 100 reads: "
-              << absl::ToInt64Milliseconds(elapsed) << "ms"
-              << " over " << num_readouts
-              << " readouts (batched: " << options_.batch_size << ")"
-              << std::endl;
+    MG_LOG(INFO) << "Milliseconds per 100 reads: "
+                 << absl::ToInt64Milliseconds(elapsed) << "ms"
+                 << " over " << num_readouts
+                 << " readouts (batched: " << options_.batch_size << ")";
   }
 
   if (ShouldResign()) {
@@ -185,7 +183,7 @@ Coord MctsPlayer::PickMove() {
   if (root_->position.n() >= temperature_cutoff_) {
     Coord c = root_->GetMostVisitedMove();
     if (options_.verbose) {
-      std::cerr << "Picked arg_max " << c << std::endl;
+      MG_LOG(INFO) << "Picked arg_max " << c;
     }
     return c;
   }
@@ -206,7 +204,7 @@ Coord MctsPlayer::PickMove() {
   float e = rnd_();
   Coord c = SearchSorted(cdf, e * cdf.back());
   if (options_.verbose) {
-    std::cerr << "Picked rnd(" << e << ") " << c << std::endl;
+    MG_LOG(INFO) << "Picked rnd(" << e << ") " << c;
   }
   MG_DCHECK(root_->child_N(c) != 0);
   return c;
@@ -224,7 +222,7 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
   int num_selected = 0;
   for (int i = 0; i < max_iterations; ++i) {
     auto* leaf = root->SelectLeaf();
-    if (leaf->game_over() || leaf->position.n() >= kMaxSearchDepth) {
+    if (leaf->game_over() || leaf->at_move_limit()) {
       float value = leaf->position.CalculateScore(options_.komi) > 0 ? 1 : -1;
       leaf->IncorporateEndGameResult(value, root);
     } else {
@@ -244,8 +242,7 @@ bool MctsPlayer::ShouldResign() const {
 
 bool MctsPlayer::PlayMove(Coord c) {
   if (root_->game_over()) {
-    std::cerr << "ERROR: can't play move " << c << ", game is over"
-              << std::endl;
+    MG_LOG(ERROR) << "can't play move " << c << ", game is over";
     return false;
   }
 
@@ -263,7 +260,7 @@ bool MctsPlayer::PlayMove(Coord c) {
   }
 
   if (!root_->legal_moves[c]) {
-    std::cerr << "Move " << c << " is illegal" << std::endl;
+    MG_LOG(ERROR) << "Move " << c << " is illegal";
     return false;
   }
 
@@ -277,12 +274,12 @@ bool MctsPlayer::PlayMove(Coord c) {
   }
 
   if (options_.verbose) {
-    std::cerr << absl::StreamFormat("%s Q: %0.5f\n", name(), root_->Q());
-    std::cerr << "Played >>" << c << std::endl;
+    MG_LOG(INFO) << absl::StreamFormat("%s Q: %0.5f", name(), root_->Q());
+    MG_LOG(INFO) << "Played >>" << c;
   }
 
   // Handle consecutive passing or termination by move limit.
-  if (root_->game_over() || root_->position.n() >= kMaxSearchDepth) {
+  if (root_->game_over() || root_->at_move_limit()) {
     float score = root_->position.CalculateScore(options_.komi);
     result_string_ = FormatScore(score);
     result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
@@ -315,7 +312,7 @@ void MctsPlayer::PushHistory(Coord c) {
     auto model_comment = absl::StrCat("models:", absl::StrJoin(models, ","));
     history.comment = absl::StrCat(model_comment, "\n", history.comment);
     if (options_.verbose) {
-      std::cerr << model_comment << std::endl;
+      MG_LOG(INFO) << model_comment;
     }
   }
 
@@ -421,6 +418,7 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
   }
 }
 
+// &q is the bleakest move from the perspective of the winner, i.e., negative.
 bool FindBleakestMove(const MctsPlayer& player, int* move, float* q) {
   if (player.options().resign_enabled) {
     return false;
@@ -442,7 +440,7 @@ bool FindBleakestMove(const MctsPlayer& player, int* move, float* q) {
     }
   }
   *move = int(bleakest_move);
-  *q = history[bleakest_move].node->Q();
+  *q = bleakest_eval;
   return true;
 }
 

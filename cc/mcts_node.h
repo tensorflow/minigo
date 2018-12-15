@@ -76,6 +76,7 @@ class MctsNode {
            (position.previous_move() == Coord::kPass && parent != nullptr &&
             parent->position.previous_move() == Coord::kPass);
   }
+  bool at_move_limit() const { return position.n() >= kMaxSearchDepth; }
 
   enum class Flag : uint8_t {
     // Node is expanded.

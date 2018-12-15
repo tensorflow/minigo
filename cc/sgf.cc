@@ -15,15 +15,14 @@
 #include "cc/sgf.h"
 
 #include <cctype>
-#include <iostream>
 #include <utility>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-#include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 
 namespace minigo {
 namespace sgf {
@@ -223,8 +222,9 @@ void GetTreeImpl(const Ast::Tree& tree,
       continue;
     }
     if (prop->values.empty()) {
-      std::cerr << "Skipping node " << node.ToString() << " because property "
-                << prop->ToString() << " has no values" << std::endl;
+      MG_LOG(WARNING) << "Skipping node " << node.ToString()
+                      << " because property " << prop->ToString()
+                      << " has no values";
       continue;
     }
     move.c = Coord::FromSgf(prop->values[0]);

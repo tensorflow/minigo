@@ -101,25 +101,9 @@ std::string Position::ToSimpleString() const {
         oss << (c == ko_ ? "*" : ".");
       }
     }
-    oss << "\n";
-  }
-  return oss.str();
-}
-
-std::string Position::ToGroupString() const {
-  std::ostringstream oss;
-  for (int row = 0; row < kN; ++row) {
-    for (int col = 0; col < kN; ++col) {
-      Coord c(row, col);
-      Stone s = stones_[c];
-      if (s.empty()) {
-        oss << kPrintEmpty << ".  ";
-      } else {
-        oss << (s.color() == Color::kWhite ? kPrintWhite : kPrintBlack);
-        oss << absl::StreamFormat("%02x ", s.group_id());
-      }
+    if (row + 1 < kN) {
+      oss << "\n";
     }
-    oss << kPrintNormal << "\n";
   }
   return oss.str();
 }
@@ -132,7 +116,6 @@ std::string Position::ToPrettyString(bool use_ansi_colors) const {
     for (int i = 0; i < kN; ++i) {
       oss << Coord::kKgsColumns[i] << " ";
     }
-    oss << "\n";
   };
 
   const char* print_white = use_ansi_colors ? kPrintWhite : "";
@@ -141,6 +124,7 @@ std::string Position::ToPrettyString(bool use_ansi_colors) const {
   const char* print_normal = use_ansi_colors ? kPrintNormal : "";
 
   format_cols();
+  oss << "\n";
   for (int row = 0; row < kN; ++row) {
     oss << absl::StreamFormat("%2d ", kN - row);
     for (int col = 0; col < kN; ++col) {

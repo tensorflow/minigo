@@ -31,6 +31,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/time/clock.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 #include "cc/sgf.h"
 #include "nlohmann/json.hpp"
 
@@ -74,7 +75,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
 }
 
 void GtpPlayer::Run() {
-  std::cerr << "GTP engine ready" << std::endl;
+  MG_LOG(INFO) << "GTP engine ready";
 
   // Start a background thread that pushes lines read from stdin into the
   // thread safe stdin_queue_. This allows us to ponder when there's nothing
@@ -155,7 +156,7 @@ bool GtpPlayer::MaybePonder() {
       (ponder_type_ == PonderType::kTimeLimited &&
        absl::Now() >= ponder_time_limit_)) {
     if (!ponder_limit_reached_) {
-      std::cerr << "mg-ponder: done" << std::endl;
+      MG_LOG(INFO) << "mg-ponder: done";
       ponder_limit_reached_ = true;
     }
     return false;
@@ -201,7 +202,7 @@ bool GtpPlayer::MaybePonder() {
         {"n", root->N()},
         {"q", root->Q()},
     };
-    std::cerr << "mg-update:" << j.dump() << std::endl;
+    MG_LOG(INFO) << "mg-update:" << j.dump();
   }
 
   // Increment the ponder count by difference new and old reads.
@@ -224,7 +225,7 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   std::vector<absl::string_view> args =
       absl::StrSplit(line, absl::ByAnyChar(" \t\r\n"), absl::SkipWhitespace());
   if (args.empty()) {
-    std::cerr << kGtpCmdDone << std::endl;
+    MG_LOG(INFO) << kGtpCmdDone;
     std::cout << "=\n\n" << std::flush;
     return true;
   }
@@ -234,13 +235,13 @@ bool GtpPlayer::HandleCmd(const std::string& line) {
   args.erase(args.begin());
 
   if (cmd == "quit") {
-    std::cerr << kGtpCmdDone << std::endl;
+    MG_LOG(INFO) << kGtpCmdDone;
     std::cout << "=\n\n" << std::flush;
     return false;
   }
 
   auto response = DispatchCmd(cmd, args);
-  std::cerr << kGtpCmdDone << std::endl;
+  MG_LOG(INFO) << kGtpCmdDone;
   std::cout << (response.ok ? "=" : "?");
   if (!response.str.empty()) {
     std::cout << " " << response.str;
@@ -387,7 +388,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
   }
 
   auto c = SuggestMove();
-  std::cerr << root()->Describe() << std::endl;
+  MG_LOG(INFO) << root()->Describe();
   MG_CHECK(PlayMove(c));
 
   // Begin pondering again if requested.
@@ -471,7 +472,7 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
   std::ifstream f;
   f.open(std::string(args[0]));
   if (!f.is_open()) {
-    std::cerr << "Couldn't read \"" << args[0] << "\"" << std::endl;
+    MG_LOG(ERROR) << "couldn't read \"" << args[0] << "\"";
     return Response::Error("cannot load file");
   }
   std::stringstream buffer;
@@ -500,8 +501,7 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
   } else if (std::tolower(args[0][0]) == 'w') {
     color = Color::kWhite;
   } else {
-    std::cerr << "ERRROR: expected b or w for player color, got " << args[0]
-              << std::endl;
+    MG_LOG(ERROR) << "expected b or w for player color, got " << args[0];
     return Response::Error("illegal move");
   }
   if (color != root()->position.to_play()) {
@@ -510,8 +510,7 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
 
   Coord c = Coord::FromKgs(args[1], true);
   if (c == Coord::kInvalid) {
-    std::cerr << "ERRROR: expected KGS coord for move, got " << args[1]
-              << std::endl;
+    MG_LOG(ERROR) << "expected GTP coord for move, got " << args[1];
     return Response::Error("illegal move");
   }
 
@@ -702,8 +701,7 @@ GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
   } else {
     Coord c = Coord::FromKgs(args[0], true);
     if (c == Coord::kInvalid) {
-      std::cerr << "ERROR: expected KGS coord for move, got " << args[0]
-                << std::endl;
+      MG_LOG(ERROR) << "expected GTP coord for move, got " << args[0];
       return Response::Error("illegal move");
     }
     if (c != child_variation_) {
@@ -734,7 +732,7 @@ GtpPlayer::Response GtpPlayer::HandleVerbosity(absl::string_view cmd,
 GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   sgf::Ast ast;
   if (!ast.Parse(sgf_str)) {
-    std::cerr << "Couldn't parse SGF" << std::endl;
+    MG_LOG(ERROR) << "couldn't parse SGF";
     return Response::Error("cannot parse file");
   }
 
@@ -756,7 +754,7 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
                 " but can't play an intermediate pass because the previous ",
                 "move was also a pass");
           }
-          std::cerr << "Inserting pass move" << std::endl;
+          MG_LOG(WARNING) << "Inserting pass move";
           MG_CHECK(PlayMove(Coord::kPass));
           ReportPosition(root());
         }
@@ -858,7 +856,7 @@ void GtpPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf) {
     childQ.push_back(static_cast<int>(std::round(root->child_Q(i) * 1000)));
   }
 
-  std::cerr << "mg-update:" << j.dump() << std::endl;
+  MG_LOG(INFO) << "mg-update:" << j.dump();
 }
 
 void GtpPlayer::ReportPosition(MctsNode* node) {
@@ -904,7 +902,7 @@ void GtpPlayer::ReportPosition(MctsNode* node) {
     j["comment"] = info->comment;
   }
 
-  std::cerr << "mg-position: " << j.dump() << std::endl;
+  MG_LOG(INFO) << "mg-position: " << j.dump();
 }
 
 GtpPlayer::AuxInfo* GtpPlayer::RegisterNode(MctsNode* node) {

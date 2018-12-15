@@ -20,10 +20,11 @@
 #include <vector>
 
 #include "absl/memory/memory.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
-#include "cc/check.h"
 #include "cc/constants.h"
+#include "cc/logging.h"
 #include "cc/thread_safe_queue.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"
@@ -153,13 +154,15 @@ TfDualNet::TfDualNet(std::string graph_path, int device_count)
     : graph_path_(graph_path), running_(true) {
   GraphDef graph_def;
 
-  // If we can't find the specified graph, try adding a .pb extension.
   auto* env = Env::Default();
-  if (!env->FileExists(graph_path).ok()) {
-    absl::StrAppend(&graph_path, ".pb");
-  }
-
   TF_CHECK_OK(ReadBinaryProto(env, graph_path, &graph_def));
+
+  // Check that we're not loading a TPU model.
+  for (const auto& node : graph_def.node()) {
+    MG_CHECK(!absl::StartsWithIgnoreCase(node.name(), "tpu"))
+        << "found node named \"" << node.name()
+        << "\", this model looks like it was compiled for TPU";
+  }
 
   auto functor = [this](const GraphDef& graph_def) {
     TfWorker worker(graph_def);

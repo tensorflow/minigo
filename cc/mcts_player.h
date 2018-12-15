@@ -17,8 +17,8 @@
 
 #include <cmath>
 #include <cstdint>
-#include <iostream>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -149,14 +149,14 @@ class MctsPlayer {
   //   -1.0 if white won.
   // Check fails if the game is not yet over.
   float result() const {
-    MG_CHECK(root_->game_over());
+    MG_CHECK(root_->game_over() || root_->at_move_limit());
     return result_;
   }
 
   // Return a text description of the game result, e.g. "B+R", "W+1.5".
   // Check fails if the game is not yet over.
   const std::string& result_string() const {
-    MG_CHECK(root_->game_over());
+    MG_CHECK(root_->game_over() || root_->at_move_limit());
     return result_string_;
   }
 
@@ -164,6 +164,7 @@ class MctsPlayer {
   const std::vector<History>& history() const { return history_; }
   const std::string& name() const { return options_.name; }
   const std::vector<InferenceInfo>& inferences() const { return inferences_; }
+  DualNet* network() { return network_.get(); }
 
  protected:
   // Path in the game tree from leaf to root.
@@ -198,8 +199,6 @@ class MctsPlayer {
   Random* rnd() { return &rnd_; }
 
   std::string FormatScore(float score) const;
-
-  DualNet* network() { return network_.get(); }
 
   // Run inference for the given leaf nodes & incorportate the inference output.
   virtual void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);
@@ -244,6 +243,8 @@ class MctsPlayer {
 // it could have been.)
 //
 // Returns true if the bleakest move was found and returned; false otherwise.
+// Q is returned from the winners perspective, which means we don't have to
+// reference the result to transform this into a sortable list of evaluations.
 bool FindBleakestMove(const MctsPlayer& player, int* move, float* q);
 
 }  // namespace minigo

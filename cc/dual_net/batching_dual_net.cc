@@ -1,5 +1,6 @@
 #include "cc/dual_net/batching_dual_net.h"
 
+#include <atomic>
 #include <queue>
 #include <utility>
 
@@ -7,109 +8,126 @@
 #include "absl/memory/memory.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
-#include "cc/check.h"
+#include "cc/logging.h"
 
 namespace minigo {
 namespace {
-class BatchingService {
-  struct InferenceData {
+
+// The ModelBatcher is responsible for batching up inference requests from
+// from multiple BatchingDualNet clients into larger (and therefore more
+// efficient) inferences.
+// Each ModelBatcher instance is responsible for batching inference requests
+// for a single model.
+class ModelBatcher {
+ public:
+  // A single inference request from a client, possibly containing multiple
+  // individual inferences because of virtual losses.
+  struct InferenceRequest {
+    ModelBatcher* other_batcher;
     std::vector<const DualNet::BoardFeatures*> features;
     std::vector<DualNet::Output*> outputs;
-    std::string* model;
+    std::string* model_name;
     absl::Notification* notification;
   };
 
- public:
-  BatchingService(std::unique_ptr<DualNet> dual_net, size_t batch_size,
-                  std::string model)
-      : dual_net_(std::move(dual_net)),
-        num_clients_(0),
-        queue_counter_(0),
-        run_counter_(0),
-        num_runs_(0),
-        batch_size_(batch_size),
-        model_(std::move(model)) {
-    dual_net_->Reserve(batch_size);
+  ModelBatcher(std::unique_ptr<DualNet> model_impl, size_t buffering)
+      : model_impl_(std::move(model_impl)), buffering_(buffering) {}
+
+  ~ModelBatcher() {
+    MG_LOG(INFO) << "Ran " << num_batches_
+                 << " batches with an average size of "
+                 << static_cast<float>(num_inferences_) / num_batches_;
   }
 
-  ~BatchingService() {
-    std::cerr << "Ran " << num_runs_ << " batches with an average size of "
-              << static_cast<float>(run_counter_) / num_runs_ << ".\n";
-  }
-
-  void IncrementClientCount() {
+  void StartGame() LOCKS_EXCLUDED(&mutex_) {
     absl::MutexLock lock(&mutex_);
-    ++num_clients_;
+    num_active_clients_ += 1;
   }
 
-  void DecrementClientCount() {
+  void EndGame() LOCKS_EXCLUDED(&mutex_) {
     absl::MutexLock lock(&mutex_);
-    --num_clients_;
-    MaybeRunBatches();
+    num_active_clients_ -= 1;
+    MaybeRunBatchesLocked();
   }
 
-  size_t num_clients() const {
-    absl::MutexLock lock(&mutex_);
-    return num_clients_;
+  DualNet::InputLayout GetInputLayout() const {
+    return model_impl_->GetInputLayout();
   }
 
-  void RunMany(std::vector<const DualNet::BoardFeatures*> features,
-               std::vector<DualNet::Output*> outputs, std::string* model) {
-    size_t num_features = features.size();
-    MG_CHECK(num_features <= batch_size_);
-    MG_CHECK(num_features == outputs.size());
+  void RunMany(ModelBatcher* other_batcher,
+               std::vector<const DualNet::BoardFeatures*> features,
+               std::vector<DualNet::Output*> outputs, std::string* model_name) {
+    MG_CHECK(features.size() == outputs.size());
 
     absl::Notification notification;
 
     {
       absl::MutexLock lock(&mutex_);
+      queue_.push({other_batcher, std::move(features), std::move(outputs),
+                   model_name, &notification});
+      if (other_batcher != nullptr) {
+        other_batcher->num_waiting_ += 1;
+      }
+      MaybeRunBatchesLocked();
+    }
 
-      queue_counter_ += num_features;
-      inference_queue_.push(
-          {std::move(features), std::move(outputs), model, &notification});
-
-      MaybeRunBatches();
+    if (other_batcher != nullptr) {
+      absl::MutexLock lock(&other_batcher->mutex_);
+      other_batcher->MaybeRunBatchesLocked();
     }
 
     notification.WaitForNotification();
   }
 
-  DualNet::InputLayout GetInputLayout() const {
-    return dual_net_->GetInputLayout();
+ private:
+  size_t GetBatchSize() const {
+    return (num_active_clients_ + buffering_ - 1) / buffering_;
   }
 
- private:
-  void MaybeRunBatches() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-    // std::cerr << "### " << model_
-    //           << "  qc-rc:" << (queue_counter_ - run_counter_)
-    //           << "  bs:" << batch_size_ << "  iq:" << inference_queue_.size()
-    //           << "  nc:" << num_clients_ << std::endl;
-    while (size_t batch_size =
-               std::min(queue_counter_ - run_counter_, batch_size_)) {
-      // Stop if we won't fill a batch and more clients will send requests.
-      if (batch_size < batch_size_ && inference_queue_.size() != num_clients_) {
-        break;
+  void MaybeRunBatchesLocked() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
+    while (!queue_.empty()) {
+      auto queue_size = queue_.size();
+      if (queue_size < GetBatchSize()) {
+        // The queue doesn't have enough requests to fill a batch: see if we
+        // can run a smaller batch instead.
+        //
+        // We run a small batch if all clients of this model have either
+        // submitted inference requests, or are in a two player game and
+        // waiting for the other player's inference.
+        //
+        // Additionally... when starting a bunch of games in parallel, we
+        // will initially submit several smaller batches until all the
+        // clients have been created. This has a ripple effect across all
+        // subsequent reads, making the batching irregular. To counteract
+        // this, we additionally enforce the constraint that a small batch
+        // can't be run until at least half of the clients have submitted
+        // inference requests. This has the effect of forcing those clients
+        // to run their batches in lock-step.
+        bool can_run_small_batch =
+            queue_size >= num_active_clients_ / 2 &&
+            queue_size + num_waiting_ >= num_active_clients_;
+        if (!can_run_small_batch) {
+          break;
+        }
       }
 
-      RunBatch(batch_size);
+      RunBatch();
     }
   }
 
-  void RunBatch(size_t batch_size) EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  void RunBatch() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
+    auto batch_size = GetBatchSize();
+
     std::vector<const DualNet::BoardFeatures*> features;
     std::vector<DualNet::Output*> outputs;
+    std::vector<InferenceRequest> inferences;
     features.reserve(batch_size);
     outputs.reserve(batch_size);
+    inferences.reserve(batch_size);
 
-    std::vector<InferenceData> inferences;
-
-    while (batch_size > 0) {
-      auto& inference = inference_queue_.front();
+    while (!queue_.empty() && inferences.size() < batch_size) {
+      auto& inference = queue_.front();
       size_t num_features = inference.features.size();
-
-      if (num_features > batch_size) {
-        break;  // Request doesn't fit anymore.
-      }
 
       std::copy_n(inference.features.begin(), num_features,
                   std::back_inserter(features));
@@ -117,133 +135,191 @@ class BatchingService {
                   std::back_inserter(outputs));
       inferences.push_back(std::move(inference));
 
-      inference_queue_.pop();
-      batch_size -= num_features;
-      run_counter_ += num_features;
+      queue_.pop();
     }
 
-    // Unlock the mutex while running inference.
+    num_batches_ += 1;
+    num_inferences_ += features.size();
+
+    // Unlock the mutex while running inference. This allows more inferences
+    // to be enqueued while inference is running.
     mutex_.Unlock();
 
-    std::string model;
-    dual_net_->RunMany(std::move(features), std::move(outputs), &model);
-    for (const auto& inference : inferences) {
-      if (inference.model != nullptr) {
-        *inference.model = model;
+    std::string model_name;
+    model_impl_->RunMany(std::move(features), std::move(outputs), &model_name);
+
+    for (auto& inference : inferences) {
+      if (inference.model_name != nullptr) {
+        *inference.model_name = model_name;
       }
+      // For all two player games, tell the batcher of the opponent model that
+      // it isn't blocked on this inference any more.
+      if (inference.other_batcher != nullptr) {
+        inference.other_batcher->num_waiting_ -= 1;
+      }
+    }
+
+    // All the required work is done, unblock all the waiting clients.
+    for (auto& inference : inferences) {
       inference.notification->Notify();
     }
-    mutex_.Lock();
 
-    ++num_runs_;
+    // Lock the mutex again.
+    mutex_.Lock();
   }
 
-  std::unique_ptr<DualNet> dual_net_;
+  absl::Mutex mutex_;
+  std::unique_ptr<DualNet> model_impl_;
+  const size_t buffering_;
+  std::queue<InferenceRequest> queue_ GUARDED_BY(&mutex_);
 
-  mutable absl::Mutex mutex_;
+  // Number of clients of this batcher that are playing in a two player game
+  // and are currently waiting for the other player to play a move. These
+  // clients are not going to make an inference request until it's their turn
+  // and the batcher shouldn't wait for them to make a request.
+  std::atomic<size_t> num_waiting_{0};
 
-  size_t num_clients_ GUARDED_BY(&mutex_);
+  // Number of clients of this batcher that are currently playing a game.
+  size_t num_active_clients_ = 0 GUARDED_BY(&mutex_);
 
-  std::queue<InferenceData> inference_queue_ GUARDED_BY(&mutex_);
-  // Number of features pushed to inference queue.
-  size_t queue_counter_ GUARDED_BY(&mutex_);
-  // Number of features popped from inference queue.
-  size_t run_counter_ GUARDED_BY(&mutex_);
-
-  // For printing batching stats in the destructor only.
-  size_t num_runs_ GUARDED_BY(&mutex_);
-
-  const size_t batch_size_;
-
-  const std::string model_;
+  // Stats that get reported when the ModelBatcher is destroyed.
+  size_t num_batches_ = 0 GUARDED_BY(&mutex_);
+  size_t num_inferences_ = 0 GUARDED_BY(&mutex_);
 };
 
+// The BatchingDualNet is a thin client for a ModelBatcher, which does all
+// the real work. The only tricky thing here is that in two player games,
+// BatchingDualNet keeps track of who the other player is so that its
+// ModelBatcher knows whose turn it is.
 class BatchingDualNet : public DualNet {
  public:
-  explicit BatchingDualNet(BatchingService* service) : service_(service) {
-    service_->IncrementClientCount();
-  }
-
-  ~BatchingDualNet() override { service_->DecrementClientCount(); }
+  explicit BatchingDualNet(std::shared_ptr<ModelBatcher> batcher)
+      : batcher_(std::move(batcher)) {}
 
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override {
-    service_->RunMany(std::move(features), std::move(outputs), model);
-  };
-
+    batcher_->RunMany(other_batcher_.get(), std::move(features),
+                      std::move(outputs), model);
+  }
   InputLayout GetInputLayout() const override {
-    return service_->GetInputLayout();
+    return batcher_->GetInputLayout();
+  }
+  void StartGame() { batcher_->StartGame(); }
+  void EndGame() { batcher_->EndGame(); }
+  void SetOther(BatchingDualNet* other) {
+    if (other == nullptr) {
+      MG_CHECK(other_batcher_ != nullptr);
+      other_batcher_ = nullptr;
+    } else {
+      MG_CHECK(other_batcher_ == nullptr);
+      other_batcher_ = other->batcher_;
+    }
   }
 
  protected:
-  BatchingService* service_;
+  friend class ModelBatcher;
+
+  // The ModelBatcher used to batch our RunMany calls.
+  std::shared_ptr<ModelBatcher> batcher_;
+
+  // In a two player game where StartGame was called with different
+  // BatchingDualNet instances, other_batcher_ points to the ModelBatcher
+  // used by the other player in the game. It's possible that batcher_ ==
+  // other_batcher_ if both players are using the same model.
+  std::shared_ptr<ModelBatcher> other_batcher_ = nullptr;
 };
 
-class BatchingFactory : public DualNetFactory {
+// BatchingDualNetFactory managers the per-model ModelBathers and creates
+// their BatchingDualNet clients.
+// TODO(tommadams): Reconsider the decision to have a single factory manage
+// multiple models. Originally, I thought it would be required to make robust
+// batching & model reloading work but that turned out not to be the case.
+class BatchingDualNetFactory : public DualNetFactory {
  public:
-  BatchingFactory(std::unique_ptr<DualNetFactory> impl, size_t batch_size)
-      : impl_(std::move(impl)), batch_size_(batch_size) {}
+  BatchingDualNetFactory(std::unique_ptr<DualNetFactory> factory_impl)
+      : factory_impl_(std::move(factory_impl)) {}
 
-  int GetBufferCount() const override { return impl_->GetBufferCount(); }
+  int GetBufferCount() const { return factory_impl_->GetBufferCount(); }
 
-  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override {
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
     absl::MutexLock lock(&mutex_);
 
     // Find or create a service for the requested model.
-    auto it = services_.find(model);
-    if (it == services_.end()) {
-      std::unique_ptr<BatchingService> service;
-      if (model == cached_model_) {
-        service = std::move(cached_service_);
-        cached_model_ = "";
-      } else {
-        service = absl::make_unique<BatchingService>(impl_->NewDualNet(model),
-                                                     batch_size_, model);
-      }
-      it = services_.emplace(model, std::move(service)).first;
+    auto it = batchers_.find(model_path);
+    if (it == batchers_.end()) {
+      auto batcher = std::make_shared<ModelBatcher>(
+          factory_impl_->NewDualNet(model_path), GetBufferCount());
+      it = batchers_.emplace(model_path, std::move(batcher)).first;
     }
 
-    // Create a new client of the service.
-    auto dual_net = absl::make_unique<BatchingDualNet>(it->second.get());
+    auto model = absl::make_unique<BatchingDualNet>(it->second);
 
     // Take this opportunity to prune any services that have no clients.
-    it = services_.begin();
-    while (it != services_.end()) {
-      if (it->second->num_clients() == 0) {
-        cached_model_ = it->first;
-        cached_service_ = std::move(it->second);
-        services_.erase(it++);
+    it = batchers_.begin();
+    while (it != batchers_.end()) {
+      // If the factory is the only one left with a reference to the batcher,
+      // delete it.
+      if (it->second.use_count() == 1) {
+        batchers_.erase(it++);
       } else {
         ++it;
       }
     }
 
-    return dual_net;
+    return model;
+  }
+
+  void StartGame(DualNet* black, DualNet* white) {
+    // TODO(tommadams): figure out if we can refactor the code somehow to take
+    // BatchingDualNet pointers and avoid these dynamic_casts.
+    auto* b = dynamic_cast<BatchingDualNet*>(black);
+    auto* w = dynamic_cast<BatchingDualNet*>(white);
+    MG_CHECK(b != nullptr && w != nullptr);
+
+    if (b != w) {
+      // This is a two player game, inform each client who the other one is.
+      b->SetOther(w);
+      w->SetOther(b);
+    }
+
+    b->StartGame();
+    if (b != w) {
+      w->StartGame();
+    }
+  }
+
+  void EndGame(DualNet* black, DualNet* white) {
+    // TODO(tommadams): figure out if we can refactor the code somehow to take
+    // BatchingDualNet pointers and avoid these dynamic_casts.
+    auto* b = dynamic_cast<BatchingDualNet*>(black);
+    auto* w = dynamic_cast<BatchingDualNet*>(white);
+    MG_CHECK(b != nullptr && w != nullptr);
+
+    if (b != w) {
+      b->SetOther(nullptr);
+      w->SetOther(nullptr);
+    }
+
+    b->EndGame();
+    if (b != w) {
+      w->EndGame();
+    }
   }
 
  private:
   absl::Mutex mutex_;
-  std::unique_ptr<DualNetFactory> impl_;
+  std::unique_ptr<DualNetFactory> factory_impl_;
 
-  // Map from model to BatchingService for that model. Once a service no longer
-  // has clients, its model to the cached_service_ and finally deleted.
-  absl::flat_hash_map<std::string, std::unique_ptr<BatchingService>> services_
+  // Map from model to BatchingService for that model.
+  absl::flat_hash_map<std::string, std::shared_ptr<ModelBatcher>> batchers_
       GUARDED_BY(&mutex_);
-
-  // The most recent BatchingService that no longer has clients. We don't delete
-  // a service that no longer has clients immediately, because a common pattern
-  // is to delete a DualNet, then create a new one with the same model.
-  std::string cached_model_;
-  std::unique_ptr<BatchingService> cached_service_;
-
-  const size_t batch_size_;
 };
 
 }  // namespace
 
 std::unique_ptr<DualNetFactory> NewBatchingDualNetFactory(
-    std::unique_ptr<DualNetFactory> impl, size_t batch_size) {
-  return absl::make_unique<BatchingFactory>(std::move(impl), batch_size);
+    std::unique_ptr<DualNetFactory> impl) {
+  return absl::make_unique<BatchingDualNetFactory>(std::move(impl));
 }
 
 }  // namespace minigo

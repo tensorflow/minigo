@@ -138,16 +138,26 @@ TEST(DualNetTest, TestStoneFeaturesWithCapture) {
 
 // Checks that the different backends produce the same result.
 TEST(DualNetTest, TestBackendsEqual) {
-  std::map<std::string, std::unique_ptr<DualNetFactory>> factories;
+  struct Test {
+    Test(std::unique_ptr<DualNetFactory> factory, std::string extension)
+        : factory(std::move(factory)), extension(std::move(extension)) {}
+    std::unique_ptr<DualNetFactory> factory;
+    std::string extension;
+  };
+
+  std::map<std::string, Test> tests;
 
 #if MG_ENABLE_TF_DUAL_NET
-  factories.emplace("TfDualNet", absl::make_unique<TfDualNetFactory>());
+  tests.emplace("TfDualNet",
+                Test(absl::make_unique<TfDualNetFactory>(), ".pb"));
 #endif
 #if MG_ENABLE_LITE_DUAL_NET
-  factories.emplace("LiteDualNet", absl::make_unique<LiteDualNetFactory>());
+  tests.emplace("LiteDualNet",
+                Test(absl::make_unique<LiteDualNetFactory>(), ".tflite"));
 #endif
 #if MG_ENABLE_TRT_DUAL_NET
-  factories.emplace("TrtDualNet", absl::make_unique<TrtDualNetFactory>());
+  tests.emplace("TrtDualNet",
+                Test(absl::make_unique<TrtDualNetFactory>(), ".uff"));
 #endif
 
   DualNet::BoardFeatures nhwc_features;
@@ -168,11 +178,13 @@ TEST(DualNetTest, TestBackendsEqual) {
     return oss.str();
   };
 
-  for (const auto& kv : factories) {
+  for (const auto& kv : tests) {
     const auto& name = kv.first;
-    std::cerr << "Running " << name << std::endl;
+    auto& test = kv.second;
+    MG_LOG(INFO) << "Running " << name;
 
-    auto dual_net = kv.second->NewDualNet("cc/dual_net/test_model");
+    auto dual_net = test.factory->NewDualNet(
+        absl::StrCat("cc/dual_net/test_model", test.extension));
 
     auto* features = dual_net->GetInputLayout() == DualNet::InputLayout::kNHWC
                          ? &nhwc_features
@@ -193,7 +205,7 @@ TEST(DualNetTest, TestBackendsEqual) {
     EXPECT_EQ(std::equal(output.policy.begin(), output.policy.end(),
                          ref_output.policy.begin(), pred),
               true)
-        << name << ": " << policy_string(output.policy) << std::endl
+        << name << ": " << policy_string(output.policy) << "\n"
         << ref_name << ": " << policy_string(ref_output.policy);
     EXPECT_NEAR(output.value, ref_output.value, 0.0001f)
         << name << " vs " << ref_name;

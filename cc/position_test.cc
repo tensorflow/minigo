@@ -433,7 +433,6 @@ TEST(PositionTest, PlayGame) {
   TestablePosition board("");
   for (const auto& move : moves) {
     board.PlayMove(move);
-    // std::cout << board.ToPrettyString() << std::endl;
   }
 
   EXPECT_EQ(CleanBoardString(R"(

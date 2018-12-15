@@ -52,7 +52,7 @@ Coord TryParseKgs(absl::string_view str) {
 }
 
 Coord TryParseSgf(absl::string_view str) {
-  if (str.empty()) {
+  if (str.empty() || (kN == 19 && str == "tt")) {
     return Coord::kPass;
   }
   if (str.size() != 2) {

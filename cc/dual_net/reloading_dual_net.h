@@ -44,9 +44,10 @@ class ReloadingDualNet : public DualNet {
 
   void Reserve(size_t capacity) override;
 
-  // Replaces the wrapped implementation.
+  // Replaces the wrapped implementation with a new one constructed from the
+  // given factory & model.
   // Called by ReloadingDualNetUpdater::Poll when it finds a new model.
-  void UpdateImpl(std::unique_ptr<DualNet> impl);
+  void UpdateImpl(std::unique_ptr<DualNet> model_impl);
 
  private:
   ReloadingDualNetUpdater* updater_;

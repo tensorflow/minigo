@@ -1,3 +1,17 @@
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Read Minigo game examples from a Bigtable.
 """
 
@@ -11,6 +25,7 @@ import time
 import numpy as np
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
+from google.cloud.bigtable import column_family
 import tensorflow as tf
 import utils
 
@@ -25,6 +40,7 @@ ROWCOUNT_PREFIX = 'ct_{:0>10}_'
 #### Column Families
 
 METADATA = 'metadata'
+TFEXAMPLE = 'tfexample'
 
 #### Column Qualifiers
 
@@ -138,13 +154,28 @@ class GameQueue:
         self.instance_name = instance_name
         self.table_name = table_name
         self.bt_table = bigtable.Client(
-            project_name).instance(
+            project_name, admin=True).instance(
                 instance_name).table(
                     table_name)
         self.tf_table = tf.contrib.cloud.BigtableClient(
             project_name,
             instance_name).table(
                 table_name)
+
+    def create(self):
+        """Create the table underlying the queue.
+
+        Create the 'metadata' and 'tfexample' column families
+        and their properties.
+        """
+        if self.bt_table.exists():
+            print('Table already exists')
+            return
+
+        max_versions_rule = column_family.MaxVersionsGCRule(1)
+        self.bt_table.create(column_families={
+            METADATA: max_versions_rule,
+            TFEXAMPLE: max_versions_rule})
 
     def latest_game_number(self):
         """Return the number of the next game to be written."""
@@ -153,6 +184,8 @@ class GameQueue:
             TABLE_STATE,
             filter_=row_filters.ColumnRangeFilter(
                 METADATA, game_counter, game_counter))
+        if table_state is None:
+            return 0
         return cbt_intvalue(table_state.cell_value(METADATA, game_counter))
 
     def bleakest_moves(self, start_game, end_game):
@@ -261,22 +294,15 @@ class GameQueue:
         # of the total moves, then trimming the result.
         total_moves = self.count_moves_in_game_range(start_game, end_game)
         probability = moves / (total_moves * 0.99)
-        utils.dbg('Row range: %s - %s; total moves: %d; probability %.3f' % (
-            start_row, end_row, total_moves, probability))
+        utils.dbg('Row range: %s - %s; total moves: %d; probability %.3f; moves %d' % (
+            start_row, end_row, total_moves, probability, moves))
         shards = 8
         ds = self.tf_table.parallel_scan_range(start_row, end_row,
                                                probability=probability,
-                                               num_parallel_scans=shards,
                                                columns=[(column_family, column)])
         if shuffle:
-            rds = tf.data.Dataset.from_tensor_slices(
-                tf.random_shuffle(tf.range(0, shards, dtype=tf.int64)))
-            ds = rds.apply(
-                tf.contrib.data.parallel_interleave(
-                    lambda x: ds.shard(shards, x),
-                    cycle_length=shards, block_length=1024,
-                    sloppy=True))
-            ds = ds.shuffle(shards * 1024 * 2)
+            utils.dbg('Doing a complete shuffle of %d moves' % moves)
+            ds = ds.shuffle(moves)
         ds = ds.take(moves)
         return ds
 
@@ -357,11 +383,32 @@ _games_nr = GameQueue(_project_name,
                       _instance_name,
                       _table_name + '-nr')
 
+def get_fresh_moves(n, fresh_fraction=0.025, minimum_fresh=18000):
+    """Get a dataset of serialized TFExamples from the last N games.
+
+    This top level wrapper returns the dataset of shuffled moves, using the
+    'require_fresh_games' function to block until enough new games have been
+    played.  The number of fresh games required is the larger of:
+       - The fraction of the total window size
+       - The `minimum_fresh` parameter
+    Args:
+      n:  an integer indicating how many past games should be sourced.
+      minimum_fresh:  an integer indicating the lower bound on the number of new
+      games.
+    """
+    latest_game = int(_games.latest_game_number())
+    if n > latest_game: # How to handle the case when the window is not yet 'full'
+        _games.require_fresh_games(minimum_fresh)
+    else:
+        _games.require_fresh_games(
+                math.ceil(n * .9 * fresh_fraction))
+
+    return get_unparsed_moves_from_last_n_games(n)
 
 def get_unparsed_moves_from_last_n_games(n,
                                          moves=2**21,
                                          shuffle=True,
-                                         column_family='tfexample',
+                                         column_family=TFEXAMPLE,
                                          column='example',
                                          values_only=True):
     """Get a dataset of serialized TFExamples from the last N games.

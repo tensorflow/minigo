@@ -18,13 +18,14 @@ cc_library(
     name = "utils_tf",
     srcs = ["utils_tf.cc"],
     hdrs = ["utils.h"],
+    tags = ["manual"],
     deps = [
         ":path",
+        "//cc:logging",
         "//cc:tensorflow",
         "//cc/platform",
         "@com_google_absl//absl/strings",
     ],
-    tags = ["manual"],
 )
 
 cc_library(
@@ -36,6 +37,7 @@ cc_library(
     hdrs = ["utils.h"],
     deps = [
         ":path",
+        "//cc:logging",
         "//cc/platform",
         "@com_google_absl//absl/strings",
     ],
@@ -64,7 +66,6 @@ cc_test(
     deps = [
         ":file",
         "//cc:base",
-        "//cc:check",
         "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",
     ],

@@ -1,4 +1,10 @@
 http_archive(
+    name = "com_google_protobuf",
+    strip_prefix = "protobuf-3.6.0",
+    url = "https://github.com/google/protobuf/archive/v3.6.0.tar.gz",
+)
+
+http_archive(
     name = "com_github_gflags_gflags",
     strip_prefix = "gflags-e292e0452fcfd5a8ae055b59052fc041cbab4abf",
     urls = ["https://github.com/gflags/gflags/archive/e292e0452fcfd5a8ae055b59052fc041cbab4abf.zip"],
@@ -14,6 +20,12 @@ http_archive(
     name = "com_github_googlecloudplatform_google_cloud_cpp",
     strip_prefix = "google-cloud-cpp-0.2.0",
     url = "https://github.com/GoogleCloudPlatform/google-cloud-cpp/archive/v0.2.0.zip",
+)
+
+http_archive(
+    name = "com_google_protobuf",
+    strip_prefix = "protobuf-3.6.0",
+    url = "https://github.com/google/protobuf/archive/v3.6.0.tar.gz",
 )
 
 new_http_archive(

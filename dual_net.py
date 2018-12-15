@@ -22,6 +22,7 @@ from absl import flags
 import functools
 import logging
 import os.path
+import time
 
 import tensorflow as tf
 from tensorflow.contrib import summary
@@ -413,11 +414,16 @@ def model_inference_fn(features, training, params):
     return policy_output, value_output, logits
 
 
-def const_model_inference_fn(features):
-    """Builds the model graph with weights marked as constant.
+def tpu_model_inference_fn(features):
+    """Builds the model graph suitable for running on TPU.
 
-    This improves TPU inference performance because it prevents the weights
-    being transferred to the TPU every call to Session.run().
+    It does two things:
+     1) Mark all weights as constant, which improves TPU inference performance
+        because it prevents the weights being transferred to the TPU every call
+        to Session.run().
+     2) Adds constant to the graph with a unique value and marks it as a
+        dependency on the rest of the model. This works around a TensorFlow bug
+        that prevents multiple models being run on a single TPU.
 
     Returns:
         (policy_output, value_output, logits) tuple of tensors.
@@ -427,7 +433,12 @@ def const_model_inference_fn(features):
             return tf.guarantee_const(
                 getter(name, *args, **kwargs), name=name + "/GuaranteeConst")
     with tf.variable_scope("", custom_getter=custom_getter):
-        return model_inference_fn(features, False, FLAGS.flag_values_dict())
+        # TODO(tommadams): remove the tf.control_dependencies context manager
+        # when a fixed version of TensorFlow is released.
+        t = int(time.time())
+        epoch_time = tf.constant(t, name='epoch_time_%d' % t)
+        with tf.control_dependencies([epoch_time]):
+            return model_inference_fn(features, False, FLAGS.flag_values_dict())
 
 
 def get_estimator():
@@ -496,13 +507,13 @@ def bootstrap():
 
 
 def export_model(model_path):
-    """Take the latest checkpoint and export it to model_path for selfplay.
+    """Take the latest checkpoint and export it to model_path.
 
     Assumes that all relevant model files are prefixed by the same name.
     (For example, foo.index, foo.meta and foo.data-00000-of-00001).
 
     Args:
-        model_path: The path (can be a gs:// path) to export model to
+        model_path: The path (can be a gs:// path) to export model
     """
     estimator = tf.estimator.Estimator(model_fn, model_dir=FLAGS.work_dir,
                                        params=FLAGS.flag_values_dict())
@@ -513,8 +524,6 @@ def export_model(model_path):
         destination_path = model_path + suffix
         print("Copying {} to {}".format(filename, destination_path))
         tf.gfile.Copy(filename, destination_path)
-    # also export a .pb for C++ inference
-    freeze_graph(model_path)
 
 
 def freeze_graph(model_path):
@@ -528,21 +537,28 @@ def freeze_graph(model_path):
 def freeze_graph_tpu(model_path):
     """Custom freeze_graph implementation for Cloud TPU."""
 
+    assert model_path
     assert FLAGS.tpu_name
-    sess = tf.Session(FLAGS.tpu_name)
+    if FLAGS.tpu_name.startswith('grpc://'):
+        tpu_grpc_url = FLAGS.tpu_name
+    else:
+        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+            FLAGS.tpu_name, zone=None, project=None)
+        tpu_grpc_url = tpu_cluster_resolver.get_master()
+    sess = tf.Session(tpu_grpc_url)
 
     output_names = []
     with sess.graph.as_default():
         # Replicate the inference function for each TPU core.
         replicated_features = []
-        for i in range(FLAGS.parallel_tpus):
+        for i in range(FLAGS.num_tpu_cores):
             features = tf.placeholder(
                 tf.float32, [None, go.N, go.N,
                              features_lib.NEW_FEATURES_PLANES],
                 name='pos_tensor_%d' % i)
             replicated_features.append((features,))
         outputs = tf.contrib.tpu.replicate(
-            const_model_inference_fn, replicated_features)
+            tpu_model_inference_fn, replicated_features)
 
         # The replicate op assigns names like output_0_shard_0 to the output
         # names. Give them human readable names.
@@ -553,19 +569,7 @@ def freeze_graph_tpu(model_path):
             tf.identity(policy_output, policy_name)
             tf.identity(value_output, value_name)
 
-        # Add initialize and shutdown TPU ops to the graph.
-        # The ops aren't actually executed here. Instead, the serialized ops are
-        # run by the C++ TpuDualNet implementation to perform one-time
-        # initialization and shutdown of the TPU. We do it this way because
-        # TensorFlow currently doesn't expose a C++ API for TPU initialization
-        # and shutdown.
-        tf.contrib.tpu.initialize_system()
-        tf.contrib.tpu.shutdown_system()
-
         tf.train.Saver().restore(sess, model_path)
-
-    # Make sure we serialize the initialize and shutdown TPU ops.
-    output_names.extend(['ConfigureDistributedTPU', 'ShutdownDistributedTPU'])
 
     # Freeze the graph.
     model_def = tf.graph_util.convert_variables_to_constants(

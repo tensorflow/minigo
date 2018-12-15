@@ -90,7 +90,7 @@ def sample_positions_from_games(sgf_files, num_positions=1):
     fail_count = 0
     for path in tqdm(sgf_files, desc="loading sgfs", unit="games"):
         try:
-            positions, moves, results = oneoff_utils.parse_sgf(path)
+            positions, moves, results = oneoff_utils.parse_sgf_to_examples(path)
         except KeyboardInterrupt:
             raise
         except Exception as e:

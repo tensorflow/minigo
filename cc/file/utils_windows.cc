@@ -15,12 +15,12 @@
 #include "cc/file/utils.h"
 
 #include <cstdio>
-#include <iostream>
 #include <string>
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "cc/file/path.h"
+#include "cc/logging.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -70,14 +70,14 @@ bool WriteFile(std::string path, absl::string_view contents) {
 
   FILE* f = fopen(path.c_str(), "wb");
   if (f == nullptr) {
-    std::cerr << "Error opening " << path << " for write" << std::endl;
+    MG_LOG(ERROR) << "error opening " << path << " for write";
     return false;
   }
   bool ok = true;
   if (!contents.empty()) {
     ok = fwrite(contents.data(), contents.size(), 1, f) == 1;
     if (!ok) {
-      std::cerr << "Error writing " << path << std::endl;
+      MG_LOG(ERROR) << "error writing " << path;
     }
   }
   fclose(f);
@@ -89,7 +89,7 @@ bool ReadFile(std::string path, std::string* contents) {
 
   FILE* f = fopen(path.c_str(), "rb");
   if (f == nullptr) {
-    std::cerr << "Error opening " << path << " for read" << std::endl;
+    MG_LOG(ERROR) << "error opening " << path << " for read";
     return false;
   }
   fseek(f, 0, SEEK_END);
@@ -97,7 +97,7 @@ bool ReadFile(std::string path, std::string* contents) {
   fseek(f, 0, SEEK_SET);
   bool ok = fread(&(*contents)[0], contents->size(), 1, f) == 1;
   if (!ok) {
-    std::cerr << "Error reading " << path << std::endl;
+    MG_LOG(ERROR) << "error reading " << path;
   }
   fclose(f);
   return ok;
