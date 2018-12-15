@@ -31,6 +31,7 @@ export SERVICE_ACCOUNT_KEY_LOCATION=${SERVICE_ACCOUNT_KEY_LOCATION:-"/tmp/${SERV
 
 # Constants for docker container creation
 export VERSION_TAG=${VERSION_TAG:-"0.16"}
+export EVAL_VERSION_TAG=${EVAL_VERSION_TAG:-"latest"}
 export MINIGUI_PY_CPU_CONTAINER=${MINIGUI_PY_CPU_CONTAINER:-"minigui-py-cpu-v2"}
 
 # Bucket names live in a single global namespace
