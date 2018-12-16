@@ -19,6 +19,7 @@
 --l2_strength=0.0001
 --sgd_momentum=0.95
 --steps_to_train=1024
+--window_size=500000
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)

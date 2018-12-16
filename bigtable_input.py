@@ -29,6 +29,23 @@ from google.cloud.bigtable import column_family
 import tensorflow as tf
 import utils
 
+from absl import flags
+
+flags.DEFINE_string('cbt_project', None,
+                    'The project used to connect to the cloud bigtable ')
+
+# CBT_INSTANCE:  identifier of Cloud Bigtable instance in PROJECT.
+flags.DEFINE_string('cbt_instance', None,
+                    'The identifier of the cloud bigtable instance in cbt_project')
+
+# CBT_TABLE:  identifier of Cloud Bigtable table in CBT_INSTANCE.
+# The CBT_TABLE is expected to be accompanied by one with an "-nr"
+# suffix, for "no-resign".
+flags.DEFINE_string('cbt_table', None,
+                    'The table within the cloud bigtable instance to use')
+
+FLAGS = flags.FLAGS
+
 
 # Constants
 
@@ -366,46 +383,30 @@ class GameQueue:
                 print('  games/sec:', len(h)/elapsed)
 
 
-# PROJECT:  the GCP project in which the Cloud Bigtable is located.
-# CBT_INSTANCE:  identifier of Cloud Bigtable instance in PROJECT.
-# CBT_TABLE:  identifier of Cloud Bigtable table in CBT_INSTANCE.
-#
-# The CBT_TABLE is expected to be accompanied by one with an "-nr"
-# suffix, for "no-resign".
-_project_name = os.environ['PROJECT']
-_instance_name = os.environ['CBT_INSTANCE']
-_table_name = os.environ['CBT_TABLE']
+def set_fresh_watermark(games, window_size, fresh_fraction=0.05, minimum_fresh=20000):
+    """Sets the metadata cell used to block until some quantity of games have been played.
 
-_games = GameQueue(_project_name,
-                   _instance_name,
-                   _table_name)
-_games_nr = GameQueue(_project_name,
-                      _instance_name,
-                      _table_name + '-nr')
-
-def get_fresh_moves(n, fresh_fraction=0.025, minimum_fresh=18000):
-    """Get a dataset of serialized TFExamples from the last N games.
-
-    This top level wrapper returns the dataset of shuffled moves, using the
-    'require_fresh_games' function to block until enough new games have been
-    played.  The number of fresh games required is the larger of:
+    This sets the 'high water mark' on the `games` queue, used to block training
+    until enough new games have been played.  The number of fresh games required
+    is the larger of:
        - The fraction of the total window size
        - The `minimum_fresh` parameter
     Args:
-      n:  an integer indicating how many past games should be sourced.
+      games: A GameQueue object, on whose backing table will be modified.
+      window_size:  an integer indicating how many past games are considered
+      fresh_fraction: a float in (0,1] indicating the fraction of games to wait for
       minimum_fresh:  an integer indicating the lower bound on the number of new
       games.
     """
-    latest_game = int(_games.latest_game_number())
+    latest_game = int(games.latest_game_number())
     if n > latest_game: # How to handle the case when the window is not yet 'full'
-        _games.require_fresh_games(minimum_fresh)
+        games.require_fresh_games(int(minimum_fresh * .9))
     else:
-        _games.require_fresh_games(
+        games.require_fresh_games(
                 math.ceil(n * .9 * fresh_fraction))
 
-    return get_unparsed_moves_from_last_n_games(n)
 
-def get_unparsed_moves_from_last_n_games(n,
+def get_unparsed_moves_from_last_n_games(games, games_nr, n,
                                          moves=2**21,
                                          shuffle=True,
                                          column_family=TFEXAMPLE,
@@ -414,6 +415,8 @@ def get_unparsed_moves_from_last_n_games(n,
     """Get a dataset of serialized TFExamples from the last N games.
 
     Args:
+      games, games_nr: GameQueues of the regular selfplay and calibration
+        (aka 'no resign') games to sample from.
       n:  an integer indicating how many past games should be sourced.
       moves:  an integer indicating how many moves should be sampled
         from those N games.
@@ -435,12 +438,12 @@ def get_unparsed_moves_from_last_n_games(n,
     ct_total = ct_r + ct_nr
     fr_r = ct_r / ct_total
     fr_nr = ct_nr / ct_total
-    resign = _games.moves_from_last_n_games(
+    resign = games.moves_from_last_n_games(
         math.ceil(n * fr_r),
         math.ceil(moves * fr_r),
         shuffle,
         column_family, column)
-    no_resign = _games_nr.moves_from_last_n_games(
+    no_resign = games_nr.moves_from_last_n_games(
         math.floor(n * fr_nr),
         math.floor(moves * fr_nr),
         shuffle,
