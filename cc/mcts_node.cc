@@ -403,4 +403,36 @@ bool MctsNode::HasPositionBeenPlayedBefore(zobrist::Hash stone_hash) const {
   return false;
 }
 
+std::string MctsNode::CalculateTreeStats() const {
+  // TODO(sethtroisi): Make this return a struct instead of string
+  long num_nodes = 0;
+  long num_leaf_nodes = 0;
+  long depth_sum = 0;
+  long depth_max = 0;
+
+  std::function<void(const MctsNode&, int)> traverse =
+      [&](const MctsNode& node, int depth) {
+    num_nodes += 1;
+    num_leaf_nodes += node.N() <= 1;
+
+    depth_sum += depth;
+    if (depth > depth_max) {
+      depth_max = depth;
+    }
+
+    for (const auto& child : node.children) {
+      traverse(*child.second.get(), depth + 1);
+    }
+  };
+
+  traverse(*this, 0);
+
+  return absl::StrFormat(
+      "%d nodes, %d leaf, %.1f average children\n"
+      "%.1f average depth, %d max depth\n",
+      num_nodes, num_leaf_nodes,
+      1.0f * num_nodes / std::max(1L, num_nodes - num_leaf_nodes),
+      1.0f * depth_sum / num_nodes, depth_max);
+}
+
 }  // namespace minigo
