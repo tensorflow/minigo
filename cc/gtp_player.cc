@@ -72,6 +72,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("undo", &GtpPlayer::HandleUndo);
   RegisterCmd("variation", &GtpPlayer::HandleVariation);
   RegisterCmd("verbosity", &GtpPlayer::HandleVerbosity);
+  NewGame();
 }
 
 void GtpPlayer::Run() {
