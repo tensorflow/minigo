@@ -258,7 +258,7 @@ class GameQueue:
             r = rows.pop()
             r.delete()
             batch.append(r)
-            if len(batch) >= google.cloud.bigtable.row.MAX_MUTATIONS:
+            if len(batch) >= bigtable.row.MAX_MUTATIONS:
                 mutate_batch()
         mutate_batch()
 
