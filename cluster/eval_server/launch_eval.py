@@ -27,10 +27,12 @@ import fire
 from absl import flags
 from tensorflow import gfile
 
+LAUNCH_EVAL_VERSION = 1
+
 
 def launch_eval_job(tag, m1_path, m2_path, job_name, completions):
     """Launches an evaluator job.
-    tag: name for later reference
+    tag: name for this eval job (used as top level folder name)
     m1_path, m2_path: full gs:// paths to the .pb files to match up
     job_name: string, appended to the container, used to differentiate the job
     names (e.g. 'minigo-cc-evaluator-v5-123-v7-456')
@@ -42,11 +44,10 @@ def launch_eval_job(tag, m1_path, m2_path, job_name, completions):
         return
 
     # TODO: Change to minigo-pub
-    bucket_path = "gs://sethtroisi-sandbox/experiments/eval/" + tag
+    sgf_bucket_path = "sethtroisi-sandbox/experiments/eval/" + tag
+    assert not sgf_bucket_path.startswith("gs://"), bucket_pat
+    bucket_path = "gs://" + sgf_bucket_path
 
-    ######## WRITE DOWN TO BUCKET ########
-
-    # TODO confirm details
 
     metadata_path = os.path.join(bucket_path, 'metadata')
     assert not gfile.Exists(metadata_path), "Already exists"
@@ -55,21 +56,40 @@ def launch_eval_job(tag, m1_path, m2_path, job_name, completions):
     metadata = {
         'timestamp': TS,
         'date': datetime.datetime.now().isoformat(' '),
-        'model1': m1_path,
-        'model2': m2_path,
+        'model1': os.path.basename(m1_path),
+        'model2': os.path.basename(m2_path),
+        'model1_path': m1_path,
+        'model2_path': m2_path,
         'job_name': job_name,
         'completions': completions,
+        'launch_eval_version' : LAUNCH_EVAL_VERSION,
     }
 
+    job_conf, resp_bw, resp_wb = launch_eval.launch_eval_job(
+        m1_path, m2_path, job_name, sgf_bucket_path, completions)
+
+    if not (resp_bw and resp_wb):
+        print("launch_eval.py failed")
+        print(job_conf)
+        print(resp_bw)
+        print(resp_wb)
+        print()
+        assert False
+
+    # Jobs were launched, record metadata to GCS.
     with gfile.GFile(metadata_path, "w") as metadata_file:
         json.dump(metadata, metadata_file)
 
-    with gfile.GFile(os.path.join(bucket_path, 'commands_' + TS), "w") as commands:
-        commands.write(str(sys.argv) + "\n")
+    with gfile.GFile(os.path.join(bucket_path, 'commands'), "w") as f:
+        f.write(str(sys.argv) + "\n")
+
+
+    with gfile.GFile(os.path.join(bucket_path, 'job_conf'), "w") as f:
+        f.write(str(job_conf) + "\n")
+
+
 
     # TODO(sethtroisi): Support patching in launch_eval.py
-
-    assert launch_eval.launch_eval_job(m1_path, m2_path, job_name, bucket_path, completions)
 
 
 if __name__ == '__main__':

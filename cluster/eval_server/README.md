@@ -1,5 +1,8 @@
 
-# Minigo Eval Server
+# Minigo Evaluation Logger
+
+A set of tools to record the conditions (code, parameters, ...) and agregate the results of many evaluation runs.
+
 
 ## Goals
 1. Reproducability (see https://github.com/tensorflow/minigo/issues/591)

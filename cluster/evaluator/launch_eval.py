@@ -43,7 +43,6 @@ def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=5):
 
     raw_job_conf = open("cluster/evaluator/cc-evaluator.yaml").read()
 
-    # TODO(should this read bucket_name from fsdb?
     os.environ['BUCKET_NAME'] = bucket_name
 
     os.environ['MODEL_BLACK'] = m1_path
@@ -54,7 +53,7 @@ def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=5):
     job_conf = yaml.load(env_job_conf)
     job_conf['spec']['completions'] = completions
 
-    resp = api_instance.create_namespaced_job('default', body=job_conf)
+    resp_bw = api_instance.create_namespaced_job('default', body=job_conf)
 
     os.environ['MODEL_WHITE'] = m1_path
     os.environ['MODEL_BLACK'] = m2_path
@@ -63,8 +62,8 @@ def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=5):
     job_conf = yaml.load(env_job_conf)
     job_conf['spec']['completions'] = completions
 
-    resp = api_instance.create_namespaced_job('default', body=job_conf)
-    return resp
+    resp_wb = api_instance.create_namespaced_job('default', body=job_conf)
+    return job_conf, resp_bw, resp_wb
 
 
 def same_run_eval(black_num=0, white_num=0):
@@ -80,10 +79,10 @@ def same_run_eval(black_num=0, white_num=0):
     b_model_path = os.path.join(fsdb.models_dir(), b)
     w_model_path = os.path.join(fsdb.models_dir(), w)
 
-    launch_eval_job(b_model_path + ".pb",
-                    w_model_path + ".pb",
-                    "{:d}-{:d}".format(black_num, white_num),
-                    flags.FLAGS.bucket_name)
+    return launch_eval_job(b_model_path + ".pb",
+                           w_model_path + ".pb",
+                           "{:d}-{:d}".format(black_num, white_num),
+                           flags.FLAGS.bucket_name)
 
 
 def _append_pairs(new_pairs, dry_run):
