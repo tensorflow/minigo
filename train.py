@@ -140,14 +140,13 @@ def train(*tf_records: "Records to train on"):
     if FLAGS.use_tpu:
         effective_batch_size *= FLAGS.num_tpu_cores
 
-    if FLAGS.use_bt:
-        games = bigtable_input.GameQueue(
-            FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table)
-        games_nr = bigtable_input.GameQueue(
-            FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table + '-nr')
     if FLAGS.use_tpu:
         if FLAGS.use_bt:
             def _input_fn(params):
+                games = bigtable_input.GameQueue(
+                    FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table)
+                games_nr = bigtable_input.GameQueue(
+                    FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table + '-nr')
                 return preprocessing.get_tpu_bt_input_tensors(
                     games,
                     games_nr,
