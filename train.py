@@ -146,7 +146,7 @@ def train(*tf_records: "Records to train on"):
                 games = bigtable_input.GameQueue(
                     FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table)
                 games_nr = bigtable_input.GameQueue(
-                    FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table + '-nr')
+                    FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table + '-test')
                 return preprocessing.get_tpu_bt_input_tensors(
                     games,
                     games_nr,
@@ -180,6 +180,8 @@ def train(*tf_records: "Records to train on"):
     estimator.train(_input_fn, steps=steps, hooks=hooks)
 
     if FLAGS.use_bt:
+        games = bigtable_input.GameQueue(
+            FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table)
         bigtable_input.set_fresh_watermark(games, FLAGS.window_size)
 
 
