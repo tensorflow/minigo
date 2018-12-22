@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tpu-trainer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tpu-trainer
+  template:
+    metadata:
+      annotations:
+        tf-version.cloud-tpus.google.com: "1.11"
+      labels:
+        app: tpu-trainer
+    spec:
+      containers:
+      - name: minigo-tpu-trainer-container
+        image: gcr.io/tensor-go/minigo-tpu-trainer:v14
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cloud-tpus.google.com/v3: 8
+        volumeMounts:
+        - name: service-credentials
+          mountPath: /etc/credentials
+        env:
+        - name: GCS_READ_CACHE_MAX_SIZE_MB
+          value: "0"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/credentials/service-account.json
+        - name: BUCKET_NAME
+          value: $BUCKET_NAME
+      volumes:
+      - name: service-credentials
+        secret:
+          secretName: $SERVICE_ACCOUNT-creds
+      restartPolicy: Always

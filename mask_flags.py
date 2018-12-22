@@ -95,12 +95,9 @@ def prepare_subprocess_cmd(subprocess_cmd):
 def run(cmd):
     '''Prepare and run a subprocess cmd, returning a CompletedProcess.'''
     print("Preparing the following cmd:")
-    for token in cmd:
-        print(token)
     cmd = prepare_subprocess_cmd(cmd)
     print("Running the following cmd:")
-    for token in cmd:
-        print(token)
+    print('\n'.join(cmd))
     return subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
 
 

@@ -20,6 +20,10 @@
 --sgd_momentum=0.95
 --steps_to_train=1024
 --window_size=500000
+--cbt_project=tensor-go
+--cbt_instance=minigo-instance
+--cbt_table=v14-games
+--pro_dataset=gs://jacksona-sandbox/data/validate
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)

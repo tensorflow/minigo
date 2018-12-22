@@ -483,7 +483,7 @@ def set_fresh_watermark(games, window_size, fresh_fraction=0.05, minimum_fresh=2
       games.
     """
     latest_game = games.latest_game_number
-    if n > latest_game: # How to handle the case when the window is not yet 'full'
+    if window_size > latest_game: # How to handle the case when the window is not yet 'full'
         games.require_fresh_games(int(minimum_fresh * .9))
     else:
         games.require_fresh_games(
