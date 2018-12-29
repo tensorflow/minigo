@@ -138,6 +138,10 @@ class MctsNode {
 
   MctsNode* MaybeAddChild(Coord c);
 
+  // Calculate and print statistics about the tree.
+  std::string CalculateTreeStats() const;
+
+
   // Parent node.
   MctsNode* parent;
 

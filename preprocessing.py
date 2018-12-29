@@ -16,6 +16,7 @@
 import functools
 import random
 
+import bigtable_input
 import coords
 import features as features_lib
 import go
@@ -237,12 +238,12 @@ def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
     return dataset
 
 
-def get_tpu_bt_input_tensors(batch_size, num_repeats=1,
+def get_tpu_bt_input_tensors(games, games_nr, batch_size, num_repeats=1,
                              number_of_games=500e3,
                              fresh_fraction=0.05,
                              random_rotation=True):
-    import bigtable_input
-    dataset = bigtable_input.get_fresh_moves(number_of_games, fresh_fraction)
+    dataset = bigtable_input.get_unparsed_moves_from_last_n_games(
+            games, games_nr, number_of_games)
     dataset = dataset.repeat(num_repeats)
     dataset = dataset.batch(batch_size)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))

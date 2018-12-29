@@ -43,7 +43,10 @@ flags.declare_key_flag('bucket_name')
 FLAGS = flags.FLAGS
 
 try:
-    TPU_NAME = os.environ['TPU_NAME']
+    if 'KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS' in os.environ:
+        TPU_NAME = os.environ['KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS']
+    else: 
+        TPU_NAME = os.environ['TPU_NAME']
 except KeyError:
     raise Exception("Must have $TPU_NAME configured")
 
@@ -92,7 +95,7 @@ def freeze(save_path, rewrite_tpu=False):
            '--work_dir={}'.format(fsdb.working_dir()),
            '--model_path={}'.format(save_path)]
 
-    if use_tpu:
+    if rewrite_tpu:
         cmd.extend(['--use_tpu',
                     '--tpu_name={}'.format(TPU_NAME)])
 
@@ -129,16 +132,19 @@ def validate_pro():
 
 def loop(unused_argv):
     while True:
-        print("=" * 40)
+        print("=" * 40, flush=True)
         with utils.timer("Train"):
             completed_process = train()
         if completed_process.returncode > 0:
-            print("Skipping validation...")
-            continue
+            print("Training failed, aborting.")
+            sys.exit(1)
+
         with utils.timer("Validate"):
-            validate_pro()
+            if not FLAGS.pro_dataset:
+                print("*** --pro_dataset not set, skipping pro validation ***")
+            else:
+                validate_pro()
             #validate_holdout_selfplay()
 
 if __name__ == '__main__':
-    flags.mark_flag_as_required('pro_dataset')
     app.run(loop)

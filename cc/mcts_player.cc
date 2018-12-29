@@ -170,6 +170,7 @@ Coord MctsPlayer::SuggestMove() {
                  << absl::ToInt64Milliseconds(elapsed) << "ms"
                  << " over " << num_readouts
                  << " readouts (batched: " << options_.batch_size << ")";
+    MG_LOG(INFO) << root_->CalculateTreeStats();
   }
 
   if (ShouldResign()) {

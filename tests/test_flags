@@ -3,3 +3,6 @@
 --conv_width=1
 --fc_width=2
 --trunk_layers=1
+--cbt_project=foo
+--cbt_instance=bar
+--cbt_table=baz
