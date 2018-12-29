@@ -43,7 +43,7 @@ def launch_eval_job(tag, m1_path, m2_path, job_name, completions):
         print("{} is not a valid tag".format(tag))
         return
 
-    # TODO: Change to minigo-pub
+    # TODO(sethtroisi): Change to minigo-pub
     sgf_bucket_path = "sethtroisi-sandbox/experiments/eval/" + tag
     assert not sgf_bucket_path.startswith("gs://"), bucket_pat
     bucket_path = "gs://" + sgf_bucket_path
@@ -86,8 +86,6 @@ def launch_eval_job(tag, m1_path, m2_path, job_name, completions):
 
     with gfile.GFile(os.path.join(bucket_path, 'job_conf'), "w") as f:
         f.write(str(job_conf) + "\n")
-
-
 
     # TODO(sethtroisi): Support patching in launch_eval.py
 
