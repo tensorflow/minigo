@@ -65,25 +65,34 @@ def check_komi(props, komi_str):
     return props.get('KM')[0] == komi_str
 
 
+def filter_year_komi(min_year=None, komi=None):
+    def validate(path):
+        with open(path) as f:
+            sgf_contents = f.read()
+        props = sgf_wrapper.get_sgf_root_node(sgf_contents).properties
+        return check_komi(props, komi) and check_year(props, min_year)
+    return validate
+
+
 def find_and_filter_sgf_files(base_dir, min_year=None, komi=None):
+    """Finds all sgf files in base_dir with year >= min_year and komi"""
     sgf_files = []
-    print("Finding all sgf files in {} with year >= {} and komi = {}".format(
-        base_dir, min_year, komi))
-    count = 0
-    for dirpath, dirnames, filenames in tqdm(os.walk(base_dir)):
+    for dirpath, dirnames, filenames in os.walk(base_dir):
         for filename in filenames:
-            count += 1
-            if count % 5000 == 0:
-                print("Parsed {}, Found {}".format(count, len(sgf_files)))
             if filename.endswith('.sgf'):
                 path = os.path.join(dirpath, filename)
-                with open(path) as f:
-                    sgf_contents = f.read()
-                props = sgf_wrapper.get_sgf_root_node(sgf_contents).properties
-                if check_year(props, min_year) and check_komi(props, komi):
-                    sgf_files.append(path)
-    print("Found {} sgf files matching filters".format(len(sgf_files)))
-    return sgf_files
+                sgf_files.append(path)
+
+    if min_year == komi == None:
+        print ("Found {} sgf_files".format(len(sgf_files)))
+        return sgf_files
+
+    f = filter_year_komi(min_year, komi)
+    filtered_sgf_files = [sgf for sgf in tqdm(sgf_files) if f(sgf)]
+
+    print("{} of {} .sgf files matched (min_year >= {}, komi = {})".format(
+        len(filtered_sgf_files), len(sgf_files), min_year, komi))
+    return filtered_sgf_files
 
 
 def get_model_paths(model_dir):
@@ -102,7 +111,7 @@ def load_player(model_path):
     with logged_timer("Loading weights from %s ... " % model_path):
         network = dual_net.DualNetwork(model_path)
         network.name = os.path.basename(model_path)
-    player = MCTSPlayer(network, verbosity=2)
+    player = MCTSPlayer(network)
     return player
 
 
