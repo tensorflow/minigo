@@ -28,13 +28,13 @@ from rl_loop import shipname
 
 flags.DEFINE_string(
     'base_dir', None,
-    'Root directory if using local FS as the database.'
+    'Root directory if using local FS as the database. '
     'Leave blank if using bucket_name.')
 
 flags.DEFINE_string(
     'bucket_name', None,
-    'Bucket name if using GCS as the filesystem DB.'
-    'Leave blank is using base_dir.')
+    'Bucket name if using GCS as the filesystem DB. '
+    'Leave blank if using base_dir.')
 
 flags.register_multi_flags_validator(
     ['base_dir', 'bucket_name'],

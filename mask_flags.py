@@ -61,6 +61,19 @@ def parse_helpfull_output(help_output, regex=FLAG_HELP_RE_PY):
     return valid_flags
 
 
+def filter_flags(parsed_flags, valid_flags):
+    '''Return the subset of `parsed_flags` that are found in the list `valid_flags`'''
+    def valid_argv(argv):
+        ''' Figures out if a flag parsed from the flagfile matches a flag in
+        the command about to be run.'''
+        flagname_match = FLAG_RE.match(argv)
+        if not flagname_match:
+            return True
+        flagname = flagname_match.group()
+        return flagname in valid_flags
+    return list(filter(valid_argv, parsed_flags))
+
+
 def prepare_subprocess_cmd(subprocess_cmd):
     '''Prepares a subprocess command by running --helpfull and masking flags.
 
@@ -80,15 +93,7 @@ def prepare_subprocess_cmd(subprocess_cmd):
         valid_flags = parse_helpfull_output(help_output, regex=FLAG_HELP_RE_CC)
     parsed_flags = flags.FlagValues().read_flags_from_files(subprocess_cmd[1:])
 
-    def valid_argv(argv):
-        ''' Figures out if a flag parsed from the flagfile matches a flag in
-        the command about to be run.'''
-        flagname_match = FLAG_RE.match(argv)
-        if not flagname_match:
-            return True
-        flagname = flagname_match.group()
-        return flagname in valid_flags
-    filtered_flags = list(filter(valid_argv, parsed_flags))
+    filtered_flags = filter_flags(parsed_flags, valid_flags)
     return [subprocess_cmd[0]] + filtered_flags
 
 

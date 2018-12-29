@@ -42,7 +42,7 @@ flags.DEFINE_string('cbt_instance', None,
                     'The identifier of the cloud bigtable instance in cbt_project')
 
 # cbt_table:  identifier of Cloud Bigtable table in cbt_instance.
-# the cbt_table is expected to be accompanied by one with an "-nr"
+# The cbt_table is expected to be accompanied by one with an "-nr"
 # suffix, for "no-resign".
 flags.DEFINE_string('cbt_table', None,
                     'The table within the cloud bigtable instance to use')
@@ -407,10 +407,10 @@ class GameQueue:
         while latest_game < wait_until_game:
             utils.dbg('Latest game {} not yet at required game {} '
                       '(+{}, {:0.3f} games/sec)'.format(
-                              latest_game,
-                              wait_until_game,
-                              latest_game - last_latest,
-                              (latest_game - last_latest) / poll_interval
+                          latest_game,
+                          wait_until_game,
+                          latest_game - last_latest,
+                          (latest_game - last_latest) / poll_interval
                       ))
             time.sleep(poll_interval)
             last_latest = latest_game
@@ -561,17 +561,19 @@ class GameQueue:
                 print('  games/sec:', len(h)/elapsed)
 
 
-def set_fresh_watermark(game_queue, count_from, window_size, fresh_fraction=0.05, minimum_fresh=20000):
+def set_fresh_watermark(game_queue, count_from, window_size,
+                        fresh_fraction=0.05, minimum_fresh=20000):
     """Sets the metadata cell used to block until some quantity of games have been played.
 
-    This sets the 'high water mark' on the `game_queue`, used to block training
+    This sets the 'freshness mark' on the `game_queue`, used to block training
     until enough new games have been played.  The number of fresh games required
     is the larger of:
        - The fraction of the total window size
        - The `minimum_fresh` parameter
+    The number of games required can be indexed from the 'count_from' parameter.
     Args:
       game_queue: A GameQueue object, on whose backing table will be modified.
-      count_from: 
+      count_from: the index of the game to compute the increment from
       window_size:  an integer indicating how many past games are considered
       fresh_fraction: a float in (0,1] indicating the fraction of games to wait for
       minimum_fresh:  an integer indicating the lower bound on the number of new

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minigo-calibrator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minigo-calibrator
+  template:
+    metadata:
+      labels:
+        app: minigo-calibrator
+    spec:
+      containers:
+      - name: minigo-calibrator-container
+        image: gcr.io/tensor-go/minigo-calibrator:v14
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: service-credentials
+          mountPath: /etc/credentials
+        env:
+        - name: GCS_READ_CACHE_MAX_SIZE_MB
+          value: "0"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/credentials/service-account.json
+        - name: BUCKET_NAME
+          value: $BUCKET_NAME
+      volumes:
+      - name: service-credentials
+        secret:
+          secretName: $SERVICE_ACCOUNT-creds
+      restartPolicy: Always
