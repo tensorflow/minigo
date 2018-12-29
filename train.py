@@ -177,13 +177,24 @@ def train(*tf_records: "Records to train on"):
     logging.info("Training, steps = %s, batch = %s -> %s examples",
                  steps or '?', effective_batch_size,
                  (steps * effective_batch_size) if steps else '?')
-    estimator.train(_input_fn, steps=steps, hooks=hooks)
 
     if FLAGS.use_bt:
         games = bigtable_input.GameQueue(
             FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table)
-        bigtable_input.set_fresh_watermark(games, FLAGS.window_size)
+        latest_game = games.latest_game_number
+        index_from = max(latest_game, games.read_wait_cell())
+        print("== Last game before training:", latest_game, flush=True)
+        print("== Wait cell:", games.read_wait_cell(), flush=True)
 
+    try:
+        estimator.train(_input_fn, steps=steps, hooks=hooks)
+        if FLAGS.use_bt:
+            bigtable_input.set_fresh_watermark(games, index_from,
+                                               FLAGS.window_size)
+    except:
+        if FLAGS.use_bt:
+            games.require_fresh_games(0)
+        raise
 
 
 def main(argv):

@@ -386,6 +386,7 @@ class GameQueue:
         table_state = self.bt_table.row(TABLE_STATE)
         table_state.set_cell(METADATA, WAIT_CELL, int(latest + number_fresh))
         table_state.commit()
+        print("== Setting wait cell to ", int(latest + number_fresh), flush=True)
 
     def wait_for_fresh_games(self, poll_interval=15.0):
         """Block caller until required new games have been played.
@@ -398,6 +399,30 @@ class GameQueue:
         until `table_state=metadata:game_counter is at least the value
         in that cell.
         """
+        wait_until_game = self.read_wait_cell()
+        if not wait_until_game:
+            return
+        latest_game = self.latest_game_number
+        last_latest = latest_game
+        while latest_game < wait_until_game:
+            utils.dbg('Latest game {} not yet at required game {} '
+                      '(+{}, {:0.3f} games/sec)'.format(
+                              latest_game,
+                              wait_until_game,
+                              latest_game - last_latest,
+                              (latest_game - last_latest) / poll_interval
+                      ))
+            time.sleep(poll_interval)
+            last_latest = latest_game
+            latest_game = self.latest_game_number
+
+    def read_wait_cell(self):
+        """Read the value of the cell holding the 'wait' value,
+
+        Returns the int value of whatever it has, or None if the cell doesn't
+        exist.
+        """
+
         table_state = self.bt_table.read_row(
             TABLE_STATE,
             filter_=bigtable_row_filters.ColumnRangeFilter(
@@ -405,20 +430,14 @@ class GameQueue:
         if table_state is None:
             utils.dbg('No waiting for new games needed; '
                       'wait_for_game_number column not in table_state')
-            return
+            return None
         value = table_state.cell_value(METADATA, WAIT_CELL)
         if not value:
             utils.dbg('No waiting for new games needed; '
                       'no value in wait_for_game_number cell '
                       'in table_state')
-            return
-        wait_until_game = cbt_intvalue(value)
-        latest_game = self.latest_game_number
-        while latest_game < wait_until_game:
-            utils.dbg('Latest game {} not yet at required game {}'.
-                      format(latest_game, wait_until_game))
-            time.sleep(poll_interval)
-            latest_game = self.latest_game_number
+            return None
+        return cbt_intvalue(value)
 
     def count_moves_in_game_range(self, game_begin, game_end):
         """Count the total moves in a game range.
@@ -542,27 +561,30 @@ class GameQueue:
                 print('  games/sec:', len(h)/elapsed)
 
 
-def set_fresh_watermark(games, window_size, fresh_fraction=0.05, minimum_fresh=20000):
+def set_fresh_watermark(game_queue, count_from, window_size, fresh_fraction=0.05, minimum_fresh=20000):
     """Sets the metadata cell used to block until some quantity of games have been played.
 
-    This sets the 'high water mark' on the `games` queue, used to block training
+    This sets the 'high water mark' on the `game_queue`, used to block training
     until enough new games have been played.  The number of fresh games required
     is the larger of:
        - The fraction of the total window size
        - The `minimum_fresh` parameter
     Args:
-      games: A GameQueue object, on whose backing table will be modified.
+      game_queue: A GameQueue object, on whose backing table will be modified.
+      count_from: 
       window_size:  an integer indicating how many past games are considered
       fresh_fraction: a float in (0,1] indicating the fraction of games to wait for
       minimum_fresh:  an integer indicating the lower bound on the number of new
       games.
     """
-    latest_game = games.latest_game_number
-    if window_size > latest_game: # How to handle the case when the window is not yet 'full'
-        games.require_fresh_games(int(minimum_fresh * .9))
+    already_played = game_queue.latest_game_number - count_from
+    print("== already_played: ", already_played, flush=True)
+    if window_size > count_from: # How to handle the case when the window is not yet 'full'
+        game_queue.require_fresh_games(int(minimum_fresh * .9))
     else:
-        games.require_fresh_games(
-            math.ceil(window_size * .9 * fresh_fraction))
+        num_to_play = max(0, math.ceil(window_size * .9 * fresh_fraction) - already_played)
+        print("== Num to play: ", num_to_play, flush=True)
+        game_queue.require_fresh_games(num_to_play)
 
 
 def get_unparsed_moves_from_last_n_games(games, games_nr, n,

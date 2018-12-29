@@ -14,8 +14,8 @@
 --lr_rates=0.02
 --lr_rates=0.002
 --lr_rates=0.0005
---lr_boundaries=600000
---lr_boundaries=1000000
+--lr_boundaries=200000
+--lr_boundaries=800000
 --l2_strength=0.0001
 --sgd_momentum=0.95
 --steps_to_train=1024
@@ -23,7 +23,6 @@
 --cbt_project=tensor-go
 --cbt_instance=minigo-instance
 --cbt_table=v14-games
---pro_dataset=gs://jacksona-sandbox/data/validate
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)

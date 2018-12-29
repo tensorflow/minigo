@@ -95,7 +95,7 @@ def freeze(save_path, rewrite_tpu=False):
            '--work_dir={}'.format(fsdb.working_dir()),
            '--model_path={}'.format(save_path)]
 
-    if use_tpu:
+    if rewrite_tpu:
         cmd.extend(['--use_tpu',
                     '--tpu_name={}'.format(TPU_NAME)])
 
@@ -132,7 +132,7 @@ def validate_pro():
 
 def loop(unused_argv):
     while True:
-        print("=" * 40)
+        print("=" * 40, flush=True)
         with utils.timer("Train"):
             completed_process = train()
         if completed_process.returncode > 0:

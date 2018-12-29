@@ -31,6 +31,8 @@ spec:
           value: /etc/credentials/service-account.json
         - name: BUCKET_NAME
           value: $BUCKET_NAME
+        - name: PRO_DATASET
+          value: $PRO_DATASET
       volumes:
       - name: service-credentials
         secret:
