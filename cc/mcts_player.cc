@@ -414,7 +414,8 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
     symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(symmetries_used_[i]),
                                    output.policy.data(), raw_policy.data());
     raw_policy[Coord::kPass] = output.policy[Coord::kPass];
-    leaf->IncorporateResults(raw_policy, output.value, root);
+    leaf->IncorporateResults(
+        options_.value_init_penalty, raw_policy, output.value, root);
     leaf->RevertVirtualLoss(root);
   }
 }

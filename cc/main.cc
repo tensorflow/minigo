@@ -87,6 +87,13 @@ DEFINE_bool(soft_pick, true,
 DEFINE_bool(random_symmetry, true,
             "If true, randomly flip & rotate the board features before running "
             "the model and apply the inverse transform to the results.");
+DEFINE_double(fpu, 0.0,
+             "New children value initialize penaly.\n"
+             "child value = parent's value - fpu * color, clamped to [-1, 1].\n"
+             "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
+             "The name FPU (\"First Play Urgency\") is used for consistency "
+             "with Leela though our implentations differ significantly.");
+
 DEFINE_string(flags_path, "",
               "Optional path to load flags from. Flags specified in this file "
               "take priority over command line flags. When running selfplay "
@@ -235,6 +242,7 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->inject_noise = FLAGS_inject_noise;
   options->soft_pick = FLAGS_soft_pick;
   options->random_symmetry = FLAGS_random_symmetry;
+  options->value_init_penalty = FLAGS_fpu;
   options->resign_threshold = FLAGS_resign_threshold;
   options->batch_size = FLAGS_virtual_losses;
   options->komi = FLAGS_komi;

@@ -274,7 +274,8 @@ MctsNode* MctsNode::SelectLeaf() {
   }
 }
 
-void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
+void MctsNode::IncorporateResults(float value_init_penalty,
+                                  absl::Span<const float> move_probabilities,
                                   float value, MctsNode* up_to) {
   MG_DCHECK(move_probabilities.size() == kNumMoves);
   // A finished game should not be going through this code path, it should
@@ -304,17 +305,32 @@ void MctsNode::IncorporateResults(absl::Span<const float> move_probabilities,
         legal_moves[i] ? policy_scalar * move_probabilities[i] : 0;
 
     edges[i].original_P = edges[i].P = move_prob;
-    // Initialize child Q as current node's value, to prevent dynamics where
-    // if B is winning, then B will only ever explore 1 move, because the Q
-    // estimation will be so much larger than the 0 of the other moves.
+
+    // NOTE: Minigo uses value [-1, 1] from black's perspective
+    //       Leela uses value [0, 1] from current player's perspective
+    //       AlphaGo uses [0, 1] in tree search (see matthew lai's post)
     //
-    // Conversely, if W is winning, then B will explore all 362 moves before
-    // continuing to explore the most favorable move. This is a waste of
-    // search.
-    //
-    // The value seeded here acts as a prior, and gets averaged into Q
-    // calculations.
-    edges[i].W += value;
+    // The initial value of a child's Q is not perfectly understood.
+    // There are a couple of general ideas:
+    //   * Init to Parent:
+    //      Init a new child to it's parent value.
+    //      We think of this as saying "The game is probably the same after *any* move
+    //   * Init to Draw AKA init to zero AKA "position looks even":
+    //      Init a new child to 0 for {-1, 1} or 0.5 for LZ
+    //      We tested this in v11, Because this is how we interpretted the original AGZ paper.
+    //      This doesn't make a lot of sense: The losing player tends to explore every move before
+    //      reading a second one twice.  The winning player tends to read only the top policy move
+    //      because it has much higher value than any other move
+    //   * Init to Parent minus a constant AKA FPU (Leela's approach):
+    //      This outperformed init to parent in eval matches when LZ tested it.
+    //      Leela-Zero uses a value around 0.15-0.25 based on policy of explored children.
+    //      Lc0 uses a much large value 1.25 (they use {-1 to 1}).
+    //   * Init to Loss:
+    //      Init all children to losing.
+    //      We think of this as saying "Only a small number of moves work don't get distracted"
+
+    float reduction = value_init_penalty * (position.to_play() == Color::kBlack ? 1 : -1);
+    edges[i].W = std::min(1.0f, std::max(-1.0f, value - reduction));
   }
   BackupValue(value, up_to);
 }

@@ -50,7 +50,7 @@ TEST(MctsNodeTest, UpperConfidenceBound) {
   MctsNode root(&root_stats, TestablePosition("", Color::kBlack));
   auto* leaf = root.SelectLeaf();
   EXPECT_EQ(&root, leaf);
-  leaf->IncorporateResults(probs, 0.5, &root);
+  leaf->IncorporateResults(0.0, probs, 0.5, &root);
 
   // 0.02 are normalized to 1/82
   EXPECT_NEAR(1.0 / 82, root.child_P(0), epsilon);
@@ -60,7 +60,7 @@ TEST(MctsNodeTest, UpperConfidenceBound) {
   EXPECT_NEAR(puct_policy * std::sqrt(1) / (1 + 0), root.child_U(0), epsilon);
 
   leaf = root.SelectLeaf();
-  leaf->IncorporateResults(probs, 0.5, &root);
+  leaf->IncorporateResults(0.0, probs, 0.5, &root);
   EXPECT_NE(&root, leaf);
   EXPECT_EQ(&root, leaf->parent);
   EXPECT_EQ(Coord(0), leaf->move);
@@ -74,7 +74,7 @@ TEST(MctsNodeTest, UpperConfidenceBound) {
   EXPECT_NE(&root, leaf2);
   EXPECT_EQ(&root, leaf2->parent);
   EXPECT_EQ(Coord(1), leaf2->move);
-  leaf2->IncorporateResults(probs, 0.5, &root);
+  leaf2->IncorporateResults(0.0, probs, 0.5, &root);
 
   // With the 2nd child expanded.
   ASSERT_EQ(3, root.N());
@@ -98,8 +98,8 @@ TEST(MctsNodeTest, ActionFlipping) {
   MctsNode black_root(&black_stats, TestablePosition("", Color::kBlack));
   MctsNode white_root(&white_stats, TestablePosition("", Color::kWhite));
 
-  black_root.SelectLeaf()->IncorporateResults(probs, 0, &black_root);
-  white_root.SelectLeaf()->IncorporateResults(probs, 0, &white_root);
+  black_root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &black_root);
+  white_root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &white_root);
   auto* black_leaf = black_root.SelectLeaf();
   auto* white_leaf = white_root.SelectLeaf();
   EXPECT_EQ(black_leaf->move, white_leaf->move);
@@ -120,7 +120,7 @@ TEST(MctsNodeTest, SelectLeaf) {
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
 
-  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+  root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   EXPECT_EQ(Color::kWhite, root.position.to_play());
   auto* leaf = root.SelectLeaf();
@@ -137,10 +137,10 @@ TEST(MctsNodeTest, BackupIncorporateResults) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
-  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+  root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   auto* leaf = root.SelectLeaf();
-  leaf->IncorporateResults(probs, -1, &root);  // white wins!
+  leaf->IncorporateResults(0.0, probs, -1, &root);  // white wins!
 
   // Root was visited twice: first at the root, then at this child.
   EXPECT_EQ(2, root.N());
@@ -165,7 +165,7 @@ TEST(MctsNodeTest, BackupIncorporateResults) {
   auto* leaf2 = root.SelectLeaf();
   ASSERT_EQ(leaf, leaf2->parent);
 
-  leaf2->IncorporateResults(probs, -0.2, &root);  // another white semi-win
+  leaf2->IncorporateResults(0.0, probs, -0.2, &root);  // another white semi-win
   EXPECT_EQ(3, root.N());
   // average of 0, 0, -1, -0.2
   EXPECT_FLOAT_EQ(-0.3, root.Q());
@@ -180,6 +180,65 @@ TEST(MctsNodeTest, BackupIncorporateResults) {
   EXPECT_FLOAT_EQ(-0.6, leaf2->Q());
 }
 
+TEST(MctsNodeTest, ExpandChildValueInit) {
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.02;
+  }
+
+  // Any child will do.
+  auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
+  {
+    MctsNode::EdgeStats root_stats;
+    MctsNode root(&root_stats, board);
+    // 0.0 is init-to-parent
+    root.IncorporateResults(0.0, probs, 0.1, &root);
+
+    auto* leaf = root.SelectLeaf();
+    EXPECT_FLOAT_EQ(0.1, root.child_Q(2));
+    EXPECT_FLOAT_EQ(0.1, leaf->Q());
+
+    // 2nd IncorporateResult shouldn't change Q.
+    root.IncorporateResults(0.0, probs, 0.9, &root);
+
+    EXPECT_FLOAT_EQ(0.1, root.child_Q(2));
+    EXPECT_FLOAT_EQ(0.1, leaf->Q());
+  }
+
+  {
+    MctsNode::EdgeStats root_stats;
+    MctsNode root(&root_stats, board);
+    // -2.0 is init-to-loss
+    root.IncorporateResults(-2.0, probs, 0.1, &root);
+
+    auto* leaf = root.SelectLeaf();
+    EXPECT_FLOAT_EQ(-1.0, root.child_Q(leaf->move));
+    EXPECT_FLOAT_EQ(-1.0, leaf->Q());
+  }
+
+  {
+    MctsNode::EdgeStats root_stats;
+    MctsNode root(&root_stats, board);
+    // 2.0 is init-to-win (this is silly don't do this)
+    root.IncorporateResults(2.0, probs, 0.1, &root);
+
+    auto* leaf = root.SelectLeaf();
+    EXPECT_FLOAT_EQ(1.0, root.child_Q(leaf->move));
+    EXPECT_FLOAT_EQ(1.0, leaf->Q());
+  }
+
+  {
+    MctsNode::EdgeStats root_stats;
+    MctsNode root(&root_stats, board);
+    // 0.25 is "FPU", prefer slightly to explore already explored children.
+    root.IncorporateResults(-0.25, probs, 0.1, &root);
+
+    auto* leaf = root.SelectLeaf();
+    EXPECT_FLOAT_EQ(-0.15, root.child_Q(leaf->move));
+    EXPECT_FLOAT_EQ(-0.15, leaf->Q());
+  }
+}
+
 TEST(MctsNodeTest, DoNotExplorePastFinish) {
   std::array<float, kNumMoves> probs;
   for (float& prob : probs) {
@@ -189,12 +248,12 @@ TEST(MctsNodeTest, DoNotExplorePastFinish) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
-  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+  root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   auto* first_pass = root.MaybeAddChild(Coord::kPass);
-  first_pass->IncorporateResults(probs, 0, &root);
+  first_pass->IncorporateResults(0.0, probs, 0, &root);
   auto* second_pass = first_pass->MaybeAddChild(Coord::kPass);
-  EXPECT_DEATH(second_pass->IncorporateResults(probs, 0, &root), "game_over");
+  EXPECT_DEATH(second_pass->IncorporateResults(0.0, probs, 0, &root), "game_over");
   float value = second_pass->position.CalculateScore(0) > 0 ? 1 : -1;
   second_pass->IncorporateEndGameResult(value, &root);
   auto* node_to_explore = second_pass->SelectLeaf();
@@ -240,7 +299,7 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
-  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+  root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   // and let's say the root were visited a lot of times, which pumps up the
   // action score for unvisited moves...
@@ -279,7 +338,7 @@ TEST(MctsNodeTest, DontTraverseUnexpandedChild) {
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
   root_stats.N = 5;
-  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+  root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   auto* leaf1 = root.SelectLeaf();
   EXPECT_EQ(17, leaf1->move);
@@ -306,7 +365,7 @@ TEST(MctsNodeTest, GetMostVisitedPath) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition("", Color::kBlack);
   MctsNode root(&root_stats, board);
-  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+  root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   // We should select the highest probabilty first.
   auto* leaf1 = root.SelectLeaf();
@@ -336,7 +395,7 @@ TEST(MctsNodeTest, TestSelectLeaf) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
-  root.SelectLeaf()->IncorporateResults(probs, 0, &root);
+  root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   std::set<MctsNode*> leaves;
 
@@ -368,7 +427,7 @@ TEST(MctsNodeTest, NormalizeTest) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition("");
   MctsNode root(&root_stats, board);
-  root.IncorporateResults(probs, 0, &root);
+  root.IncorporateResults(0.0, probs, 0, &root);
 
   // Adjust for the one value that is five times larger and one missing value.
   float normalized = 1.0 / (kNumMoves - 1 + 4);
@@ -393,7 +452,7 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
-  root.IncorporateResults(probs, 0, &root);
+  root.IncorporateResults(0.0, probs, 0, &root);
 
   // kAlmostDoneBoard has 6 legal moves including pass.
   float uniform_policy = 1.0 / 6;

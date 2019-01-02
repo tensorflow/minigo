@@ -92,7 +92,8 @@ std::unique_ptr<TestablePlayer> CreateBasicPlayer(MctsPlayer::Options options) {
       &player->root()->position.stones()};
   DualNet::SetFeatures(positions, Color::kBlack, &features);
   auto output = player->Run(features);
-  first_node->IncorporateResults(output.policy, output.value, player->root());
+  first_node->IncorporateResults(
+    0.0, output.policy, output.value, player->root());
   return player;
 }
 

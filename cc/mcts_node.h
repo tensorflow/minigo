@@ -109,7 +109,8 @@ class MctsNode {
   // called), then SelectLeaf will return that same node.
   MctsNode* SelectLeaf();
 
-  void IncorporateResults(absl::Span<const float> move_probabilities,
+  void IncorporateResults(float value_init_penalty,
+                          absl::Span<const float> move_probabilities,
                           float value, MctsNode* up_to);
 
   void IncorporateEndGameResult(float value, MctsNode* up_to);

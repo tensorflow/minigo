@@ -45,13 +45,17 @@ class MctsPlayer {
     bool inject_noise = true;
     bool soft_pick = true;
     bool random_symmetry = true;
-    float resign_threshold = -0.95;
+
+    // See mcts_node.cc for details.
+    // Default (0.0) is init-to-parent.
+    float value_init_penalty = 0.0;
 
     // We use a separate resign_enabled flag instead of setting the
     // resign_threshold to -1 for games where resignation is diabled. This
     // enables us to report games where the eventual winner would have
     // incorrectly resigned early, had resignations been enabled.
     bool resign_enabled = true;
+    float resign_threshold = -0.95;
 
     // TODO(tommadams): rename batch_size to virtual_losses.
     int batch_size = 8;
