@@ -1,3 +1,7 @@
+# This file is an enumeration of all hyperparameters required by the
+# AGZ pipeline. The flags in this file get passed into all of the scripts
+# in the rl_loop/ directory via the mask_flags.py helper library.
+
 --conv_width=8
 --fc_width=16
 --trunk_layers=1
@@ -6,3 +10,4 @@
 --num_evaluation_games=1
 --verbose=0
 --num_readouts=10
+--value_init_penalty=2.0

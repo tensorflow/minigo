@@ -34,3 +34,4 @@
 --num_readouts=800
 --disable_resign_pct=0.00
 --resign_threshold=-0.999
+--value_init_penalty=2.0
