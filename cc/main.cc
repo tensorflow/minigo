@@ -178,7 +178,7 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
               const Game& game, bool write_comments) {
   MG_CHECK(file::RecursivelyCreateDir(output_dir));
 
-  bool log_names = game.black_name() != game.black_name();
+  bool log_names = game.black_name() != game.white_name();
 
   std::vector<sgf::MoveWithComment> moves;
   moves.reserve(game.moves().size());
