@@ -35,6 +35,12 @@ DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
 DEFINE_int32(virtual_losses, 8,
              "Number of virtual losses when running tree search.");
+DEFINE_double(value_init_penalty, 0.0,
+              "New children value initialize penaly.\n"
+              "child's value = parent's value - value_init_penalty * color, "
+              "clamped to [-1, 1].\n"
+              "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
+              "This behaves similiarly to leela's FPU \"First Play Urgency\".");
 
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
@@ -68,6 +74,7 @@ void Gtp() {
   options.soft_pick = false;
   options.random_symmetry = true;
   options.resign_threshold = FLAGS_resign_threshold;
+  options.value_init_penalty = FLAGS_value_init_penalty;
   options.batch_size = FLAGS_virtual_losses;
   options.komi = kDefaultKomi;
   options.num_readouts = FLAGS_num_readouts;

@@ -47,6 +47,12 @@ DEFINE_string(model, "",
               "inferece engine. For engine=tf, the model should be a GraphDef "
               "proto. For engine=lite, the model should be .tflite "
               "flatbuffer.");
+DEFINE_double(value_init_penalty, 0.0,
+              "New children value initialize penaly.\n"
+              "child's value = parent's value - value_init_penalty * color, "
+              "clamped to [-1, 1].\n"
+              "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
+              "This behaves similiarly to leela's FPU \"First Play Urgency\".");
 
 namespace minigo {
 namespace {
@@ -61,6 +67,7 @@ void Puzzle() {
   options.soft_pick = false;
   options.random_symmetry = true;
   options.resign_threshold = -1;
+  options.value_init_penalty = FLAGS_value_init_penalty;
   options.batch_size = FLAGS_virtual_losses;
   options.komi = kDefaultKomi;
   options.random_seed = FLAGS_seed;

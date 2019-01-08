@@ -298,6 +298,35 @@ void MctsNode::IncorporateResults(float value_init_penalty,
     policy_scalar = 1 / policy_scalar;
   }
 
+  // NOTE: Minigo uses value [-1, 1] from black's perspective
+  //       Leela uses value [0, 1] from current player's perspective
+  //       AlphaGo uses [0, 1] in tree search (see matthew lai's post)
+  //
+  // The initial value of a child's Q is not perfectly understood.
+  // There are a couple of general ideas:
+  //   * Init to Parent:
+  //      Init a new child to its parent value.
+  //      We think of this as saying "The game is probably the same after
+  //      *any* move".
+  //   * Init to Draw AKA init to zero AKA "position looks even":
+  //      Init a new child to 0 for {-1, 1} or 0.5 for LZ.
+  //      We tested this in v11, because this is how we interpretted the
+  //      original AGZ paper. This doesn't make a lot of sense: The losing
+  //      player tends to explore every move before reading a second one
+  //      twice.  The winning player tends to read only the top policy move
+  //      because it has much higher value than any other move.
+  //   * Init to Parent minus a constant AKA FPU (Leela's approach):
+  //      This outperformed init to parent in eval matches when LZ tested it.
+  //      Leela-Zero uses a value around 0.15-0.25 based on policy of explored
+  //      children. LCZero uses a much large value 1.25 (they use {-1 to 1}).
+  //   * Init to Loss:
+  //      Init all children to losing.
+  //      We think of this as saying "Only a small number of moves work don't
+  //      get distracted"
+  float reduction =
+      value_init_penalty * (position.to_play() == Color::kBlack ? 1 : -1);
+  float reduced_value = std::min(1.0f, std::max(-1.0f, value - reduction));
+
   SetFlag(Flag::kExpanded);
   for (int i = 0; i < kNumMoves; ++i) {
     // Zero out illegal moves, and re-normalize move_probabilities.
@@ -306,31 +335,15 @@ void MctsNode::IncorporateResults(float value_init_penalty,
 
     edges[i].original_P = edges[i].P = move_prob;
 
-    // NOTE: Minigo uses value [-1, 1] from black's perspective
-    //       Leela uses value [0, 1] from current player's perspective
-    //       AlphaGo uses [0, 1] in tree search (see matthew lai's post)
-    //
-    // The initial value of a child's Q is not perfectly understood.
-    // There are a couple of general ideas:
-    //   * Init to Parent:
-    //      Init a new child to it's parent value.
-    //      We think of this as saying "The game is probably the same after *any* move
-    //   * Init to Draw AKA init to zero AKA "position looks even":
-    //      Init a new child to 0 for {-1, 1} or 0.5 for LZ
-    //      We tested this in v11, Because this is how we interpretted the original AGZ paper.
-    //      This doesn't make a lot of sense: The losing player tends to explore every move before
-    //      reading a second one twice.  The winning player tends to read only the top policy move
-    //      because it has much higher value than any other move
-    //   * Init to Parent minus a constant AKA FPU (Leela's approach):
-    //      This outperformed init to parent in eval matches when LZ tested it.
-    //      Leela-Zero uses a value around 0.15-0.25 based on policy of explored children.
-    //      Lc0 uses a much large value 1.25 (they use {-1 to 1}).
-    //   * Init to Loss:
-    //      Init all children to losing.
-    //      We think of this as saying "Only a small number of moves work don't get distracted"
-
-    float reduction = value_init_penalty * (position.to_play() == Color::kBlack ? 1 : -1);
-    edges[i].W = std::min(1.0f, std::max(-1.0f, value - reduction));
+    // Note that we accumulate W here, rather than assigning.
+    // When performing tree search normally, we could just assign the value to W
+    // because the result of value head is known before we expand the node.
+    // When running Minigui in study move however, we load the entire game tree
+    // before starting background inference. This means that while background
+    // inferences are being performed, nodes in the tree may already be expanded
+    // and have non-zero W values at the time we need to incorporate a result
+    // for the node from the value head.
+    edges[i].W += reduced_value;
   }
   BackupValue(value, up_to);
 }
@@ -426,8 +439,8 @@ std::string MctsNode::CalculateTreeStats() const {
   long depth_sum = 0;
   long depth_max = 0;
 
-  std::function<void(const MctsNode&, int)> traverse =
-      [&](const MctsNode& node, int depth) {
+  std::function<void(const MctsNode&, int)> traverse = [&](const MctsNode& node,
+                                                           int depth) {
     num_nodes += 1;
     num_leaf_nodes += node.N() <= 1;
 

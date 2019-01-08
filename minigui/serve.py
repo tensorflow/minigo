@@ -16,7 +16,6 @@ import os
 import sys
 sys.path.insert(0, ".")  # to run from minigo/ dir
 
-
 from absl import flags
 from flask import Flask
 import absl.app
@@ -29,6 +28,7 @@ import logging
 import select
 import subprocess
 import threading
+
 
 flags.DEFINE_string("model", None, "Model path.")
 
@@ -60,6 +60,14 @@ flags.DEFINE_integer(
 
 flags.DEFINE_float("resign_threshold", -0.8, "Resign threshold.")
 
+flags.DEFINE_float(
+    "value_init_penalty", 0,
+    "New children value initialize penaly.\n"
+    "child's value = parent's value - value_init_penalty * color, "
+    "clamped to [-1, 1].\n"
+    "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
+    "This behaves similiarly to leela's FPU \"First Play Urgency\".")
+
 FLAGS = flags.FLAGS
 
 # Suppress Flask's info logging.
@@ -86,6 +94,7 @@ def _open_pipes():
             "bazel-bin/cc/gtp",
             "--model=%s" % FLAGS.model,
             "--num_readouts=%d" % FLAGS.num_readouts,
+            "--value_init_penalty=%d" % FLAGS.value_init_penalty,
             "--courtesy_pass=true",
             "--engine=%s" % FLAGS.engine,
             "--virtual_losses=%d" % FLAGS.virtual_losses,
