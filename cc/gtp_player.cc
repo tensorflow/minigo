@@ -264,25 +264,21 @@ void GtpPlayer::ProcessLeaves(absl::Span<TreePath> paths,
   }
 }
 
-GtpPlayer::Response GtpPlayer::CheckArgsExact(absl::string_view cmd,
-                                              size_t expected_num_args,
+GtpPlayer::Response GtpPlayer::CheckArgsExact(size_t expected_num_args,
                                               CmdArgs args) {
   if (args.size() != expected_num_args) {
-    return Response::Error("expected ", expected_num_args,
-                           " args for GTP command ", cmd, ", got ", args.size(),
-                           " args: ", absl::StrJoin(args, " "));
+    return Response::Error("expected ", expected_num_args, " args, got ",
+                           args.size(), " args: ", absl::StrJoin(args, " "));
   }
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::CheckArgsRange(absl::string_view cmd,
-                                              size_t expected_min_args,
+GtpPlayer::Response GtpPlayer::CheckArgsRange(size_t expected_min_args,
                                               size_t expected_max_args,
                                               CmdArgs args) {
   if (args.size() < expected_min_args || args.size() > expected_max_args) {
     return Response::Error("expected between ", expected_min_args, " and ",
-                           expected_max_args, " args for GTP command ", cmd,
-                           ", got ", args.size(),
+                           expected_max_args, " args, got ", args.size(),
                            " args: ", absl::StrJoin(args, " "));
   }
   return Response::Ok();
@@ -295,14 +291,13 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(const std::string& cmd,
     return Response::Error("unknown command");
   }
   auto handler = it->second;
-  return (this->*handler)(cmd, args);
+  return (this->*handler)(args);
 }
 
-GtpPlayer::Response GtpPlayer::HandleBenchmark(absl::string_view cmd,
-                                               CmdArgs args) {
+GtpPlayer::Response GtpPlayer::HandleBenchmark(CmdArgs args) {
   // benchmark [readouts] [batch_size]
   // Note: By default use current time_control (readouts or time).
-  auto response = CheckArgsRange(cmd, 0, 2, args);
+  auto response = CheckArgsRange(0, 2, args);
   if (!response.ok) {
     return response;
   }
@@ -333,9 +328,8 @@ GtpPlayer::Response GtpPlayer::HandleBenchmark(absl::string_view cmd,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleBoardsize(absl::string_view cmd,
-                                               CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandleBoardsize(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -348,9 +342,8 @@ GtpPlayer::Response GtpPlayer::HandleBoardsize(absl::string_view cmd,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleClearBoard(absl::string_view cmd,
-                                                CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 0, args);
+GtpPlayer::Response GtpPlayer::HandleClearBoard(CmdArgs args) {
+  auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
@@ -361,13 +354,12 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(absl::string_view cmd,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleEcho(absl::string_view cmd, CmdArgs args) {
+GtpPlayer::Response GtpPlayer::HandleEcho(CmdArgs args) {
   return Response::Ok(absl::StrJoin(args, " "));
 }
 
-GtpPlayer::Response GtpPlayer::HandleFinalScore(absl::string_view cmd,
-                                                CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 0, args);
+GtpPlayer::Response GtpPlayer::HandleFinalScore(CmdArgs args) {
+  auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
@@ -382,9 +374,8 @@ GtpPlayer::Response GtpPlayer::HandleFinalScore(absl::string_view cmd,
   }
 }
 
-GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
-                                             CmdArgs args) {
-  auto response = CheckArgsRange(cmd, 0, 1, args);
+GtpPlayer::Response GtpPlayer::HandleGenmove(CmdArgs args) {
+  auto response = CheckArgsRange(0, 1, args);
   if (!response.ok) {
     return response;
   }
@@ -407,8 +398,8 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(absl::string_view cmd,
   return Response::Ok(c.ToKgs());
 }
 
-GtpPlayer::Response GtpPlayer::HandleInfo(absl::string_view cmd, CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 0, args);
+GtpPlayer::Response GtpPlayer::HandleInfo(CmdArgs args) {
+  auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
@@ -419,9 +410,8 @@ GtpPlayer::Response GtpPlayer::HandleInfo(absl::string_view cmd, CmdArgs args) {
   return Response::Ok(oss.str());
 }
 
-GtpPlayer::Response GtpPlayer::HandleKnownCommand(absl::string_view cmd,
-                                                  CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandleKnownCommand(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -434,8 +424,8 @@ GtpPlayer::Response GtpPlayer::HandleKnownCommand(absl::string_view cmd,
   return Response::Ok(result);
 }
 
-GtpPlayer::Response GtpPlayer::HandleKomi(absl::string_view cmd, CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandleKomi(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -448,9 +438,8 @@ GtpPlayer::Response GtpPlayer::HandleKomi(absl::string_view cmd, CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleListCommands(absl::string_view cmd,
-                                                  CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 0, args);
+GtpPlayer::Response GtpPlayer::HandleListCommands(CmdArgs args) {
+  auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
@@ -464,9 +453,8 @@ GtpPlayer::Response GtpPlayer::HandleListCommands(absl::string_view cmd,
   return response;
 }
 
-GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
-                                             CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandleLoadsgf(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -483,16 +471,16 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(absl::string_view cmd,
   return ParseSgf(buffer.str());
 }
 
-GtpPlayer::Response GtpPlayer::HandleName(absl::string_view cmd, CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 0, args);
+GtpPlayer::Response GtpPlayer::HandleName(CmdArgs args) {
+  auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
   return Response::Ok(options().name);
 }
 
-GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 2, args);
+GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {
+  auto response = CheckArgsExact(2, args);
   if (!response.ok) {
     return response;
   }
@@ -524,15 +512,13 @@ GtpPlayer::Response GtpPlayer::HandlePlay(absl::string_view cmd, CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandlePlaysgf(absl::string_view cmd,
-                                             CmdArgs args) {
+GtpPlayer::Response GtpPlayer::HandlePlaysgf(CmdArgs args) {
   auto sgf_str = absl::StrReplaceAll(absl::StrJoin(args, " "), {{"\\n", "\n"}});
   return ParseSgf(sgf_str);
 }
 
-GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
-                                            CmdArgs args) {
-  auto response = CheckArgsRange(cmd, 1, 2, args);
+GtpPlayer::Response GtpPlayer::HandlePonder(CmdArgs args) {
+  auto response = CheckArgsRange(1, 2, args);
   if (!response.ok) {
     return response;
   }
@@ -549,7 +535,7 @@ GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
   }
 
   // Subsequent sub commands require exactly 2 arguments.
-  response = CheckArgsExact(cmd, 2, args);
+  response = CheckArgsExact(2, args);
   if (!response.ok) {
     return response;
   }
@@ -594,9 +580,8 @@ GtpPlayer::Response GtpPlayer::HandlePonder(absl::string_view cmd,
   return Response::Error("unrecognized ponder mode");
 }
 
-GtpPlayer::Response GtpPlayer::HandlePruneNodes(absl::string_view cmd,
-                                                CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandlePruneNodes(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -610,9 +595,8 @@ GtpPlayer::Response GtpPlayer::HandlePruneNodes(absl::string_view cmd,
 
   return Response::Ok();
 }
-GtpPlayer::Response GtpPlayer::HandleReadouts(absl::string_view cmd,
-                                              CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandleReadouts(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -627,9 +611,8 @@ GtpPlayer::Response GtpPlayer::HandleReadouts(absl::string_view cmd,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleReportSearchInterval(absl::string_view cmd,
-                                                          CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandleReportSearchInterval(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -643,9 +626,8 @@ GtpPlayer::Response GtpPlayer::HandleReportSearchInterval(absl::string_view cmd,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
-                                                    CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 1, args);
+GtpPlayer::Response GtpPlayer::HandleSelectPosition(CmdArgs args) {
+  auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
@@ -678,8 +660,8 @@ GtpPlayer::Response GtpPlayer::HandleSelectPosition(absl::string_view cmd,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleUndo(absl::string_view cmd, CmdArgs args) {
-  auto response = CheckArgsExact(cmd, 0, args);
+GtpPlayer::Response GtpPlayer::HandleUndo(CmdArgs args) {
+  auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
@@ -691,9 +673,8 @@ GtpPlayer::Response GtpPlayer::HandleUndo(absl::string_view cmd, CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
-                                               CmdArgs args) {
-  auto response = CheckArgsRange(cmd, 0, 1, args);
+GtpPlayer::Response GtpPlayer::HandleVariation(CmdArgs args) {
+  auto response = CheckArgsRange(0, 1, args);
   if (!response.ok) {
     return response;
   }
@@ -715,9 +696,8 @@ GtpPlayer::Response GtpPlayer::HandleVariation(absl::string_view cmd,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleVerbosity(absl::string_view cmd,
-                                               CmdArgs args) {
-  auto response = CheckArgsRange(cmd, 0, 1, args);
+GtpPlayer::Response GtpPlayer::HandleVerbosity(CmdArgs args) {
+  auto response = CheckArgsRange(0, 1, args);
   if (!response.ok) {
     return response;
   }

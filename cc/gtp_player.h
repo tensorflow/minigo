@@ -113,7 +113,7 @@ class GtpPlayer : public MctsPlayer {
   };
 
   using CmdArgs = const std::vector<absl::string_view>&;
-  using CmdHandler = Response (GtpPlayer::*)(absl::string_view, CmdArgs);
+  using CmdHandler = Response (GtpPlayer::*)(CmdArgs);
   void RegisterCmd(const std::string& cmd, CmdHandler handler);
 
   // If waiting for the opponent to play, consider thinking for a bit.
@@ -124,37 +124,36 @@ class GtpPlayer : public MctsPlayer {
   // Returns false if the GtpPlayer should quit.
   bool HandleCmd(const std::string& line);
 
-  Response CheckArgsExact(absl::string_view cmd, size_t expected_num_args,
+  Response CheckArgsExact(size_t expected_num_args, CmdArgs args);
+  Response CheckArgsRange(size_t expected_min_args, size_t expected_max_args,
                           CmdArgs args);
-  Response CheckArgsRange(absl::string_view cmd, size_t expected_min_args,
-                          size_t expected_max_args, CmdArgs args);
 
   Response DispatchCmd(const std::string& cmd, CmdArgs args);
 
   // TODO(tommadams): clearly document these methods w.r.t. the GTP standard and
   // what public methods they call.
-  Response HandleBenchmark(absl::string_view cmd, CmdArgs args);
-  Response HandleBoardsize(absl::string_view cmd, CmdArgs args);
-  Response HandleClearBoard(absl::string_view cmd, CmdArgs args);
-  Response HandleEcho(absl::string_view cmd, CmdArgs args);
-  Response HandleFinalScore(absl::string_view cmd, CmdArgs args);
-  Response HandleGenmove(absl::string_view cmd, CmdArgs args);
-  Response HandleInfo(absl::string_view cmd, CmdArgs args);
-  Response HandleKnownCommand(absl::string_view cmd, CmdArgs args);
-  Response HandleKomi(absl::string_view cmd, CmdArgs args);
-  Response HandleListCommands(absl::string_view cmd, CmdArgs args);
-  Response HandleLoadsgf(absl::string_view cmd, CmdArgs args);
-  Response HandleName(absl::string_view cmd, CmdArgs args);
-  Response HandlePlay(absl::string_view cmd, CmdArgs args);
-  Response HandlePlaysgf(absl::string_view cmd, CmdArgs args);
-  Response HandlePonder(absl::string_view cmd, CmdArgs args);
-  Response HandlePruneNodes(absl::string_view cmd, CmdArgs args);
-  Response HandleReadouts(absl::string_view cmd, CmdArgs args);
-  Response HandleReportSearchInterval(absl::string_view cmd, CmdArgs args);
-  Response HandleSelectPosition(absl::string_view cmd, CmdArgs args);
-  Response HandleUndo(absl::string_view cmd, CmdArgs args);
-  Response HandleVariation(absl::string_view cmd, CmdArgs args);
-  Response HandleVerbosity(absl::string_view cmd, CmdArgs args);
+  Response HandleBenchmark(CmdArgs args);
+  Response HandleBoardsize(CmdArgs args);
+  Response HandleClearBoard(CmdArgs args);
+  Response HandleEcho(CmdArgs args);
+  Response HandleFinalScore(CmdArgs args);
+  Response HandleGenmove(CmdArgs args);
+  Response HandleInfo(CmdArgs args);
+  Response HandleKnownCommand(CmdArgs args);
+  Response HandleKomi(CmdArgs args);
+  Response HandleListCommands(CmdArgs args);
+  Response HandleLoadsgf(CmdArgs args);
+  Response HandleName(CmdArgs args);
+  Response HandlePlay(CmdArgs args);
+  Response HandlePlaysgf(CmdArgs args);
+  Response HandlePonder(CmdArgs args);
+  Response HandlePruneNodes(CmdArgs args);
+  Response HandleReadouts(CmdArgs args);
+  Response HandleReportSearchInterval(CmdArgs args);
+  Response HandleSelectPosition(CmdArgs args);
+  Response HandleUndo(CmdArgs args);
+  Response HandleVariation(CmdArgs args);
+  Response HandleVerbosity(CmdArgs args);
 
   // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
   Response ParseSgf(const std::string& sgf_str);
