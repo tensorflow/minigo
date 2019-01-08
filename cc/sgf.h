@@ -126,7 +126,8 @@ std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                             const CreateSgfOptions& options);
 
 // Extracts the complete game trees from an SGF AST.
-std::vector<std::unique_ptr<Node>> GetTrees(const Ast& ast);
+MG_WARN_UNUSED_RESULT bool GetTrees(const Ast& ast,
+                                    std::vector<std::unique_ptr<Node>>* trees);
 
 }  // namespace sgf
 }  // namespace minigo

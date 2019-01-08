@@ -715,7 +715,7 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
   sgf::Ast ast;
   if (!ast.Parse(sgf_str)) {
     MG_LOG(ERROR) << "couldn't parse SGF";
-    return Response::Error("cannot parse file");
+    return Response::Error("cannot load file");
   }
 
   // Clear the board before replaying sgf.
@@ -731,10 +731,11 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
           if (root()->move == Coord::kPass) {
             auto expected = ColorToCode(root()->position.to_play());
             auto actual = node.move.ToSgf();
-            return Response::Error(
-                "expected move by ", expected, ", got ", actual,
-                " but can't play an intermediate pass because the previous ",
-                "move was also a pass");
+            MG_LOG(ERROR) << "expected move by " << expected << ", got "
+                          << actual
+                          << " but can't play an intermediate pass because the"
+                          << " previous move was also a pass";
+            return Response::Error("cannot load file");
           }
           MG_LOG(WARNING) << "Inserting pass move";
           MG_CHECK(PlayMove(Coord::kPass, &game_));
@@ -742,7 +743,8 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
         }
 
         if (!PlayMove(node.move.c, &game_)) {
-          return Response::Error("error playing ", node.move.ToSgf());
+          MG_LOG(ERROR) << "error playing " << node.move.ToSgf();
+          return Response::Error("cannot load file");
         }
 
         if (!node.comment.empty()) {
@@ -761,7 +763,10 @@ GtpPlayer::Response GtpPlayer::ParseSgf(const std::string& sgf_str) {
         return Response::Ok();
       };
 
-  auto trees = sgf::GetTrees(ast);
+  std::vector<std::unique_ptr<sgf::Node>> trees;
+  if (!sgf::GetTrees(ast, &trees)) {
+    return Response::Error("cannot load file");
+  }
   for (const auto& tree : trees) {
     auto response = traverse(*tree);
     if (!response.ok) {

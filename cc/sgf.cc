@@ -205,7 +205,7 @@ class Parser {
   std::string* error_;
 };
 
-void GetTreeImpl(const Ast::Tree& tree,
+bool GetTreeImpl(const Ast::Tree& tree,
                  std::vector<std::unique_ptr<Node>>* dst) {
   const auto* src = &tree;
   const Ast::Property* prop;
@@ -227,7 +227,12 @@ void GetTreeImpl(const Ast::Tree& tree,
                       << " has no values";
       continue;
     }
-    move.c = Coord::FromSgf(prop->values[0]);
+    move.c = Coord::FromSgf(prop->values[0], true);
+    if (move.c == Coord::kInvalid) {
+      MG_LOG(ERROR) << "Can't parse node " << node.ToString() << ": \""
+                    << prop->values[0] << "\" isn't a valid SGF coord";
+      return false;
+    }
 
     // Parse comment.
     std::string comment;
@@ -240,8 +245,11 @@ void GetTreeImpl(const Ast::Tree& tree,
   }
 
   for (const auto& src_child : src->children) {
-    GetTreeImpl(src_child, dst);
+    if (!GetTreeImpl(src_child, dst)) {
+      return false;
+    }
   }
+  return true;
 }
 
 }  // namespace
@@ -328,12 +336,20 @@ std::vector<Move> Node::ExtractMainLine() const {
   return result;
 }
 
-std::vector<std::unique_ptr<Node>> GetTrees(const Ast& ast) {
-  std::vector<std::unique_ptr<Node>> dst;
+bool GetTrees(const Ast& ast, std::vector<std::unique_ptr<Node>>* trees) {
+  // Parse the AST into a temporary vector.
+  std::vector<std::unique_ptr<Node>> tmp;
   for (const auto& tree : ast.trees()) {
-    GetTreeImpl(tree, &dst);
+    if (!GetTreeImpl(tree, &tmp)) {
+      return false;
+    }
   }
-  return dst;
+
+  // If everything parsed ok, move the parsed trees into the output vector.
+  for (auto& tree : tmp) {
+    trees->push_back(std::move(tree));
+  }
+  return true;
 }
 
 std::ostream& operator<<(std::ostream& os, const MoveWithComment& move) {

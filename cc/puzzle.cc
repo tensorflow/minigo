@@ -90,8 +90,8 @@ void Puzzle() {
       MG_CHECK(file::ReadFile(path, &contents));
       sgf::Ast ast;
       MG_CHECK(ast.Parse(contents));
-      auto trees = GetTrees(ast);
-      MG_CHECK(!trees.empty());
+      std::vector<std::unique_ptr<sgf::Node>> trees;
+      MG_CHECK(GetTrees(ast, &trees));
       auto moves = trees[0]->ExtractMainLine();
 
       total_moves += moves.size();
