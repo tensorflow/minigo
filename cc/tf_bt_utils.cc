@@ -133,7 +133,7 @@ void WriteEvalRecord(const std::string& gcp_project_name,
   auto row_name = absl::StrFormat(kEvalGameRowFormat, game_counter);
   SingleRowMutation row_mutation(
       row_name, SetCell("metadata", "black", game.black_name()),
-      SetCell("metadata", "white", game.black_name()),
+      SetCell("metadata", "white", game.white_name()),
       SetCell("metadata", "black_won", absl::StrCat(game.result() > 0)),
       SetCell("metadata", "white_won", absl::StrCat(game.result() < 0)),
       SetCell("metadata", "result", game.result_string()),
