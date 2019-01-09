@@ -395,7 +395,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(CmdArgs args) {
 
   ReportPosition(root());
 
-  return Response::Ok(c.ToKgs());
+  return Response::Ok(c.ToGtp());
 }
 
 GtpPlayer::Response GtpPlayer::HandleInfo(CmdArgs args) {
@@ -498,7 +498,7 @@ GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {
     return Response::Error("out of turn moves are not yet supported");
   }
 
-  Coord c = Coord::FromKgs(args[1], true);
+  Coord c = Coord::FromGtp(args[1], true);
   if (c == Coord::kInvalid) {
     MG_LOG(ERROR) << "expected GTP coord for move, got " << args[1];
     return Response::Error("illegal move");
@@ -682,7 +682,7 @@ GtpPlayer::Response GtpPlayer::HandleVariation(CmdArgs args) {
   if (args.size() == 0) {
     child_variation_ = Coord::kInvalid;
   } else {
-    Coord c = Coord::FromKgs(args[0], true);
+    Coord c = Coord::FromGtp(args[0], true);
     if (c == Coord::kInvalid) {
       MG_LOG(ERROR) << "expected GTP coord for move, got " << args[0];
       return Response::Error("illegal move");
@@ -800,7 +800,7 @@ void GtpPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf) {
   if (!src_pv.empty()) {
     auto& dst_pv = j["variations"]["pv"];
     for (Coord c : src_pv) {
-      dst_pv.push_back(c.ToKgs());
+      dst_pv.push_back(c.ToGtp());
     }
   }
 
@@ -814,19 +814,19 @@ void GtpPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf) {
       std::reverse(src_search.begin(), src_search.end());
       auto& dst_search = j["variations"]["search"];
       for (const auto* node : src_search) {
-        dst_search.push_back(node->move.ToKgs());
+        dst_search.push_back(node->move.ToGtp());
       }
     }
   }
 
   // Requested child variation, if any.
   if (child_variation_ != Coord::kInvalid) {
-    auto& child_v = j["variations"][child_variation_.ToKgs()];
-    child_v.push_back(child_variation_.ToKgs());
+    auto& child_v = j["variations"][child_variation_.ToGtp()];
+    child_v.push_back(child_variation_.ToGtp());
     auto it = root->children.find(child_variation_);
     if (it != root->children.end()) {
       for (Coord c : it->second->MostVisitedPath()) {
-        child_v.push_back(c.ToKgs());
+        child_v.push_back(c.ToGtp());
       }
     }
   }
@@ -883,7 +883,7 @@ void GtpPlayer::ReportPosition(MctsNode* node) {
     }
   }
   if (node->move != Coord::kInvalid) {
-    j["move"] = node->move.ToKgs();
+    j["move"] = node->move.ToGtp();
   }
   if (!info->comment.empty()) {
     j["comment"] = info->comment;

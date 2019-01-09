@@ -169,7 +169,7 @@ std::string MctsNode::Describe() const {
     absl::StrAppendFormat(
         &result,
         "\n%-5s: % 4.3f % 4.3f %0.3f %0.3f %0.3f %5d %0.4f % 6.5f % 3.2f",
-        i.ToKgs(), child_action_score[i], child_Q(i), child_U(i), child_P(i),
+        i.ToGtp(), child_action_score[i], child_Q(i), child_U(i), child_P(i),
         child_original_P(i), static_cast<int>(child_N(i)), soft_N, p_delta,
         p_rel);
   }
@@ -211,7 +211,7 @@ std::string MctsNode::MostVisitedPathString() const {
     auto it = node->children.find(c);
     MG_CHECK(it != node->children.end());
     node = it->second.get();
-    absl::StrAppendFormat(&result, "%s (%d) ==> ", node->move.ToKgs(),
+    absl::StrAppendFormat(&result, "%s (%d) ==> ", node->move.ToGtp(),
                           static_cast<int>(node->N()));
   }
   absl::StrAppendFormat(&result, "Q: %0.5f", node->Q());

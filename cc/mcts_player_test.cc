@@ -92,8 +92,8 @@ std::unique_ptr<TestablePlayer> CreateBasicPlayer(MctsPlayer::Options options) {
       &player->root()->position.stones()};
   DualNet::SetFeatures(positions, Color::kBlack, &features);
   auto output = player->Run(features);
-  first_node->IncorporateResults(
-    0.0, output.policy, output.value, player->root());
+  first_node->IncorporateResults(0.0, output.policy, output.value,
+                                 player->root());
   return player;
 }
 
@@ -239,7 +239,7 @@ TEST(MctsPlayerTest, DontPassIfLosing) {
 
   // Search should converge on D9 as only winning move.
   auto best_move = ArgMax(root->edges, MctsNode::CmpN);
-  ASSERT_EQ(Coord::FromKgs("D9"), best_move);
+  ASSERT_EQ(Coord::FromGtp("D9"), best_move);
   // D9 should have a positive value.
   EXPECT_LT(0, root->child_Q(best_move));
   EXPECT_LE(20, root->N());
@@ -466,7 +466,7 @@ TEST(MctsPlayerTest, SymmetriesTest) {
   std::vector<std::string> moves = {"B3", "F1", "C7"};
   auto* parent = root;
   for (const auto& move : moves) {
-    nodes.push_back(absl::make_unique<MctsNode>(parent, Coord::FromKgs(move)));
+    nodes.push_back(absl::make_unique<MctsNode>(parent, Coord::FromGtp(move)));
     parent = nodes.back().get();
   }
 
@@ -480,11 +480,11 @@ TEST(MctsPlayerTest, SymmetriesTest) {
     path.leaf = leaf;
     leaf->AddVirtualLoss(root);
     player.ProcessLeaves({&path, 1}, true);
-    ASSERT_EQ(0.0, leaf->child_P(Coord::FromKgs("pass")));
+    ASSERT_EQ(0.0, leaf->child_P(Coord::FromGtp("pass")));
     for (const auto move : moves) {
       // Playing where stones exist is illegal and should have been marked as 0.
-      ASSERT_EQ(0.0, leaf->child_P(Coord::FromKgs(move)));
-      for (const auto n : kNeighborCoords[Coord::FromKgs(move)]) {
+      ASSERT_EQ(0.0, leaf->child_P(Coord::FromGtp(move)));
+      for (const auto n : kNeighborCoords[Coord::FromGtp(move)]) {
         ASSERT_NEAR(policy_fraction, leaf->child_P(n), 1e-7);
       }
     }

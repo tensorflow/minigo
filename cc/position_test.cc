@@ -73,7 +73,7 @@ TEST(PositionTest, TestIsKoish) {
   std::set<std::string> expected_white_kos = {"E9", "J9", "D6"};
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
-      auto c = Coord(row, col).ToKgs();
+      auto c = Coord(row, col).ToGtp();
       Color expected;
       Color actual = board.IsKoish(c);
       if (expected_white_kos.find(c) != expected_white_kos.end()) {

@@ -24,11 +24,11 @@ namespace minigo {
 
 constexpr uint16_t Coord::kPass;
 constexpr uint16_t Coord::kInvalid;
-const char Coord::kKgsColumns[20] = "ABCDEFGHJKLMNOPQRST";
+const char Coord::kGtpColumns[20] = "ABCDEFGHJKLMNOPQRST";
 
 namespace {
 
-Coord TryParseKgs(absl::string_view str) {
+Coord TryParseGtp(absl::string_view str) {
   auto upper = absl::AsciiStrToUpper(str);
   if (upper == "PASS") {
     return Coord::kPass;
@@ -68,7 +68,7 @@ Coord TryParseSgf(absl::string_view str) {
 }
 
 Coord TryParseString(absl::string_view str) {
-  auto result = TryParseKgs(str);
+  auto result = TryParseGtp(str);
   if (result != Coord::kInvalid) {
     return result;
   }
@@ -77,8 +77,8 @@ Coord TryParseString(absl::string_view str) {
 
 }  // namespace
 
-Coord Coord::FromKgs(absl::string_view str, bool allow_invalid) {
-  auto c = TryParseKgs(str);
+Coord Coord::FromGtp(absl::string_view str, bool allow_invalid) {
+  auto c = TryParseGtp(str);
   MG_CHECK(allow_invalid || c != Coord::kInvalid);
   return c;
 }
@@ -95,7 +95,7 @@ Coord Coord::FromString(absl::string_view str, bool allow_invalid) {
   return c;
 }
 
-std::string Coord::ToKgs() const {
+std::string Coord::ToGtp() const {
   if (*this == kPass) {
     return "pass";
   } else if (*this == kResign) {
@@ -105,7 +105,7 @@ std::string Coord::ToKgs() const {
   }
   int row = value_ / kN;
   int col = value_ % kN;
-  absl::string_view col_str = kKgsColumns;
+  absl::string_view col_str = kGtpColumns;
   return absl::StrCat(col_str.substr(col, 1), kN - row);
 }
 
@@ -138,7 +138,7 @@ std::ostream& operator<<(std::ostream& os, Coord c) {
     uint16_t value = c;
     int row = value / kN;
     int col = value % kN;
-    return os << Coord::kKgsColumns[col] << (kN - row);
+    return os << Coord::kGtpColumns[col] << (kN - row);
   }
 }
 

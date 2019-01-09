@@ -114,7 +114,7 @@ std::string Position::ToPrettyString(bool use_ansi_colors) const {
   auto format_cols = [&oss]() {
     oss << "   ";
     for (int i = 0; i < kN; ++i) {
-      oss << Coord::kKgsColumns[i] << " ";
+      oss << Coord::kGtpColumns[i] << " ";
     }
   };
 

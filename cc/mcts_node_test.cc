@@ -113,7 +113,7 @@ TEST(MctsNodeTest, SelectLeaf) {
   for (float& prob : probs) {
     prob = 0.02;
   }
-  Coord c = Coord::FromKgs("D9");
+  Coord c = Coord::FromGtp("D9");
   probs[c] = 0.4;
 
   MctsNode::EdgeStats root_stats;
@@ -267,7 +267,7 @@ TEST(MctsNodeTest, AddChild) {
   TestablePosition board("");
   MctsNode root(&root_stats, board);
 
-  Coord c = Coord::FromKgs("B9");
+  Coord c = Coord::FromGtp("B9");
   auto* child = root.MaybeAddChild(c);
   EXPECT_EQ(1, root.children.count(c));
   EXPECT_EQ(&root, child->parent);
@@ -279,7 +279,7 @@ TEST(MctsNodeTest, AddChildIdempotency) {
   TestablePosition board("");
   MctsNode root(&root_stats, board);
 
-  Coord c = Coord::FromKgs("B9");
+  Coord c = Coord::FromGtp("B9");
   auto* child = root.MaybeAddChild(c);
   EXPECT_EQ(1, root.children.count(c));
   EXPECT_EQ(1, root.children.size());
@@ -351,7 +351,7 @@ TEST(MctsNodeTest, DontTraverseUnexpandedChild) {
 
 // Verifies that action score is used as a tie-breaker to choose between moves
 // with the same visit count when selecting the best one.
-// This test uses raw indices here instead of KGS coords to make it clear that
+// This test uses raw indices here instead of GTP coords to make it clear that
 // without using action score as a tie-breaker, the move with the lower index
 // would be selected by GetMostVisitedMove.
 TEST(MctsNodeTest, GetMostVisitedPath) {
@@ -519,20 +519,20 @@ TEST(MctsNodeTest, TestSuperko) {
         &root_stats, Position(&bv, &gv, Color::kBlack)));
 
     for (size_t move_idx = 0; move_idx < iteration; ++move_idx) {
-      Coord c = Coord::FromKgs(non_ko_moves[move_idx]);
+      Coord c = Coord::FromGtp(non_ko_moves[move_idx]);
       ASSERT_TRUE(nodes.back()->legal_moves[c]);
       nodes.push_back(absl::make_unique<MctsNode>(nodes.back().get(), c));
     }
 
     for (const auto& move : ko_moves) {
-      Coord c = Coord::FromKgs(move);
+      Coord c = Coord::FromGtp(move);
       ASSERT_TRUE(nodes.back()->legal_moves[c]);
       nodes.push_back(absl::make_unique<MctsNode>(nodes.back().get(), c));
     }
 
     // Without superko checking, it should look like capturing the second ko at
     // C1 is valid.
-    auto c1 = Coord::FromKgs("C1");
+    auto c1 = Coord::FromGtp("C1");
     EXPECT_EQ(Position::MoveType::kCapture,
               nodes.back()->position.ClassifyMove(c1));
 

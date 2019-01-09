@@ -19,33 +19,33 @@
 namespace minigo {
 namespace {
 
-TEST(CoordTest, TestFromKgs) {
-  EXPECT_EQ(Coord::kPass, Coord::FromKgs("pass"));
+TEST(CoordTest, TestFromGtp) {
+  EXPECT_EQ(Coord::kPass, Coord::FromGtp("pass"));
 
   if (kN == 9) {
-    EXPECT_EQ(Coord(0, 0), Coord::FromKgs("A9"));
-    EXPECT_EQ(Coord(0, 7), Coord::FromKgs("H9"));
-    EXPECT_EQ(Coord(0, 8), Coord::FromKgs("J9"));
-    EXPECT_EQ(Coord(8, 0), Coord::FromKgs("A1"));
-    EXPECT_EQ(Coord(8, 7), Coord::FromKgs("H1"));
-    EXPECT_EQ(Coord(8, 8), Coord::FromKgs("J1"));
+    EXPECT_EQ(Coord(0, 0), Coord::FromGtp("A9"));
+    EXPECT_EQ(Coord(0, 7), Coord::FromGtp("H9"));
+    EXPECT_EQ(Coord(0, 8), Coord::FromGtp("J9"));
+    EXPECT_EQ(Coord(8, 0), Coord::FromGtp("A1"));
+    EXPECT_EQ(Coord(8, 7), Coord::FromGtp("H1"));
+    EXPECT_EQ(Coord(8, 8), Coord::FromGtp("J1"));
   } else {
-    EXPECT_EQ(Coord(0, 0), Coord::FromKgs("A19"));
-    EXPECT_EQ(Coord(0, 7), Coord::FromKgs("H19"));
-    EXPECT_EQ(Coord(0, 8), Coord::FromKgs("J19"));
-    EXPECT_EQ(Coord(18, 0), Coord::FromKgs("A1"));
-    EXPECT_EQ(Coord(18, 7), Coord::FromKgs("H1"));
-    EXPECT_EQ(Coord(18, 8), Coord::FromKgs("J1"));
-    EXPECT_EQ(Coord(18, 18), Coord::FromKgs("T1"));
+    EXPECT_EQ(Coord(0, 0), Coord::FromGtp("A19"));
+    EXPECT_EQ(Coord(0, 7), Coord::FromGtp("H19"));
+    EXPECT_EQ(Coord(0, 8), Coord::FromGtp("J19"));
+    EXPECT_EQ(Coord(18, 0), Coord::FromGtp("A1"));
+    EXPECT_EQ(Coord(18, 7), Coord::FromGtp("H1"));
+    EXPECT_EQ(Coord(18, 8), Coord::FromGtp("J1"));
+    EXPECT_EQ(Coord(18, 18), Coord::FromGtp("T1"));
   }
 }
 
-TEST(CoordTest, KgsRoundTrip) {
-  EXPECT_EQ(Coord::kPass, Coord::FromKgs(Coord(Coord::kPass).ToKgs()));
+TEST(CoordTest, GtpRoundTrip) {
+  EXPECT_EQ(Coord::kPass, Coord::FromGtp(Coord(Coord::kPass).ToGtp()));
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
       Coord c(row, col);
-      EXPECT_EQ(c, Coord::FromKgs(c.ToKgs()));
+      EXPECT_EQ(c, Coord::FromGtp(c.ToGtp()));
     }
   }
 }

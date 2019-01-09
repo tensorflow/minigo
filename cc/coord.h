@@ -32,7 +32,7 @@ class Coord {
   static constexpr uint16_t kPass = kN * kN;
   static constexpr uint16_t kResign = kPass + 1;
   static constexpr uint16_t kInvalid = 0xffff;
-  static const char kKgsColumns[20];
+  static const char kGtpColumns[20];
 
   Coord(uint16_t value) : value_(value) {}  // NOLINT(runtime/explicit)
 
@@ -42,8 +42,8 @@ class Coord {
     value_ = row * kN + col;
   }
 
-  // Parse a Coord from a KGS string.
-  static Coord FromKgs(absl::string_view str, bool allow_invalid = false);
+  // Parse a Coord from a GTP string.
+  static Coord FromGtp(absl::string_view str, bool allow_invalid = false);
 
   // Parse a Coord from a SGF string.
   static Coord FromSgf(absl::string_view str, bool allow_invalid = false);
@@ -51,8 +51,8 @@ class Coord {
   // Parse a Coord from one of the above string representations.
   static Coord FromString(absl::string_view str, bool allow_invalid = false);
 
-  // Format the Coord as a KGS string.
-  std::string ToKgs() const;
+  // Format the Coord as a GTP string.
+  std::string ToGtp() const;
 
   // Format the Coord as an SGF string.
   std::string ToSgf() const;
@@ -63,7 +63,7 @@ class Coord {
   uint16_t value_;
 };
 
-// Formats the coord as a KGS string.
+// Formats the coord as a GTP string.
 std::ostream& operator<<(std::ostream& os, Coord c);
 
 }  // namespace minigo
