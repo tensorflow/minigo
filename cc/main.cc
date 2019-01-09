@@ -81,12 +81,12 @@ DEFINE_bool(soft_pick, true,
 DEFINE_bool(random_symmetry, true,
             "If true, randomly flip & rotate the board features before running "
             "the model and apply the inverse transform to the results.");
-DEFINE_double(value_init_penalty, 0.0,
-              "New children value initialize penaly.\n"
-              "child's value = parent's value - value_init_penalty * color, "
-              "clamped to [-1, 1].\n"
+DEFINE_double(value_init_penalty, 2.0,
+              "New children value initialization penalty.\n"
+              "Child value = parent's value - penalty * color, clamped to"
+              " [-1, 1].  Penalty should be in [0.0, 2.0].\n"
               "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
-              "This behaves similiarly to leela's FPU \"First Play Urgency\".");
+              "This behaves similiarly to Leela's FPU \"First Play Urgency\".");
 
 DEFINE_string(flags_path, "",
               "Optional path to load flags from. Flags specified in this file "

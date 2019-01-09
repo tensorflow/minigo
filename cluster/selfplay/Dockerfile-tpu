@@ -6,10 +6,8 @@ RUN pip3 install tensorflow>=1.11
 WORKDIR /app
 
 ARG RUNMODE
-ARG CBT_OUTPUT
 
 ENV RUNMODE=$RUNMODE
-ENV CBT_OUTPUT=$CBT_OUTPUT
 ENV BOARD_SIZE="19"
 
 COPY staging /app
@@ -18,4 +16,4 @@ COPY staging/rl_loop/ /app
 COPY staging/mask_flags.py /app
 
 RUN bazel build -c opt cc/main --define=tf=1 --define=tpu=1 --define=bt=1
-CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=$RUNMODE --output_bigtable=$CBT_OUTPUT"]
+CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=$RUNMODE"]

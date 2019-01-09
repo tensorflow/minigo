@@ -17,3 +17,4 @@
 --disable_resign_pct=1.00
 --resign_threshold=-0.99999
 --value_init_penalty=2.0
+--output_bigtable=tensor-go,minigo-instance,v15-games-nr

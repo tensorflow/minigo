@@ -45,7 +45,7 @@ FLAGS = flags.FLAGS
 try:
     if 'KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS' in os.environ:
         TPU_NAME = os.environ['KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS']
-    else: 
+    else:
         TPU_NAME = os.environ['TPU_NAME']
 except KeyError:
     raise Exception("Must have $TPU_NAME configured")

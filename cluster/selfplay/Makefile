@@ -17,7 +17,7 @@ endef
 
 tpu-image:
 	$(staging)
-	docker build --quiet --build-arg RUNMODE=$(RUNMODE) --build-arg CBT_OUTPUT=$(CBT_OUTPUT) --build-arg PROJECT=$(PROJECT) -f Dockerfile-tpu -t "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)" .
+	docker build --quiet --build-arg RUNMODE=$(RUNMODE) --build-arg PROJECT=$(PROJECT) -f Dockerfile-tpu -t "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)" .
 
 py-image:
 	$(staging)
@@ -29,12 +29,15 @@ cc-image:
 	docker build --quiet --build-arg PROJECT=$(PROJECT) -f Dockerfile-cc -t "gcr.io/$(PROJECT)/minigo-cc-player:$(VERSION_TAG)" .
 
 cc-push: cc-image
-	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-cc-player:$(VERSION_TAG)"
+	gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-cc-player:$(VERSION_TAG)"
 
 py-push: py-image
-	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-py-player:$(VERSION_TAG)"
+	gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-py-player:$(VERSION_TAG)"
 
 tpu-push: tpu-image
-	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)"
+	gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-tpu-player:$(VERSION_TAG)"
+
+clean:
+	rm -rfd staging
 
 .PHONY: cc-image cpu-image tpu-image gpu-image image-push cc-push cpu-push gpu-push tpu-push

@@ -1,7 +1,7 @@
 ARG PROJECT
 FROM gcr.io/$PROJECT/cc-base:latest
 
-RUN pip3 install tensorflow==1.11
+RUN pip3 install tensorflow==1.12
 WORKDIR /app
 
 ENV BOARD_SIZE="19"

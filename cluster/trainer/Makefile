@@ -15,11 +15,14 @@ define staging =
 endef
 
 
-tpu-image:
+image:
 	$(staging)
 	docker build --quiet --build-arg PROJECT=$(PROJECT) -f Dockerfile -t "gcr.io/$(PROJECT)/minigo-tpu-trainer:$(VERSION_TAG)" .
 
-tpu-push: tpu-image
-	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-tpu-trainer:$(VERSION_TAG)"
+push: image
+	gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-tpu-trainer:$(VERSION_TAG)"
 
-.PHONY: tpu-image tpu-push
+clean:
+	rm -rfd staging
+
+.PHONY: image push clean

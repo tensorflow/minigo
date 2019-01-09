@@ -19,4 +19,7 @@ image:
 push: image
 	gcloud docker -- push "gcr.io/$(PROJECT)/minigo-calibrator:$(VERSION_TAG)"
 
-.PHONY: image push
+clean:
+	rm -rfd staging
+
+.PHONY: image push clean

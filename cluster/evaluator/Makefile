@@ -11,10 +11,10 @@ py-image:
 		cp ../../requirements.txt staging/
 		cp evaluator_py_wrapper.sh staging/
 	  docker build -f Dockerfile-py -t "gcr.io/$(PROJECT)/minigo-py-evaluator:$(VERSION_TAG)" .
-		rm -rfd staging
+		rm -rfd staging/
 
-py-push: gpu-image
-	    gcloud docker -- push "gcr.io/$(PROJECT)/minigo-py-evaluator:$(VERSION_TAG)"
+py-push: py-image
+	    gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-py-evaluator:$(VERSION_TAG)"
 
 cc-image:
 		mkdir -p staging/cc
@@ -26,6 +26,8 @@ cc-image:
 		rm -rfd staging/
 
 cc-push: cc-image
-	    gcloud docker -- push "gcr.io/$(PROJECT)/minigo-cc-evaluator:$(VERSION_TAG)"
+	    gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-cc-evaluator:$(VERSION_TAG)"
 
-.PHONY: gpu-image gpu-push
+clean:
+		rm -rfd staging/
+.PHONY: py-image py-push cc-image cc-push clean

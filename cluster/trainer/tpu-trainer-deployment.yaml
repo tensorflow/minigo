@@ -10,13 +10,13 @@ spec:
   template:
     metadata:
       annotations:
-        tf-version.cloud-tpus.google.com: "1.11"
+        tf-version.cloud-tpus.google.com: "1.12"
       labels:
         app: tpu-trainer
     spec:
       containers:
       - name: minigo-tpu-trainer-container
-        image: gcr.io/tensor-go/minigo-tpu-trainer:v14
+        image: gcr.io/tensor-go/minigo-tpu-trainer:v15
         imagePullPolicy: Always
         resources:
           limits:

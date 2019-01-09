@@ -14,15 +14,15 @@
 --lr_rates=0.02
 --lr_rates=0.002
 --lr_rates=0.0005
---lr_boundaries=200000
---lr_boundaries=800000
+--lr_boundaries=300000
+--lr_boundaries=600000
 --l2_strength=0.0001
 --sgd_momentum=0.95
 --steps_to_train=1024
 --window_size=500000
 --cbt_project=tensor-go
 --cbt_instance=minigo-instance
---cbt_table=v14-games
+--cbt_table=v15-games
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)
@@ -35,3 +35,4 @@
 --disable_resign_pct=0.00
 --resign_threshold=-0.999
 --value_init_penalty=2.0
+--output_bigtable=tensor-go,minigo-instance,v15-games

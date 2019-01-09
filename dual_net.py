@@ -507,7 +507,7 @@ def bootstrap():
 
 
 def export_model(model_path):
-    """Take the latest checkpoint and export it to model_path.
+    """Take the latest checkpoint and copy it to model_path.
 
     Assumes that all relevant model files are prefixed by the same name.
     (For example, foo.index, foo.meta and foo.data-00000-of-00001).

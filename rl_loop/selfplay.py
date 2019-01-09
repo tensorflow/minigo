@@ -28,8 +28,6 @@ flags.declare_key_flag('bucket_name')
 flags.DEFINE_enum('mode', None, ['cc', 'tpu', 'tpu_nr'],
                   'Which setup to use: cc on GPU or cc/py on TPU.')
 
-flags.DEFINE_string('output_bigtable', '', 'Bigtable output specification')
-
 FLAGS = flags.FLAGS
 
 
@@ -66,8 +64,7 @@ def run_tpu(no_resign=False):
         '--output_dir={}'.format(fsdb.selfplay_dir()),
         '--holdout_dir={}'.format(fsdb.holdout_dir()),
         '--sgf_dir={}'.format(fsdb.sgf_dir()),
-        '--run_forever=true',
-        '--output_bigtable={}'.format(FLAGS.output_bigtable)]
+        '--run_forever=true']
 
     if 'KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS' in os.environ:
         flagset.append('--tpu_name={}'.format(os.environ['KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS']))

@@ -230,7 +230,7 @@ TEST(MctsNodeTest, ExpandChildValueInit) {
   {
     MctsNode::EdgeStats root_stats;
     MctsNode root(&root_stats, board);
-    // 0.25 is "FPU", prefer slightly to explore already explored children.
+    // 0.25 slightly prefers to explore already visited children.
     root.IncorporateResults(-0.25, probs, 0.1, &root);
 
     auto* leaf = root.SelectLeaf();
@@ -253,7 +253,8 @@ TEST(MctsNodeTest, DoNotExplorePastFinish) {
   auto* first_pass = root.MaybeAddChild(Coord::kPass);
   first_pass->IncorporateResults(0.0, probs, 0, &root);
   auto* second_pass = first_pass->MaybeAddChild(Coord::kPass);
-  EXPECT_DEATH(second_pass->IncorporateResults(0.0, probs, 0, &root), "game_over");
+  EXPECT_DEATH(second_pass->IncorporateResults(0.0, probs, 0, &root),
+               "game_over");
   float value = second_pass->position.CalculateScore(0) > 0 ? 1 : -1;
   second_pass->IncorporateEndGameResult(value, &root);
   auto* node_to_explore = second_pass->SelectLeaf();

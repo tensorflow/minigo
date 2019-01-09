@@ -181,6 +181,8 @@ def train(*tf_records: "Records to train on"):
     if FLAGS.use_bt:
         games = bigtable_input.GameQueue(
             FLAGS.cbt_project, FLAGS.cbt_instance, FLAGS.cbt_table)
+        if not games.read_wait_cell():
+            games.require_fresh_games(20000)
         latest_game = games.latest_game_number
         index_from = max(latest_game, games.read_wait_cell())
         print("== Last game before training:", latest_game, flush=True)
