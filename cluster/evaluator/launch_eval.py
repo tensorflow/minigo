@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, '.')
 
 import fire
+import random
 from absl import flags
 import kubernetes
 import yaml
@@ -128,6 +129,7 @@ def zoo_loop(sgf_dir=None, max_jobs=40):
       should be around 500 to keep kubernetes from losing track of completions
     """
     desired_pairs = restore_pairs() or []
+    random.shuffle(desired_pairs)
     last_model_queued = restore_last_model()
 
     if sgf_dir:
@@ -171,7 +173,7 @@ def zoo_loop(sgf_dir=None, max_jobs=40):
                     raise
                 save_pairs(sorted(desired_pairs))
                 save_last_model(last_model)
-                time.sleep(6)
+                time.sleep(3)
 
             else:
                 print("{}\t{} jobs outstanding. ({} to be scheduled)".format(

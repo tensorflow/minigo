@@ -295,7 +295,7 @@ def wins_subset(bucket):
             "select model_winner, model_loser from wins "
             "join models where "
             "    models.bucket = ? AND "
-            "    (model_winner = models.id or model_loser = models.id)",
+            "    model_winner = models.id",
             (bucket,)).fetchall()
     return data
 
