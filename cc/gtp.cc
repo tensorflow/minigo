@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "cc/constants.h"
 #include "cc/dual_net/factory.h"
 #include "cc/file/path.h"
 #include "cc/gtp_player.h"
 #include "cc/init.h"
+#include "cc/minigui_player.h"
 #include "cc/zobrist.h"
 #include "gflags/gflags.h"
+
+// GTP flags.
+DEFINE_bool(minigui, false, "Enable Minigui GTP extensions");
 
 // Game options flags.
 DEFINE_int32(
@@ -82,10 +87,18 @@ void Gtp() {
   options.decay_factor = FLAGS_decay_factor;
 
   auto model_factory = NewDualNetFactory();
-  GtpPlayer player(model_factory->NewDualNet(FLAGS_model), options);
-  model_factory->StartGame(player.network(), player.network());
-  player.Run();
-  model_factory->EndGame(player.network(), player.network());
+  std::unique_ptr<GtpPlayer> player;
+  if (FLAGS_minigui) {
+    player = absl::make_unique<MiniguiPlayer>(
+        model_factory->NewDualNet(FLAGS_model), options);
+  } else {
+    player = absl::make_unique<GtpPlayer>(
+        model_factory->NewDualNet(FLAGS_model), options);
+  }
+
+  model_factory->StartGame(player->network(), player->network());
+  player->Run();
+  model_factory->EndGame(player->network(), player->network());
 }
 
 }  // namespace

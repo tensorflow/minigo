@@ -92,6 +92,7 @@ def _open_pipes():
     else:
         GTP_COMMAND = [
             "bazel-bin/cc/gtp",
+            "--minigui=true",
             "--model=%s" % FLAGS.model,
             "--num_readouts=%d" % FLAGS.num_readouts,
             "--value_init_penalty=%d" % FLAGS.value_init_penalty,

@@ -160,10 +160,8 @@ minigo_cc_library(
         ":sgf",
         "//cc:thread_safe_queue",
         "//cc/dual_net",
-        "@com_github_nlohmann_json//:json",
-        "@com_google_absl//absl/container:flat_hash_map",
+        "//cc/file",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -196,6 +194,25 @@ minigo_cc_library(
         "@com_google_absl//absl/debugging:stacktrace",
         "@com_google_absl//absl/debugging:symbolize",
         "@com_google_absl//absl/synchronization",
+    ],
+)
+
+minigo_cc_library(
+    name = "minigui_player",
+    srcs = ["minigui_player.cc"],
+    hdrs = ["minigui_player.h"],
+    deps = [
+        ":base",
+        ":gtp_player",
+        ":mcts",
+        ":sgf",
+        "//cc/dual_net",
+        "//cc/file",
+        "@com_github_nlohmann_json//:json",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -476,10 +493,12 @@ minigo_cc_binary(
         ":base",
         ":gtp_player",
         ":init",
+        ":minigui_player",
         ":zobrist",
         "//cc/dual_net:factory",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
 )
