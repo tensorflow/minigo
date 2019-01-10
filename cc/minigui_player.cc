@@ -35,8 +35,6 @@ namespace minigo {
 MiniguiPlayer::MiniguiPlayer(std::unique_ptr<DualNet> network,
                              const Options& options)
     : GtpPlayer(std::move(network), options) {
-  cmd_handlers_["clear_board"] =
-      std::bind(&MiniguiPlayer::HandleClearBoard, this, std::placeholders::_1);
   RegisterCmd("clear_board", &MiniguiPlayer::HandleClearBoard);
   RegisterCmd("echo", &MiniguiPlayer::HandleEcho);
   RegisterCmd("genmove", &MiniguiPlayer::HandleGenmove);
