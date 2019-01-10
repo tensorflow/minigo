@@ -243,6 +243,16 @@ bool MctsPlayer::ShouldResign() const {
          root_->Q_perspective() < options_.game_options.resign_threshold;
 }
 
+std::string MctsPlayer::GetModelsUsedForInference() const {
+  std::vector<std::string> parts;
+  parts.reserve(inferences_.size());
+  for (const auto& info : inferences_) {
+    parts.push_back(absl::StrCat(info.model, "(", info.first_move, ",",
+                                 info.last_move, ")"));
+  }
+  return absl::StrJoin(parts, ", ");
+}
+
 bool MctsPlayer::PlayMove(Coord c, Game* game) {
   if (root_->game_over()) {
     MG_LOG(ERROR) << "can't play move " << c << ", game is over";
@@ -412,8 +422,8 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
     symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(symmetries_used_[i]),
                                    output.policy.data(), raw_policy.data());
     raw_policy[Coord::kPass] = output.policy[Coord::kPass];
-    leaf->IncorporateResults(
-        options_.value_init_penalty, raw_policy, output.value, root);
+    leaf->IncorporateResults(options_.value_init_penalty, raw_policy,
+                             output.value, root);
     leaf->RevertVirtualLoss(root);
   }
 }

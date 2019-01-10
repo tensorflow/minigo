@@ -15,6 +15,8 @@
 #ifndef CC_PLATFORM_UTILS_H_
 #define CC_PLATFORM_UTILS_H_
 
+#include <string>
+
 #if defined(_MSC_VER)
 
 #define MG_ALIGN(x) __declspec(align(x))
@@ -34,6 +36,9 @@ int GetNumLogicalCpus();
 
 // Returns true if the given file descriptor supports ANSI color codes.
 bool FdSupportsAnsiColors(int fd);
+
+// Returns the hostname if possible, or "unknown".
+std::string GetHostname();
 
 }  // namespace minigo
 

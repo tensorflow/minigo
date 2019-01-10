@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cc/platform/utils.h"
+
 #include <sys/sysctl.h>
 #include <unistd.h>
+#include <cstring>
 
 #include "cc/logging.h"
 
@@ -27,6 +30,14 @@ int GetNumLogicalCpus() {
   MG_CHECK(sysctlbyname("hw.logicalcpu", &nproc, &len, nullptr, 0) == 0);
   MG_CHECK(len == sizeof(nproc));
   return nproc;
+}
+
+std::string GetHostname() {
+  char hostname[256];
+  if (gethostname(hostname, sizeof(hostname)) != 0) {
+    std::strncpy(hostname, "unknown", sizeof(hostname));
+  }
+  return std::string(hostname);
 }
 
 }  // namespace minigo

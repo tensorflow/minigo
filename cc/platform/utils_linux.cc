@@ -12,18 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cc/platform/utils.h"
+
 #include <sys/sysinfo.h>
 #include <unistd.h>
+#include <cstring>
 
 namespace minigo {
 
-bool FdSupportsAnsiColors(int fd) {
-  return isatty(fd);
-}
+bool FdSupportsAnsiColors(int fd) { return isatty(fd); }
 
-int GetNumLogicalCpus() {
- return get_nprocs();
+int GetNumLogicalCpus() { return get_nprocs(); }
+
+std::string GetHostname() {
+  char hostname[256];
+  if (gethostname(hostname, sizeof(hostname)) != 0) {
+    std::strncpy(hostname, "unknown", sizeof(hostname));
+  }
+  return std::string(hostname);
 }
 
 }  // namespace minigo
-

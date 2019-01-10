@@ -136,6 +136,21 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
+    name = "game_utils",
+    srcs = ["game_utils.cc"],
+    hdrs = ["game_utils.h"],
+    deps = [
+        ":base",
+        ":game",
+        ":sgf",
+        "//cc/file",
+        "//cc/platform",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+minigo_cc_library(
     name = "gtp_player",
     srcs = ["gtp_player.cc"],
     hdrs = ["gtp_player.h"],
@@ -431,6 +446,29 @@ minigo_cc_test(
 )
 
 minigo_cc_binary(
+    name = "eval",
+    srcs = ["eval.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base",
+        ":game_utils",
+        ":init",
+        ":logging",
+        ":mcts",
+        ":random",
+        ":tf_utils",
+        ":zobrist",
+        "//cc/dual_net:batching_dual_net",
+        "//cc/dual_net:factory",
+        "//cc/file",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+minigo_cc_binary(
     name = "gtp",
     srcs = ["gtp.cc"],
     visibility = ["//visibility:public"],
@@ -452,11 +490,11 @@ minigo_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
+        ":game_utils",
         ":init",
         ":logging",
         ":mcts",
         ":random",
-        ":sgf",
         ":tf_utils",
         ":zobrist",
         "//cc/dual_net:batching_dual_net",

@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,29 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/platform/utils.h"
+#ifndef CC_GAME_UTILS_H_
+#define CC_GAME_UTILS_H_
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include <cstddef>
+#include <string>
 
-#include <cstring>
+#include "absl/time/time.h"
+#include "cc/game.h"
 
 namespace minigo {
 
-bool FdSupportsAnsiColors(int fd) { return false; }
+// Returns the name (specifically the basename stem) for an output game file
+// (e.g. SGF, TF example, etc) based on the current time, hostname and game ID.
+std::string GetOutputName(absl::Time now, size_t game_id);
 
-int GetNumLogicalCpus() {
-  SYSTEM_INFO sysinfo;
-  GetSystemInfo(&sysinfo);
-  return sysinfo.dwNumberOfProcessors;
-}
-
-std::string GetHostname() {
-  char hostname[256];
-  if (gethostname(hostname, sizeof(hostname)) != 0) {
-    std::strncpy(hostname, "unknown", sizeof(hostname));
-  }
-  return std::string(hostname);
-}
+// Writes an SGF of the given game.
+void WriteSgf(const std::string& output_dir, const std::string& output_name,
+              const Game& game, bool write_comments);
 
 }  // namespace minigo
+
+#endif  //  CC_GAME_UTILS_H_
