@@ -41,7 +41,7 @@ def run_cc():
         sys.exit()
 
     mask_flags.checked_run([
-        'bazel-bin/cc/main',
+        'bazel-bin/cc/selfplay',
         '--model={}'.format(model_name),
         '--mode=selfplay',
         '--engine=tf',
@@ -57,7 +57,7 @@ def run_cc():
 def run_tpu(no_resign=False):
     os.environ['GRPC_DEFAULT_SSL_ROOTS_FILE_PATH'] = '/etc/ssl/certs/ca-certificates.crt'
     flagset = [
-        'bazel-bin/cc/main',
+        'bazel-bin/cc/selfplay',
         '--mode=selfplay',
         '--engine=tpu',
         '--model={}'.format(os.path.join(fsdb.working_dir(), 'model.ckpt-%d.pb')),

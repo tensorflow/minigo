@@ -43,7 +43,7 @@ flags.DEFINE_string("host", "127.0.0.1", "The hostname or IP to listen on.")
 flags.DEFINE_string(
     "engine", "py",
     "Which Minigo engine to use: \"py\" for the Python engine, or "
-    "one of the C++ engines (run \"cc/main --helpon=factory\" for the "
+    "one of the C++ engines (run \"cc/gtp --helpon=factory\" for the "
     "C++ engine list.")
 
 flags.DEFINE_integer(
