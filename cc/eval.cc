@@ -63,12 +63,13 @@ DEFINE_double(value_init_penalty, 2.0,
 // Inference flags.
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
-              "inferece engine. For engine=tf, the model should be a GraphDef "
-              "proto. For engine=lite, the model should be .tflite "
-              "flatbuffer.");
+              "inference engine. If parallel_games=1, this model is used for "
+              "black. For engine=tf, the model should be a GraphDef proto. For "
+              "engine=lite, the model should be .tflite flatbuffer.");
 DEFINE_string(model_two, "",
               "Provide a path to a second minigo model, also serialized as a "
-              "GraphDef proto.");
+              "GraphDef proto. If parallel_games=1, this model is used for "
+              "white.");
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 
 // Output flags.

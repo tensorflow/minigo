@@ -58,7 +58,7 @@ DEFINE_double(decay_factor, 0.98,
 // Inference flags.
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
-              "inferece engine. For engine=tf, the model should be a GraphDef "
+              "inference engine. For engine=tf, the model should be a GraphDef "
               "proto. For engine=lite, the model should be .tflite "
               "flatbuffer.");
 

@@ -44,7 +44,7 @@ DEFINE_int32(virtual_losses, 8,
 DEFINE_string(sgf_dir, "", "SGF directory containing puzzles.");
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
-              "inferece engine. For engine=tf, the model should be a GraphDef "
+              "inference engine. For engine=tf, the model should be a GraphDef "
               "proto. For engine=lite, the model should be .tflite "
               "flatbuffer.");
 DEFINE_double(value_init_penalty, 0.0,

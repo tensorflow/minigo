@@ -105,10 +105,10 @@ DEFINE_bool(run_forever, false,
 // Inference flags.
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
-              "inferece engine. For engine=tf, the model should be a GraphDef "
+              "inference engine. For engine=tf, the model should be a GraphDef "
               "proto. For engine=lite, the model should be .tflite "
               "flatbuffer.");
-DEFINE_int32(parallel_games, 1, "Number of games to play in parallel.");
+DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
