@@ -66,11 +66,12 @@ void SimpleExample() {
     auto move = player.SuggestMove();
 
     const auto& position = player.root()->position;
-    MG_LOG(INFO) << player.root()->position.ToPrettyString(use_ansi_colors);
-    MG_LOG(INFO) << "Move: " << position.n()
-                 << " Captures X: " << position.num_captures()[0]
-                 << " O: " << position.num_captures()[1];
-    MG_LOG(INFO) << player.root()->Describe();
+    std::cout << player.root()->position.ToPrettyString(use_ansi_colors)
+              << "\n";
+    std::cout << "Move: " << position.n()
+              << " Captures X: " << position.num_captures()[0]
+              << " O: " << position.num_captures()[1] << "\n";
+    std::cout << player.root()->Describe() << "\n";
 
     MG_CHECK(player.PlayMove(move, &game));
   }
