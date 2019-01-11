@@ -15,5 +15,5 @@ COPY staging /app
 COPY staging/rl_loop/ /app
 COPY staging/mask_flags.py /app
 
-RUN bazel build -c opt cc/main --define=tf=1 --define=tpu=1 --define=bt=1
+RUN bazel build -c opt cc/selfplay --define=tf=1 --define=tpu=1 --define=bt=1
 CMD ["sh", "-c", "python rl_loop/selfplay.py --bucket_name=$BUCKET_NAME --mode=$RUNMODE"]
