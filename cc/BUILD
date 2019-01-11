@@ -535,6 +535,23 @@ minigo_cc_binary(
 )
 
 minigo_cc_binary(
+    name = "simple_example",
+    srcs = ["simple_example.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base",
+        ":init",
+        ":logging",
+        ":mcts",
+        ":random",
+        ":zobrist",
+        "//cc/dual_net:factory",
+        "//cc/platform",
+        "@com_github_gflags_gflags//:gflags",
+    ],
+)
+
+minigo_cc_binary(
     name = "tfrzz_to_cbt",
     srcs = ["tfrzz_to_cbt.cc"],
     tags = ["manual"],
