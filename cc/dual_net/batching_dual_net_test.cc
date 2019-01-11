@@ -184,30 +184,30 @@ class BatchingDualNetTest : public ::testing::Test {
  protected:
   void InitFactory(int buffer_count) {
     auto impl = absl::make_unique<WaitingDualNetFactory>(buffer_count);
-    waiting_factory_ = impl.get();
-    batching_factory_ = NewBatchingDualNetFactory(std::move(impl));
+    model_factory_ = impl.get();
+    batcher_ = absl::make_unique<BatchingDualNetFactory>(std::move(impl));
   }
 
   std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) {
-    return batching_factory_->NewDualNet(model_path);
+    return batcher_->NewDualNet(model_path);
   }
 
   void StartGame(DualNet* black, DualNet* white) {
-    batching_factory_->StartGame(black, white);
+    batcher_->StartGame(black, white);
   }
 
   void EndGame(DualNet* black, DualNet* white) {
-    batching_factory_->EndGame(black, white);
+    batcher_->EndGame(black, white);
   }
 
   void FlushBatch(const std::string& model_path, size_t expected_batch_size) {
-    waiting_factory_->FlushBatch(model_path, expected_batch_size);
+    model_factory_->FlushBatch(model_path, expected_batch_size);
   }
 
  private:
-  // Owned by batching_factory_.
-  WaitingDualNetFactory* waiting_factory_ = nullptr;
-  std::unique_ptr<DualNetFactory> batching_factory_;
+  // Owned by batcher_.
+  WaitingDualNetFactory* model_factory_ = nullptr;
+  std::unique_ptr<BatchingDualNetFactory> batcher_;
 };
 
 TEST_F(BatchingDualNetTest, SelfPlay) {

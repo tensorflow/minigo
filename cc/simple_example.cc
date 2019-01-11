@@ -58,11 +58,6 @@ void SimpleExample() {
   // Create a game object that tracks the move history & final score.
   Game game(player.name(), player.name(), options.game_options);
 
-  // Tell the model factory we're starting a game.
-  // TODO(tommadams): Remove this once BatchingDualNetFactory is no longer a
-  // DualNetFactory.
-  model_factory->StartGame(player.network(), player.network());
-
   // Play the game.
   while (!player.root()->game_over() && !player.root()->at_move_limit()) {
     auto move = player.SuggestMove();
@@ -77,11 +72,6 @@ void SimpleExample() {
 
     MG_CHECK(player.PlayMove(move, &game));
   }
-
-  // Tell the model factory we're ending a game.
-  // TODO(tommadams): Remove this once BatchingDualNetFactory is no longer a
-  // DualNetFactory.
-  model_factory->EndGame(player.network(), player.network());
 
   std::cout << game.result_string() << std::endl;
 }

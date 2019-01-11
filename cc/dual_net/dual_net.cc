@@ -76,8 +76,4 @@ DualNetFactory::~DualNetFactory() = default;
 
 int DualNetFactory::GetBufferCount() const { return 1; }
 
-void DualNetFactory::StartGame(DualNet* black, DualNet* white) {}
-
-void DualNetFactory::EndGame(DualNet* black, DualNet* white) {}
-
 }  // namespace minigo

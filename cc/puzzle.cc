@@ -60,7 +60,7 @@ namespace {
 void Puzzle() {
   auto start_time = absl::Now();
 
-  auto model_factory = NewBatchingDualNetFactory(NewDualNetFactory());
+  BatchingDualNetFactory batcher(NewDualNetFactory());
 
   MctsPlayer::Options options;
   options.game_options.resign_enabled = false;
@@ -98,8 +98,8 @@ void Puzzle() {
 
       // Create player.
       auto player = absl::make_unique<MctsPlayer>(
-          model_factory->NewDualNet(FLAGS_model), options);
-      model_factory->StartGame(player->network(), player->network());
+          batcher.NewDualNet(FLAGS_model), options);
+      batcher.StartGame(player->network(), player->network());
 
       // Play through each game. For each position in the game, compare the
       // model's suggested move to the actual move played in the game.
@@ -120,7 +120,7 @@ void Puzzle() {
           ++correct_moves;
         }
       }
-      model_factory->EndGame(player->network(), player->network());
+      batcher.EndGame(player->network(), player->network());
     });
   }
 

@@ -191,23 +191,21 @@ class SelfPlayer {
     auto start_time = absl::Now();
     {
       absl::MutexLock lock(&mutex_);
-      dual_net_factory_ = NewDualNetFactory();
+      auto model_factory = NewDualNetFactory();
       // If the model path contains a pattern, wrap the implementation factory
       // in a ReloadingDualNetFactory to automatically reload the latest model
       // that matches the pattern.
       if (FLAGS_model.find("%d") != std::string::npos) {
-        dual_net_factory_ = absl::make_unique<ReloadingDualNetFactory>(
-            std::move(dual_net_factory_), absl::Seconds(3));
+        model_factory = absl::make_unique<ReloadingDualNetFactory>(
+            std::move(model_factory), absl::Seconds(3));
       }
       // Note: it's more efficient to perform the reload wrapping before the
       // batch wrapping because this way, we only need to reload the single
       // implementation DualNet when a new model is found. If we performed batch
       // wrapping before reload wrapping, the reload code would need to update
       // all the BatchingDualNet wrappers.
-      if (FLAGS_parallel_games > 1) {
-        dual_net_factory_ =
-            NewBatchingDualNetFactory(std::move(dual_net_factory_));
-      }
+      batcher_ =
+          absl::make_unique<BatchingDualNetFactory>(std::move(model_factory));
     }
     for (int i = 0; i < FLAGS_parallel_games; ++i) {
       threads_.emplace_back(std::bind(&SelfPlayer::ThreadRun, this, i));
@@ -278,8 +276,7 @@ class SelfPlayer {
             << "Manually changing the model during selfplay is not supported.";
         thread_options.Init(thread_id, &rnd_);
         player = absl::make_unique<MctsPlayer>(
-            dual_net_factory_->NewDualNet(FLAGS_model),
-            thread_options.player_options);
+            batcher_->NewDualNet(FLAGS_model), thread_options.player_options);
         game =
             absl::make_unique<Game>(player->name(), player->name(),
                                     thread_options.player_options.game_options);
@@ -287,7 +284,7 @@ class SelfPlayer {
 
       // Play the game.
       auto start_time = absl::Now();
-      dual_net_factory_->StartGame(player->network(), player->network());
+      batcher_->StartGame(player->network(), player->network());
       while (!player->root()->game_over() && !player->root()->at_move_limit()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
@@ -301,7 +298,7 @@ class SelfPlayer {
         }
         MG_CHECK(player->PlayMove(move, game.get()));
       }
-      dual_net_factory_->EndGame(player->network(), player->network());
+      batcher_->EndGame(player->network(), player->network());
 
       {
         // Log the end game info with the shared mutex held to prevent the
@@ -390,7 +387,7 @@ class SelfPlayer {
   }
 
   absl::Mutex mutex_;
-  std::unique_ptr<DualNetFactory> dual_net_factory_ GUARDED_BY(&mutex_);
+  std::unique_ptr<BatchingDualNetFactory> batcher_ GUARDED_BY(&mutex_);
   Random rnd_ GUARDED_BY(&mutex_);
   std::vector<std::thread> threads_;
   uint64_t flags_timestamp_ = 0;

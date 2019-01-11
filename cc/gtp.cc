@@ -95,10 +95,7 @@ void Gtp() {
     player = absl::make_unique<GtpPlayer>(
         model_factory->NewDualNet(FLAGS_model), options);
   }
-
-  model_factory->StartGame(player->network(), player->network());
   player->Run();
-  model_factory->EndGame(player->network(), player->network());
 }
 
 }  // namespace
