@@ -28,6 +28,7 @@ from rl_loop import fsdb
 from ratings import ratings
 
 MAX_TASKS = 250  # Keep < 500, or k8s may not track completions accurately.
+MIN_TASKS = 20
 
 
 def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=5):
@@ -160,6 +161,9 @@ def zoo_loop(sgf_dir=None, max_jobs=40):
             if tasks < MAX_TASKS:
                 if len(desired_pairs) == 0:
                     if sgf_dir:
+                        if tasks > MIN_TASKS:
+                            time.sleep(60)
+                            continue
                         print("Out of pairs!  Syncing new eval games...")
                         ratings.sync(sgf_dir)
                         print("Updating ratings and getting suggestions...")

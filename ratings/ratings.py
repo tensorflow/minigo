@@ -32,6 +32,10 @@ from tqdm import tqdm
 import datetime as dt
 
 
+flags.DEFINE_bool('sync_ratings', False, 'Synchronize files before computing ratings.')
+
+FLAGS = flags.FLAGS
+
 EVAL_REGEX = "(\d*)-minigo-cc-evaluator-"
 MODEL_REGEX = "(\d*)-(.*)"
 PW_REGEX = "PW\[([^]]*)\]"
@@ -302,7 +306,8 @@ def wins_subset(bucket):
 
 def main():
     root = os.path.abspath(os.path.join("sgf", fsdb.FLAGS.bucket_name, "sgf/eval"))
-    sync(root)
+    if FLAGS.sync_ratings:
+        sync(root)
     models = fsdb.get_models()
     data = wins_subset(fsdb.models_dir())
     print(len(data))
