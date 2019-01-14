@@ -37,6 +37,8 @@ DEFINE_int32(num_readouts, 100,
 namespace minigo {
 namespace {
 
+// Demonstrates how to perform basic self-play, while eliding the additional
+// complexity required by the training pipeline.
 void SimpleExample() {
   // Determine whether ANSI color codes are supported (used when printing
   // the board state after each move).
