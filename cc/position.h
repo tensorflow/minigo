@@ -191,7 +191,6 @@ class Position {
   std::string ToPrettyString(bool use_ansi_colors = true) const;
 
   Color to_play() const { return to_play_; }
-  Coord previous_move() const { return previous_move_; }
   const Stones& stones() const { return stones_; }
   int n() const { return n_; }
   zobrist::Hash stone_hash() const { return stone_hash_; }
@@ -210,12 +209,6 @@ class Position {
   Color IsKoish(Coord c) const;
 
  private:
-  // Play a pass or resign move.
-  // Note that in computer go, resign isn't normally considered a move but we
-  // treat it as such here so that we can handle a game tree that potentially
-  // contains multiple resigned positions in its different variations.
-  void PassOrResignMove(Coord c);
-
   // Removes the group with a stone at the given coordinate from the board,
   // updating the liberty counts of neighboring groups.
   void RemoveGroup(Coord c);
@@ -234,7 +227,6 @@ class Position {
   GroupPool groups_;
 
   Color to_play_;
-  Coord previous_move_ = Coord::kInvalid;
   Coord ko_ = Coord::kInvalid;
 
   // Number of captures for (B, W).

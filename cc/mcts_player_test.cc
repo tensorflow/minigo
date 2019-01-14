@@ -347,14 +347,17 @@ TEST(MctsPlayerTest, OnlyCheckGameEndOnce) {
   BoardVisitor bv;
   GroupVisitor gv;
   Position position(&bv, &gv, Color::kBlack);
-  position.PlayMove({3, 3});  // B plays.
-  position.PlayMove({3, 4});  // W plays.
-  position.PlayMove({4, 3});  // B plays.
-  // W passes. If B passes too, B would lose by komi..
-  position.PlayMove(Coord::kPass);
 
   auto player = absl::make_unique<TestablePlayer>(MctsPlayer::Options());
   player->InitializeGame(position);
+
+  MG_CHECK(player->PlayMove({3, 3}, nullptr));  // B plays.
+  MG_CHECK(player->PlayMove({3, 4}, nullptr));  // W plays.
+  MG_CHECK(player->PlayMove({4, 3}, nullptr));  // B plays.
+
+  // W passes. If B passes too, B would lose by komi..
+  MG_CHECK(player->PlayMove(Coord::kPass, nullptr));
+
   auto* root = player->root();
 
   // Initialize the root

@@ -262,8 +262,7 @@ MctsNode* MctsNode::SelectLeaf() {
     }
     // HACK: if last move was a pass, always investigate double-pass first
     // to avoid situations where we auto-lose by passing too early.
-    if (node->position.previous_move() == Coord::kPass &&
-        node->child_N(Coord::kPass) == 0) {
+    if (node->move == Coord::kPass && node->child_N(Coord::kPass) == 0) {
       node = node->MaybeAddChild(Coord::kPass);
       continue;
     }

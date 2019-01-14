@@ -72,9 +72,9 @@ class MctsNode {
   }
 
   bool game_over() const {
-    return (position.previous_move() == Coord::kResign) ||
-           (position.previous_move() == Coord::kPass && parent != nullptr &&
-            parent->position.previous_move() == Coord::kPass);
+    return (move == Coord::kResign) ||
+           (move == Coord::kPass && parent != nullptr &&
+            parent->move == Coord::kPass);
   }
   bool at_move_limit() const { return position.n() >= kMaxSearchDepth; }
 
@@ -139,7 +139,6 @@ class MctsNode {
 
   // Calculate and print statistics about the tree.
   std::string CalculateTreeStats() const;
-
 
   // Parent node.
   MctsNode* parent;
