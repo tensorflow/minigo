@@ -183,7 +183,7 @@ class Evaluator {
     }
 
     const bool verbose = thread_id == 0;
-    player_options.verbose = verbose;
+    player_options.verbose = false;
     player_options.name = black_model->name;
     auto black = absl::make_unique<MctsPlayer>(
         model_factory->NewDualNet(black_model->path), player_options);
@@ -200,12 +200,14 @@ class Evaluator {
     while (!curr_player->root()->game_over() &&
            !curr_player->root()->at_move_limit()) {
       auto move = curr_player->SuggestMove();
-      if (curr_player->options().verbose) {
+      if (verbose) {
         std::cerr << curr_player->root()->Describe() << "\n";
       }
       curr_player->PlayMove(move, &game);
       next_player->PlayMove(move, nullptr);
-      if (curr_player->options().verbose) {
+      if (verbose) {
+        MG_LOG(INFO) << absl::StreamFormat("%s Q: %0.5f", curr_player->name(),
+                                           curr_player->root()->Q());
         MG_LOG(INFO) << curr_player->root()->position.ToPrettyString();
       }
       std::swap(curr_player, next_player);

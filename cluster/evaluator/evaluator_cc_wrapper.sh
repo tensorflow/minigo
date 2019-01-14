@@ -35,11 +35,14 @@ BASENAME_BLACK=`basename $MODEL_BLACK`
 BASENAME_WHITE=`basename $MODEL_WHITE`
 DATE=`date +%Y-%m-%d`
 
-bazel-bin/cc/main --mode=eval \
+bazel-bin/cc/eval \
   --model=$BASENAME_BLACK \
   --model_two=$BASENAME_WHITE \
   --sgf_dir "gs://$SGF_BUCKET_NAME/sgf/eval/$DATE" \
   --num_readouts=1000 \
-  --resign_threshold=0.90
+  --parallel_games=1 \
+  --value_init_penalty=2.00 \
+  --virtual_losses=8 \
+  --resign_threshold=0.70
 
 echo Finished an evaluation game!

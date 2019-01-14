@@ -3,7 +3,7 @@ FROM gcr.io/$project/cc-base:latest
 
 COPY evaluator_cc_wrapper.sh /app
 
-ADD staging/ /app
-RUN bazel build -c opt --define=tf=1 --define=gpu=1 cc/main
+COPY staging/ /app
+RUN bazel build -c opt --define=tf=1 --define=gpu=1 --define=bt=1 cc/eval
 
 CMD ["/bin/sh", "evaluator_cc_wrapper.sh"]
