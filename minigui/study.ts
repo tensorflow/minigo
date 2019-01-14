@@ -399,6 +399,14 @@ class ExploreApp extends App {
       }
     });
 
+    // Count score.
+    let countScoreElem = getElement('count-score');
+    countScoreElem.addEventListener('click', () => {
+      this.gtp.send(`final_score`).then((result: string) => {
+        window.alert(result);
+      });
+    });
+
     // Set move number.
     this.moveElem.addEventListener('keypress', (e: KeyboardEvent) => {
       // Prevent non-numeric characters being input.

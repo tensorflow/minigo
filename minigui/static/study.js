@@ -315,6 +315,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     this.selectPosition(position);
                 }
             });
+            let countScoreElem = util_1.getElement('count-score');
+            countScoreElem.addEventListener('click', () => {
+                this.gtp.send(`final_score`).then((result) => {
+                    window.alert(result);
+                });
+            });
             this.moveElem.addEventListener('keypress', (e) => {
                 if (e.key < '0' || e.key > '9') {
                     e.preventDefault();
