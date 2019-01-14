@@ -63,10 +63,10 @@ Q-value](http://computer-go.org/pipermail/computer-go/2017-December/010555.html)
 led to weird ping-ponging behavior inside search, and changed to init to the
 average of the parent.
 
-Around v148, we realized we had the learning rate decay time off by an order of
+Around generation 148, we realized we had the learning rate decay time off by an order of
 magnitude...oops.  We also started experimenting with different values for `c_puct`, but didn't really see a difference for our range of values between 0.8 and 2.0.
 
-Around v165, we changed how many games we tried to play per generation, from
+Around generation 165, we changed how many games we tried to play per generation, from
 12,500 games to 7,000 games, and also increased how many positions each
 generation was trained on, from 1M to 2M.  This was largely due to how we had
 originally read the AGZ paper, where they say they had played 25,000 games with
@@ -74,17 +74,18 @@ the most recent model.  However, with 5M games and 700 checkpoints, that works
 out to about 7,000 games/checkpoint.  As we were doing more of an 'AZ' approach,
 with no evaluation of the new models, we figured this was more accurate.
 
-Around v230, we disabled resignation in 5% of games and checked our
+Around generation 230, we disabled resignation in 5% of games and checked our
 resign-threshold false positive rate.  We'd been pretty accurate, having tuned
 it down to about .9 (i.e., odds of winning at 5%) based on our analysis of true
 negatives.  (i.e., what was the distribution of the closest a player got to
 resigning who ended up winning)
 
-Around v250, we started experimenting with tree reuse to gather data about its
+Around generation 250, we started experimenting with tree reuse to gather data about its
 effect on the Dirchlet noise, and if it was affecting our position diversity.
-We also changed from 'stretching' the probabilities pi by exponentiating to a
-factor of 8 (i.e., temperature 0.125), to making it onehot (infinitesimal
-temperature), to leaving it proportional to visits (unity temperature).
+
+We had also been stretching the probabilities pi by raising to 8th power
+before training on them, as a compromise between training on the one-hot
+vector versus the original MCTS visit distribution.
 
 There's still ambiguity about whether or not a onehot training target for the
 policy net is good or bad, but we're leaning towards leaving pi as the softmax
@@ -96,11 +97,14 @@ the move for play (after the fuseki).
 We put the models on KGS and CGOS as 'somebot' starting around version 160.  The
 harness running these models is very primitive: they are single-threaded python,
 running nodes through the accelerator with a batch-size of ONE... very bad.  The
-CGOS harness only manages to run around 300-500 searches per move.
+CGOS harness only manages to run around 300-500 searches per move (5s/move).
 
 However, with that said, we were able to watch it improve and reach a level
 where it would consistently lose to the top bots (Zen, AQ, Leela 0.11), and
 consistently beat the basic bots, GnuGo, michi, the Aya placeholder bots, etc.
+We found CGOS not particularly useful because of this large gap. Additionally,
+the large population of LeelaZero variants all had similar playstyles, further
+distorting the rating system.
 
 Sometime between v180 and v230, our CGOS results seemed to level off.  The
 ladder weakness meant our performance on CGOS was split: either our opponents
@@ -125,11 +129,11 @@ left us in a local minima with 3-3s that D-noise & etc. are not able to
 overcome.
 
 
-## Third run, Minigo, v250-..., Jan 20th-Feb 1st (ish)
+## Third run, Minigo, generation 250-..., Jan 20th-Feb 1st (ish)
 
-As our fiddling about after v250 didn't seem to get us anywhere, and due to our
+As our fiddling about after generation 250 didn't seem to get us anywhere, and due to our
 reconsidering about whether or not to one-hot the policy network target ('pi'), we rolled
-back to version 250 to continue training.
+back to generation 250 to continue training.
 
 We also completely replaced our custom class for handling training examples
 (helpfully called `Dataset`, and predating tf.data.Dataset) with a proper
@@ -152,7 +156,10 @@ The remaining differences between this run and the described paper:
     overall search -- is this broadening important to the discovery of new moves
     by the policy network, and thus the improvement of the network overall?  Who
     knows? :)
-2. Ambiguity around the transformation of the MCTS output, pi.
+2. Ambiguity around the training target - should we be trying to predict the MCTS
+  visit distribution pi, or the one-hot representation of the final move picked?
+  What about in the early game when softpick didn't necessarily pick the move with
+  the most visits?
 3. Too few filters (128 vs 256).
 
 
@@ -190,8 +197,7 @@ These [improvements](https://github.com/tensorflow/minigo/milestone/2?closed=1) 
    updates](https://github.com/tensorflow/minigo/commit/360e056f218833938d845b454b4e24158034b58a)
    that training would make to our weights.
  - [Setting aside a
-   set of positions](https://github.com/tensorflow/minigo/commit/f941f5ac72d860f1f583392cbeb69d0694373824) to use to detect
-overfitting.
+   set of holdout positions](https://github.com/tensorflow/minigo/commit/f941f5ac72d860f1f583392cbeb69d0694373824) to use to detect overfitting.
  - Improvements to setting up clusters and setting up automated testing/CI.
 
 
@@ -237,8 +243,12 @@ During v5, we wrote a number of new features, including:
  - A new UI (in the minigui/ directory)
  - Automated evaluation on a separate cluster
  - Separate tfexample pipeline guaranteeing complete shuffling and better
-   throughput.
- - And general improvements to our monitoring and data analysis.
+   throughput (albeit with some hacks that meant that not every game was sampled
+   from equally).
+ - General improvements to stackdriver monitoring, like logging
+   the average Q estimate by each side, or average depth of search.
+ - Logging MCTS tree summaries in SGFs to inspect tree search behavior.
+
 
 
 #### v5 changelog:
@@ -284,7 +294,6 @@ The major changes were:
    cut at model #192 in the short-lived 'v6')
  - higher numbers of games per model ( >15k, usually ending up with ~20k)
 
-
 v7's first premature run had a couple problems:
 
  - We weren't writing our holdout data for 174-179ish, resulting in some weird tensorboard
@@ -305,8 +314,19 @@ was too small.  Compared to other efforts (AGZ paper says 10%, LZ stepped from 1
 and LCZ was still at 100% games played without resignations), Minigo is
 definitely the odd one out.
 
+Resign disable rate is a very sensitive parameter; it has several effects:
+
+- Resigning saves compute cycles
+- Resigning removes mostly-decided late-game positions from the dataset, helping prevent
+  overfitting to a large set of very similar looking, very biased data.
+- We need some resign-disabled games; otherwise we forget how to play endgame.
+- Resign disabled games also prevent our bot from going into a self-perpetuating
+  loop of "resign early" -> used as training data, resulting in the bot being even
+  more pessimistic and resigning earlier.
+
 This, combined with our better selfplay performance, made it a relatively
-painless decision to decide to roll back the few days progress.
+painless decision to decide to roll back the few days progress, while changing
+resign disable rate from 5% -> 20%.
 
 ### v7, May 16-July-17
 
@@ -570,5 +590,94 @@ examples from the first 400 moves should mostly rid us of those pointless
 examples without dramatically distorting the ratio of opening/middle/endgame
 examples seen by the network.
 
+This run ended up not really having fixed anything. On our cross-evaluation 
+matches, v12 ended up slightly stronger than the other runs, but it was well
+within the natural variability of the other runs. V12 still had ladder issues
+and it still could not beat LeelaZero or ELF, even with increased playouts.
 
-This run is ongoing...
+### v14, Bigtable integration with init-to-loss switch
+
+For v14, the biggest change was replacing the ad-hoc in-memory shuffler with
+a BigTable shuffler.
+
+Previously, we'd write out tiny TFRecords containing ~200
+TFExamples each, and another Python process would rsync the records to one
+machine, read them into memory, and maintain a large moving window of positions
+in memory that would be periodically be spit out as training chunks. This shuffler
+had all sorts of hacks in it - we'd entirely ignore any games with < 30 moves;
+we'd ignore any moves with move number > 400; we'd draw a fixed number (4) of
+moves from each game (which oversampled short games). This hacky fixed-number
+sampling was because exactly 10% of our games were resign-disabled, but those
+resign disabled games were much longer than the other games, meaning that an
+even sampling by move would oversample our resign-disabled games. A fixed-number
+sampling would at least guarantee a 10% representation of resign-disabled games.
+
+In terms of bottlenecks, our sampler took a big chunk of time to run, but it
+was still shorter than the training time, so it was not technically a bottleneck
+yet. But we were still training on a single TPU (8 cores) rather than a pod
+(128 cores), so if we were to scale to more TPUs for selfplay, and upgrade our
+trainer to use a pod to compensate, then this shuffler would quickly become the
+bottleneck.
+
+For v14, our selfplay workers would instead directly upload each move to BigTable
+as a (position, next_move, winner) tuple. A set of parallel readers would then
+use BigTable's built-in samplers to read over a specified window of games. In
+order to ensure a 10% ratio of resign-disabled games to resign-enabled games, we
+used the BigTable input readers to enforce a 90:10 ratio.
+
+Another benefit of the BigTable integration was that we could directly run a
+query on BigTable to compute the appropriate resign threshold. Previously, this
+had been done by manually inspecting a Stackdriver graph and editing a flagfile
+on GCS. This meant that the latency of resign threshold updates dropped from
+hours to minutes.
+
+Overall, time between checkpoints dropped from 30 minutes to 20 minutes. (With
+one run being 800 checkpoints, this means that we can complete a run in 11 days.)
+We had much more consistent sampling for resign disabled/enabled games and for
+games of varying lengths. We reduced the latency for resign threshold measurements.
+
+The run was uneventful and was a bit better than previous runs; it escaped random
+play much more quickly, probably because the improved resign threshold latency
+meant that our training data was appropriately pruned of 'easy' positions.
+So all in all, the rewrite didn't create any new pipeline issues.
+
+Around generation 280, we discovered on LCZero forums that AlphaGoZero had used
+init-to-loss for Q values. We switched to init-to-loss from init-to-parent and
+saw our network gain dramatically in strength. Soon, our top model thoroughly
+exceeded our previous best model, and beat LZ's v157, the last model from before
+LZ started mixing in game data from the much stronger ELF.
+
+### v15, clean run with init to loss
+
+This run beat v14 pretty early on, producing a model that was stronger than v14's
+best at generation 330. v15 ended up slightly stronger than v14 but was otherwise
+similar.
+
+Qualitatively, we noticed that V14/V15's models were much sharper,
+meaning that they had more concentrated policy network output and the value
+network output would have stronger opinions on whether it was winning or losing.
+Simultaneously, the calibrated resign threshold for init-to-loss ended up at 0.5
+compared to 0.9 in previous runs. So v14/v15's MCTS was operating in the sweet
+spot more frequently. (The MCTS algorithm tends to go blind once Q gets close to
+0.9, because there's no more room at the top.) The init-to-loss configuration
+also led to much deeper reads, as the tree search behavior would dive deeply
+into one variation before going onto the next. This read behavior meant that
+v14 was our first model to be able to consistently read ladders. As a result,
+it was actually not clear whether v14 was actually stronger than v12, or whether
+v14 was just bullying v12 around by reading ladders that v12 couldn't read, and
+winning easy rating points. But since we had achieved success against external
+reference points, we concluded that v14/v15 were in fact really stronger than v12.
+
+During v15's run, we realized that our evaluation cluster infrastructure was in
+need of some upgrades, primarily for two reasons:
+
+1. We wanted to include LZ in the mix, so we could cross-evaluate LZ models with
+our own.
+1. We wanted to be able to run each model with its preferred configuration (init
+to parent for v10/v12, and init to loss for v14/v15.)
+
+
+
+
+
+
