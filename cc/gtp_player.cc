@@ -55,6 +55,7 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
   RegisterCmd("play", &GtpPlayer::HandlePlay);
   RegisterCmd("ponder", &GtpPlayer::HandlePonder);
   RegisterCmd("readouts", &GtpPlayer::HandleReadouts);
+  RegisterCmd("showboard", &GtpPlayer::HandleShowboard);
   RegisterCmd("undo", &GtpPlayer::HandleUndo);
   RegisterCmd("verbosity", &GtpPlayer::HandleVerbosity);
   NewGame();
@@ -75,6 +76,11 @@ void GtpPlayer::Run() {
     }
     running = false;
   });
+
+  // Don't wait for the stdin reading thread to exit because there's no way to
+  // abort the blocking call std::getline read (apart from the user hitting
+  // ctrl-C). The OS will clean the thread up when the process exits.
+  stdin_thread.detach();
 
   while (running) {
     std::string line;
@@ -103,8 +109,7 @@ void GtpPlayer::Run() {
       }
     }
   }
-
-  stdin_thread.join();
+  running = false;
 }
 
 Coord GtpPlayer::SuggestMove() {
@@ -470,6 +475,15 @@ GtpPlayer::Response GtpPlayer::HandleReadouts(CmdArgs args) {
   }
 
   return Response::Ok();
+}
+
+GtpPlayer::Response GtpPlayer::HandleShowboard(CmdArgs args) {
+  auto response = CheckArgsExact(0, args);
+  if (!response.ok) {
+    return response;
+  }
+  return Response::Ok(
+      absl::StrCat("\n", root()->position.ToPrettyString(false)));
 }
 
 GtpPlayer::Response GtpPlayer::HandleUndo(CmdArgs args) {

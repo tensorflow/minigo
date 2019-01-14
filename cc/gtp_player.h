@@ -134,6 +134,7 @@ class GtpPlayer : public MctsPlayer {
   virtual Response HandlePlay(CmdArgs args);
   virtual Response HandlePonder(CmdArgs args);
   virtual Response HandleReadouts(CmdArgs args);
+  virtual Response HandleShowboard(CmdArgs args);
   virtual Response HandleUndo(CmdArgs args);
   virtual Response HandleVerbosity(CmdArgs args);
 
