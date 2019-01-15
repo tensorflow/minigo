@@ -35,7 +35,7 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
      << " random_symmetry:" << options.random_symmetry
      << " resign_threshold:" << options.game_options.resign_threshold
      << " resign_enabled:" << options.game_options.resign_enabled
-     << " batch_size:" << options.batch_size
+     << " virtual_losses:" << options.virtual_losses
      << " komi:" << options.game_options.komi
      << " num_readouts:" << options.num_readouts
      << " seconds_per_move:" << options.seconds_per_move
@@ -169,7 +169,7 @@ Coord MctsPlayer::SuggestMove() {
     MG_LOG(INFO) << "Milliseconds per 100 reads: "
                  << absl::ToInt64Milliseconds(elapsed) << "ms"
                  << " over " << num_readouts
-                 << " readouts (batched: " << options_.batch_size << ")";
+                 << " readouts (vlosses: " << options_.virtual_losses << ")";
     MG_LOG(INFO) << root_->CalculateTreeStats();
   }
 
@@ -213,7 +213,7 @@ Coord MctsPlayer::PickMove() {
 
 void MctsPlayer::TreeSearch() {
   tree_search_paths_.clear();
-  SelectLeaves(root_, options_.batch_size, &tree_search_paths_);
+  SelectLeaves(root_, options_.virtual_losses, &tree_search_paths_);
   ProcessLeaves(absl::MakeSpan(tree_search_paths_), options_.random_symmetry);
 }
 

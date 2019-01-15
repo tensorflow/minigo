@@ -87,7 +87,7 @@ namespace {
 
 void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->game_options.resign_threshold = -std::abs(FLAGS_resign_threshold);
-  options->batch_size = FLAGS_virtual_losses;
+  options->virtual_losses = FLAGS_virtual_losses;
   options->random_seed = FLAGS_seed;
   options->num_readouts = FLAGS_num_readouts;
   options->inject_noise = false;

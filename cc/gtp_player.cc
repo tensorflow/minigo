@@ -147,7 +147,7 @@ void GtpPlayer::Ponder() {
   int n = root()->N();
 
   std::vector<TreePath> paths;
-  SelectLeaves(root(), options().batch_size, &paths);
+  SelectLeaves(root(), options().virtual_losses, &paths);
   ProcessLeaves(absl::MakeSpan(paths), options().random_symmetry);
 
   // Increment the ponder count by difference new and old reads.
@@ -201,7 +201,7 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(const std::string& cmd,
 }
 
 GtpPlayer::Response GtpPlayer::HandleBenchmark(CmdArgs args) {
-  // benchmark [readouts] [batch_size]
+  // benchmark [readouts] [virtual_losses]
   // Note: By default use current time_control (readouts or time).
   auto response = CheckArgsRange(0, 2, args);
   if (!response.ok) {
@@ -219,8 +219,8 @@ GtpPlayer::Response GtpPlayer::HandleBenchmark(CmdArgs args) {
   }
 
   if (args.size() == 2) {
-    if (!absl::SimpleAtoi(args[1], &temp_options.batch_size)) {
-      return Response::Error("bad batch_size");
+    if (!absl::SimpleAtoi(args[1], &temp_options.virtual_losses)) {
+      return Response::Error("bad virtual_losses");
     }
   }
 

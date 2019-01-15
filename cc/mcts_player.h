@@ -54,8 +54,7 @@ class MctsPlayer {
     // Default (0.0) is init-to-parent.
     float value_init_penalty = 0.0;
 
-    // TODO(tommadams): rename batch_size to virtual_losses.
-    int batch_size = 8;
+    int virtual_losses = 8;
     std::string name = "minigo";
 
     // Seed used from random permutations.

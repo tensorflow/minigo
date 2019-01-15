@@ -138,7 +138,7 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->random_symmetry = FLAGS_random_symmetry;
   options->value_init_penalty = FLAGS_value_init_penalty;
   options->game_options.resign_threshold = -std::abs(FLAGS_resign_threshold);
-  options->batch_size = FLAGS_virtual_losses;
+  options->virtual_losses = FLAGS_virtual_losses;
   options->random_seed = FLAGS_seed;
   options->num_readouts = FLAGS_num_readouts;
   options->seconds_per_move = FLAGS_seconds_per_move;

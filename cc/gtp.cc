@@ -80,7 +80,7 @@ void Gtp() {
   options.soft_pick = false;
   options.random_symmetry = true;
   options.value_init_penalty = FLAGS_value_init_penalty;
-  options.batch_size = FLAGS_virtual_losses;
+  options.virtual_losses = FLAGS_virtual_losses;
   options.num_readouts = FLAGS_num_readouts;
   options.seconds_per_move = FLAGS_seconds_per_move;
   options.time_limit = FLAGS_time_limit;

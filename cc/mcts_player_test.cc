@@ -76,7 +76,7 @@ class TestablePlayer : public MctsPlayer {
   }
 
   void TreeSearch(int virtual_losses) {
-    mutable_options()->batch_size = virtual_losses;
+    mutable_options()->virtual_losses = virtual_losses;
     TreeSearch();
   }
 };

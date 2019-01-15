@@ -91,7 +91,7 @@ void MiniguiPlayer::Ponder() {
 
   // First populate the batch with any nodes that require win rate evaluation.
   std::vector<TreePath> paths;
-  for (int i = 0; i < options().batch_size; ++i) {
+  for (int i = 0; i < options().virtual_losses; ++i) {
     if (to_eval_.empty()) {
       break;
     }

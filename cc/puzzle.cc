@@ -68,7 +68,7 @@ void Puzzle() {
   options.soft_pick = false;
   options.random_symmetry = true;
   options.value_init_penalty = FLAGS_value_init_penalty;
-  options.batch_size = FLAGS_virtual_losses;
+  options.virtual_losses = FLAGS_virtual_losses;
   options.random_seed = FLAGS_seed;
   options.num_readouts = FLAGS_num_readouts;
   options.verbose = false;
