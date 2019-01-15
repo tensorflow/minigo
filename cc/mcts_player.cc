@@ -35,6 +35,8 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
      << " random_symmetry:" << options.random_symmetry
      << " resign_threshold:" << options.game_options.resign_threshold
      << " resign_enabled:" << options.game_options.resign_enabled
+     << " value_init_penalty:" << options.value_init_penalty
+     << " policy_softmax_temp:" << options.policy_softmax_temp
      << " virtual_losses:" << options.virtual_losses
      << " komi:" << options.game_options.komi
      << " num_readouts:" << options.num_readouts
