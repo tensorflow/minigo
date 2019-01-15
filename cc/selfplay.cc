@@ -75,10 +75,13 @@ DEFINE_bool(random_symmetry, true,
             "the model and apply the inverse transform to the results.");
 DEFINE_double(value_init_penalty, 2.0,
               "New children value initialization penalty.\n"
-              "Child value = parent's value - penalty * color, clamped to"
-              " [-1, 1].  Penalty should be in [0.0, 2.0].\n"
+              "Child value = parent's value - penalty * color, clamped to "
+              "[-1, 1].  Penalty should be in [0.0, 2.0].\n"
               "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
               "This behaves similiarly to Leela's FPU \"First Play Urgency\".");
+DEFINE_double(policy_softmax_temp, 0.98,
+              "For soft-picked moves, the probabilities are exponentiated by "
+              "policy_softmax_temp to encourage diversity in early play.\n");
 
 DEFINE_string(flags_path, "",
               "Optional path to load flags from. Flags specified in this file "
@@ -137,6 +140,7 @@ void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
   options->soft_pick = FLAGS_soft_pick;
   options->random_symmetry = FLAGS_random_symmetry;
   options->value_init_penalty = FLAGS_value_init_penalty;
+  options->policy_softmax_temp = FLAGS_policy_softmax_temp;
   options->game_options.resign_threshold = -std::abs(FLAGS_resign_threshold);
   options->virtual_losses = FLAGS_virtual_losses;
   options->random_seed = FLAGS_seed;

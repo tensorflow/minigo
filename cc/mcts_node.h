@@ -35,7 +35,6 @@ namespace minigo {
 class MctsNode {
  public:
   struct EdgeStats {
-    // TODO(tom): consider moving N into the MctsNode to save memory.
     float N = 0;
     float W = 0;
     float P = 0;

@@ -197,7 +197,7 @@ Coord MctsPlayer::PickMove() {
   // a temperature slightly larger than unity to encourage diversity in early
   // play and hopefully to move away from 3-3s.
   for (size_t i = 0; i < cdf.size(); ++i) {
-    cdf[i] = std::pow(root_->child_N(i), kVisitCountSquash);
+    cdf[i] = std::pow(root_->child_N(i), options_.policy_softmax_temp);
   }
   for (size_t i = 1; i < cdf.size(); ++i) {
     cdf[i] += cdf[i - 1];
@@ -325,7 +325,7 @@ void MctsPlayer::UpdateGame(Coord c, Game* game) {
   if (root_->position.n() < temperature_cutoff_) {
     // Squash counts before normalizing to match softpick behavior in PickMove.
     for (int i = 0; i < kNumMoves; ++i) {
-      search_pi[i] = std::pow(root_->child_N(i), kVisitCountSquash);
+      search_pi[i] = std::pow(root_->child_N(i), options_.policy_softmax_temp);
     }
   } else {
     for (int i = 0; i < kNumMoves; ++i) {

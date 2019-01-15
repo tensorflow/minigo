@@ -54,7 +54,12 @@ class MctsPlayer {
     // Default (0.0) is init-to-parent.
     float value_init_penalty = 0.0;
 
+    // For soft-picked moves, the probabilities are exponentiated by
+    // policy_softmax_temp to encourage diversity in early play.
+    float policy_softmax_temp = 0.98;
+
     int virtual_losses = 8;
+
     std::string name = "minigo";
 
     // Seed used from random permutations.
