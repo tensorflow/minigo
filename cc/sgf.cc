@@ -20,6 +20,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "cc/constants.h"
 #include "cc/logging.h"
@@ -295,15 +296,11 @@ bool Ast::Parse(std::string contents) {
 
 std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                             const CreateSgfOptions& options) {
-  std::string str = "(";
-
-  // TODO(tommadams): Clean this up once the Abseil team releases proper
-  // formatting functions.
-  absl::StrAppend(
-      &str, absl::StrCat(";GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[",
-                         options.ruleset, "]\n", "SZ[", kN, "]KM[",
-                         options.komi, "]PW[", options.white_name, "]PB[",
-                         options.black_name, "]RE[", options.result, "]\n"));
+  auto str = absl::StrFormat(
+      "(;GM[1]FF[4]CA[UTF-8]AP[Minigo_sgfgenerator]RU[%s]\n"
+      "SZ[%d]KM[%g]PW[%s]PB[%s]RE[%s]\n",
+      options.ruleset, kN, options.komi, options.white_name, options.black_name,
+      options.result);
   if (!options.game_comment.empty()) {
     absl::StrAppend(&str, "C[", options.game_comment, "]\n");
   }
@@ -311,8 +308,8 @@ std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
   for (const auto& move_with_comment : moves) {
     Move move = move_with_comment.move;
     MG_CHECK(move.color == Color::kBlack || move.color == Color::kWhite);
-    const char* color = move.color == Color::kBlack ? "B" : "W";
-    absl::StrAppend(&str, absl::StrCat(";", color, "[", move.c.ToSgf(), "]"));
+    absl::StrAppendFormat(&str, ";%s[%s]", ColorToCode(move.color),
+                          move.c.ToSgf());
     if (!move_with_comment.comment.empty()) {
       absl::StrAppend(&str, "C[", move_with_comment.comment, "]");
     }
