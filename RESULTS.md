@@ -49,7 +49,7 @@ This ran on a Google Container Engine cluster of pre-release preemptible GPUs;
 (TODO: link) Hopefully the product was improved by our bug reports :)
 
 ### Adjustments
-Generations 0-165 played about 12,500 games each, and each generation/checkpoint
+Generations 0-165 played about 12,500 games each, and each model/checkpoint
 was trained on about 1M positions (compare to DM's 2M positions in AGZ paper).
 
 After transitioning to a larger board size, and a cluster with GPUs, we started
@@ -58,29 +58,29 @@ on the layers of the value head.  After around 500k games, we realized the
 policy head should also have had its batchnorm fixed.  This coincided with a
 *really* sharp improvement in policy error.
 
-Around generation 95, we realized the [initial
+Around model 95, we realized the [initial
 Q-value](http://computer-go.org/pipermail/computer-go/2017-December/010555.html)
 led to weird ping-ponging behavior inside search, and changed to init to the
 average of the parent.
 
-Around generation 148, we realized we had the learning rate decay time off by an order of
+Around model 148, we realized we had the learning rate decay time off by an order of
 magnitude...oops.  We also started experimenting with different values for `c_puct`, but didn't really see a difference for our range of values between 0.8 and 2.0.
 
-Around generation 165, we changed how many games we tried to play per generation, from
+Around model 165, we changed how many games we tried to play per model, from
 12,500 games to 7,000 games, and also increased how many positions each
-generation was trained on, from 1M to 2M.  This was largely due to how we had
+model was trained on, from 1M to 2M.  This was largely due to how we had
 originally read the AGZ paper, where they say they had played 25,000 games with
 the most recent model.  However, with 5M games and 700 checkpoints, that works
 out to about 7,000 games/checkpoint.  As we were doing more of an 'AZ' approach,
 with no evaluation of the new models, we figured this was more accurate.
 
-Around generation 230, we disabled resignation in 5% of games and checked our
+Around model 230, we disabled resignation in 5% of games and checked our
 resign-threshold false positive rate.  We'd been pretty accurate, having tuned
 it down to about .9 (i.e., odds of winning at 5%) based on our analysis of true
 negatives.  (i.e., what was the distribution of the closest a player got to
 resigning who ended up winning)
 
-Around generation 250, we started experimenting with tree reuse to gather data about its
+Around model 250, we started experimenting with tree reuse to gather data about its
 effect on the Dirchlet noise, and if it was affecting our position diversity.
 
 We had also been stretching the probabilities pi by raising to 8th power
@@ -112,7 +112,7 @@ could ladder us correctly, or they couldn't :)  As such, it was hard to use CGOS
 objective measurement.  Similarly, while we were able to notch some wins against
 KGS dan players, it was hard to tell if we were still making progress.  This led
 to our continued twiddling of settings and general sense of frustration.  The
-ladder weakness continued strong all the way to the very end, around generation
+ladder weakness continued strong all the way to the very end, around model
 v280, when our prerelease cluster expired.
 
 On the whole, we did feel pretty good about having answered some of the
@@ -129,11 +129,11 @@ left us in a local minima with 3-3s that D-noise & etc. are not able to
 overcome.
 
 
-## Third run, Minigo, generation 250-..., Jan 20th-Feb 1st (ish)
+## Third run, Minigo, model 250-..., Jan 20th-Feb 1st (ish)
 
-As our fiddling about after generation 250 didn't seem to get us anywhere, and due to our
+As our fiddling about after model 250 didn't seem to get us anywhere, and due to our
 reconsidering about whether or not to one-hot the policy network target ('pi'), we rolled
-back to generation 250 to continue training.
+back to model 250 to continue training.
 
 We also completely replaced our custom class for handling training examples
 (helpfully called `Dataset`, and predating tf.data.Dataset) with a proper
@@ -245,8 +245,7 @@ During v5, we wrote a number of new features, including:
  - Separate tfexample pipeline guaranteeing complete shuffling and better
    throughput (albeit with some hacks that meant that not every game was sampled
    from equally).
- - General improvements to stackdriver monitoring, like logging
-   the average Q estimate by each side, or average depth of search.
+ - General improvements to stackdriver monitoring, like average Q value.
  - Logging MCTS tree summaries in SGFs to inspect tree search behavior.
 
 
@@ -270,7 +269,7 @@ as v6)
 
 1. 352 change filter to 0.03 and move shuffle buffer back to 200k
 
-1. during 354 (for 355) change steps per generation to 1M from 2M, shuffle
+1. during 354 (for 355) change steps per model to 1M from 2M, shuffle
 buffer down to 100k
 
 1. 23.2M steps -- change l2_strength to 0.0002 (from 0.0001)
@@ -309,7 +308,7 @@ After finding a [potentially bad engine
 bug](https://github.com/tensorflow/minigo/pull/234) we decided to pause training
 to get to the bottom of it.  It ended up affecting < 0.01% of games, but we had
 already seen progress stall and retrace similar to v5, so we decided to rollback
-and test a new hypothesis:  That our amount of games with resign disabled (5%)
+and test a new hypothesis:  That our amount of calibration games (5%)
 was too small.  Compared to other efforts (AGZ paper says 10%, LZ stepped from 100% => 20%,
 and LCZ was still at 100% games played without resignations), Minigo is
 definitely the odd one out.
@@ -319,23 +318,23 @@ Resign disable rate is a very sensitive parameter; it has several effects:
 - Resigning saves compute cycles
 - Resigning removes mostly-decided late-game positions from the dataset, helping prevent
   overfitting to a large set of very similar looking, very biased data.
-- We need some resign-disabled games; otherwise we forget how to play endgame.
-- Resign disabled games also prevent our bot from going into a self-perpetuating
+- We need some calibration games; otherwise we forget how to play endgame.
+- Calibration games also prevent our bot from going into a self-perpetuating
   loop of "resign early" -> used as training data, resulting in the bot being even
   more pessimistic and resigning earlier.
 
 This, combined with our better selfplay performance, made it a relatively
 painless decision to decide to roll back the few days progress, while changing
-resign disable rate from 5% -> 20%.
+calibration fraction from 5% -> 20%.
 
 ### v7, May 16-July-17
 
 Rolled back to model v5-173; continued with the flags & features added in v7a,
 but with holdout data being written from the start ;)  And also with the
-resign-disabled fraction increased to 20%
+calibration rate increased to 20%
 
 We expect to see it go sideways as it adapts to the new proportion of
-resign-disabled games, then show a similar improvement to the v7a improvement.
+calibration games, then show a similar improvement to the v7a improvement.
 After that, if it flattens off again we'll lower the learning rate further.
 
 After our learning rate cuts, the ratings appeared to taper off.  A brief bit of
@@ -377,8 +376,8 @@ it, which was good to see.  Unfortunately, the model was not able to beat the
 best Leela Zero model (from before they mixed in ELF games), so there was
 clearly something still amiss.  It was unclear what factors caused the model to
 stop improving.  Perhaps not having rotation enabled from the beginning
-essentially 'clipped its wings', or perhaps the higher percentage of resign
-disabled games (20%) caused it to see too many useless game positions, or
+essentially 'clipped its wings', or perhaps the higher percentage of calibration
+games (20%) caused it to see too many useless game positions, or
 perhaps we had waited too long to cut the learning rate -- this was the AZ
 approach instead of the AGZ approach after all, so perhaps using the AGZ LR
 schedule was not appropriate.
@@ -393,7 +392,7 @@ Our first set of hypothesis were not ambitious.  Mostly we wanted to prove that
 our solution was 'stable' and that we could improve a few of the small things we
 knew were wrong with v9, but mostly to leave it the same.  The major differences were:
 
-1. Setting the games played with resign disabled back to 10% (from 20%)
+1. Setting the fraction of calibration games back to 10% (from 20%)
 1. Keeping rotation in training on the whole time
 1. Playing slightly more games per model
 1. Cutting the learning rate the first time as soon as we saw `l2_cost` bottom out and start
@@ -414,7 +413,7 @@ great.  But with all the things we changed, which was responsible?
 
 In retrospect, probably the two most useful changes were leaving the learning
 rate at the `medium` setting for longer, giving it a longer time to meander
-through the loss landscape, and setting the resign disabled percent back to 10%.
+through the loss landscape, and setting the calibration rate back to 10%.
 (Having rotation on in training the whole time obviously doesn't hurt, but it
 probably doesn't affect the overall skill ceiling)
 
@@ -428,7 +427,7 @@ value error.
 
 With this amount as a good proxy for 'the amount of data needed to impact
 training significantly', we could then think about how the percent of
-resign-disabled games might be affecting us.  With 20% of the
+calibration games might be affecting us.  With 20% of the
 games being played to scoring, sometimes requiring 2x or 3x as many moves, it
 meant that the moves sampled from these games were essentially 'useless' i.e.,
 from a point beyond which the outcome was no longer in doubt.  Since we were
@@ -549,8 +548,6 @@ only one sentence from the second paper to guide us: "We use virtual loss to
 ensure each thread evaluates different nodes" (from Methods, "Search Algorithm",
 *Backup*)
 
-
-
 In particular, the cost of running a neural network is greatly amortized by the
 highly parallel nature of GPUs and TPUs.  E.g., the time taken to evaluate one
 node might be nearly the same as the cost of evaluating two nodes, as the
@@ -583,7 +580,7 @@ of of selfplay game examples).
 
 One other minor tweak was to stop training on moves after move #400 after we had
 reached a reasonable strength.  The "logic" here is similar to v10's explanation
-re: the 10% resign disable games.  if the resign disable games run, on average,
+re: the 10% calibration games.  if the calibration games run, on average,
 2x or 3x longer, then the examples taken from them are almost always past the
 point when the outcome is well understood.  So forcibly drawing the training
 examples from the first 400 moves should mostly rid us of those pointless
@@ -595,53 +592,79 @@ matches, v12 ended up slightly stronger than the other runs, but it was well
 within the natural variability of the other runs. V12 still had ladder issues
 and it still could not beat LeelaZero or ELF, even with increased playouts.
 
+### v13, pro game bootstrap
+
+Out of curiosity, we wanted to see what happened if we bootstrapped a model
+from a pro game dataset. The expected thing happened: the model started from
+a much stronger starting place, and the distribution of opening moves played
+was very reminiscent of human pro play. We eventually saw the model discard
+some common human opening patterns and revert back to Zero-ish play (e.g.
+lots of 3-3 invasions). Overall, the run went well, but the strength never
+peaked to the same level as v10 or v12.
+
 ### v14, Bigtable integration with init-to-loss switch
 
-For v14, the biggest change was replacing the ad-hoc in-memory shuffler with
+For v14, the biggest change was replacing the in-memory TFExample shuffler with
 a BigTable shuffler.
+
+A minor change - we started logging the average depth of search.
 
 Previously, we'd write out tiny TFRecords containing ~200
 TFExamples each, and another Python process would rsync the records to one
 machine, read them into memory, and maintain a large moving window of positions
 in memory that would be periodically be spit out as training chunks. This shuffler
-had all sorts of hacks in it - we'd entirely ignore any games with < 30 moves;
-we'd ignore any moves with move number > 400; we'd draw a fixed number (4) of
-moves from each game (which oversampled short games). This hacky fixed-number
-sampling was because exactly 10% of our games were resign-disabled, but those
-resign disabled games were much longer than the other games, meaning that an
-even sampling by move would oversample our resign-disabled games. A fixed-number
-sampling would at least guarantee a 10% representation of resign-disabled games.
+had all sorts of hacks in it:
+
+  - we'd entirely ignore any games with < 30 moves
+  - at the end of v12, we tried ignoring moves > 400 to remove post-endgame noise
+  - we'd draw a fixed number (4) of moves from each game (which oversampled
+    short games). This hacky fixed-number sampling was because exactly 10% of
+    our games were calibration games, but those calibration games were much 
+    longer than the other games, meaning that an even sampling by move would
+    oversample the calibration games. A fixed-number sampling would at least
+    guarantee a 10% representation of calibration games.
 
 In terms of bottlenecks, our sampler took a big chunk of time to run, but it
-was still shorter than the training time, so it was not technically a bottleneck
+was about the same as training time, so it was not technically a bottleneck
 yet. But we were still training on a single TPU (8 cores) rather than a pod
 (128 cores), so if we were to scale to more TPUs for selfplay, and upgrade our
 trainer to use a pod to compensate, then this shuffler would quickly become the
 bottleneck.
 
-For v14, our selfplay workers would instead directly upload each move to BigTable
-as a (position, next_move, winner) tuple. A set of parallel readers would then
-use BigTable's built-in samplers to read over a specified window of games. In
-order to ensure a 10% ratio of resign-disabled games to resign-enabled games, we
-used the BigTable input readers to enforce a 90:10 ratio.
+For v14, our selfplay workers would instead directly upload each TFExample
+to BigTable, indexed by game number and move number. A set of parallel readers
+would then use BigTable's built-in samplers to read over a specified window of
+games. In order to ensure a 10% ratio of calibration games to resign-enabled
+games, we used the BigTable input readers to enforce a 90:10 ratio.
 
-Another benefit of the BigTable integration was that we could directly run a
-query on BigTable to compute the appropriate resign threshold. Previously, this
-had been done by manually inspecting a Stackdriver graph and editing a flagfile
-on GCS. This meant that the latency of resign threshold updates dropped from
-hours to minutes.
+The many benefits of BT replacement included:
 
-Overall, time between checkpoints dropped from 30 minutes to 20 minutes. (With
-one run being 800 checkpoints, this means that we can complete a run in 11 days.)
-We had much more consistent sampling for resign disabled/enabled games and for
-games of varying lengths. We reduced the latency for resign threshold measurements.
+  - we could directly run a query on BigTable to compute the appropriate resign
+  threshold. Previously, this had been done by manually inspecting a
+  Stackdriver graph and editing a flagfile on GCS. This meant that the latency
+  of resign threshold updates dropped from hours to minutes. Also, because
+  the resign threshold had been set manually, we tended to pick a number on the
+  high side, since it would be in force for a while.
+  - Time between checkpoints dropped from 30 minutes to 20 minutes. This
+  was due to the trainer not having to wait for the shuffler at all. We actually
+  ended up adding waiting logic to the timer to ensure enough games had been
+  completed before starting training again. This was probably an improvement on
+  our previous logic, which output a golden chunk as soon as the trainer completed
+  training a new generation.
+  - The ratio of sampled positions from calibration games and normal games was
+  precisely set at 90:10, instead of implicitly depending on the ratio of game
+  lengths for calibration games / normal games. (The AGZ paper reported setting
+  aside 10% of games, which could lead to anywhere from 10~20% of moves being
+  from calibration games.
 
 The run was uneventful and was a bit better than previous runs; it escaped random
-play much more quickly, probably because the improved resign threshold latency
+play much more quickly, probably because the up-to-date resign thresholds
 meant that our training data was appropriately pruned of 'easy' positions.
-So all in all, the rewrite didn't create any new pipeline issues.
+So all in all, the rewrite didn't create any new pipeline issues and improved
+many aspects.
 
-Around generation 280, we discovered on LCZero forums that AlphaGoZero had used
+Around model 280, we [discovered on LCZero forums](http://talkchess.com/forum3/viewtopic.php?f=2&t=69175&p=781765&sid=c57776201e233b1be14bf56f71f5e54e#p781765)
+that AlphaGoZero had used
 init-to-loss for Q values. We switched to init-to-loss from init-to-parent and
 saw our network gain dramatically in strength. Soon, our top model thoroughly
 exceeded our previous best model, and beat LZ's v157, the last model from before
@@ -650,19 +673,23 @@ LZ started mixing in game data from the much stronger ELF.
 ### v15, clean run with init to loss
 
 This run beat v14 pretty early on, producing a model that was stronger than v14's
-best at generation 330. v15 ended up slightly stronger than v14 but was otherwise
+best at model 330. v15 ended up slightly stronger than v14 but was otherwise
 similar.
 
 Qualitatively, we noticed that V14/V15's models were much sharper,
 meaning that they had more concentrated policy network output and the value
 network output would have stronger opinions on whether it was winning or losing.
-Simultaneously, the calibrated resign threshold for init-to-loss ended up at 0.5
-compared to 0.9 in previous runs. So v14/v15's MCTS was operating in the sweet
-spot more frequently. (The MCTS algorithm tends to go blind once Q gets close to
-0.9, because there's no more room at the top.) The init-to-loss configuration
-also led to much deeper reads, as the tree search behavior would dive deeply
-into one variation before going onto the next. This read behavior meant that
-v14 was our first model to be able to consistently read ladders. As a result,
+Simultaneously, the calibrated resign threshold for init-to-loss ended up at
+0.5-0.7 compared to 0.8-0.95 in previous runs. So v14/v15's MCTS was operating
+in the sweet spot of [-0.5, 0.5] more frequently. (The MCTS algorithm tends to
+go blind once Q gets close to 0.9, because there's no more room at the top.)
+
+The init-to-loss configuration also led to much deeper reads, as the tree search
+behavior would dive deeply into one variation before going onto the next.
+Originally, we'd labelled this behavior as pathological and thought it went
+against the spirit of MCTS, which was why init-to-loss wasn't seriously
+considered. But this read behavior meant that v14 was our first model to be
+able to consistently read ladders. One funny side effect was that
 it was actually not clear whether v14 was actually stronger than v12, or whether
 v14 was just bullying v12 around by reading ladders that v12 couldn't read, and
 winning easy rating points. But since we had achieved success against external
@@ -671,13 +698,9 @@ reference points, we concluded that v14/v15 were in fact really stronger than v1
 During v15's run, we realized that our evaluation cluster infrastructure was in
 need of some upgrades, primarily for two reasons:
 
-1. We wanted to include LZ in the mix, so we could cross-evaluate LZ models with
-our own.
+1. We wanted to include external reference points, so that we could get a more
+stable evaluation.
 1. We wanted to be able to run each model with its preferred configuration (init
-to parent for v10/v12, and init to loss for v14/v15.)
-
-
-
-
-
-
+to parent for v10/v12, and init to loss for v14/v15.) This would seem easy - run
+each side as an independent subprocess. However, because of GPU memory / TPU
+contention issues, this was tricky to do.
