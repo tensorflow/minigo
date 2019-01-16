@@ -592,6 +592,11 @@ matches, v12 ended up slightly stronger than the other runs, but it was well
 within the natural variability of the other runs. V12 still had ladder issues
 and it still could not beat LeelaZero or ELF, even with increased playouts.
 
+In retrospect, the fact that v12 had improved slightly in strength suggested
+that adding spurious reads to the game tree would diminish MCTS's ability to
+discern the best move.
+
+
 ### v13, pro game bootstrap
 
 Out of curiosity, we wanted to see what happened if we bootstrapped a model
