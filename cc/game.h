@@ -81,10 +81,9 @@ class Game {
 
   void SetGameOverBecauseOfResign(Color winner);
 
-  // Returns up to the last num_moves of moves that lead up to the requested
-  // move, including the move itself.
-  // After GetStoneHistory returns, history[i] will point to the stones from
-  // (move - i). If (move - i) < 0, history[i] == nullptr.
+  // Returns up to the last `num_moves` of moves that lead up to the requested
+  // `move`, including the move itself.
+  // If `move < num_moves`, history will be truncated to the first `move` moves.
   void GetStoneHistory(int move, int num_moves,
                        std::vector<const Position::Stones*>* history) const;
 

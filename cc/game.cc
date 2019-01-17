@@ -85,8 +85,8 @@ void Game::GetStoneHistory(
 
   MG_CHECK(move >= 0);
   MG_CHECK(move < static_cast<int>(moves_.size()));
-  for (int i = 0; i < num_moves; ++i) {
-    history->push_back(move - i >= 0 ? &moves_[move - i]->stones : nullptr);
+  for (int i = 0; i < num_moves && move - i >= 0; ++i) {
+    history->push_back(&moves_[move - i]->stones);
   }
 }
 
