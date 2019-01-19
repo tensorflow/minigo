@@ -111,12 +111,19 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             let params = new URLSearchParams(window.location.search);
             let p = params.get("gtp_debug");
             let debug = (p != null) && (p == "" || p == "1" || p.toLowerCase() == "true");
-            return this.gtp.connect(uri, debug).then((size) => {
-                base_1.setBoardSize(size);
-                let stones = new Array(base_1.N * base_1.N);
-                stones.fill(base_1.Color.Empty);
-                this.rootPosition = new position_1.Position('dummy-root', null, stones, null, base_1.Color.Black, false, true);
-                this.activePosition = this.rootPosition;
+            return fetch('player_list').then((response) => {
+                return response.json();
+            }).then((players) => {
+                if (players.length != 1) {
+                    throw new Error(`expected 1 player, got ${players}`);
+                }
+                return this.gtp.connect(uri, players[0], debug).then((size) => {
+                    base_1.setBoardSize(size);
+                    let stones = new Array(base_1.N * base_1.N);
+                    stones.fill(base_1.Color.Empty);
+                    this.rootPosition = new position_1.Position('dummy-root', null, stones, null, base_1.Color.Black, false, true);
+                    this.activePosition = this.rootPosition;
+                });
             });
         }
         newGame() {

@@ -368,7 +368,7 @@ class ExploreApp extends App {
       let reader = new FileReader();
       reader.onload = () => {
         this.newGame();
-        let sgf = reader.result.replace(/\n/g, '\\n');
+        let sgf = (reader.result as string).replace(/\n/g, '\\n');
 
         this.board.enabled = false;
         this.board.showSearch = false;

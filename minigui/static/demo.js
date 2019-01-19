@@ -92,17 +92,27 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 return;
             }
             if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
-                this.mainBoard.enabled = false;
-                this.pvLayer.show = true;
-                this.engineBusy = true;
-                this.gtp.send('genmove').finally(() => {
-                    this.engineBusy = false;
-                });
+                this.genmove();
             }
             else {
                 this.mainBoard.enabled = true;
                 this.pvLayer.show = false;
             }
+        }
+        genmove() {
+            if (this.activePosition.gameOver || this.engineBusy) {
+                return;
+            }
+            this.mainBoard.enabled = false;
+            this.pvLayer.show = true;
+            this.engineBusy = true;
+            let colorStr = this.activePosition.toPlay == base_1.Color.Black ? 'b' : 'w';
+            this.gtp.send(`genmove ${colorStr}`).finally(() => {
+                this.engineBusy = false;
+                if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
+                    this.genmove();
+                }
+            });
         }
         onPositionUpdate(position, update) {
             if (position != this.activePosition) {
@@ -118,6 +128,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             for (let board of this.boards) {
                 board.setPosition(position);
             }
+            this.winrateGraph.setActive(position);
             this.winrateGraph.update(position);
             this.log.scroll();
             this.onPlayerChanged();

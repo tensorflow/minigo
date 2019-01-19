@@ -131,16 +131,28 @@ class DemoApp extends App {
     }
 
     if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
-      this.mainBoard.enabled = false;
-      this.pvLayer.show = true;
-      this.engineBusy = true;
-      this.gtp.send('genmove').finally(() => {
-        this.engineBusy = false;
-      });
+      this.genmove();
     } else {
       this.mainBoard.enabled = true;
       this.pvLayer.show = false;
     }
+  }
+
+  private genmove() {
+    if (this.activePosition.gameOver || this.engineBusy) {
+      return;
+    }
+
+    this.mainBoard.enabled = false;
+    this.pvLayer.show = true;
+    this.engineBusy = true;
+    let colorStr = this.activePosition.toPlay == Color.Black ? 'b' : 'w';
+    this.gtp.send(`genmove ${colorStr}`).finally(() => {
+      this.engineBusy = false;
+      if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
+        this.genmove();
+      }
+    });
   }
 
   protected onPositionUpdate(position: Position, update: Position.Update) {
@@ -158,6 +170,7 @@ class DemoApp extends App {
     for (let board of this.boards) {
       board.setPosition(position);
     }
+    this.winrateGraph.setActive(position);
     this.winrateGraph.update(position);
     this.log.scroll();
     this.onPlayerChanged();

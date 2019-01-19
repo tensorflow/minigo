@@ -43,13 +43,15 @@ class Socket {
 
   private dataHandlers: {prefix: string, handler: DataHandler}[] = [];
   private textHandlers: TextHandler[] = [];
+  private player = "";
 
   private debug = false;
 
   // Connects to the Minigui server at the given URI.
   // Returns a promise that gets resolved of the board size when the connection
   // is established.
-  connect(uri: string, debug=false) {
+  connect(uri: string, player: string, debug=false) {
+    this.player = player;
     this.debug = debug;
     this.sock = io.connect(uri)
 
@@ -80,10 +82,10 @@ class Socket {
         // Probe for the supported board size.
         // Minigo only supports a single board size and will reject GTP
         // "boardsize" commands for any other size.
-        this.send('boardsize 9')
-          .then(() => { resolve(9); })
+        this.send('boardsize 19')
+          .then(() => { resolve(19); })
           .catch(() => {
-            this.send('boardsize 19').then(() => { resolve(19); });
+            this.send('boardsize 9').then(() => { resolve(9); });
           });
       });
     });
@@ -219,7 +221,7 @@ class Socket {
     if (this.debug) {
       console.log(`### SND ${cmd}`);
     }
-    this.sock.emit('gtpcmd', {data: cmd});
+    this.sock.emit('gtpcmd', {player: this.player, data: cmd});
   }
 }
 

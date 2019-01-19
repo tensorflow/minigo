@@ -114,6 +114,7 @@ void WriteGameExamples(const std::string& output_dir,
                        const std::string& output_name, const Game& game) {
   MG_CHECK(file::RecursivelyCreateDir(output_dir));
   auto output_path = file::JoinPath(output_dir, output_name + ".tfrecord.zz");
+
   auto examples = MakeExamples(game);
   WriteTfExamples(output_path, examples);
 }

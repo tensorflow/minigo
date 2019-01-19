@@ -160,8 +160,8 @@ class WinrateGraph extends View {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    ctx.lineCap = 'butt';
-    ctx.lineJoin = 'butt';
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
 
     // Apply a translation such that (0, 0) is the center of the pixel at the
     // top left of the graph.

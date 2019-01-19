@@ -1,4 +1,4 @@
-define(["require", "exports", "./app", "./board", "./layer", "./log", "./util", "./winrate_graph"], function (require, exports, app_1, board_1, lyr, log_1, util_1, winrate_graph_1) {
+define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", "./util", "./winrate_graph"], function (require, exports, app_1, base_1, board_1, lyr, log_1, util_1, winrate_graph_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     class KioskApp extends app_1.App {
@@ -60,7 +60,8 @@ define(["require", "exports", "./app", "./board", "./layer", "./log", "./util", 
                 window.setTimeout(() => { this.newGame(); }, 3000);
             }
             else {
-                this.gtp.send('genmove');
+                let colorStr = this.activePosition.toPlay == base_1.Color.Black ? 'b' : 'w';
+                this.gtp.send(`genmove ${colorStr}`);
             }
         }
         onGameOver() {

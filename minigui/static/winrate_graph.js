@@ -101,8 +101,8 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             let h = this.h;
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.lineCap = 'butt';
-            ctx.lineJoin = 'butt';
+            ctx.lineCap = 'square';
+            ctx.lineJoin = 'miter';
             ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
             ctx.lineWidth = pr;
             ctx.strokeStyle = '#96928f';

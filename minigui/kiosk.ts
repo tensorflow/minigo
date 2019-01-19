@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {App} from './app'
+import {Color} from './base'
 import {Board} from './board'
 import * as lyr from './layer'
 import {Log} from './log'
@@ -81,7 +82,8 @@ class KioskApp extends App {
     if (this.activePosition.gameOver) {
       window.setTimeout(() => { this.newGame(); }, 3000);
     } else {
-      this.gtp.send('genmove');
+      let colorStr = this.activePosition.toPlay == Color.Black ? 'b' : 'w';
+      this.gtp.send(`genmove ${colorStr}`);
     }
   }
 

@@ -279,6 +279,8 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(CmdArgs args) {
     return response;
   }
 
+  // TODO(tommadams): Handle out of turn moves.
+
   auto c = SuggestMove();
   MG_LOG(INFO) << root()->Describe();
   MG_CHECK(PlayMove(c, &game_));

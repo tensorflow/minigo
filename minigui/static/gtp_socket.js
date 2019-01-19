@@ -16,9 +16,11 @@ define(["require", "exports"], function (require, exports) {
             this.lines = [];
             this.dataHandlers = [];
             this.textHandlers = [];
+            this.player = "";
             this.debug = false;
         }
-        connect(uri, debug = false) {
+        connect(uri, player, debug = false) {
+            this.player = player;
             this.debug = debug;
             this.sock = io.connect(uri);
             this.sock.on('json', (msg) => {
@@ -43,10 +45,10 @@ define(["require", "exports"], function (require, exports) {
             return new Promise((resolve) => {
                 this.sock.on('connect', () => {
                     this.newSession();
-                    this.send('boardsize 9')
-                        .then(() => { resolve(9); })
+                    this.send('boardsize 19')
+                        .then(() => { resolve(19); })
                         .catch(() => {
-                        this.send('boardsize 19').then(() => { resolve(19); });
+                        this.send('boardsize 9').then(() => { resolve(9); });
                     });
                 });
             });
@@ -140,7 +142,7 @@ define(["require", "exports"], function (require, exports) {
             if (this.debug) {
                 console.log(`### SND ${cmd}`);
             }
-            this.sock.emit('gtpcmd', { data: cmd });
+            this.sock.emit('gtpcmd', { player: this.player, data: cmd });
         }
     }
     exports.Socket = Socket;

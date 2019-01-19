@@ -180,16 +180,24 @@ abstract class App {
     let params = new URLSearchParams(window.location.search);
     let p = params.get("gtp_debug");
     let debug = (p != null) && (p == "" || p == "1" || p.toLowerCase() == "true");
-    return this.gtp.connect(uri, debug).then((size: number) => {
-      // setBoardSize sets the global variable N to the board size for the game
-      // (as provided by the backend engine). The code uses N from hereon in.
-      setBoardSize(size);
+    return fetch('player_list').then((response) => {
+      return response.json();
+    }).then((players: string[]) => {
+      if (players.length != 1) {
+        throw new Error(`expected 1 player, got ${players}`);
+      }
+      return this.gtp.connect(uri, players[0], debug).then((size: number) => {
+        // setBoardSize sets the global variable N to the board size for the
+        // game (as provided by the backend engine). The code uses N from hereon
+        // in.
+        setBoardSize(size);
 
-      let stones = new Array<Color>(N * N);
-      stones.fill(Color.Empty);
-      this.rootPosition = new Position(
-          'dummy-root', null, stones, null, Color.Black, false, true);
-      this.activePosition = this.rootPosition;
+        let stones = new Array<Color>(N * N);
+        stones.fill(Color.Empty);
+        this.rootPosition = new Position(
+            'dummy-root', null, stones, null, Color.Black, false, true);
+        this.activePosition = this.rootPosition;
+      });
     });
   }
 
