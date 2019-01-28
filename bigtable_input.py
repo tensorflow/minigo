@@ -24,6 +24,7 @@ import operator
 import re
 import struct
 import time
+from tqdm import tqdm
 import numpy as np
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters as bigtable_row_filters
@@ -127,11 +128,13 @@ def make_single_array(ds, batch_size=8*1024):
         iterator = ds.make_initializable_iterator()
         sess.run(iterator.initializer)
         get_next = iterator.get_next()
-        try:
-            while True:
-                batches.append(sess.run(get_next))
-        except tf.errors.OutOfRangeError:
-            pass
+        with tqdm(desc='Elements', unit_scale=1) as pbar:
+            try:
+                while True:
+                    batches.append(sess.run(get_next))
+                    pbar.update(len(batches[-1]))
+            except tf.errors.OutOfRangeError:
+                pass
     if batches:
         return np.concatenate(batches)
     return np.array([], dtype=ds.output_types.as_numpy_dtype)
@@ -194,8 +197,6 @@ def _delete_rows(args):
     btspec, row_keys = args
     bt_table = bigtable.Client(btspec.project).instance(
         btspec.instance).table(btspec.table)
-    utils.dbg('...deleting range %s..%s' % (
-        row_keys[0], row_keys[-1]))
     rows = [bt_table.row(k) for k in row_keys]
     for r in rows:
         r.delete()
@@ -309,15 +310,22 @@ class GameQueue:
         # trimmed out of the middle.
         row_keys.reverse()
         total_keys = len(row_keys)
-        batches = [(self.btspec, b) for b in
-                   utils.iter_chunks(bigtable.row.MAX_MUTATIONS, row_keys)]
-        assert sum([len(b) for t, b in batches]) == total_keys
-        utils.dbg('Deleting %d batches, total of %d keys' % (
-            len(batches), total_keys))
+        utils.dbg('Deleting total of %d keys' % total_keys)
         concurrency = min(MAX_BT_CONCURRENCY,
                           multiprocessing.cpu_count() * 2)
         with multiprocessing.Pool(processes=concurrency) as pool:
-            pool.map(_delete_rows, batches)
+            batches = []
+            with tqdm(desc='Keys', unit_scale=2, total=total_keys) as pbar:
+                for b in utils.iter_chunks(bigtable.row.MAX_MUTATIONS,
+                                           row_keys):
+                    pbar.update(len(b))
+                    batches.append((self.btspec, b))
+                    if len(batches) >= concurrency:
+                        pool.map(_delete_rows, batches)
+                        batches = []
+                pool.map(_delete_rows, batches)
+                batches = []
+
 
     def trim_games_since(self, t, max_games=500000):
         """Trim off the games since the given time.
