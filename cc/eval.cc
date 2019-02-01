@@ -57,7 +57,7 @@ DEFINE_double(value_init_penalty, 2.0,
               "New children value initialization penalty.\n"
               "Child value = parent's value - penalty * color, clamped to"
               " [-1, 1].  Penalty should be in [0.0, 2.0].\n"
-              "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
+              "0 is init-to-parent, 2.0 is init-to-loss [default].\n"
               "This behaves similiarly to Leela's FPU \"First Play Urgency\".");
 
 // Inference flags.
