@@ -1,0 +1,17 @@
+# Copy of requirements.txt with packages in colab commented.
+
+#absl-py
+autopep8>=1.3
+fire
+google.cloud.logging
+google.cloud.bigtable
+#grpcio-tools
+#keras
+#numpy>=1.14.0
+#protobuf
+pylint
+sgf==0.5
+#six
+#tqdm>=4.17
+
+#oauth2client==4.1
