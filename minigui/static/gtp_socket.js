@@ -16,17 +16,16 @@ define(["require", "exports"], function (require, exports) {
             this.lines = [];
             this.dataHandlers = [];
             this.textHandlers = [];
-            this.player = "";
+            this.playerName = "";
             this.debug = false;
         }
-        connect(uri, player, debug = false) {
-            this.player = player;
+        connect(uri, playerName, debug = false) {
+            this.playerName = playerName;
             this.debug = debug;
             this.sock = io.connect(uri);
             this.sock.on('json', (msg) => {
                 let obj = JSON.parse(msg);
-                if (obj.token != this.gameToken) {
-                    console.log('ignoring', obj, `${obj.token} != ${this.gameToken}`);
+                if (obj.token != this.token) {
                     return;
                 }
                 if (obj.stdout !== undefined) {
@@ -45,11 +44,7 @@ define(["require", "exports"], function (require, exports) {
             return new Promise((resolve) => {
                 this.sock.on('connect', () => {
                     this.newSession();
-                    this.send('boardsize 19')
-                        .then(() => { resolve(19); })
-                        .catch(() => {
-                        this.send('boardsize 9').then(() => { resolve(9); });
-                    });
+                    resolve();
                 });
             });
         }
@@ -81,16 +76,16 @@ define(["require", "exports"], function (require, exports) {
         }
         newSession() {
             this.cmdQueue = [];
-            let token = `session-id-${Date.now()}`;
-            this.gameToken = token;
+            let token = `${this.playerName}-${Date.now()}`;
+            this.token = token;
             this.send(`echo __NEW_TOKEN__ ${token}`);
         }
         cmdHandler(line) {
             let { cmd, resolve, reject } = this.cmdQueue[0];
             if (this.debug) {
-                console.log(`### OUT ${cmd} ${line}`);
+                console.log(`### ${this.playerName} OUT ${cmd} ${line}`);
             }
-            this.textHandler(`${trimText(cmd, 1024)} ${trimText(line, 1024)}`);
+            this.textHandler(`${trimText(line, 1024)}`);
             if (line[0] == '=' || line[0] == '?') {
                 this.cmdQueue = this.cmdQueue.slice(1);
                 if (this.cmdQueue.length > 0) {
@@ -109,7 +104,7 @@ define(["require", "exports"], function (require, exports) {
         stderrHandler(line) {
             let handled = false;
             if (this.debug) {
-                console.log(`### ERR ${line}`);
+                console.log(`### ${this.playerName} ERR ${line}`);
             }
             for (let { prefix, handler } of this.dataHandlers) {
                 if (line.substr(0, prefix.length) == prefix) {
@@ -140,9 +135,9 @@ define(["require", "exports"], function (require, exports) {
                 this.textHandler(trimText(cmd, 1024));
             }
             if (this.debug) {
-                console.log(`### SND ${cmd}`);
+                console.log(`### ${this.playerName} SND ${cmd}`);
             }
-            this.sock.emit('gtpcmd', { player: this.player, data: cmd });
+            this.sock.emit('gtpcmd', { player: this.playerName, data: cmd });
         }
     }
     exports.Socket = Socket;

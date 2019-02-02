@@ -57,24 +57,43 @@ class GtpPlayer : public MctsPlayer {
   GtpPlayer(std::unique_ptr<DualNet> network, const Options& options);
 
   void Run();
+  void NewGame() override;
   Coord SuggestMove() override;
 
  protected:
   // Response from the GTP command handler.
   struct Response {
     static Response Ok(std::string str = "") {
-      return {std::move(str), true, false};
+      Response response;
+      response.str = std::move(str);
+      response.ok = true;
+      return response;
     }
 
     template <typename... Args>
     static Response Error(const Args&... args) {
-      return {absl::StrCat(args...), false, false};
+      Response response;
+      response.str = absl::StrCat(args...);
+      response.ok = false;
+      return response;
     }
 
-    static Response Done() { return {"", true, true}; }
+    static Response Done() {
+      Response response;
+      response.done = true;
+      return response;
+    }
+
+    void set_cmd_id(int id) {
+      has_cmd_id = true;
+      cmd_id = id;
+    }
 
     friend std::ostream& operator<<(std::ostream& os, const Response& r) {
       os << (r.ok ? "=" : "?");
+      if (r.has_cmd_id) {
+        os << r.cmd_id;
+      }
       if (!r.str.empty()) {
         os << " " << r.str;
       }
@@ -85,10 +104,14 @@ class GtpPlayer : public MctsPlayer {
     std::string str;
 
     // True if the command completed successfully.
-    bool ok;
+    bool ok = false;
 
     // True if the Run loop should exit.
-    bool done;
+    bool done = false;
+
+    bool has_cmd_id = false;
+
+    int cmd_id = 0;
   };
 
   using CmdArgs = const std::vector<absl::string_view>&;

@@ -22,9 +22,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 let searchElem = util_1.getElement('search-board');
                 if (searchElem) {
                     this.boards.push(new board_1.Board(searchElem, this.rootPosition, [
-                        new lyr.Caption('search'),
+                        new lyr.Caption('live'),
                         new lyr.BoardStones(),
-                        new lyr.Variation('search')
+                        new lyr.Variation('live')
                     ]));
                 }
                 let nElem = util_1.getElement('n-board');
@@ -129,13 +129,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 board.setPosition(position);
             }
             this.winrateGraph.setActive(position);
-            this.winrateGraph.update(position);
             this.log.scroll();
             this.onPlayerChanged();
         }
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
-            let moveStr = base_1.toKgs(move);
+            let moveStr = base_1.toGtp(move);
             this.gtp.send(`play ${colorStr} ${moveStr}`);
         }
         onGameOver() {

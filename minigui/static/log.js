@@ -5,6 +5,7 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
         constructor(logElemId, consoleElemId = null) {
             this.consoleElem = null;
             this.cmdHandler = null;
+            this.scrollPending = false;
             this.logElem = util_1.getElement(logElemId);
             if (consoleElemId) {
                 this.consoleElem = util_1.getElement(consoleElemId);
@@ -43,8 +44,14 @@ define(["require", "exports", "./util"], function (require, exports, util_1) {
             this.logElem.innerHTML = '';
         }
         scroll() {
-            if (this.logElem.lastElementChild) {
-                this.logElem.lastElementChild.scrollIntoView();
+            if (!this.scrollPending) {
+                this.scrollPending = true;
+                window.requestAnimationFrame(() => {
+                    this.scrollPending = false;
+                    if (this.logElem.lastElementChild) {
+                        this.logElem.lastElementChild.scrollIntoView();
+                    }
+                });
             }
         }
         onConsoleCmd(cmdHandler) {

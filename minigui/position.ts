@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Color, Move, Nullable, Point, movesEqual, otherColor, stonesEqual, toKgs} from './base'
-import {partialUpdate} from './util'
+import {Color, Move, N, Nullable, Point, moveIsPoint, movesEqual, otherColor, stonesEqual, toGtp} from './base'
+import * as util from './util'
 
 namespace Annotation {
   export enum Shape {
@@ -28,16 +28,23 @@ interface Annotation {
 }
 
 class Position {
+  id: string;
+  parent: Nullable<Position> = null;
+  stones: Color[];
+  lastMove: Nullable<Move> = null;
+  toPlay: Color;
+  gameOver: boolean;
+  isMainLine = true;
+
   n = 0;
   q: Nullable<number> = null;
   moveNum: number;
-  search: Move[] = [];
 
   // A map of variations.
-  // The pricinpal variation is keyed by "pv".
-  // The current tree search is keyed by "search".
-  // All other variations are keyed by their KGS string.
-  variations = new Map<string, Move[]>();
+  // The principal variation is keyed by "pv".
+  // The current live tree search is keyed by "live".
+  // All other variations are keyed by their GTP string.
+  variations = new Map<string, Position.Variation>();
 
   annotations: Annotation[] = [];
   childN: Nullable<number[]> = null;
@@ -52,63 +59,109 @@ class Position {
 
   comment = "";
 
-  constructor(public id: string,
-              public parent: Nullable<Position>,
-              public stones: Color[],
-              public lastMove: Nullable<Move>,
-              public toPlay: Color,
-              public gameOver: boolean,
-              public isMainLine: boolean) {
-    this.moveNum = parent != null ? parent.moveNum + 1 : 0;
-    if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
+  treeStats: Position.TreeStats = {
+    numNodes: 0,
+    numLeafNodes: 0,
+    maxDepth: 0,
+  }
+
+  constructor(j: Position.Definition) {
+    this.id = j.id;
+    this.moveNum = j.moveNum;
+    this.toPlay = util.parseColor(j.toPlay);
+    this.stones = [];
+    if (j.stones !== undefined) {
+      const stoneMap: {[index: string]: Color} = {
+        '.': Color.Empty,
+        'X': Color.Black,
+        'O': Color.White,
+      };
+      for (let i = 0; i < N * N; ++i) {
+        this.stones.push(stoneMap[j.stones[i]]);
+      }
+    } else {
+      for (let i = 0; i < N * N; ++i) {
+        this.stones.push(Color.Empty);
+      }
+    }
+    if (j.move) {
+      this.lastMove = util.parseMove(j.move);
+    }
+    this.gameOver = j.gameOver || false;
+    this.moveNum = j.moveNum;
+    if (j.comment) {
+      this.comment = j.comment;
+    }
+    if (j.caps !== undefined) {
+      this.captures[0] = j.caps[0];
+      this.captures[1] = j.caps[1];
+    }
+
+    if (moveIsPoint(this.lastMove)) {
       this.annotations.push({
-        p: lastMove,
+        p: this.lastMove,
         shape: Annotation.Shape.Dot,
         colors: ['#ef6c02'],
       });
     }
   }
 
-  addChild(id: string, move: Move, stones: Color[], gameOver: boolean) {
+  addChild(p: Position) {
+    if (p.lastMove == null) {
+      throw new Error('Child nodes shouldn\'t have a null lastMove');
+    }
+    if (p.parent != null) {
+      throw new Error('Node already has a parent');
+    }
+
     // If the position already has a child with the given move, verify that the
     // stones are equal and return the existing child.
     for (let child of this.children) {
-      if (child.lastMove == null) {
-        throw new Error('Child node shouldn\'t have a null lastMove');
-      }
-      if (movesEqual(child.lastMove, move)) {
-        if (!stonesEqual(stones, child.stones)) {
-          throw new Error(`Position has child ${toKgs(move)} with different stones`);
-        }
-        return child;
+      if (movesEqual(child.lastMove, p.lastMove)) {
+        throw new Error(`Position already has child ${toGtp(p.lastMove)}`);
       }
     }
 
     // Create a new child.
-    let isMainLine = this.isMainLine && this.children.length == 0;
-    let child = new Position(id, this, stones, move, otherColor(this.toPlay),
-                             gameOver, isMainLine);
-    this.children.push(child);
-    return child;
+    p.isMainLine = this.isMainLine && this.children.length == 0;
+    p.parent = this;
+    this.children.push(p);
+  }
+
+  getChild(move: Move) {
+    for (let child of this.children) {
+      if (movesEqual(child.lastMove, move)) {
+        return child;
+      }
+    }
+    return null;
   }
 
   update(update: Position.Update) {
-    // Update simple properties.
-    const props = ['n', 'q', 'childN', 'childQ'];
-    partialUpdate(update, this, props);
-
-    // Variations need special handling.
-    if (update.variations != null) {
+    if (update.n !== undefined) { this.n = update.n; }
+    if (update.q !== undefined) { this.q = update.q; }
+    if (update.childN !== undefined) { this.childN = update.childN; }
+    if (update.childQ !== undefined) {
+      this.childQ = [];
+      for (let q of update.childQ) { this.childQ.push(q / 1000); }
+    }
+    if (update.treeStats !== undefined) { this.treeStats = update.treeStats; }
+    if (update.variations !== undefined) {
+      this.variations.clear();
+      let pv: Nullable<Position.Variation> = null;
       for (let key in update.variations) {
-        this.variations.set(key, update.variations[key]);
-      }
-      // If the update has a principal variation also update the variation
-      // at it's first move.
-      if ("pv" in update.variations) {
-        let pv = update.variations["pv"];
-        if (pv.length > 0) {
-          this.variations.set(toKgs(pv[0]), pv);
+        let variation = {
+          n: update.variations[key].n,
+          q: update.variations[key].q,
+          moves: util.parseMoves(update.variations[key].moves),
+        };
+        this.variations.set(key, variation);
+        if (pv == null || variation.n > pv.n) {
+          pv = variation;
         }
+      }
+      if (pv != null) {
+        this.variations.set("pv", pv);
       }
     }
   }
@@ -134,26 +187,47 @@ class Position {
   }
 }
 
-
 namespace Position {
+  // Definition of a Position
+  export interface Definition {
+    id: string;
+    parentId?: string;
+    moveNum: number;
+    toPlay: string;
+    stones?: string;
+    gameOver?: boolean;
+    move?: string;
+    comment?: string;
+    caps?: number[];
+  }
+
+  export interface Variation {
+    n: number;
+    q: number;
+    moves: Move[];
+  };
+
+  export interface TreeStats {
+    numNodes: number;
+    numLeafNodes: number;
+    maxDepth: number;
+  }
+
   export interface Update {
-    // Number of reads under this position.
+    id: string;
     n?: number;
-
-    // This position's Q score.
     q?: number;
-
-    // A map of variations.
-    // The pricinpal variation is keyed by "pv".
-    // The current tree search is keyed by "search".
-    // All other variations are keyed by their KGS string.
-    variations?: {[index: string]: Move[]};
-
-    // Child visit counts.
+    pv?: string;
     childN?: number[];
-
-    // Child Q scores.
     childQ?: number[];
+    treeStats?: TreeStats;
+    variations?: {
+      [index:string]: {
+        n: number;
+        q: number;
+        moves: string[];
+      }
+    };
   }
 }
 

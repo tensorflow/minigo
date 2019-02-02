@@ -68,9 +68,13 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     }
     exports.Grid = Grid;
     class Label extends StaticLayer {
+        constructor(size = 0.6) {
+            super();
+            this.size = size;
+        }
         draw() {
             let ctx = this.board.ctx;
-            let textHeight = Math.floor(0.6 * this.board.stoneRadius);
+            let textHeight = Math.floor(this.size * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.fillStyle = '#9d7c4d';
             ctx.textAlign = 'center';
@@ -133,7 +137,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             let ctx = this.board.ctx;
             let w = this.board.pointW;
             let h = this.board.pointH;
-            let stones = this.board.stones;
+            let stones = this.board.position.stones;
             let p = { row: 0, col: 0 };
             let i = 0;
             for (p.row = 0; p.row < base_1.N; ++p.row) {
@@ -268,7 +272,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             }
             this._showVariation = x;
             this.update(new Set(["variations"]));
-            this.draw();
+            this.board.draw();
         }
         clear() {
             super.clear();
@@ -286,10 +290,10 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 this.clear();
                 return false;
             }
-            if (this.variationsEqual(variation, this.variation)) {
+            if (this.variationsEqual(variation.moves, this.variation)) {
                 return false;
             }
-            this.variation = variation.slice(0);
+            this.variation = variation.moves.slice(0);
             this.parseVariation(this.variation);
             return true;
         }
@@ -426,68 +430,80 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
         }
     }
     exports.Annotations = Annotations;
-    class Search extends Layer {
+    class Search extends Variation {
         constructor() {
-            super(...arguments);
-            this.bestVariations = new Map();
+            super('');
+            this.variations = [];
+        }
+        addToBoard(board) {
+            super.addToBoard(board);
+            this.board.ctx.canvas.addEventListener('mousemove', (e) => {
+                let p = this.board.canvasToBoard(e.offsetX, e.offsetY, 0.45);
+                if (p != null && this.hasVariation(p)) {
+                    let gtp = base_1.toGtp(p);
+                    if (this.showVariation == gtp) {
+                        return;
+                    }
+                    this.showVariation = base_1.toGtp(p);
+                }
+                else if (this.showVariation != '') {
+                    this.showVariation = '';
+                }
+            });
+            this.board.ctx.canvas.addEventListener('mouseleave', () => {
+                this.showVariation = '';
+            });
         }
         hasVariation(p) {
-            return this.bestVariations.has(p.col + p.row * base_1.N);
-        }
-        clear() {
-            if (this.bestVariations.size > 0) {
-                this.bestVariations.clear();
-                this.board.draw();
+            for (let v of this.variations) {
+                if (base_1.movesEqual(p, v.p)) {
+                    return true;
+                }
             }
+            return false;
         }
         update(props) {
-            if (!props.has('childN') && !props.has('childQ')) {
-                return false;
-            }
-            this.bestVariations.clear();
-            let position = this.board.position;
-            if (position.childN == null || position.childQ == null) {
-                return false;
-            }
-            let indices = [];
-            for (let i = 0; i < base_1.N * base_1.N; ++i) {
-                indices.push(i);
-            }
-            indices.sort((a, b) => {
-                let n = position.childN;
-                return n[b] - n[a];
-            });
-            let maxN = position.childN[indices[0]];
-            if (maxN == 0) {
-                return true;
-            }
-            let logMaxN = Math.log(maxN);
-            let idx = indices[0];
-            for (let i = 0; i < indices.length; ++i) {
-                let idx = indices[i];
-                let n = position.childN[idx];
-                if (n <= 1 || n < position.n / 100) {
-                    break;
-                }
-                this.addVariation(idx, logMaxN);
-            }
-            for (let child of position.children) {
-                if (base_1.moveIsPoint(child.lastMove) && !this.hasVariation(child.lastMove)) {
-                    let idx = child.lastMove.col + child.lastMove.row * base_1.N;
-                    this.addVariation(idx, logMaxN);
-                }
-            }
-            return true;
+            return super.update(props) || props.has('search');
         }
         draw() {
-            if (this.bestVariations.size == 0) {
+            if (this.showVariation != '') {
+                super.draw();
                 return;
             }
             let ctx = this.board.ctx;
             let pr = util_1.pixelRatio();
             let toPlay = this.board.position.toPlay;
             let stoneRgb = toPlay == base_1.Color.Black ? 0 : 255;
-            this.bestVariations.forEach((v) => {
+            let maxN = 0;
+            this.board.position.variations.forEach((v) => {
+                maxN = Math.max(maxN, v.n);
+            });
+            if (maxN <= 1) {
+                return;
+            }
+            let logMaxN = Math.log(maxN);
+            this.variations = [];
+            this.board.position.variations.forEach((v, key) => {
+                try {
+                    if (v.n == 0 || v.moves.length == 0 || !base_1.moveIsPoint(util_1.parseMove(key))) {
+                        return;
+                    }
+                }
+                catch {
+                    return;
+                }
+                let alpha = Math.log(v.n) / logMaxN;
+                alpha = Math.max(0, Math.min(alpha, 1));
+                if (alpha < 0.1) {
+                    return;
+                }
+                this.variations.push({
+                    p: v.moves[0],
+                    alpha: alpha,
+                    q: v.q,
+                });
+            });
+            for (let v of this.variations) {
                 let c = this.boardToCanvas(v.p.row, v.p.col);
                 let x = c.x + 0.5;
                 let y = c.y + 0.5;
@@ -495,49 +511,21 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 ctx.beginPath();
                 ctx.arc(x, y, 0.85 * this.board.stoneRadius, 0, 2 * Math.PI);
                 ctx.fill();
-            });
+            }
             let textHeight = Math.floor(0.8 * this.board.stoneRadius);
             ctx.font = `${textHeight}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = toPlay == base_1.Color.Black ? '#fff' : '#000';
             let scoreScale = this.board.position.toPlay == base_1.Color.Black ? 1 : -1;
-            this.bestVariations.forEach((v) => {
+            for (let v of this.variations) {
                 let c = this.boardToCanvas(v.p.row, v.p.col);
                 let winRate = 50 + 50 * scoreScale * v.q;
                 ctx.fillText(winRate.toFixed(1), c.x, c.y);
-            });
-        }
-        addVariation(idx, logMaxN) {
-            if (this.board.position.childN == null ||
-                this.board.position.childQ == null) {
-                return;
             }
-            let n = this.board.position.childN[idx];
-            if (n == 0 || logMaxN == 0) {
-                return;
-            }
-            let q = this.board.position.childQ[idx];
-            let alpha = Math.log(n) / logMaxN;
-            alpha = Math.max(0, Math.min(alpha, 1));
-            this.bestVariations.set(idx, new Search.Move(idx, n, q, alpha));
+            ;
         }
     }
-    exports.Search = Search;
-    (function (Search) {
-        class Move {
-            constructor(idx, n, q, alpha) {
-                this.n = n;
-                this.q = q;
-                this.alpha = alpha;
-                this.p = {
-                    row: Math.floor(idx / base_1.N),
-                    col: idx % base_1.N,
-                };
-            }
-        }
-        Search.Move = Move;
-    })(Search || (Search = {}));
     exports.Search = Search;
 });
 //# sourceMappingURL=layer.js.map

@@ -34,11 +34,27 @@ namespace minigo {
 
 class MctsNode {
  public:
+  struct TreeStats {
+    int num_nodes = 0;
+    int num_leaf_nodes = 0;
+    int max_depth = 0;
+    int depth_sum = 0;
+
+    std::string ToString() const;
+  };
+
   struct EdgeStats {
     float N = 0;
     float W = 0;
     float P = 0;
     float original_P = 0;
+  };
+
+  // Information about a child. Returned by CalculateRankedChildInfo.
+  struct ChildInfo {
+    Coord c = Coord::kInvalid;
+    float N;
+    float action_score;
   };
 
   static bool CmpN(const EdgeStats& a, const EdgeStats& b) { return a.N < b.N; }
@@ -93,6 +109,9 @@ class MctsNode {
   std::string MostVisitedPathString() const;
   std::vector<Coord> MostVisitedPath() const;
 
+  // Sorts the child nodes by visit counts, breaking ties by child action score.
+  std::array<ChildInfo, kNumMoves> CalculateRankedChildInfo() const;
+
   // Returns up to the last num_moves of moves that lead up to this node,
   // including the node itself.
   // After GetMoveHistory returns, history[0] is this MctsNode and history[i] is
@@ -137,7 +156,7 @@ class MctsNode {
   MctsNode* MaybeAddChild(Coord c);
 
   // Calculate and print statistics about the tree.
-  std::string CalculateTreeStats() const;
+  TreeStats CalculateTreeStats() const;
 
   // Parent node.
   MctsNode* parent;

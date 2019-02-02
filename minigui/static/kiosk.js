@@ -16,9 +16,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         new lyr.Annotations()
                     ]),
                     new board_1.Board('search-board', this.rootPosition, [
-                        new lyr.Caption('search'),
+                        new lyr.Caption('live'),
                         new lyr.BoardStones(),
-                        new lyr.Variation('search')
+                        new lyr.Variation('live')
                     ]),
                     new board_1.Board('n-board', this.rootPosition, [
                         new lyr.Caption('N'),
@@ -54,7 +54,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             for (let board of this.boards) {
                 board.setPosition(position);
             }
-            this.winrateGraph.update(position);
+            this.winrateGraph.setActive(position);
             this.log.scroll();
             if (this.activePosition.gameOver) {
                 window.setTimeout(() => { this.newGame(); }, 3000);

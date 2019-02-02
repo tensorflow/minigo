@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<html>
+  <head>
+    <title>Minigo: vs</title>
+    <link href="style.css" rel="stylesheet">
+    <script type="text/javascript" src="socketio/socket.io.min.js"></script>
+    <script data-main="vs" src="require/require.js"></script>
+    <style>
+      html, body { height: 100%; }
+      div { display: flex; }
+
+      .back-black { background-color: #000; }
+      .back-white { background-color: #fff; }
+      .fore-black { color: #000; }
+      .fore-white { color: #fff; }
+      .underline { text-decoration: underline; }
+
+      .column { flex-direction: column; }
+      .row { flex-direction: row; }
+      .flex-start { justify-content: flex-start; }
+      .flex-center { justify-content: flex-center; }
+      .flex-end { justify-content: flex-end; }
+      .flex-50pct { flex: 50%; }
+
+      .aligner {
+        font-size: 0;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+      }
+
+      .minigui {
+        flex-direction: column;
+        font-family: sans-serif;
+        padding-bottom: 2vh;
+      }
+
+      .top {
+        align-items: center;
+        display: inline-flex;
+        flex-direction: row;
+        height: 7vh;
+        justify-content: center;
+        width: 151vh;
+      }
+      .top-left {
+        width: 60vh;
+        justify-content: flex-end;
+      }
+      .top-right {
+        width: 60vh;
+        justify-content: flex-start;
+      }
+
+      .score {
+        color: #aaa199;
+        font-size: 5vh;
+        justify-content: center;
+        width: 31vh;
+      }
+      #b-games {
+        justify-content: flex-end;
+        width: 11vh;
+      }
+      #score-sep {
+        justify-content: center;
+        width: 3vh;
+      }
+      #w-games {
+        justify-content: flex-start;
+        width: 11vh;
+      }
+
+      .board-pad { height: 63vh; width: 63vh; padding: 3vh; }
+      #b-board { width: 100%; height: 100%; }
+      #w-board { width: 100%; height: 100%; }
+
+      .time-total { height: 2vh; font-size: 2vh; }
+      .time-elapsed { height: 1.5vh; font-size: 1.5vh; }
+
+      .graph { background-color: #403428; }
+      #winrate-graph {
+        width: 20vh;
+        height: 51vh;
+      }
+      #reads-graph {
+        width: 40vh;
+        height: 20vh;
+      }
+
+      .top-sep { width: 36vh; }
+
+      .top-circle {
+        align-items: center;
+        border-radius: 2vh;
+        display: inline-flex;
+        font-size: 2vh;
+        height: 4vh;
+        justify-content: center;
+        width: 4vh;
+      }
+
+      .player-text {
+        display: inline-flex;
+        align-items: center;
+        font-size: 3vh;
+      }
+
+      .info-text {
+        color: #aaa199;
+        font-size: 1.5vh;
+      }
+
+      .button {
+        border-radius: 0.6vh;
+        font-size: 1.3vh;
+        height: 4vh;
+        width: 7vh;
+      }
+
+      #pause {
+        background-color: #111;
+        color: #eee;
+        width: 100%;
+      }
+
+      .log-container { width: 53vh; height: 20vh; }
+      .log { width: 100%; height: calc(20vh - 24px); font-size: 9px; }
+      .log > div { display: block; }
+      .console-wrapper { height: 24px; }
+      .console-prompt { font-size: 10px; width: 16px; }
+      .console { font-size: 10px; width: calc(52vh - 16px); padding: 3px 0 3px 0; }
+      .console:focus { outline: none; }
+    </style>
+  </head>
+
+  <body>
+    <div class="aligner">
+      <div class="minigui">
+        <!-- header -->
+        <div class="top row">
+          <div class="top-left">
+            <div class="player-text" style="text-align:left; color:#000" id="b-name">Black</div>
+            <div class="sp-1vh"></div>
+            <div class="top-circle back-black fore-white" id="b-captures">0</div>
+          </div>
+
+          <div class="score">
+            <div id="b-score">0</div><div id="score-sep">-</div><div id="w-score">0</div>
+          </div>
+
+          <div class="top-right">
+            <div class="top-circle back-white fore-black" id="w-captures">0</div>
+            <div class="sp-1vh"></div>
+            <div class="player-text" style="color:#fff" id="w-name">White</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <!-- black board -->
+          <div class="board-pad board">
+            <div id="b-board"></div>
+          </div>
+
+          <div class="sp-3vh"></div>
+
+          <div class="column">
+            <!-- winrate graph -->
+            <div id="winrate-graph" class="graph"></div>
+
+            <!-- info -->
+            <div class="info-text" style="justify-content:center" id="move-num">move: 0</div>
+
+            <div class="sp-1vh"></div>
+
+            <div class="row info-text">
+              <div class="column flex-50pct">
+                <div class="flex-start time-total" id="b-time-total">00:00:00</div>
+                <div class="sp-1vh"></div>
+                <div class="flex-start time-elapsed" id="b-time-elapsed">00:00:00</div>
+              </div>
+              <div class="column flex-50pct">
+                <div class="flex-end time-total" id="w-time-total">00:00:00</div>
+                <div class="sp-1vh"></div>
+                <div class="flex-end time-elapsed" id="w-time-elapsed">00:00:00</div>
+              </div>
+            </div>
+
+            <div class="sp-1vh"></div>
+
+            <!-- controls -->
+            <div id="pause" class="button">Pause</div>
+          </div>
+
+          <div class="sp-3vh"></div>
+
+          <!-- white board -->
+          <div class="board-pad board">
+            <div id="w-board"></div>
+          </div>
+        </div>
+
+        <div class="sp-3vh"></div>
+
+        <div class="row">
+          <!-- black console -->
+          <div class="log-container column">
+            <div id="b-log" class="log column"></div>
+            <div class="console-wrapper row">
+              <div class="console-prompt">&gt;</div><div contenteditable id="b-console" class="console"></div>
+            </div>
+          </div>
+
+          <div class="sp-3vh"></div>
+
+          <!-- read depth graph -->
+          <div id="reads-graph" class="graph"></div>
+
+          <div class="sp-3vh"></div>
+
+          <!-- white console -->
+          <div class="log-container column">
+            <div id="w-log" class="log column"></div>
+            <div class="console-wrapper row">
+              <div class="console-prompt">&gt;</div><div contenteditable id="w-console" class="console"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -39,6 +39,7 @@ class MiniguiPlayer : public GtpPlayer {
   MiniguiPlayer(std::unique_ptr<DualNet> network, const Options& options);
 
   void NewGame() override;
+  Coord SuggestMove() override;
   bool PlayMove(Coord c, Game* game) override;
 
  protected:
@@ -94,7 +95,6 @@ class MiniguiPlayer : public GtpPlayer {
   Response HandlePruneNodes(CmdArgs args);
   Response HandleReportSearchInterval(CmdArgs args);
   Response HandleSelectPosition(CmdArgs args);
-  Response HandleVariation(CmdArgs args);
   Response HandleWinrateEvals(CmdArgs args);
 
   // Shared implementation used by HandleLoadsgf and HandlePlaysgf.
@@ -103,7 +103,8 @@ class MiniguiPlayer : public GtpPlayer {
   // Writes the search data for the tree search being performed at the given
   // root to stderr. If leaf is non-null, the search path from root to leaf
   // is also written.
-  void ReportSearchStatus(MctsNode* root, MctsNode* leaf);
+  void ReportSearchStatus(MctsNode* root, MctsNode* leaf,
+                          bool include_tree_stats);
 
   // Writes the position data for the node to stderr as a JSON object.
   void ReportPosition(MctsNode* node);

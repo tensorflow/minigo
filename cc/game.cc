@@ -30,6 +30,12 @@ Game::Game(std::string black_name, std::string white_name,
       black_name_(std::move(black_name)),
       white_name_(std::move(white_name)) {}
 
+void Game::NewGame() {
+  game_over_ = false;
+  moves_.clear();
+  comment_.clear();
+}
+
 void Game::AddComment(const std::string& comment) {
   if (comment_.empty()) {
     comment_ = comment;
@@ -42,6 +48,7 @@ void Game::AddMove(Color color, Coord c, const Position::Stones& stones,
                    std::string comment, float Q,
                    const std::array<float, kNumMoves>& search_pi,
                    std::vector<std::string> models) {
+  MG_CHECK(!game_over_);
   moves_.push_back(absl::make_unique<Move>());
   auto* move = moves_.back().get();
   move->color = color;
@@ -56,6 +63,7 @@ void Game::AddMove(Color color, Coord c, const Position::Stones& stones,
 void Game::UndoMove() {
   MG_CHECK(!moves_.empty());
   moves_.pop_back();
+  game_over_ = false;
 }
 
 void Game::SetGameOverBecauseOfPasses(float score) {

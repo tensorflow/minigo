@@ -14,32 +14,9 @@
 
 import {Annotation, Position} from './position'
 import {Socket} from './gtp_socket'
-import {Color, Move, N, Nullable, movesEqual, setBoardSize, stonesEqual, toKgs} from './base'
+import {Color, Move, N, setBoardSize} from './base'
 import {Board} from './board'
 import * as util from './util'
-
-interface PositionJson {
-  id: string;
-  parentId?: string;
-  moveNum: number;
-  toPlay: string;
-  stones: string;
-  move?: string;
-  gameOver: boolean;
-  comment?: string;
-  caps?: number[];
-}
-
-interface PositionUpdateJson {
-  id: string;
-  n?: number;
-  q?: number;
-  pv?: string;
-  variations?: string[][];
-  search?: string[];
-  childN?: number[];
-  childQ?: number[];
-}
 
 // App base class used by the different Minigui UI implementations.
 abstract class App {
@@ -64,7 +41,7 @@ abstract class App {
   protected abstract onNewPosition(position: Position): void;
 
   constructor() {
-    this.gtp.onData('mg-update', (j: PositionUpdateJson) => {
+    this.gtp.onData('mg-update', (j: Position.Update) => {
       let position = this.positionMap.get(j.id);
       if (position === undefined) {
         // Just after refreshing the page, the backend will still be sending
@@ -72,107 +49,43 @@ abstract class App {
         // positions we don't know about.
         return;
       }
-      let update = this.newPositionUpdate(j);
-      position.update(update);
-      this.onPositionUpdate(position, update);
+      position.update(j);
+      this.onPositionUpdate(position, j);
     });
 
-    this.gtp.onData('mg-position', (j: PositionJson | PositionUpdateJson) => {
-      let position = this.newPosition(j as PositionJson);
-      let update = this.newPositionUpdate(j);
-      position.update(update);
+    this.gtp.onData('mg-position', (j: Position.Definition | Position.Update) => {
+      let position: Position;
+      let def = j as Position.Definition;
+      if (def.move == null) {
+        // No parent, this must be the root.
+        position = this.rootPosition;
+        position.id = def.id;
+      } else {
+        // Get the parent.
+        if (def.parentId === undefined) {
+          throw new Error('child node must have a valid parentId');
+        }
+        let parent = this.positionMap.get(def.parentId);
+        if (parent == null) {
+          throw new Error(`couldn't find parent ${def.parentId}`);
+        }
+
+        // See if we already have this position.
+        let child = parent.getChild(util.parseMove(def.move));
+        if (child != null) {
+          position = child;
+        } else {
+          position = new Position(def);
+          parent.addChild(position);
+        }
+      }
+      position.update(j);
       this.onNewPosition(position);
       if (position.gameOver) {
         this.onGameOver();
       }
+      this.positionMap.set(position.id, position);
     });
-  }
-
-  private newPosition(j: PositionJson): Position {
-    let position = this.positionMap.get(j.id);
-    if (position !== undefined) {
-      return position;
-    }
-
-    for (let prop of ['stones', 'toPlay', 'gameOver']) {
-      if (!j.hasOwnProperty(prop)) {
-        throw new Error(`missing required property: ${prop}`);
-      }
-    }
-
-    let def = j as PositionJson;
-    let stones: Color[] = [];
-    const stoneMap: {[index: string]: Color} = {
-      '.': Color.Empty,
-      'X': Color.Black,
-      'O': Color.White,
-    };
-    for (let i = 0; i < def.stones.length; ++i) {
-      stones.push(stoneMap[def.stones[i]]);
-    }
-    let toPlay = util.parseColor(def.toPlay);
-    let gameOver = def.gameOver;
-
-    if (def.parentId === undefined) {
-      // No parent, this must be the root.
-      if (def.move != null) {
-        throw new Error('move mustn\'t be set for root position');
-      }
-      position = this.rootPosition;
-      position.id = def.id;
-    } else {
-      // The position has a parent, which must exist in the positionMap.
-      let parent = this.positionMap.get(def.parentId);
-      if (parent === undefined) {
-        throw new Error(
-            `Can't find parent with id ${def.parentId} for position ${def.id}`);
-      }
-      if (def.move == null) {
-        throw new Error('new positions must specify move');
-      }
-      let move = util.parseMove(def.move);
-      position = parent.addChild(def.id, move, stones, gameOver);
-    }
-
-    if (j.comment) {
-      position.comment = j.comment;
-    }
-
-    if (j.caps !== undefined) {
-      position.captures[0] = j.caps[0];
-      position.captures[1] = j.caps[1];
-    }
-
-    if (position.toPlay != toPlay) {
-      throw new Error(`expected ${position.toPlay}, got ${toPlay}`);
-    }
-    this.positionMap.set(position.id, position);
-    return position;
-  }
-
-  private newPositionUpdate(j: PositionUpdateJson): Position.Update {
-    let update: Position.Update = {}
-    if (j.n != null) { update.n = j.n; }
-    if (j.q != null) { update.q = j.q; }
-    if (j.variations != null) {
-      update.variations = {};
-      for (let key in j.variations) {
-        if (key == null) {
-          continue;
-        }
-        update.variations[key] = util.parseMoves(j.variations[key]);
-      }
-    }
-    if (j.childN != null) {
-      update.childN = j.childN;
-    }
-    if (j.childQ != null) {
-      update.childQ = [];
-      for (let q of j.childQ) {
-        update.childQ.push(q / 1000);
-      }
-    }
-    return update;
   }
 
   protected connect() {
@@ -180,24 +93,27 @@ abstract class App {
     let params = new URLSearchParams(window.location.search);
     let p = params.get("gtp_debug");
     let debug = (p != null) && (p == "" || p == "1" || p.toLowerCase() == "true");
-    return fetch('player_list').then((response) => {
+    return fetch('config').then((response) => {
       return response.json();
-    }).then((players: string[]) => {
-      if (players.length != 1) {
-        throw new Error(`expected 1 player, got ${players}`);
-      }
-      return this.gtp.connect(uri, players[0], debug).then((size: number) => {
-        // setBoardSize sets the global variable N to the board size for the
-        // game (as provided by the backend engine). The code uses N from hereon
-        // in.
-        setBoardSize(size);
+    }).then((cfg: any) => {
+      // TODO(tommadams): Give cfg a real type.
 
-        let stones = new Array<Color>(N * N);
-        stones.fill(Color.Empty);
-        this.rootPosition = new Position(
-            'dummy-root', null, stones, null, Color.Black, false, true);
-        this.activePosition = this.rootPosition;
+      // setBoardSize sets the global variable N to the board size for the game
+      // (as provided by the backend engine). The code uses N from hereon in.
+      setBoardSize(cfg.boardSize);
+      let stones = new Array<Color>(N * N);
+      stones.fill(Color.Empty);
+      this.rootPosition = new Position({
+        id: 'dummy-root',
+        moveNum: 0,
+        toPlay: 'b',
       });
+      this.activePosition = this.rootPosition;
+
+      if (cfg.players.length != 1) {
+        throw new Error(`expected 1 player, got ${cfg.players}`);
+      }
+      return this.gtp.connect(uri, cfg.players[0], debug);
     });
   }
 
@@ -209,6 +125,7 @@ abstract class App {
     this.gtp.send('clear_board');
     this.gtp.send('info');
 
+    // TODO(tommadams): Move this functionality into .ctl files.
     // Iterate over the data-* attributes attached to the main minigui container
     // element, looking for data-gtp-* attributes. Send any matching ones as GTP
     // commands to the backend.

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {App} from './app'
-import {COL_LABELS, Color, Move, N, Nullable, Point, movesEqual, otherColor, toKgs} from './base'
+import {COL_LABELS, Color, Move, N, Nullable, Point, movesEqual, otherColor, toGtp} from './base'
 import {Board, ClickableBoard} from './board'
 import {Socket} from './gtp_socket'
 import * as lyr from './layer'
@@ -24,24 +24,6 @@ import {VariationTree} from './variation_tree'
 import {WinrateGraph} from './winrate_graph'
 
 class ExploreBoard extends ClickableBoard {
-  private _showSearch = true;
-  get showSearch() {
-    return this._showSearch;
-  }
-  set showSearch(x: boolean) {
-    if (x != this._showSearch) {
-      this._showSearch = x;
-      if (x) {
-        this.variationLayer.show = false;
-        this.searchLayer.show = true;
-      } else {
-        this.variationLayer.show = false;
-        this.searchLayer.show = false;
-      }
-      this.draw();
-    }
-  }
-
   private _highlightedNextMove: Nullable<Move> = null;
   get highlightedNextMove() {
     return this._highlightedNextMove;
@@ -54,69 +36,39 @@ class ExploreBoard extends ClickableBoard {
   }
 
   get variation() {
-    return this.variationLayer.variation;
+    return this.searchLyr.variation.length > 0 ? this.searchLyr.variation : null;
   }
 
-  private searchLayer: lyr.Search;
-  private variationLayer: lyr.Variation;
-  private nextLayer: lyr.Annotations;
+  get showSearch() {
+    return this.searchLyr.show;
+  }
+  set showSearch(x: boolean) {
+    this.searchLyr.show = x;
+  }
+
+  private searchLyr: lyr.Search;
 
   constructor(parentElemId: string, position: Position, private gtp: Socket) {
     super(parentElemId, position, []);
 
-    this.searchLayer = new lyr.Search();
-    this.variationLayer = new lyr.Variation('pv');
+    this.searchLyr = new lyr.Search();
     this.addLayers([
         new lyr.Label(),
         new lyr.BoardStones(),
-        this.searchLayer,
-        this.variationLayer,
+        this.searchLyr,
         new lyr.Annotations()]);
-    this.variationLayer.show = false;
     this.enabled = true;
 
-    this.ctx.canvas.addEventListener('mousemove', (e) => {
-      if (this.showSearch) {
-        let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
-        if (p != null) {
-          if (this.getStone(p) != Color.Empty || !this.searchLayer.hasVariation(p)) {
-            p = null;
-          }
-        }
-        this.showVariation(p);
-      }
-    });
-
-    this.ctx.canvas.addEventListener('mouseleave', () => {
-      if (this.showSearch) {
-        this.showVariation(null);
-      }
-    });
-
     this.onClick((p: Point) => {
-      if (this.variationLayer.showVariation != 'pv') {
-        this.gtp.send('variation');
-      }
-      this.variationLayer.showVariation = 'pv';
-      this.variationLayer.clear();
-      this.variationLayer.show = false;
-      this.searchLayer.clear();
-      this.searchLayer.show = true;
+      // if (this.variationLayer.showVariation != 'pv') {
+      //   this.gtp.send('variation');
+      // }
+      // this.variationLayer.showVariation = 'pv';
+      // this.variationLayer.clear();
+      // this.variationLayer.show = false;
+      // this.searchLayer.clear();
+      // this.searchLayer.show = true;
     });
-  }
-
-  setPosition(position: Position) {
-    if (position != this.position) {
-      this.showVariation(null);
-      super.setPosition(position);
-    }
-  }
-
-  drawImpl() {
-    super.drawImpl();
-    if (this.showSearch) {
-      this.drawNextMoves();
-    }
   }
 
   private drawNextMoves() {
@@ -167,29 +119,6 @@ class ExploreBoard extends ClickableBoard {
       }
     }
     ctx.setLineDash([]);
-  }
-
-  private showVariation(p: Nullable<Point>) {
-    let moveStr: string;
-    if (p == null) {
-      moveStr = 'pv';
-    } else {
-      moveStr = toKgs(p);
-    }
-    if (moveStr == this.variationLayer.showVariation) {
-      return;
-    }
-
-    this.variationLayer.showVariation = moveStr;
-    this.variationLayer.clear();
-    this.variationLayer.show = p != null;
-    this.searchLayer.show = p == null;
-
-    if (p != null) {
-      this.gtp.send(`variation ${moveStr}`);
-    } else {
-      this.gtp.send('variation');
-    }
   }
 }
 
@@ -291,13 +220,13 @@ class ExploreApp extends App {
       // variation, pressing a number will play the move out the corresponding
       // position in the variation.
       if (e.key >= '0' && e.key <= '9' && this.board.variation != null) {
-        let move = e.key.charCodeAt(0) - '0'.charCodeAt(0);
-        if (move == 0) {
-          move = 10;
+        let moveNum = e.key.charCodeAt(0) - '0'.charCodeAt(0);
+        if (moveNum == 0) {
+          moveNum = 10;
         }
-        if (move <= this.board.variation.length) {
+        if (moveNum <= this.board.variation.length) {
           let color = this.board.position.toPlay;
-          for (let i = 0; i < move; ++i) {
+          for (let i = 0; i < moveNum; ++i) {
             this.playMove(color, this.board.variation[i]);
             color = otherColor(color);
           }
@@ -510,7 +439,7 @@ class ExploreApp extends App {
 
   private playMove(color: Color, move: Move) {
     let colorStr = color == Color.Black ? 'b' : 'w';
-    let moveStr = toKgs(move);
+    let moveStr = toGtp(move);
     this.board.enabled = false;
     this.gtp.send(`play ${colorStr} ${moveStr}`).finally(() => {
       this.board.enabled = true;

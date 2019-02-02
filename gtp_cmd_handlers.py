@@ -219,7 +219,6 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
 
         self._last_report_time = None
         self._report_search_interval = 0.0
-        self._last_pv = None
 
     def cmd_echo(self, *args):
         return " ".join(args)
@@ -239,6 +238,10 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
     def cmd_report_search_interval(self, interval_ms: float):
         self._report_search_interval = interval_ms / 1000.0
 
+    def cmd_clear_board(self):
+        super().cmd_clear_board()
+        self._minigui_report_position()
+
     def cmd_play(self, arg0: str, arg1=None):
         super().cmd_play(arg0, arg1)
         root = self._player.get_root()
@@ -246,30 +249,7 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
             self._player.set_result(
                 root.position.result(), was_resign=False)
 
-    def cmd_gamestate(self):
-        position = self._player.get_position()
-        root = self._player.get_root()
-        msg = {}
-        board = []
-        for row in range(go.N):
-            for col in range(go.N):
-                stone = position.board[row, col]
-                if stone == go.BLACK:
-                    board.append("X")
-                elif stone == go.WHITE:
-                    board.append("O")
-                else:
-                    board.append(".")
-        msg["board"] = "".join(board)
-        if position.recent:
-            msg["lastMove"] = coords.to_kgs(position.recent[-1].move)
-        else:
-            msg["lastMove"] = None
-        msg["toPlay"] = "B" if position.to_play == 1 else "W"
-        msg["moveNum"] = position.n
-        msg["q"] = root.parent.Q if root.parent and root.parent.parent else 0
-        msg["gameOver"] = position.is_game_over()
-        dbg("mg-gamestate:%s" % json.dumps(msg, sort_keys=True))
+        self._minigui_report_position()
 
     def cmd_genmove(self, color=None):
         start = time.time()
@@ -288,6 +268,8 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
                 self._player.set_result(
                     root.position.result(), was_resign=False)
 
+        self._minigui_report_position()
+
         return result
 
     def _tree_search_wrapper(self, parallel_readouts=None):
@@ -299,6 +281,36 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
                 self._minigui_report_search_status(leaves)
                 self._last_report_time = now
         return leaves
+
+    def _minigui_report_position(self):
+        root = self._player.get_root()
+        position = root.position
+
+        board = []
+        for row in range(go.N):
+            for col in range(go.N):
+                stone = position.board[row, col]
+                if stone == go.BLACK:
+                    board.append("X")
+                elif stone == go.WHITE:
+                    board.append("O")
+                else:
+                    board.append(".")
+
+        msg = {
+            "id": hex(id(root)),
+            "toPlay": "B" if position.to_play == 1 else "W",
+            "moveNum": position.n,
+            "stones": "".join(board),
+            "gameOver": position.is_game_over(),
+            "caps": position.caps,
+        }
+        if root.parent and root.parent.parent:
+            msg["parentId"] = hex(id(root.parent))
+            msg["q"] = float(root.parent.Q)
+        if position.recent:
+            msg["move"] = coords.to_kgs(position.recent[-1].move)
+        dbg("mg-position:%s" % json.dumps(msg, sort_keys=True))
 
     def _minigui_report_search_status(self, leaves):
         """Prints the current MCTS search status to stderr.
@@ -312,11 +324,31 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
          """
 
         root = self._player.get_root()
+        position = root.position
 
         msg = {
-            "moveNum": root.position.n,
-            "toPlay": "B" if root.position.to_play == go.BLACK else "W",
+            "id": hex(id(root)),
+            "n": int(root.N),
+            "q": float(root.Q),
         }
+
+        msg["childQ"] = [int(round(q * 1000)) for q in root.child_Q]
+        msg["childN"] = [int(n) for n in root.child_N]
+
+        ranked_children = root.rank_children()
+        variations = {}
+        for i in ranked_children[:15]:
+            if root.child_N[i] == 0 or i not in root.children:
+                break
+            c = coords.to_kgs(coords.from_flat(i))
+            child = root.children[i]
+            nodes = child.most_visited_path_nodes()
+            moves = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
+            variations[c] = {
+                "n": int(root.child_N[i]),
+                "q": float(root.child_Q[i]),
+                "moves": [c] + moves,
+            }
 
         if leaves:
             path = []
@@ -324,20 +356,15 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
             while leaf != root:
                 path.append(leaf.fmove)
                 leaf = leaf.parent
-            msg["search"] = [coords.to_kgs(coords.from_flat(m))
-                             for m in reversed(path)]
-        else:
-            msg["search"] = []
+            if path:
+                path.reverse()
+                variations["live"] = {
+                    "n": int(root.child_N[path[0]]),
+                    "q": float(root.child_Q[path[0]]),
+                    "moves": [coords.to_kgs(coords.from_flat(m)) for m in path]
+                }
 
-        dq = root.child_Q - root.Q
-        msg["dq"] = [int(round(x * 100)) for x in dq]
+        if variations:
+            msg["variations"] = variations
 
-        msg["n"] = [int(n) for n in root.child_N]
-
-        nodes = root.most_visited_path_nodes()
-        pv = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
-        if pv != self._last_pv:
-            msg["pv"] = pv
-            self._last_pv = pv
-
-        dbg("mg-search:%s" % json.dumps(msg, sort_keys=True))
+        dbg("mg-update:%s" % json.dumps(msg, sort_keys=True))

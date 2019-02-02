@@ -172,7 +172,7 @@ Coord MctsPlayer::SuggestMove() {
                  << absl::ToInt64Milliseconds(elapsed) << "ms"
                  << " over " << num_readouts
                  << " readouts (vlosses: " << options_.virtual_losses << ")";
-    MG_LOG(INFO) << root_->CalculateTreeStats();
+    MG_LOG(INFO) << root_->CalculateTreeStats().ToString();
   }
 
   if (ShouldResign()) {

@@ -15,9 +15,7 @@
 import {Nullable} from './base'
 import {Position} from './position'
 import {getElement, pixelRatio} from './util'
-import {View} from './view'
-
-const MIN_POINTS = 10;
+import {Graph} from './graph'
 
 function arraysApproxEqual(a: number[], b: number[], threshold: number) {
   if (a.length != b.length) {
@@ -31,65 +29,29 @@ function arraysApproxEqual(a: number[], b: number[], threshold: number) {
   return true;
 }
 
-class WinrateGraph extends View {
+class WinrateGraph extends Graph {
   protected ctx: CanvasRenderingContext2D;
-  protected marginTop: number;
-  protected marginBottom: number;
-  protected marginLeft: number;
-  protected marginRight: number;
-  protected textHeight: number;
-
-  protected w: number;
-  protected h: number;
 
   protected mainLine: number[] = [];
   protected variation: number[] = [];
-
-  // Horizontal scaling factor used when plotting. It's the maximum move number
-  // seen, with a minimum of MIN_POINTS. Note that because win rate evaluation
-  // is computed lazily after an SGF file has been loaded, the maximum move
-  // number can be larger than the prefix of the current variation that we have
-  // data to plot. Scaling by the maximum move number therefore gives an
-  // indication to the user how many more moves need to be evaluated before we
-  // have a win rate estimation for the complete game.
-  protected xScale = MIN_POINTS;
 
   protected rootPosition: Nullable<Position> = null;
   protected activePosition: Nullable<Position> = null;
 
   constructor(parent: HTMLElement | string) {
-    super();
+    super(parent, {
+      xStart: 0,
+      xEnd: 10,
+      yStart: 1,
+      yEnd: -1,
+      marginTop: 0.05,
+      marginBottom: 0.05,
+      marginLeft: 0.075,
+      marginRight: 0.125,
+    });
     if (typeof(parent) == 'string') {
       parent = getElement(parent);
     }
-
-    let canvas = document.createElement('canvas');
-    this.ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-    parent.appendChild(canvas);
-    this.resizeCanvas();
-
-    window.addEventListener('resize', () => {
-      this.resizeCanvas();
-      this.draw();
-    });
-  }
-
-  private resizeCanvas() {
-    let pr = pixelRatio();
-    let canvas = this.ctx.canvas;
-    let parent = canvas.parentElement as HTMLElement;
-    canvas.width = pr * parent.offsetWidth;
-    canvas.height = pr * parent.offsetHeight;
-    canvas.style.width = `${parent.offsetWidth}px`;
-    canvas.style.height = `${parent.offsetHeight}px`;
-
-    this.marginTop = Math.floor(0.05 * canvas.width);
-    this.marginBottom = Math.floor(0.05 * canvas.width);
-    this.marginLeft = Math.floor(0.075 * canvas.width);
-    this.marginRight = Math.floor(0.125 * canvas.width);
-    this.w = canvas.width - this.marginLeft - this.marginRight;
-    this.h = canvas.height - this.marginTop - this.marginBottom;
-    this.textHeight = 0.06 * this.h;
   }
 
   newGame(rootPosition: Position) {
@@ -97,13 +59,13 @@ class WinrateGraph extends View {
     this.activePosition = rootPosition;
     this.mainLine = [];
     this.variation = [];
-    this.xScale = MIN_POINTS;
+    this.xEnd = 10;
     this.draw();
   }
 
   setActive(position: Position) {
     if (position != this.activePosition) {
-      this.xScale = Math.max(this.xScale, position.moveNum);
+      this.xEnd = Math.max(this.xEnd, position.moveNum);
       this.activePosition = position;
       this.update(position);
       this.draw();
@@ -151,59 +113,35 @@ class WinrateGraph extends View {
   }
 
   drawImpl() {
+    super.drawImpl();
+
     let pr = pixelRatio();
     let ctx = this.ctx;
-    let w = this.w;
-    let h = this.h;
-
-    // Reset the transform to identity and clear.
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    ctx.lineCap = 'square';
-    ctx.lineJoin = 'miter';
-
-    // Apply a translation such that (0, 0) is the center of the pixel at the
-    // top left of the graph.
-    ctx.translate(this.marginLeft + 0.5, this.marginTop + 0.5);
-
-    // Draw the horizontal & vertical axis and the move.
-    ctx.lineWidth = pr;
-
-    ctx.strokeStyle = '#96928f';
-
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, h);
-    ctx.moveTo(0, Math.floor(0.5 * h));
-    ctx.lineTo(w, Math.floor(0.5 * h));
-    ctx.stroke();
 
     // Draw the Y axis labels.
-    ctx.font = `${this.textHeight}px sans-serif`;
+    let textHeight = 0.25 * this.marginRight;
+    ctx.font = `${textHeight}px sans-serif`;
     ctx.fillStyle = '#96928f';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('B', -0.5 * this.textHeight, Math.round(0.05 * h));
-    ctx.fillText('W', -0.5 * this.textHeight, Math.round(0.95 * h));
+    this.drawText('B', -4 / this.xScale, 0.95);
+    this.drawText('W', -4 / this.xScale, -0.95);
 
     if (this.activePosition == null) {
       return;
     }
 
     let moveNum = this.activePosition.moveNum;
-    ctx.setLineDash([1, 2]);
-    ctx.beginPath();
-    ctx.moveTo(Math.round(w * moveNum / this.xScale), 0.5);
-    ctx.lineTo(Math.round(w * moveNum / this.xScale), h - 0.5);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    this.beginPath([0, 3]);
+    this.moveTo(moveNum, this.yStart, true);
+    this.lineTo(moveNum, this.yEnd, true);
+    this.stroke();
 
     if (this.activePosition.isMainLine) {
-      this.drawPlot(this.mainLine, pr, '#ffe');
+      this.drawVariation('#ffe', this.mainLine);
     } else {
-      this.drawPlot(this.mainLine, pr, '#615b56');
-      this.drawPlot(this.variation, pr, '#ffe');
+      this.drawVariation('#615b56', this.mainLine);
+      this.drawVariation('#ffe', this.variation);
     }
 
     // Draw the value label.
@@ -216,14 +154,13 @@ class WinrateGraph extends View {
       q = values[Math.min(moveNum, values.length - 1)];
     }
     let score = 50 + 50 * q;
-    let y = h * (0.5 - 0.5 * q);
     let txt: string;
     if (score > 50) {
       txt = `B:${Math.round(score)}%`;
     } else {
       txt = `W:${Math.round(100 - score)}%`;
     }
-    ctx.fillText(txt, w + 8, y);
+    this.drawText(txt, this.xEnd + 4 / this.xScale, q);
   }
 
   // Returns the win rate estimation for the prefix of `variation` that has
@@ -241,21 +178,18 @@ class WinrateGraph extends View {
     return result;
   }
 
-  private drawPlot(values: number[], lineWidth: number, style: string) {
+  private drawVariation(style: string, values: number[]) {
     if (values.length < 2) {
       return;
     }
 
-    let ctx = this.ctx;
-    ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = style;
-    ctx.beginPath();
-    ctx.moveTo(0, this.h * (0.5 - 0.5 * values[0]));
-    for (let x = 0; x < values.length; ++x) {
-      let y = values[x];
-      ctx.lineTo(this.w * x / this.xScale, this.h * (0.5 - 0.5 * y));
+    let points: number[][] = [];
+    for (let i = 0; i < values.length; ++i) {
+      if (values[i] != null) {
+        points[i] = [i, values[i]];
+      }
     }
-    ctx.stroke();
+    super.drawPlot(1, style, points);
   }
 }
 

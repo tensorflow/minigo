@@ -17,6 +17,13 @@ define(["require", "exports"], function (require, exports) {
         return color == Color.White ? Color.Black : Color.White;
     }
     exports.otherColor = otherColor;
+    function gtpColor(color) {
+        if (color != Color.White && color != Color.Black) {
+            throw new Error(`invalid color ${color}`);
+        }
+        return color == Color.Black ? 'b' : 'w';
+    }
+    exports.gtpColor = gtpColor;
     function stonesEqual(a, b) {
         if (a.length != b.length) {
             throw new Error(`Expected arrays of equal length, got lengths ${a.length} & ${b.length}`);
@@ -50,7 +57,7 @@ define(["require", "exports"], function (require, exports) {
         return move != null && move != 'pass' && move != 'resign';
     }
     exports.moveIsPoint = moveIsPoint;
-    function toKgs(move) {
+    function toGtp(move) {
         if (move == 'pass' || move == 'resign') {
             return move;
         }
@@ -58,7 +65,7 @@ define(["require", "exports"], function (require, exports) {
         let col = COL_LABELS[move.col];
         return `${col}${row}`;
     }
-    exports.toKgs = toKgs;
+    exports.toGtp = toGtp;
     function movesEqual(a, b) {
         if (moveIsPoint(a) && moveIsPoint(b)) {
             return a.row == b.row && a.col == b.col;

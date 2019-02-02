@@ -5,62 +5,17 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         constructor(parentElemId, position, gtp) {
             super(parentElemId, position, []);
             this.gtp = gtp;
-            this._showSearch = true;
             this._highlightedNextMove = null;
-            this.searchLayer = new lyr.Search();
-            this.variationLayer = new lyr.Variation('pv');
+            this.searchLyr = new lyr.Search();
             this.addLayers([
                 new lyr.Label(),
                 new lyr.BoardStones(),
-                this.searchLayer,
-                this.variationLayer,
+                this.searchLyr,
                 new lyr.Annotations()
             ]);
-            this.variationLayer.show = false;
             this.enabled = true;
-            this.ctx.canvas.addEventListener('mousemove', (e) => {
-                if (this.showSearch) {
-                    let p = this.canvasToBoard(e.offsetX, e.offsetY, 0.45);
-                    if (p != null) {
-                        if (this.getStone(p) != base_1.Color.Empty || !this.searchLayer.hasVariation(p)) {
-                            p = null;
-                        }
-                    }
-                    this.showVariation(p);
-                }
-            });
-            this.ctx.canvas.addEventListener('mouseleave', () => {
-                if (this.showSearch) {
-                    this.showVariation(null);
-                }
-            });
             this.onClick((p) => {
-                if (this.variationLayer.showVariation != 'pv') {
-                    this.gtp.send('variation');
-                }
-                this.variationLayer.showVariation = 'pv';
-                this.variationLayer.clear();
-                this.variationLayer.show = false;
-                this.searchLayer.clear();
-                this.searchLayer.show = true;
             });
-        }
-        get showSearch() {
-            return this._showSearch;
-        }
-        set showSearch(x) {
-            if (x != this._showSearch) {
-                this._showSearch = x;
-                if (x) {
-                    this.variationLayer.show = false;
-                    this.searchLayer.show = true;
-                }
-                else {
-                    this.variationLayer.show = false;
-                    this.searchLayer.show = false;
-                }
-                this.draw();
-            }
         }
         get highlightedNextMove() {
             return this._highlightedNextMove;
@@ -72,19 +27,13 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             }
         }
         get variation() {
-            return this.variationLayer.variation;
+            return this.searchLyr.variation.length > 0 ? this.searchLyr.variation : null;
         }
-        setPosition(position) {
-            if (position != this.position) {
-                this.showVariation(null);
-                super.setPosition(position);
-            }
+        get showSearch() {
+            return this.searchLyr.show;
         }
-        drawImpl() {
-            super.drawImpl();
-            if (this.showSearch) {
-                this.drawNextMoves();
-            }
+        set showSearch(x) {
+            this.searchLyr.show = x;
         }
         drawNextMoves() {
             let sr = this.stoneRadius;
@@ -126,28 +75,6 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
             }
             ctx.setLineDash([]);
-        }
-        showVariation(p) {
-            let moveStr;
-            if (p == null) {
-                moveStr = 'pv';
-            }
-            else {
-                moveStr = base_1.toKgs(p);
-            }
-            if (moveStr == this.variationLayer.showVariation) {
-                return;
-            }
-            this.variationLayer.showVariation = moveStr;
-            this.variationLayer.clear();
-            this.variationLayer.show = p != null;
-            this.searchLayer.show = p == null;
-            if (p != null) {
-                this.gtp.send(`variation ${moveStr}`);
-            }
-            else {
-                this.gtp.send('variation');
-            }
         }
     }
     class ExploreApp extends app_1.App {
@@ -223,13 +150,13 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                     }
                 }
                 if (e.key >= '0' && e.key <= '9' && this.board.variation != null) {
-                    let move = e.key.charCodeAt(0) - '0'.charCodeAt(0);
-                    if (move == 0) {
-                        move = 10;
+                    let moveNum = e.key.charCodeAt(0) - '0'.charCodeAt(0);
+                    if (moveNum == 0) {
+                        moveNum = 10;
                     }
-                    if (move <= this.board.variation.length) {
+                    if (moveNum <= this.board.variation.length) {
                         let color = this.board.position.toPlay;
-                        for (let i = 0; i < move; ++i) {
+                        for (let i = 0; i < moveNum; ++i) {
                             this.playMove(color, this.board.variation[i]);
                             color = base_1.otherColor(color);
                         }
@@ -409,7 +336,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
         }
         playMove(color, move) {
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
-            let moveStr = base_1.toKgs(move);
+            let moveStr = base_1.toGtp(move);
             this.board.enabled = false;
             this.gtp.send(`play ${colorStr} ${moveStr}`).finally(() => {
                 this.board.enabled = true;

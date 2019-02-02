@@ -143,14 +143,30 @@ Coord MctsNode::GetMostVisitedMove() const {
   return c;
 }
 
-std::string MctsNode::Describe() const {
+std::array<MctsNode::ChildInfo, kNumMoves> MctsNode::CalculateRankedChildInfo()
+    const {
   auto child_action_score = CalculateChildActionScore();
-  using SortInfo = std::tuple<float, float, int>;
-  std::array<SortInfo, kNumMoves> sort_order;
+  std::array<ChildInfo, kNumMoves> child_info;
   for (int i = 0; i < kNumMoves; ++i) {
-    sort_order[i] = SortInfo(child_N(i), child_action_score[i], i);
+    child_info[i].c = i;
+    child_info[i].N = child_N(i);
+    child_info[i].action_score = child_action_score[i];
   }
-  std::sort(sort_order.begin(), sort_order.end(), std::greater<SortInfo>());
+  std::sort(child_info.begin(), child_info.end(),
+            [](const ChildInfo& a, const ChildInfo& b) {
+              if (a.N != b.N) {
+                return a.N > b.N;
+              }
+              if (a.action_score != b.action_score) {
+                return a.action_score > b.action_score;
+              }
+              return a.c > b.c;
+            });
+  return child_info;
+}
+
+std::string MctsNode::Describe() const {
+  auto sorted_child_info = CalculateRankedChildInfo();
 
   auto result = absl::StrFormat(
       "%0.4f\n%s\n"
@@ -162,16 +178,16 @@ std::string MctsNode::Describe() const {
     child_N_sum += e.N;
   }
   for (int rank = 0; rank < 15; ++rank) {
-    Coord i = std::get<2>(sort_order[rank]);
-    float soft_N = child_N(i) / child_N_sum;
-    float p_delta = soft_N - child_P(i);
-    float p_rel = p_delta / child_P(i);
+    Coord c = sorted_child_info[rank].c;
+    float soft_N = child_N(c) / child_N_sum;
+    float p_delta = soft_N - child_P(c);
+    float p_rel = p_delta / child_P(c);
     absl::StrAppendFormat(
         &result,
         "\n%-5s: % 4.3f % 4.3f %0.3f %0.3f %0.3f %5d %0.4f % 6.5f % 3.2f",
-        i.ToGtp(), child_action_score[i], child_Q(i), child_U(i), child_P(i),
-        child_original_P(i), static_cast<int>(child_N(i)), soft_N, p_delta,
-        p_rel);
+        c.ToGtp(), sorted_child_info[rank].action_score, child_Q(c), child_U(c),
+        child_P(c), child_original_P(c), static_cast<int>(child_N(c)), soft_N,
+        p_delta, p_rel);
   }
   return result;
 }
@@ -431,22 +447,15 @@ bool MctsNode::HasPositionBeenPlayedBefore(zobrist::Hash stone_hash) const {
   return false;
 }
 
-std::string MctsNode::CalculateTreeStats() const {
-  // TODO(sethtroisi): Make this return a struct instead of string
-  long num_nodes = 0;
-  long num_leaf_nodes = 0;
-  long depth_sum = 0;
-  long depth_max = 0;
+MctsNode::TreeStats MctsNode::CalculateTreeStats() const {
+  TreeStats stats;
 
   std::function<void(const MctsNode&, int)> traverse = [&](const MctsNode& node,
                                                            int depth) {
-    num_nodes += 1;
-    num_leaf_nodes += node.N() <= 1;
-
-    depth_sum += depth;
-    if (depth > depth_max) {
-      depth_max = depth;
-    }
+    stats.num_nodes += 1;
+    stats.num_leaf_nodes += node.N() <= 1;
+    stats.max_depth = std::max(depth, stats.max_depth);
+    stats.depth_sum += depth;
 
     for (const auto& child : node.children) {
       traverse(*child.second.get(), depth + 1);
@@ -455,12 +464,16 @@ std::string MctsNode::CalculateTreeStats() const {
 
   traverse(*this, 0);
 
+  return stats;
+}
+
+std::string MctsNode::TreeStats::ToString() const {
   return absl::StrFormat(
       "%d nodes, %d leaf, %.1f average children\n"
       "%.1f average depth, %d max depth\n",
       num_nodes, num_leaf_nodes,
-      1.0f * num_nodes / std::max(1L, num_nodes - num_leaf_nodes),
-      1.0f * depth_sum / num_nodes, depth_max);
+      1.0f * num_nodes / std::max(1, num_nodes - num_leaf_nodes),
+      1.0f * depth_sum / num_nodes, max_depth);
 }
 
 }  // namespace minigo

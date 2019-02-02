@@ -37,9 +37,9 @@ class KioskApp extends App {
             new lyr.Variation('pv'),
             new lyr.Annotations()]),
         new Board('search-board', this.rootPosition, [
-            new lyr.Caption('search'),
+            new lyr.Caption('live'),
             new lyr.BoardStones(),
-            new lyr.Variation('search')]),
+            new lyr.Variation('live')]),
         new Board('n-board', this.rootPosition, [
             new lyr.Caption('N'),
             new lyr.VisitCountHeatMap(),
@@ -76,7 +76,7 @@ class KioskApp extends App {
     for (let board of this.boards) {
       board.setPosition(position);
     }
-    this.winrateGraph.update(position);
+    this.winrateGraph.setActive(position);
     this.log.scroll();
 
     if (this.activePosition.gameOver) {

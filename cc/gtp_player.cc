@@ -20,6 +20,7 @@
 #include <thread>
 #include <utility>
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "cc/constants.h"
@@ -28,11 +29,6 @@
 #include "cc/sgf.h"
 
 namespace minigo {
-
-namespace {
-// String written to stderr to signify that handling a GTP command is done.
-constexpr auto kGtpCmdDone = "__GTP_CMD_DONE__";
-}  // namespace
 
 GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
     : MctsPlayer(std::move(network), options),
@@ -112,6 +108,11 @@ void GtpPlayer::Run() {
   running = false;
 }
 
+void GtpPlayer::NewGame() {
+  game_.NewGame();
+  MctsPlayer::NewGame();
+}
+
 Coord GtpPlayer::SuggestMove() {
   if (courtesy_pass_ && root()->move == Coord::kPass) {
     return Coord::kPass;
@@ -161,14 +162,28 @@ GtpPlayer::Response GtpPlayer::HandleCmd(const std::string& line) {
     return Response::Ok();
   }
 
-  // Split the GTP command and its arguments.
+  // Split the GTP into possible ID, command and arguments.
+  int cmd_id;
+  bool has_cmd_id = absl::SimpleAtoi(args[0], &cmd_id);
+  if (has_cmd_id) {
+    args.erase(args.begin());
+  }
   auto cmd = std::string(args[0]);
   args.erase(args.begin());
 
+  // Process the command.
+  Response response;
   if (cmd == "quit") {
-    return Response::Done();
+    response = Response::Done();
+  } else {
+    response = DispatchCmd(cmd, args);
   }
-  return DispatchCmd(cmd, args);
+
+  // Set the command ID on the response if we have one.
+  if (has_cmd_id) {
+    response.set_cmd_id(cmd_id);
+  }
+  return response;
 }
 
 GtpPlayer::Response GtpPlayer::CheckArgsExact(size_t expected_num_args,
@@ -278,6 +293,9 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(CmdArgs args) {
   if (!response.ok) {
     return response;
   }
+  if (root()->game_over()) {
+    return Response::Error("game is over");
+  }
 
   // TODO(tommadams): Handle out of turn moves.
 
@@ -383,6 +401,9 @@ GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {
   auto response = CheckArgsExact(2, args);
   if (!response.ok) {
     return response;
+  }
+  if (root()->game_over()) {
+    return Response::Error("game is over");
   }
 
   Color color;

@@ -27,6 +27,13 @@ function otherColor(color: Color) {
   return color == Color.White ? Color.Black : Color.White;
 }
 
+function gtpColor(color: Color) {
+  if (color != Color.White && color != Color.Black) {
+    throw new Error(`invalid color ${color}`);
+  }
+  return color == Color.Black ? 'b' : 'w'
+}
+
 function stonesEqual(a: Color[], b: Color[]) {
   if (a.length != b.length) {
     throw new Error(
@@ -73,7 +80,7 @@ function moveIsPoint(move: Nullable<Move>): move is Point {
   return move != null && move != 'pass' && move != 'resign';
 }
 
-function toKgs(move: Move) {
+function toGtp(move: Move) {
   if (move == 'pass' || move == 'resign') {
     return move;
   }
@@ -101,10 +108,11 @@ export {
   N,
   Nullable,
   Point,
+  gtpColor,
   moveIsPoint,
   movesEqual,
   otherColor,
   setBoardSize,
   stonesEqual,
-  toKgs,
+  toGtp,
 }

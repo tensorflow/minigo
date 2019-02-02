@@ -287,10 +287,14 @@ class MCTSNode(object):
             output.append(coords.to_kgs(coords.from_flat(node.fmove)))
         return ' '.join(output)
 
-    def describe(self):
-        sort_order = list(range(go.N * go.N + 1))
-        sort_order.sort(key=lambda i: (
+    def rank_children(self):
+        ranked_children = list(range(go.N * go.N + 1))
+        ranked_children.sort(key=lambda i: (
             self.child_N[i], self.child_action_score[i]), reverse=True)
+        return ranked_children
+
+    def describe(self):
+        ranked_children = self.rank_children()
         soft_n = self.child_N / max(1, sum(self.child_N))
         prior = self.child_prior
         p_delta = soft_n - prior
@@ -302,18 +306,18 @@ class MCTSNode(object):
         output.append(self.most_visited_path())
         output.append(
             "move : action    Q     U     P   P-Dir    N  soft-N  p-delta  p-rel")
-        for key in sort_order[:15]:
-            if self.child_N[key] == 0:
+        for i in ranked_children[:15]:
+            if self.child_N[i] == 0:
                 break
             output.append("\n{!s:4} : {: .3f} {: .3f} {:.3f} {:.3f} {:.3f} {:5d} {:.4f} {: .5f} {: .2f}".format(
-                coords.to_kgs(coords.from_flat(key)),
-                self.child_action_score[key],
-                self.child_Q[key],
-                self.child_U[key],
-                self.child_prior[key],
-                self.original_prior[key],
-                int(self.child_N[key]),
-                soft_n[key],
-                p_delta[key],
-                p_rel[key]))
+                coords.to_kgs(coords.from_flat(i)),
+                self.child_action_score[i],
+                self.child_Q[i],
+                self.child_U[i],
+                self.child_prior[i],
+                self.original_prior[i],
+                int(self.child_N[i]),
+                soft_n[i],
+                p_delta[i],
+                p_rel[i]))
         return ''.join(output)

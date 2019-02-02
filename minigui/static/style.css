@@ -21,6 +21,7 @@ body {
 .sp-1vh { width: 1vh; height: 1vh; display: inline-block; }
 .sp-2vh { width: 2vh; height: 2vh; display: inline-block; }
 .sp-3vh { width: 3vh; height: 3vh; display: inline-block; }
+.sp-5vh { width: 5vh; height: 5vh; display: inline-block; }
 
 /* Squares of different sizes (mostly used for boards) */
 .sq-280 { width: 280px; height: 280px; }
@@ -63,7 +64,7 @@ body {
   outline: none;
 }
 
-.winrate-graph {
+.graph {
   background-color: #2c241e;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }

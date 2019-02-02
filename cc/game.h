@@ -68,6 +68,8 @@ class Game {
 
   Game(std::string black_name, std::string white_name, const Options& options);
 
+  void NewGame();
+
   void AddComment(const std::string& comment);
 
   void AddMove(Color color, Coord c, const Position::Stones& stones,

@@ -22,6 +22,7 @@ class Log {
   logElem: HTMLElement;
   consoleElem: Nullable<HTMLElement> = null;
   private cmdHandler: Nullable<CmdHandler> = null;
+  private scrollPending = false;
 
   constructor(logElemId: string, consoleElemId: Nullable<string> = null) {
     this.logElem = getElement(logElemId);
@@ -67,8 +68,14 @@ class Log {
   }
 
   scroll() {
-    if (this.logElem.lastElementChild) {
-      this.logElem.lastElementChild.scrollIntoView();
+    if (!this.scrollPending) {
+      this.scrollPending = true;
+      window.requestAnimationFrame(() => {
+        this.scrollPending = false;
+        if (this.logElem.lastElementChild) {
+          this.logElem.lastElementChild.scrollIntoView();
+        }
+      });
     }
   }
 

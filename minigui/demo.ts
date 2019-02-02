@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {App} from './app'
-import {COL_LABELS, Color, Move, N, Nullable, toKgs} from './base'
+import {COL_LABELS, Color, Move, N, Nullable, toGtp} from './base'
 import {Board, ClickableBoard} from './board'
 import * as lyr from './layer'
 import {Log} from './log'
@@ -52,9 +52,9 @@ class DemoApp extends App {
       let searchElem = getElement('search-board');
       if (searchElem) {
         this.boards.push(new Board(searchElem, this.rootPosition, [
-            new lyr.Caption('search'),
+            new lyr.Caption('live'),
             new lyr.BoardStones(),
-            new lyr.Variation('search')]));
+            new lyr.Variation('live')]));
       }
 
       let nElem = getElement('n-board');
@@ -171,14 +171,13 @@ class DemoApp extends App {
       board.setPosition(position);
     }
     this.winrateGraph.setActive(position);
-    this.winrateGraph.update(position);
     this.log.scroll();
     this.onPlayerChanged();
   }
 
   private playMove(color: Color, move: Move) {
     let colorStr = color == Color.Black ? 'b' : 'w';
-    let moveStr = toKgs(move);
+    let moveStr = toGtp(move);
     this.gtp.send(`play ${colorStr} ${moveStr}`);
   }
 

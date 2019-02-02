@@ -36,6 +36,9 @@ function parseMove(gtpCoord: string): Move {
     --col;
   }
   let row = N - parseInt(gtpCoord.slice(1), 10);
+  if (row < 0 || row >= N || col < 0 || col > N) {
+    throw new Error(`Can't parse "${gtpCoord}" as a GTP coord`);
+  }
   return {row: row, col: col};
 }
 

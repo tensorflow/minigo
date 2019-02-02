@@ -1,4 +1,4 @@
-define(["require", "exports", "./base", "./util"], function (require, exports, base_1, util_1) {
+define(["require", "exports", "./base", "./util"], function (require, exports, base_1, util) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var Annotation;
@@ -10,17 +10,12 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
     })(Annotation || (Annotation = {}));
     exports.Annotation = Annotation;
     class Position {
-        constructor(id, parent, stones, lastMove, toPlay, gameOver, isMainLine) {
-            this.id = id;
-            this.parent = parent;
-            this.stones = stones;
-            this.lastMove = lastMove;
-            this.toPlay = toPlay;
-            this.gameOver = gameOver;
-            this.isMainLine = isMainLine;
+        constructor(j) {
+            this.parent = null;
+            this.lastMove = null;
+            this.isMainLine = true;
             this.n = 0;
             this.q = null;
-            this.search = [];
             this.variations = new Map();
             this.annotations = [];
             this.childN = null;
@@ -28,44 +23,109 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             this.children = [];
             this.captures = [0, 0];
             this.comment = "";
-            this.moveNum = parent != null ? parent.moveNum + 1 : 0;
-            if (lastMove != null && lastMove != 'pass' && lastMove != 'resign') {
+            this.treeStats = {
+                numNodes: 0,
+                numLeafNodes: 0,
+                maxDepth: 0,
+            };
+            this.id = j.id;
+            this.moveNum = j.moveNum;
+            this.toPlay = util.parseColor(j.toPlay);
+            this.stones = [];
+            if (j.stones !== undefined) {
+                const stoneMap = {
+                    '.': base_1.Color.Empty,
+                    'X': base_1.Color.Black,
+                    'O': base_1.Color.White,
+                };
+                for (let i = 0; i < base_1.N * base_1.N; ++i) {
+                    this.stones.push(stoneMap[j.stones[i]]);
+                }
+            }
+            else {
+                for (let i = 0; i < base_1.N * base_1.N; ++i) {
+                    this.stones.push(base_1.Color.Empty);
+                }
+            }
+            if (j.move) {
+                this.lastMove = util.parseMove(j.move);
+            }
+            this.gameOver = j.gameOver || false;
+            this.moveNum = j.moveNum;
+            if (j.comment) {
+                this.comment = j.comment;
+            }
+            if (j.caps !== undefined) {
+                this.captures[0] = j.caps[0];
+                this.captures[1] = j.caps[1];
+            }
+            if (base_1.moveIsPoint(this.lastMove)) {
                 this.annotations.push({
-                    p: lastMove,
+                    p: this.lastMove,
                     shape: Annotation.Shape.Dot,
                     colors: ['#ef6c02'],
                 });
             }
         }
-        addChild(id, move, stones, gameOver) {
+        addChild(p) {
+            if (p.lastMove == null) {
+                throw new Error('Child nodes shouldn\'t have a null lastMove');
+            }
+            if (p.parent != null) {
+                throw new Error('Node already has a parent');
+            }
             for (let child of this.children) {
-                if (child.lastMove == null) {
-                    throw new Error('Child node shouldn\'t have a null lastMove');
+                if (base_1.movesEqual(child.lastMove, p.lastMove)) {
+                    throw new Error(`Position already has child ${base_1.toGtp(p.lastMove)}`);
                 }
+            }
+            p.isMainLine = this.isMainLine && this.children.length == 0;
+            p.parent = this;
+            this.children.push(p);
+        }
+        getChild(move) {
+            for (let child of this.children) {
                 if (base_1.movesEqual(child.lastMove, move)) {
-                    if (!base_1.stonesEqual(stones, child.stones)) {
-                        throw new Error(`Position has child ${base_1.toKgs(move)} with different stones`);
-                    }
                     return child;
                 }
             }
-            let isMainLine = this.isMainLine && this.children.length == 0;
-            let child = new Position(id, this, stones, move, base_1.otherColor(this.toPlay), gameOver, isMainLine);
-            this.children.push(child);
-            return child;
+            return null;
         }
         update(update) {
-            const props = ['n', 'q', 'childN', 'childQ'];
-            util_1.partialUpdate(update, this, props);
-            if (update.variations != null) {
-                for (let key in update.variations) {
-                    this.variations.set(key, update.variations[key]);
+            if (update.n !== undefined) {
+                this.n = update.n;
+            }
+            if (update.q !== undefined) {
+                this.q = update.q;
+            }
+            if (update.childN !== undefined) {
+                this.childN = update.childN;
+            }
+            if (update.childQ !== undefined) {
+                this.childQ = [];
+                for (let q of update.childQ) {
+                    this.childQ.push(q / 1000);
                 }
-                if ("pv" in update.variations) {
-                    let pv = update.variations["pv"];
-                    if (pv.length > 0) {
-                        this.variations.set(base_1.toKgs(pv[0]), pv);
+            }
+            if (update.treeStats !== undefined) {
+                this.treeStats = update.treeStats;
+            }
+            if (update.variations !== undefined) {
+                this.variations.clear();
+                let pv = null;
+                for (let key in update.variations) {
+                    let variation = {
+                        n: update.variations[key].n,
+                        q: update.variations[key].q,
+                        moves: util.parseMoves(update.variations[key].moves),
+                    };
+                    this.variations.set(key, variation);
+                    if (pv == null || variation.n > pv.n) {
+                        pv = variation;
                     }
+                }
+                if (pv != null) {
+                    this.variations.set("pv", pv);
                 }
             }
         }
@@ -82,6 +142,10 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             return result;
         }
     }
+    exports.Position = Position;
+    (function (Position) {
+        ;
+    })(Position || (Position = {}));
     exports.Position = Position;
 });
 //# sourceMappingURL=position.js.map

@@ -6,7 +6,6 @@ define(["require", "exports", "./base", "./layer", "./util", "./view"], function
         constructor(parent, position, layers) {
             super();
             this.position = position;
-            this.stones = [];
             this.layers = [];
             if (typeof (parent) == 'string') {
                 parent = util_1.getElement(parent);

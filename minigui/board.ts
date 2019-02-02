@@ -19,7 +19,6 @@ import {getElement, pixelRatio} from './util'
 import {View} from './view'
 
 class Board extends View {
-  stones: Color[] = [];
   ctx: CanvasRenderingContext2D;
 
   backgroundColor: string;

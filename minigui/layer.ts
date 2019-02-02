@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import {Position, Annotation} from './position'
-import {BoardSize, COL_LABELS, Color, Coord, Point, Move, N, Nullable, moveIsPoint, movesEqual, otherColor, toKgs} from './base'
+import {BoardSize, COL_LABELS, Color, Coord, Point, Move, N, Nullable, moveIsPoint, movesEqual, otherColor, toGtp} from './base'
 import {Board} from './board'
-import {pixelRatio} from './util'
+import {parseMove, pixelRatio} from './util'
 
 const STAR_POINTS = {
   [BoardSize.Nine]: [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]],
@@ -102,10 +102,14 @@ class Grid extends StaticLayer {
 }
 
 class Label extends StaticLayer {
+  constructor(private size = 0.6) {
+    super()
+  }
+
   draw() {
     let ctx = this.board.ctx;
 
-    let textHeight = Math.floor(0.6 * this.board.stoneRadius);
+    let textHeight = Math.floor(this.size * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
     ctx.fillStyle = '#9d7c4d';
 
@@ -173,7 +177,7 @@ abstract class HeatMapBase extends Layer {
     let ctx = this.board.ctx;
     let w = this.board.pointW;
     let h = this.board.pointH;
-    let stones = this.board.stones;
+    let stones = this.board.position.stones;
     let p = {row: 0, col: 0};
     let i = 0;
     for (p.row = 0; p.row < N; ++p.row) {
@@ -311,7 +315,7 @@ class Variation extends StoneBaseLayer {
     }
     this._showVariation = x;
     this.update(new Set<string>(["variations"]));
-    this.draw();
+    this.board.draw();
   }
 
   public variation: Move[] = [];
@@ -343,11 +347,11 @@ class Variation extends StoneBaseLayer {
       return false;
     }
 
-    if (this.variationsEqual(variation, this.variation)) {
+    if (this.variationsEqual(variation.moves, this.variation)) {
       return false;
     }
 
-    this.variation = variation.slice(0);
+    this.variation = variation.moves.slice(0);
     this.parseVariation(this.variation);
 
     return true;
@@ -507,76 +511,53 @@ class Annotations extends Layer {
   }
 }
 
-class Search extends Layer {
-  // Map from move index in the range [0..N*N) to first move in the variation.
-  private bestVariations = new Map<number, Search.Move>();
+class Search extends Variation {
+  private variations: {
+    p: Point;
+    alpha: number;
+    q: number;
+  }[] = [];
 
-  hasVariation(p: Point) {
-    return this.bestVariations.has(p.col + p.row * N);
+  constructor() {
+    super('');
   }
 
-  clear() {
-    if (this.bestVariations.size > 0) {
-      this.bestVariations.clear();
-      this.board.draw();
+  addToBoard(board: Board) {
+    super.addToBoard(board);
+    this.board.ctx.canvas.addEventListener('mousemove', (e) => {
+      let p = this.board.canvasToBoard(e.offsetX, e.offsetY, 0.45);
+      if (p != null && this.hasVariation(p)) {
+        let gtp = toGtp(p);
+        if (this.showVariation == gtp) {
+          return;
+        }
+        this.showVariation = toGtp(p);
+      } else if (this.showVariation != '') {
+        this.showVariation = '';
+      }
+    });
+    this.board.ctx.canvas.addEventListener('mouseleave', () => {
+      this.showVariation = '';
+    });
+  }
+
+  private hasVariation(p: Nullable<Move>) {
+    for (let v of this.variations) {
+      if (movesEqual(p, v.p)) {
+        return true;
+      }
     }
+    return false;
   }
 
   update(props: Set<string>) {
-    if (!props.has('childN') && !props.has('childQ')) {
-      return false;
-    }
-
-    this.bestVariations.clear();
-
-    let position = this.board.position;
-    if (position.childN == null || position.childQ == null) {
-      return false;
-    }
-
-    // Build a list of indices into childN & childQ sorted in descending N.
-    let indices = [];
-    for (let i = 0; i < N * N; ++i) {
-      indices.push(i);
-    }
-    indices.sort((a: number, b: number) => {
-      let n = position.childN as number[];
-      return n[b] - n[a];
-    });
-
-    let maxN = position.childN[indices[0]];
-    if (maxN == 0) {
-      // We haven't done any reads yet.
-      return true;
-    }
-
-    let logMaxN = Math.log(maxN);
-
-    // Build the list of best variations.
-    let idx = indices[0];
-    for (let i = 0; i < indices.length; ++i) {
-      let idx = indices[i];
-      let n = position.childN[idx];
-      if (n <= 1 || n < position.n / 100) {
-        break;
-      }
-      this.addVariation(idx, logMaxN);
-    }
-
-    // Make sure we include all variations of the current position, no matter
-    // how bad we think they are.
-    for (let child of position.children) {
-      if (moveIsPoint(child.lastMove) && !this.hasVariation(child.lastMove)) {
-        let idx = child.lastMove.col + child.lastMove.row * N;
-        this.addVariation(idx, logMaxN);
-      }
-    }
-
-    return true;
+    return super.update(props) || props.has('search');
   }
 
   draw() {
-    if (this.bestVariations.size == 0) {
+    if (this.showVariation != '') {
+      // Draw the selected variation.
+      super.draw();
       return;
     }
 
@@ -585,7 +566,38 @@ class Search extends Layer {
 
     let toPlay = this.board.position.toPlay;
     let stoneRgb = toPlay == Color.Black ? 0 : 255;
-    this.bestVariations.forEach((v: Search.Move) => {
+
+    let maxN = 0;
+    this.board.position.variations.forEach((v) => {
+      maxN = Math.max(maxN, v.n);
+    });
+    if (maxN <= 1) {
+      return;
+    }
+    let logMaxN = Math.log(maxN);
+
+    this.variations = []
+    this.board.position.variations.forEach((v, key) => {
+      try {
+        if (v.n == 0 || v.moves.length == 0 || !moveIsPoint(parseMove(key))) {
+          return;
+        }
+      } catch {
+        return;
+      }
+      let alpha = Math.log(v.n) / logMaxN;
+      alpha = Math.max(0, Math.min(alpha, 1));
+      if (alpha  < 0.1) {
+        return;
+      }
+      this.variations.push({
+        p: v.moves[0] as Point,
+        alpha: alpha,
+        q: v.q,
+      });
+    });
+
+    for (let v of this.variations) {
       let c = this.boardToCanvas(v.p.row, v.p.col);
       let x = c.x + 0.5;
       let y = c.y + 0.5;
@@ -593,7 +605,7 @@ class Search extends Layer {
       ctx.beginPath();
       ctx.arc(x, y, 0.85 * this.board.stoneRadius, 0, 2 * Math.PI);
       ctx.fill();
-    });
+    }
 
     let textHeight = Math.floor(0.8 * this.board.stoneRadius);
     ctx.font = `${textHeight}px sans-serif`;
@@ -601,40 +613,12 @@ class Search extends Layer {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = toPlay == Color.Black ? '#fff' : '#000';
     let scoreScale = this.board.position.toPlay == Color.Black ? 1 : -1;
-    this.bestVariations.forEach((v: Search.Move) => {
+
+    for (let v of this.variations) {
       let c = this.boardToCanvas(v.p.row, v.p.col);
       let winRate = 50 + 50 * scoreScale * v.q;
       ctx.fillText(winRate.toFixed(1), c.x, c.y);
-    });
-  }
-
-  private addVariation(idx: number, logMaxN: number) {
-    if (this.board.position.childN == null ||
-        this.board.position.childQ == null) {
-      return;
-    }
-    let n = this.board.position.childN[idx];
-    if (n == 0 || logMaxN == 0) {
-      return;
-    }
-    let q = this.board.position.childQ[idx];
-    let alpha = Math.log(n) / logMaxN;
-    alpha = Math.max(0, Math.min(alpha, 1));
-    this.bestVariations.set(idx, new Search.Move(idx, n, q, alpha));
-  }
-}
-
-namespace Search {
-  // Holds data required to render the first move in a variation.
-  export class Move {
-    p: Point;
-    constructor(idx: number, public n: number, public q: number,
-                public alpha: number) {
-      this.p = {
-        row: Math.floor(idx / N),
-        col: idx % N,
-      };
-    }
+    };
   }
 }
 

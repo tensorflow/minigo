@@ -23,6 +23,9 @@ define(["require", "exports", "./base"], function (require, exports, base_1) {
             --col;
         }
         let row = base_1.N - parseInt(gtpCoord.slice(1), 10);
+        if (row < 0 || row >= base_1.N || col < 0 || col > base_1.N) {
+            throw new Error(`Can't parse "${gtpCoord}" as a GTP coord`);
+        }
         return { row: row, col: col };
     }
     exports.parseMove = parseMove;

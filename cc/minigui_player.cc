@@ -46,7 +46,6 @@ MiniguiPlayer::MiniguiPlayer(std::unique_ptr<DualNet> network,
   RegisterCmd("report_search_interval",
               &MiniguiPlayer::HandleReportSearchInterval);
   RegisterCmd("select_position", &MiniguiPlayer::HandleSelectPosition);
-  RegisterCmd("variation", &MiniguiPlayer::HandleVariation);
   RegisterCmd("winrate_evals", &MiniguiPlayer::HandleWinrateEvals);
 }
 
@@ -54,12 +53,18 @@ void MiniguiPlayer::NewGame() {
   node_to_info_.clear();
   id_to_info_.clear();
   to_eval_.clear();
-  MctsPlayer::NewGame();
+  GtpPlayer::NewGame();
   RegisterNode(root());
 }
 
+Coord MiniguiPlayer::SuggestMove() {
+  auto move = GtpPlayer::SuggestMove();
+  ReportSearchStatus(root(), nullptr, true);
+  return move;
+}
+
 bool MiniguiPlayer::PlayMove(Coord c, Game* game) {
-  if (!MctsPlayer::PlayMove(c, game)) {
+  if (!GtpPlayer::PlayMove(c, game)) {
     return false;
   }
   RefreshPendingWinRateEvals();
@@ -141,12 +146,12 @@ GtpPlayer::Response MiniguiPlayer::HandleCmd(const std::string& line) {
 
 void MiniguiPlayer::ProcessLeaves(absl::Span<TreePath> paths,
                                   bool random_symmetry) {
-  MctsPlayer::ProcessLeaves(paths, random_symmetry);
+  GtpPlayer::ProcessLeaves(paths, random_symmetry);
   if (!paths.empty() && report_search_interval_ != absl::ZeroDuration()) {
     auto now = absl::Now();
     if (now - last_report_time_ > report_search_interval_) {
       last_report_time_ = now;
-      ReportSearchStatus(paths.back().root, paths.back().leaf);
+      ReportSearchStatus(paths.back().root, paths.back().leaf, false);
     }
   }
 }
@@ -285,29 +290,6 @@ GtpPlayer::Response MiniguiPlayer::HandleSelectPosition(CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response MiniguiPlayer::HandleVariation(CmdArgs args) {
-  auto response = CheckArgsRange(0, 1, args);
-  if (!response.ok) {
-    return response;
-  }
-
-  if (args.size() == 0) {
-    child_variation_ = Coord::kInvalid;
-  } else {
-    Coord c = Coord::FromGtp(args[0], true);
-    if (c == Coord::kInvalid) {
-      MG_LOG(ERROR) << "expected GTP coord for move, got " << args[0];
-      return Response::Error("illegal move");
-    }
-    if (c != child_variation_) {
-      child_variation_ = c;
-      ReportSearchStatus(root(), nullptr);
-    }
-  }
-
-  return Response::Ok();
-}
-
 GtpPlayer::Response MiniguiPlayer::HandleWinrateEvals(CmdArgs args) {
   int num_reads;
   if (!absl::SimpleAtoi(args[1], &num_reads) || num_reads < 0) {
@@ -386,59 +368,80 @@ GtpPlayer::Response MiniguiPlayer::ProcessSgf(
   return Response::Ok();
 }
 
-void MiniguiPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf) {
+void MiniguiPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf,
+                                       bool include_tree_stats) {
+  auto sorted_child_info = root->CalculateRankedChildInfo();
+
   nlohmann::json j = {
       {"id", GetAuxInfo(root)->id},
       {"n", root->N()},
       {"q", root->Q()},
   };
 
-  // Pricipal variation.
-  auto src_pv = root->MostVisitedPath();
-  if (!src_pv.empty()) {
-    auto& dst_pv = j["variations"]["pv"];
-    for (Coord c : src_pv) {
-      dst_pv.push_back(c.ToGtp());
+  // TODO(tommadams): Make the number of child variations sent back
+  // configurable.
+  nlohmann::json variations;
+  for (int i = 0; i < 10; ++i) {
+    Coord c = sorted_child_info[i].c;
+    const auto child_it = root->children.find(c);
+    if (child_it == root->children.end() || root->child_N(c) == 0) {
+      break;
     }
+
+    nlohmann::json moves = {c.ToGtp()};
+    const auto* node = child_it->second.get();
+    for (const auto c : node->MostVisitedPath()) {
+      moves.push_back(c.ToGtp());
+    }
+    variations[c.ToGtp()] = {
+        {"n", root->child_N(c)},
+        {"q", root->child_Q(c)},
+        {"moves", std::move(moves)},
+    };
+  }
+  if (!variations.empty()) {
+    j["variations"] = std::move(variations);
   }
 
-  // Current tree search variation.
+  // Current live search variation.
   if (leaf != nullptr) {
-    std::vector<const MctsNode*> src_search;
+    std::vector<const MctsNode*> live;
     for (const auto* node = leaf; node != root; node = node->parent) {
-      src_search.push_back(node);
+      live.push_back(node);
     }
-    if (!src_search.empty()) {
-      std::reverse(src_search.begin(), src_search.end());
-      auto& dst_search = j["variations"]["search"];
-      for (const auto* node : src_search) {
-        dst_search.push_back(node->move.ToGtp());
+    if (!live.empty()) {
+      std::reverse(live.begin(), live.end());
+      nlohmann::json moves;
+      for (const auto* node : live) {
+        moves.push_back(node->move.ToGtp());
       }
-    }
-  }
-
-  // Requested child variation, if any.
-  if (child_variation_ != Coord::kInvalid) {
-    auto& child_v = j["variations"][child_variation_.ToGtp()];
-    child_v.push_back(child_variation_.ToGtp());
-    auto it = root->children.find(child_variation_);
-    if (it != root->children.end()) {
-      for (Coord c : it->second->MostVisitedPath()) {
-        child_v.push_back(c.ToGtp());
-      }
+      j["variations"]["live"] = {
+          {"n", live.front()->N()},
+          {"q", live.front()->Q()},
+          {"moves", std::move(moves)},
+      };
     }
   }
 
   // Child N.
-  auto& childN = j["childN"];
+  auto& child_N = j["childN"];
   for (const auto& edge : root->edges) {
-    childN.push_back(static_cast<int>(edge.N));
+    child_N.push_back(static_cast<int>(edge.N));
   }
 
   // Child Q.
-  auto& childQ = j["childQ"];
+  auto& child_Q = j["childQ"];
   for (int i = 0; i < kNumMoves; ++i) {
-    childQ.push_back(static_cast<int>(std::round(root->child_Q(i) * 1000)));
+    child_Q.push_back(static_cast<int>(std::round(root->child_Q(i) * 1000)));
+  }
+
+  if (include_tree_stats) {
+    auto tree_stats = root->CalculateTreeStats();
+    j["treeStats"] = {
+        {"numNodes", tree_stats.num_nodes},
+        {"numLeafNodes", tree_stats.num_leaf_nodes},
+        {"maxDepth", tree_stats.max_depth},
+    };
   }
 
   MG_LOG(INFO) << "mg-update:" << j.dump();
@@ -468,6 +471,7 @@ void MiniguiPlayer::ReportPosition(MctsNode* node) {
       {"stones", oss.str()},
       {"gameOver", node->game_over()},
   };
+
   const auto& captures = node->position.num_captures();
   if (captures[0] != 0 || captures[1] != 0) {
     j["caps"].push_back(captures[0]);
