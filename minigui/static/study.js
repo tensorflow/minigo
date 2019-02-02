@@ -14,8 +14,6 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 new lyr.Annotations()
             ]);
             this.enabled = true;
-            this.onClick((p) => {
-            });
         }
         get highlightedNextMove() {
             return this._highlightedNextMove;

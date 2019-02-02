@@ -122,12 +122,6 @@ class MiniguiPlayer : public GtpPlayer {
   // Clears the to_eval_ win rate evaluation queue and repopulates it.
   void RefreshPendingWinRateEvals();
 
-  // Controls which variation is reported during tree search.
-  // If child_variation_ == Coord::kInvalid, the principle variation from the
-  // root is reported. Otherwise, the principle variation of the
-  // corresponding child of the root is reported.
-  Coord child_variation_ = Coord::kInvalid;
-
   // Map from MctsNode to auxiliary info about that node used by the GtpPlayer.
   absl::flat_hash_map<MctsNode*, std::unique_ptr<AuxInfo>> node_to_info_;
 

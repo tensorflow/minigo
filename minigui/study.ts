@@ -58,17 +58,6 @@ class ExploreBoard extends ClickableBoard {
         this.searchLyr,
         new lyr.Annotations()]);
     this.enabled = true;
-
-    this.onClick((p: Point) => {
-      // if (this.variationLayer.showVariation != 'pv') {
-      //   this.gtp.send('variation');
-      // }
-      // this.variationLayer.showVariation = 'pv';
-      // this.variationLayer.clear();
-      // this.variationLayer.show = false;
-      // this.searchLayer.clear();
-      // this.searchLayer.show = true;
-    });
   }
 
   private drawNextMoves() {
