@@ -19,6 +19,8 @@ import dual_net
 
 flags.DEFINE_string('model_path', None, 'Path to model to freeze')
 
+flags.mark_flag_as_required('model_path')
+
 FLAGS = flags.FLAGS
 
 

@@ -34,6 +34,7 @@ import features as features_lib
 import go
 import symmetries
 
+
 flags.DEFINE_integer('train_batch_size', 256,
                      'Batch size to use for train/eval evaluation. For GPU '
                      'this is batch size as expected. If \"use_tpu\" is set,'
@@ -60,6 +61,11 @@ flags.DEFINE_multi_integer('lr_boundaries', [400000, 600000],
 flags.DEFINE_multi_float('lr_rates', [0.01, 0.001, 0.0001],
                          'The different learning rates')
 
+flags.register_multi_flags_validator(
+    ['lr_boundaries', 'lr_rates'],
+    lambda flags: len(flags['lr_boundaries']) == len(flags['lr_rates']) - 1,
+    'Number of learning rates must be exactly one greater than the number of boundaries')
+
 flags.DEFINE_float('l2_strength', 1e-4,
                    'The L2 regularization parameter applied to weights.')
 
@@ -76,6 +82,16 @@ flags.DEFINE_string('work_dir', None,
 
 flags.DEFINE_bool('use_tpu', False, 'Whether to use TPU for training.')
 
+flags.DEFINE_string(
+    'tpu_name', None,
+    'The Cloud TPU to use for training. This should be either the name used'
+    'when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 url.')
+
+flags.DEFINE_integer(
+    'num_tpu_cores', default=8,
+    help=('Number of TPU cores. For a single TPU device, this is 8 because each'
+          ' TPU has 4 chips each with 2 cores.'))
+
 flags.DEFINE_bool('quantize', False,
                   'Whether create a quantized model. When loading a model for '
                   'inference, this must match how the model was trained.')
@@ -84,16 +100,6 @@ flags.DEFINE_integer('quant_delay', 700 * 1024,
                      'Number of training steps after which weights and '
                      'activations are quantized.')
 
-flags.DEFINE_string(
-    'tpu_name', None,
-    'The Cloud TPU to use for training. This should be either the name used'
-    'when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 url.')
-
-flags.register_multi_flags_validator(
-    ['lr_boundaries', 'lr_rates'],
-    lambda flags: len(flags['lr_boundaries']) == len(flags['lr_rates']) - 1,
-    'Number of learning rates must be exactly one greater than the number of boundaries')
-
 flags.DEFINE_integer(
     'iterations_per_loop', 128,
     help=('Number of steps to run on TPU before outfeeding metrics to the CPU.'
@@ -101,11 +107,6 @@ flags.DEFINE_integer(
           ' train steps, the loop will exit before reaching'
           ' --iterations_per_loop. The larger this value is, the higher the'
           ' utilization on the TPU.'))
-
-flags.DEFINE_integer(
-    'num_tpu_cores', default=8,
-    help=('Number of TPU cores. For a single TPU device, this is 8 because each'
-          ' TPU has 4 chips each with 2 cores.'))
 
 flags.DEFINE_integer(
     'summary_steps', default=256,
@@ -118,6 +119,7 @@ flags.DEFINE_bool(
     'use_random_symmetry', True,
     help='If true random symmetries be used when doing inference.')
 
+# TODO(seth): Verify if this is still required.
 flags.register_multi_flags_validator(
     ['use_tpu', 'iterations_per_loop', 'summary_steps'],
     lambda flags: (not flags['use_tpu'] or
