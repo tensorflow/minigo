@@ -10,7 +10,6 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 
 # Example usage:
-#   export BOARD_SIZE=19
 #   python3 oneoffs/swa.py --bucket_name="minigo-pub/v7-19x19" --data_dir="data/swa"
 #   python main.py freeze-graph data/swa/swa-2
 

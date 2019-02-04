@@ -23,7 +23,7 @@ This script replaces the policy and game results in a file of TFExamples
 (-1 or 1) with a model's evaluation of that position.
 
 Usage:
-BOARD_SIZE=19 python3 oneoffs/distillation.py \
+python3 oneoffs/distillation.py \
     --model data/000721-eagle \
     --in_path data/300.tfrecord.zz \
     --out_path data/300.dist.tfrecord.zz \

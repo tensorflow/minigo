@@ -15,7 +15,7 @@
 """Validate a network.
 
 Usage:
-  BOARD_SIZE=19 python validate.py tfrecord_dir/ tfrecord_dir2/
+    python validate.py tfrecord_dir/ tfrecord_dir2/
 """
 import os
 

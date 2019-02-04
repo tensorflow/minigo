@@ -151,7 +151,7 @@ To freeze a model into a GraphDef proto that can be run on Cloud TPU, use
 `freeze_graph.py`:
 
 ```
-BOARD_SIZE=19 python freeze_graph.py \
+python freeze_graph.py \
   --model_path=$MODEL_PATH \
   --use_tpu=true \
   --tpu_name=$TPU_NAME \

@@ -211,7 +211,7 @@ and you can use any gtp-compliant program with it.
 ```shell
 # Latest model should look like: /path/to/models/000123-something
 LATEST_MODEL=$(ls -d $MINIGO_MODELS/* | tail -1 | cut -f 1 -d '.')
-BOARD_SIZE=19 python3 gtp.py --load_file=$LATEST_MODEL --num_readouts=$READOUTS --verbose=3
+python3 gtp.py --load_file=$LATEST_MODEL --num_readouts=$READOUTS --verbose=3
 ```
 
 After some loading messages, it will display `GTP engine ready`, at which point
@@ -287,7 +287,7 @@ If these directories don't exist, bootstrap will create them for you.
 
 ```shell
 export MODEL_NAME=000000-bootstrap
-BOARD_SIZE=19 python3 bootstrap.py \
+python3 bootstrap.py \
   --work_dir=estimator_working_dir \
   --export_path=outputs/models/$MODEL_NAME
 ```
@@ -300,7 +300,7 @@ as well as in SGF form in the directories.
 
 
 ```shell
-BOARD_SIZE=19 python3 selfplay.py \
+python3 selfplay.py \
   --load_file=outputs/models/$MODEL_NAME \
   --num_readouts 10 \
   --verbose 3 \
@@ -319,7 +319,7 @@ parameter.
 Run the training job:
 
 ```shell
-BOARD_SIZE=19 python3 train.py \
+python3 train.py \
   outputs/data/selfplay/* \
   --work_dir=estimator_working_dir \
   --export_path=outputs/models/000001-first_generation
@@ -372,7 +372,7 @@ Once you've collected all the files in a directory, producing validation is as
 easy as
 
 ```shell
-BOARD_SIZE=19 python3 validate.py \
+python3 validate.py \
   validation_files/ \
   --work_dir=estimator_working_dir \
   --validation_name=pro_dataset

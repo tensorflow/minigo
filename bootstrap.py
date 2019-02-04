@@ -14,7 +14,7 @@
 """Bootstrap network weights.
 
 Usage:
-    BOARD_SIZE=19 python bootstrap.py \
+bootstrap.py \
     --work_dir=/tmp/estimator_working_dir \
     --export_path=/tmp/published_models_dir
 """

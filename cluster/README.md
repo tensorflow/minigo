@@ -47,7 +47,6 @@ For example: if you would like to override the GCP Project or image tag, you can
 ```shell
 export PROJECT=my-project
 export VERSION_TAG=0.12.34
-export BOARD_SIZE=19
 ```
 
 After you've done that, source the defaults:
