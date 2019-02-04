@@ -2,11 +2,11 @@ players = {
   "leelaz" : Player("../leela-zero/build/leelaz"
                     " --weights best-network"
                     " --timemanage off -r 3"
-		    " --noponder"
+                    " --noponder"
                     " -g",
                     startup_gtp_commands=[
                       "time_settings 0 5 1",
-		    ],
+                    ],
                     cwd="../leela-zero/build"),
 
   "minigo" : Player("bazel-bin/cc/gtp"

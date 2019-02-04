@@ -57,7 +57,6 @@ class Socket {
     this.sock.on('json', (msg: string) => {
       let obj = JSON.parse(msg);
       if (obj.token != this.token) {
-        // console.log('ignoring', obj, `${obj.token} != ${this.token}`);
         return;
       }
 
