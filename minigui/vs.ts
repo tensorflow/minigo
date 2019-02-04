@@ -216,10 +216,13 @@ class ReadsGraph extends Graph {
     super.drawImpl();
 
     // Draw a dotted line for the current move number.
-    this.beginPath([0, 3]);
-    this.moveTo(this.moveNum, this.yStart, true);
-    this.lineTo(this.moveNum, this.yEnd, true);
-    this.stroke();
+    this.drawPlot(
+      [[this.moveNum, this.yStart], [this.moveNum, this.yEnd]], {
+      dash: [0, 3],
+      width: 1,
+      style: '#96928f',
+      snap: true,
+    });
 
     for (let i = 0; i < this.plots.length; ++i) {
       let plot = this.plots[i];
@@ -229,7 +232,10 @@ class ReadsGraph extends Graph {
           points.push([x, plot[x]]);
         }
       }
-      this.drawPlot(3, i == 0 ? '#fff' : '#000', points);
+      this.drawPlot(points, {
+        width: 3,
+        style: i == 0 ? '#fff' : '#000'
+      });
     }
 
     let pr = util.pixelRatio();
@@ -280,10 +286,13 @@ class WinrateGraph extends Graph {
     let ctx = this.ctx;
 
     // Draw a dotted line for the current move number.
-    this.beginPath([0, 3]);
-    this.moveTo(this.xStart, this.moveNum, true);
-    this.lineTo(this.xEnd, this.moveNum, true);
-    this.stroke();
+    this.drawPlot(
+      [[this.xStart, this.moveNum], [this.xEnd, this.moveNum]], {
+      dash: [0, 3],
+      width: 1,
+      style: '#96928f',
+      snap: true,
+    });
 
     // Draw the plots.
     for (let i = 0; i < this.plots.length; ++i) {
@@ -294,7 +303,10 @@ class WinrateGraph extends Graph {
           points.push([-plot[y], y]);
         }
       }
-      this.drawPlot(3, i == 0 ? '#fff' : '#000', points);
+      this.drawPlot(points, {
+        width: 3,
+        style: i == 0 ? '#fff' : '#000',
+      });
     }
   }
 

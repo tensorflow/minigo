@@ -18,7 +18,7 @@ import {getElement, pixelRatio} from './util'
 import {View} from './view'
 
 namespace Graph {
-export interface Options {
+export interface GraphOptions {
   xStart: number;
   xEnd: number;
   yStart: number;
@@ -30,8 +30,21 @@ export interface Options {
   marginLeft?: number;
   marginRight?: number;
 }
+
 export type Point = number[];
+
+export interface PlotOptions {
+  width?: number;
+  style?: string;
+  snap?: boolean;
+  dash?: number[];
 }
+}
+
+const DEFAULT_PLOT_OPTIONS: Graph.PlotOptions = {
+  width: 1,
+  snap: false,
+};
 
 abstract class Graph extends View {
   protected ctx: CanvasRenderingContext2D;
@@ -58,7 +71,7 @@ abstract class Graph extends View {
   protected yEnd = 1;
   protected moveNum = 0;
 
-  constructor(parent: HTMLElement | string, private options: Graph.Options) {
+  constructor(parent: HTMLElement | string, private options: Graph.GraphOptions) {
     super();
     this.xStart = options.xStart;
     this.xEnd = options.xEnd;
@@ -177,24 +190,27 @@ abstract class Graph extends View {
     this.ctx.fillText(text, x, y);
   }
 
-  protected drawPlot(lineWidth: number, style: string, points: number[][]) {
+  protected drawPlot(points: Graph.Point[], options=DEFAULT_PLOT_OPTIONS) {
     if (points.length == 0) {
       return;
     }
     let pr = pixelRatio();
     let ctx = this.ctx;
-    ctx.lineWidth = lineWidth * pr;
-    ctx.strokeStyle = style;
-    this.beginPath();
-    this.moveTo(points[0][0], points[0][1]);
+    let snap = options.snap || false;
+    ctx.lineWidth = (options.width || 1) * pr;
+    if (options.style) {
+      ctx.strokeStyle = options.style;
+    }
+    this.beginPath(options.dash || null);
+    this.moveTo(points[0][0], points[0][1], snap);
     for (let i = Math.min(1, points.length - 1); i < points.length; ++i) {
       let p = points[i];
-      this.lineTo(p[0], p[1]);
+      this.lineTo(p[0], p[1], snap);
     }
     this.stroke();
   }
 
-  protected beginPath(dash: Nullable<number[]> = null) {
+  private beginPath(dash: Nullable<number[]> = null) {
     let ctx = this.ctx;
     if (dash != null) {
       ctx.lineCap = 'square';
@@ -207,11 +223,11 @@ abstract class Graph extends View {
     ctx.beginPath();
   }
 
-  protected stroke() {
+  private stroke() {
     this.ctx.stroke();
   }
 
-  protected moveTo(x: number, y: number, snap=false) {
+  private moveTo(x: number, y: number, snap=false) {
     x = this.xScale * (x - this.xStart);
     y = this.yScale * (y - this.yStart);
     if (snap) {
@@ -221,7 +237,7 @@ abstract class Graph extends View {
     this.ctx.moveTo(x, y);
   }
 
-  protected lineTo(x: number, y: number, snap=false) {
+  private lineTo(x: number, y: number, snap=false) {
     x = this.xScale * (x - this.xStart);
     y = this.yScale * (y - this.yStart);
     if (snap) {

@@ -1,6 +1,10 @@
 define(["require", "exports", "./util", "./view"], function (require, exports, util_1, view_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    const DEFAULT_PLOT_OPTIONS = {
+        width: 1,
+        snap: false,
+    };
     class Graph extends view_1.View {
         constructor(parent, options) {
             super();
@@ -109,19 +113,22 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
             }
             this.ctx.fillText(text, x, y);
         }
-        drawPlot(lineWidth, style, points) {
+        drawPlot(points, options = DEFAULT_PLOT_OPTIONS) {
             if (points.length == 0) {
                 return;
             }
             let pr = util_1.pixelRatio();
             let ctx = this.ctx;
-            ctx.lineWidth = lineWidth * pr;
-            ctx.strokeStyle = style;
-            this.beginPath();
-            this.moveTo(points[0][0], points[0][1]);
+            let snap = options.snap || false;
+            ctx.lineWidth = (options.width || 1) * pr;
+            if (options.style) {
+                ctx.strokeStyle = options.style;
+            }
+            this.beginPath(options.dash || null);
+            this.moveTo(points[0][0], points[0][1], snap);
             for (let i = Math.min(1, points.length - 1); i < points.length; ++i) {
                 let p = points[i];
-                this.lineTo(p[0], p[1]);
+                this.lineTo(p[0], p[1], snap);
             }
             this.stroke();
         }

@@ -158,10 +158,12 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./graph",
         drawImpl() {
             this.xEnd = Math.max(this.xEnd, this.moveNum);
             super.drawImpl();
-            this.beginPath([0, 3]);
-            this.moveTo(this.moveNum, this.yStart, true);
-            this.lineTo(this.moveNum, this.yEnd, true);
-            this.stroke();
+            this.drawPlot([[this.moveNum, this.yStart], [this.moveNum, this.yEnd]], {
+                dash: [0, 3],
+                width: 1,
+                style: '#96928f',
+                snap: true,
+            });
             for (let i = 0; i < this.plots.length; ++i) {
                 let plot = this.plots[i];
                 let points = [];
@@ -170,7 +172,10 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./graph",
                         points.push([x, plot[x]]);
                     }
                 }
-                this.drawPlot(3, i == 0 ? '#fff' : '#000', points);
+                this.drawPlot(points, {
+                    width: 3,
+                    style: i == 0 ? '#fff' : '#000'
+                });
             }
             let pr = util.pixelRatio();
             let ctx = this.ctx;
@@ -210,10 +215,12 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./graph",
             super.drawImpl();
             let pr = util.pixelRatio();
             let ctx = this.ctx;
-            this.beginPath([0, 3]);
-            this.moveTo(this.xStart, this.moveNum, true);
-            this.lineTo(this.xEnd, this.moveNum, true);
-            this.stroke();
+            this.drawPlot([[this.xStart, this.moveNum], [this.xEnd, this.moveNum]], {
+                dash: [0, 3],
+                width: 1,
+                style: '#96928f',
+                snap: true,
+            });
             for (let i = 0; i < this.plots.length; ++i) {
                 let plot = this.plots[i];
                 let points = [];
@@ -222,7 +229,10 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./graph",
                         points.push([-plot[y], y]);
                     }
                 }
-                this.drawPlot(3, i == 0 ? '#fff' : '#000', points);
+                this.drawPlot(points, {
+                    width: 3,
+                    style: i == 0 ? '#fff' : '#000',
+                });
             }
         }
         update(position) {

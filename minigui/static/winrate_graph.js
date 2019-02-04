@@ -92,10 +92,12 @@ define(["require", "exports", "./util", "./graph"], function (require, exports, 
                 return;
             }
             let moveNum = this.activePosition.moveNum;
-            this.beginPath([0, 3]);
-            this.moveTo(moveNum, this.yStart, true);
-            this.lineTo(moveNum, this.yEnd, true);
-            this.stroke();
+            this.drawPlot([[moveNum, this.yStart], [moveNum, this.yEnd]], {
+                dash: [0, 3],
+                width: 1,
+                style: '#96928f',
+                snap: true,
+            });
             if (this.activePosition.isMainLine) {
                 this.drawVariation('#ffe', this.mainLine);
             }
@@ -140,7 +142,10 @@ define(["require", "exports", "./util", "./graph"], function (require, exports, 
                     points[i] = [i, values[i]];
                 }
             }
-            super.drawPlot(1, style, points);
+            super.drawPlot(points, {
+                width: 1,
+                style: style,
+            });
         }
     }
     exports.WinrateGraph = WinrateGraph;
