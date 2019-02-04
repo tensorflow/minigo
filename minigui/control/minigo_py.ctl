@@ -11,5 +11,5 @@ players = {
                        " --resign_threshold=-0.8"
                        " --verbose=2",
                        startup_gtp_commands=[],
-		       environ={"BOARD_SIZE": str(board_size)}),
+                       environ={"BOARD_SIZE": str(board_size)}),
 }
