@@ -309,7 +309,7 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
             msg["parentId"] = hex(id(root.parent))
             msg["q"] = float(root.parent.Q)
         if position.recent:
-            msg["move"] = coords.to_kgs(position.recent[-1].move)
+            msg["move"] = coords.to_gtp(position.recent[-1].move)
         dbg("mg-position:%s" % json.dumps(msg, sort_keys=True))
 
     def _minigui_report_search_status(self, leaves):
@@ -340,10 +340,10 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
         for i in ranked_children[:15]:
             if root.child_N[i] == 0 or i not in root.children:
                 break
-            c = coords.to_kgs(coords.from_flat(i))
+            c = coords.to_gtp(coords.from_flat(i))
             child = root.children[i]
             nodes = child.most_visited_path_nodes()
-            moves = [coords.to_kgs(coords.from_flat(m.fmove)) for m in nodes]
+            moves = [coords.to_gtp(coords.from_flat(m.fmove)) for m in nodes]
             variations[c] = {
                 "n": int(root.child_N[i]),
                 "q": float(root.child_Q[i]),
@@ -361,7 +361,7 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
                 variations["live"] = {
                     "n": int(root.child_N[path[0]]),
                     "q": float(root.child_Q[path[0]]),
-                    "moves": [coords.to_kgs(coords.from_flat(m)) for m in path]
+                    "moves": [coords.to_gtp(coords.from_flat(m)) for m in path]
                 }
 
         if variations:
