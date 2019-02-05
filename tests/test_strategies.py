@@ -165,7 +165,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # print(player.root.describe())
 
         # Search should converge on D9 as only winning move.
-        flattened = coords.to_flat(coords.from_kgs('D9'))
+        flattened = coords.to_flat(coords.from_gtp('D9'))
         best_move = np.argmax(player.root.child_N)
         self.assertEqual(flattened, best_move)
         # D9 should have a positive value
@@ -192,7 +192,7 @@ class TestMCTSPlayer(test_utils.MiniGoUnitTest):
         # print(player.root.describe())
 
         # Search should converge on D9 as only winning move.
-        flattened = coords.to_flat(coords.from_kgs('D9'))
+        flattened = coords.to_flat(coords.from_gtp('D9'))
         best_move = np.argmax(player.root.child_N)
         self.assertEqual(flattened, best_move)
         # D9 should have a positive value

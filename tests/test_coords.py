@@ -23,29 +23,31 @@ class TestCoords(test_utils.MiniGoUnitTest):
     def test_upperleft(self):
         self.assertEqual((0, 0), coords.from_sgf('aa'))
         self.assertEqual((0, 0), coords.from_flat(0))
-        self.assertEqual((0, 0), coords.from_kgs('A9'))
+        self.assertEqual((0, 0), coords.from_gtp('A9'))
 
         self.assertEqual('aa', coords.to_sgf((0, 0)))
         self.assertEqual(0, coords.to_flat((0, 0)))
-        self.assertEqual('A9', coords.to_kgs((0, 0)))
+        self.assertEqual('A9', coords.to_gtp((0, 0)))
 
     def test_topleft(self):
         self.assertEqual((0, 8), coords.from_sgf('ia'))
         self.assertEqual((0, 8), coords.from_flat(8))
-        self.assertEqual((0, 8), coords.from_kgs('J9'))
+        self.assertEqual((0, 8), coords.from_gtp('J9'))
 
         self.assertEqual('ia', coords.to_sgf((0, 8)))
         self.assertEqual(8, coords.to_flat((0, 8)))
-        self.assertEqual('J9', coords.to_kgs((0, 8)))
+        self.assertEqual('J9', coords.to_gtp((0, 8)))
 
     def test_pass(self):
         self.assertEqual(None, coords.from_sgf(''))
+        self.assertEqual(None, coords.from_sgf('tt'))
         self.assertEqual(None, coords.from_flat(81))
-        self.assertEqual(None, coords.from_kgs('pass'))
+        self.assertEqual(None, coords.from_gtp('pass'))
+        self.assertEqual(None, coords.from_gtp('PASS'))
 
         self.assertEqual('', coords.to_sgf(None))
         self.assertEqual(81, coords.to_flat(None))
-        self.assertEqual('pass', coords.to_kgs(None))
+        self.assertEqual('pass', coords.to_gtp(None))
 
     def test_parsing_9x9(self):
         self.assertEqual((0, 0), coords.from_sgf('aa'))
@@ -56,13 +58,13 @@ class TestCoords(test_utils.MiniGoUnitTest):
         self.assertEqual('aa', coords.to_sgf(coords.from_sgf('aa')))
         self.assertEqual('sa', coords.to_sgf(coords.from_sgf('sa')))
         self.assertEqual((1, 17), coords.from_sgf(coords.to_sgf((1, 17))))
-        self.assertEqual((8, 0), coords.from_kgs('A1'))
-        self.assertEqual((0, 0), coords.from_kgs('A9'))
-        self.assertEqual((7, 2), coords.from_kgs('C2'))
-        self.assertEqual((7, 8), coords.from_kgs('J2'))
+        self.assertEqual((8, 0), coords.from_gtp('A1'))
+        self.assertEqual((0, 0), coords.from_gtp('A9'))
+        self.assertEqual((7, 2), coords.from_gtp('C2'))
+        self.assertEqual((7, 8), coords.from_gtp('J2'))
 
-        self.assertEqual('J9', coords.to_kgs((0, 8)))
-        self.assertEqual('A1', coords.to_kgs((8, 0)))
+        self.assertEqual('J9', coords.to_gtp((0, 8)))
+        self.assertEqual('A1', coords.to_gtp((8, 0)))
 
     def test_flatten(self):
         self.assertEqual(0, coords.to_flat((0, 0)))

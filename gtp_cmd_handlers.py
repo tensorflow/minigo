@@ -68,7 +68,7 @@ class BasicCmdHandler(object):
             # let's assume this never happens for now.
             # self._accomodate_out_of_turn(translate_gtp_color(arg0))
             move = arg1
-        return self._player.play_move(coords.from_kgs(move))
+        return self._player.play_move(coords.from_gtp(move))
 
     def cmd_genmove(self, color=None):
         if color is not None:
@@ -91,7 +91,7 @@ class BasicCmdHandler(object):
         if self._player.get_root().is_done():
             self._player.set_result(self._player.get_position().result(),
                                     was_resign=False)
-        return coords.to_kgs(move)
+        return coords.to_gtp(move)
 
     def cmd_undo(self):
         raise NotImplementedError()
@@ -203,7 +203,7 @@ class GoGuiCmdHandler(object):
 
     def _heatmap(self, sort_order, node, prop):
         return "\n".join(["{!s:6} {}".format(
-            coords.to_kgs(coords.from_flat(key)),
+            coords.to_gtp(coords.from_flat(key)),
             node.__dict__.get(prop)[key])
             for key in sort_order if node.child_N[key] > 0][: 20])
 

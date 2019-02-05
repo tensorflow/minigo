@@ -220,7 +220,7 @@ class MCTSPlayer(MCTSPlayerInterface):
 
         def fmt(move):
             return "{}-{}".format('b' if move.color == go.BLACK else 'w',
-                                  coords.to_kgs(move.move))
+                                  coords.to_gtp(move.move))
 
         path = " ".join(fmt(move) for move in pos.recent[-diff:])
         if node.position.n >= FLAGS.max_game_length:

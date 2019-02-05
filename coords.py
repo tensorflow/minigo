@@ -23,9 +23,9 @@ Flattened Coordinate: this is a number ranging from 0 - N^2 (so N^2+1
 SGF Coordinate: Coordinate used for SGF serialization format. Coordinates use
     two-letter pairs having the form (column, row) indexed from the upper-left
     where 0, 0 = 'aa'.
-KGS Coordinate: Human-readable coordinate string indexed from bottom left, with
+GTP Coordinate: Human-readable coordinate string indexed from bottom left, with
     the first character a capital letter for the column and the second a number
-    from 1-19 for the row. Note that KGS chooses to skip the letter 'I' due to
+    from 1-19 for the row. Note that GTP chooses to skip the letter 'I' due to
     its similarity with 'l' (lowercase 'L').
 PYGTP Coordinate: Tuple coordinate indexed starting at 1,1 from bottom-left
     in the format (column, row)
@@ -37,14 +37,14 @@ Coord Type      upper_left      upper_right     pass
 minigo coord    (0, 0)          (0, 18)         None
 flat            0               18              361
 SGF             'aa'            'sa'            ''
-KGS             'A19'           'T19'           'pass'
+GTP             'A19'           'T19'           'pass'
 """
 
 import go
 
 # We provide more than 19 entries here in case of boards larger than 19 x 19.
 _SGF_COLUMNS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-_KGS_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
+_GTP_COLUMNS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 
 def from_flat(flat):
@@ -63,7 +63,7 @@ def to_flat(coord):
 
 def from_sgf(sgfc):
     """Converts from an SGF coordinate to a MiniGo coordinate."""
-    if sgfc is None or sgfc == '':
+    if sgfc is None or sgfc == '' or (go.N <= 19 and sgfc == 'tt'):
         return None
     return _SGF_COLUMNS.index(sgfc[1]), _SGF_COLUMNS.index(sgfc[0])
 
@@ -75,19 +75,19 @@ def to_sgf(coord):
     return _SGF_COLUMNS[coord[1]] + _SGF_COLUMNS[coord[0]]
 
 
-def from_kgs(kgsc):
-    """Converts from a KGS coordinate to a MiniGo coordinate."""
-    if kgsc == 'pass':
+def from_gtp(gtpc):
+    """Converts from a GTP coordinate to a MiniGo coordinate."""
+    gtpc = gtpc.upper()
+    if gtpc == 'PASS':
         return None
-    kgsc = kgsc.upper()
-    col = _KGS_COLUMNS.index(kgsc[0])
-    row_from_bottom = int(kgsc[1:])
+    col = _GTP_COLUMNS.index(gtpc[0])
+    row_from_bottom = int(gtpc[1:])
     return go.N - row_from_bottom, col
 
 
-def to_kgs(coord):
-    """Converts from a MiniGo coordinate to a KGS coordinate."""
+def to_gtp(coord):
+    """Converts from a MiniGo coordinate to a GTP coordinate."""
     if coord is None:
         return 'pass'
     y, x = coord
-    return '{}{}'.format(_KGS_COLUMNS[x], go.N - y)
+    return '{}{}'.format(_GTP_COLUMNS[x], go.N - y)

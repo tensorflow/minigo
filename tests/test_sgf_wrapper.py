@@ -82,7 +82,7 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
             n=1,
             komi=5.5,
             caps=(0, 0),
-            recent=(go.PlayerMove(go.WHITE, coords.from_kgs('E5')),),
+            recent=(go.PlayerMove(go.WHITE, coords.from_gtp('E5')),),
             to_play=go.BLACK,
         )
         final_board = test_utils.load_board('''
@@ -101,8 +101,8 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
             n=2,
             komi=5.5,
             caps=(0, 0),
-            recent=(go.PlayerMove(go.WHITE, coords.from_kgs('E5')),
-                    go.PlayerMove(go.BLACK, coords.from_kgs('D3')),),
+            recent=(go.PlayerMove(go.WHITE, coords.from_gtp('E5')),
+                    go.PlayerMove(go.BLACK, coords.from_gtp('D3')),),
             to_play=go.WHITE,
         )
         positions_w_context = list(replay_sgf(JAPANESE_HANDICAP_SGF))
@@ -129,7 +129,7 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
             n=1,
             komi=5.5,
             caps=(0, 0),
-            recent=(go.PlayerMove(go.BLACK, coords.from_kgs('G7')),),
+            recent=(go.PlayerMove(go.BLACK, coords.from_gtp('G7')),),
             to_play=go.BLACK,
         )
         final_board = test_utils.load_board('''
@@ -149,15 +149,15 @@ class TestSgfWrapper(test_utils.MiniGoUnitTest):
             komi=5.5,
             caps=(7, 2),
             ko=None,
-            recent=(go.PlayerMove(go.WHITE, coords.from_kgs('E9')),
-                    go.PlayerMove(go.BLACK, coords.from_kgs('F9')),),
+            recent=(go.PlayerMove(go.WHITE, coords.from_gtp('E9')),
+                    go.PlayerMove(go.BLACK, coords.from_gtp('F9')),),
             to_play=go.WHITE
         )
         positions_w_context = list(replay_sgf(CHINESE_HANDICAP_SGF))
         self.assertEqualPositions(
             intermediate_position, positions_w_context[1].position)
         self.assertEqual(
-            positions_w_context[1].next_move, coords.from_kgs('C3'))
+            positions_w_context[1].next_move, coords.from_gtp('C3'))
         final_replayed_position = positions_w_context[-1].position.play_move(
             positions_w_context[-1].next_move)
         self.assertEqualPositions(final_position, final_replayed_position)

@@ -460,7 +460,7 @@ class Position():
         if not self.is_move_legal(c):
             raise IllegalMove("{} move at {} is illegal: \n{}".format(
                 "Black" if self.to_play == BLACK else "White",
-                coords.to_kgs(c), self))
+                coords.to_gtp(c), self))
 
         potential_ko = is_koish(self.board, c)
 

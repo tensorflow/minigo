@@ -97,7 +97,7 @@ def play(network):
                 player.root.position.n, readouts, dur / readouts * 100.0, dur), flush=True)
         if FLAGS.verbose >= 3:
             print("Played >>",
-                  coords.to_kgs(coords.from_flat(player.root.fmove)))
+                  coords.to_gtp(coords.from_flat(player.root.fmove)))
 
     if FLAGS.verbose >= 2:
         utils.dbg("%s: %.3f" % (player.result_string, player.root.Q))

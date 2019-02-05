@@ -177,7 +177,7 @@ def extract_move_data(root_node, worker_id, completed_time, board_size):
             'move_num': move_num,
             'turn_to_play': to_play,
             'move': move_played,
-            'move_kgs': coords.to_kgs(coords.from_flat(move_played)),
+            'move_kgs': coords.to_gtp(coords.from_flat(move_played)),
             'prior_Q': None,
             'post_Q': post_Q,
             'policy_prior': policy_prior,
@@ -215,7 +215,7 @@ def parse_comment_node(comment):
         columns = comment_splitter.split(line)
         columns = list(filter(bool, columns))
         coord, *other_columns = columns
-        coord = coords.to_flat(coords.from_kgs(coord))
+        coord = coords.to_flat(coords.from_gtp(coord))
         debug_rows.append(DebugRow(coord, *map(float, other_columns)))
         if FLAGS.only_top_move:
             break

@@ -123,7 +123,7 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
             black_root.child_action_score, white_root.child_action_score)
 
     def test_select_leaf(self):
-        flattened = coords.to_flat(coords.from_kgs('D9'))
+        flattened = coords.to_flat(coords.from_gtp('D9'))
         probs = np.array([.02] * (go.N * go.N + 1))
         probs[flattened] = 0.4
         root = mcts.MCTSNode(SEND_TWO_RETURN_ONE)
