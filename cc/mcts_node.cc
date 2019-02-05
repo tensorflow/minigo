@@ -248,7 +248,7 @@ void MctsNode::GetMoveHistory(
   }
 }
 
-void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise) {
+void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise, float mix) {
   // NOTE: our interpretation is to only add dirichlet noise to legal moves.
   // Because dirichlet entries are independent we can simply zero and rescale.
 
@@ -265,7 +265,7 @@ void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise) {
 
   for (int i = 0; i < kNumMoves; ++i) {
     float scaled_noise = scalar * (legal_moves[i] ? noise[i] : 0);
-    edges[i].P = 0.75f * edges[i].P + 0.25f * scaled_noise;
+    edges[i].P = (1 - mix) * edges[i].P + mix * scaled_noise;
   }
 }
 

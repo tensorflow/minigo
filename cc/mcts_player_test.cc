@@ -158,7 +158,7 @@ TEST(MctsPlayerTest, InjectNoise) {
     EXPECT_EQ(root->child_U(0), root->child_U(i));
   }
 
-  root->InjectNoise(player->Noise());
+  root->InjectNoise(player->Noise(), 0.25);
 
   // Priors should still be normalized after injecting noise.
   sum_P = 0;

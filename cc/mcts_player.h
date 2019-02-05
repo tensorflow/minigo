@@ -46,6 +46,8 @@ class MctsPlayer {
     // Game-level options.
     Game::Options game_options;
 
+    // If inject_noise is true, the amount of noise to mix into the root.
+    float noise_mix = 0.25;
     bool inject_noise = true;
     bool soft_pick = true;
     bool random_symmetry = true;

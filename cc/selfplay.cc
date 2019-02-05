@@ -66,6 +66,8 @@ DEFINE_int32(virtual_losses, 8,
 DEFINE_bool(inject_noise, true,
             "If true, inject noise into the root position at the start of "
             "each tree search.");
+DEFINE_double(noise_mix, 0.25,
+              "If inject_noise is true, the amount of noise to mix into the root.");
 DEFINE_bool(soft_pick, true,
             "If true, choose moves early in the game with a probability "
             "proportional to the number of times visited during tree search. "
@@ -136,6 +138,7 @@ std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
 }
 
 void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
+  options->noise_mix = FLAGS_noise_mix;
   options->inject_noise = FLAGS_inject_noise;
   options->soft_pick = FLAGS_soft_pick;
   options->random_symmetry = FLAGS_random_symmetry;
@@ -288,7 +291,10 @@ class SelfPlayer {
 
       // Play the game.
       auto start_time = absl::Now();
-      batcher_->StartGame(player->network(), player->network());
+      {
+        absl::MutexLock lock(&mutex_);
+        batcher_->StartGame(player->network(), player->network());
+      }
       while (!player->root()->game_over() && !player->root()->at_move_limit()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
@@ -302,7 +308,10 @@ class SelfPlayer {
         }
         MG_CHECK(player->PlayMove(move, game.get()));
       }
-      batcher_->EndGame(player->network(), player->network());
+      {
+        absl::MutexLock lock(&mutex_);
+        batcher_->EndGame(player->network(), player->network());
+      }
 
       {
         // Log the end game info with the shared mutex held to prevent the

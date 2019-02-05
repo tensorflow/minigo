@@ -56,7 +56,7 @@ class ModelBatcher {
                std::vector<DualNet::Output*> outputs, std::string* model_name);
 
  private:
-  size_t GetBatchSize() const;
+  size_t GetBatchSize() const EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
 
   void MaybeRunBatchesLocked() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
   void RunBatch() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
@@ -73,11 +73,11 @@ class ModelBatcher {
   std::atomic<size_t> num_waiting_{0};
 
   // Number of clients of this batcher that are currently playing a game.
-  size_t num_active_clients_ = 0 GUARDED_BY(&mutex_);
+  size_t num_active_clients_ GUARDED_BY(&mutex_) = 0;
 
   // Stats that get reported when the ModelBatcher is destroyed.
-  size_t num_batches_ = 0 GUARDED_BY(&mutex_);
-  size_t num_inferences_ = 0 GUARDED_BY(&mutex_);
+  size_t num_batches_ GUARDED_BY(&mutex_) = 0;
+  size_t num_inferences_ GUARDED_BY(&mutex_) = 0;
 };
 
 // The BatchingDualNet is a thin client for a ModelBatcher, which does all

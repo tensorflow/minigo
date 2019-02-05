@@ -119,7 +119,9 @@ class MctsNode {
   void GetMoveHistory(int num_moves,
                       std::vector<const Position::Stones*>* history) const;
 
-  void InjectNoise(const std::array<float, kNumMoves>& noise);
+  // Mix noise into the node's priors:
+  //   P_i = (1 - mix) * P_i + mix * noise_i
+  void InjectNoise(const std::array<float, kNumMoves>& noise, float mix);
 
   // Selects the next leaf node for inference.
   // If inference is being batched and SelectLeaf chooses a node that has

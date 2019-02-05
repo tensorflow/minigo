@@ -143,7 +143,7 @@ Coord MctsPlayer::SuggestMove() {
   if (options_.inject_noise) {
     std::array<float, kNumMoves> noise;
     rnd_.Dirichlet(kDirichletAlpha, &noise);
-    root_->InjectNoise(noise);
+    root_->InjectNoise(noise, options_.noise_mix);
   }
   int current_readouts = root_->N();
 

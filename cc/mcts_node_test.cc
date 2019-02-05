@@ -320,7 +320,7 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   for (int i = 0; i < 10; ++i) {
     std::array<float, kNumMoves> noise;
     rnd.Uniform(0, 1, &noise);
-    root.InjectNoise(noise);
+    root.InjectNoise(noise, 0.25);
     leaf = root.SelectLeaf();
     EXPECT_NE(1, leaf->move);
   }
@@ -470,7 +470,7 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
   Random rnd(1);
   std::array<float, kNumMoves> noise;
   rnd.Uniform(0, 1, &noise);
-  root.InjectNoise(noise);
+  root.InjectNoise(noise, 0.25);
 
   for (int i = 0; i < kNumMoves; ++i) {
     if (root.legal_moves[i]) {

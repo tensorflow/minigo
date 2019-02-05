@@ -234,7 +234,7 @@ TEST_F(BatchingDualNetTest, SelfPlay) {
     }
 
     for (auto& game : games) {
-      game.thread = std::thread([this, &game] {
+      game.thread = std::thread([&game] {
         game.model->RunMany({&game.features}, {&game.output}, nullptr);
       });
     }
@@ -276,7 +276,7 @@ TEST_F(BatchingDualNetTest, EvalDoubleBuffer) {
     }
 
     for (auto& game : games) {
-      game.thread = std::thread([this, &game] {
+      game.thread = std::thread([&game] {
         game.black->RunMany({&game.features}, {&game.output}, nullptr);
         game.white->RunMany({&game.features}, {&game.output}, nullptr);
       });
