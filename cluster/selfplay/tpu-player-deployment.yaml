@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: tpu-player-deployment
 spec:
-  replicas: 64
+  replicas: 128
   selector:
     matchLabels:
       app: tpu-player
@@ -31,6 +31,8 @@ spec:
           value: /etc/credentials/service-account.json
         - name: BUCKET_NAME
           value: $BUCKET_NAME
+        - name: WORK_DIR
+          value: gs://$BUCKET_NAME/work_dir
       volumes:
       - name: service-credentials
         secret:

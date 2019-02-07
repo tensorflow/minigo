@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ringmaster-runner-$JOB_NAME
+spec:
+  backoffLimit: 100
+  parallelism: 10
+  completions: 10
+  template:
+    metadata:
+      name: ringmaster-runner-$JOB_NAME
+    spec:
+      containers:
+      - name: ringmaster-runner
+        image: gcr.io/tensor-go/mg-ring:latest
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: service-credentials
+          mountPath: /etc/credentials
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/credentials/service-account.json
+        - name: RINGMASTER_CONTROL_PATH
+          value: $RINGMASTER_CONTROL_PATH
+        - name: OUT_PATH
+          value: $OUT_PATH
+        - name: MODEL_ONE
+          value: $MODEL_ONE
+        - name: MODEL_TWO
+          value: $MODEL_TWO
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+      volumes:
+      - name: service-credentials
+        secret:
+          secretName: $SERVICE_ACCOUNT-creds
+      restartPolicy: OnFailure

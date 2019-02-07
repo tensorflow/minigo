@@ -19,10 +19,12 @@ import fire
 import random
 from absl import flags
 import kubernetes
+from kubernetes.client.rest import ApiException
 import yaml
 import json
 import os
 import time
+import random
 from rl_loop import fsdb
 
 from ratings import ratings
@@ -70,7 +72,7 @@ def launch_eval_job(m1_path, m2_path, job_name, bucket_name, completions=5):
     return job_conf, resp_bw, resp_wb
 
 
-def same_run_eval(black_num=0, white_num=0):
+def same_run_eval(black_num=0, white_num=0, completions=4):
     """Shorthand to spawn a job matching up two models from the same run,
     identified by their model number """
     if black_num <= 0 or white_num <= 0:
@@ -86,7 +88,8 @@ def same_run_eval(black_num=0, white_num=0):
     return launch_eval_job(b_model_path + ".pb",
                            w_model_path + ".pb",
                            "{:d}-{:d}".format(black_num, white_num),
-                           flags.FLAGS.bucket_name)
+                           flags.FLAGS.bucket_name,
+                           completions=completions)
 
 
 def _append_pairs(new_pairs, dry_run):
@@ -98,7 +101,7 @@ def _append_pairs(new_pairs, dry_run):
 
 
 def add_uncertain_pairs(dry_run=False):
-    new_pairs = ratings.suggest_pairs()
+    new_pairs = ratings.suggest_pairs(ignore_before=50)
     _append_pairs(new_pairs, dry_run)
 
 
@@ -106,9 +109,9 @@ def add_top_pairs(dry_run=False):
     """ Pairs up the top twenty models against each other.
     #1 plays 2,3,4,5, #2 plays 3,4,5,6 etc. for a total of 15*4 matches.
     """
-    top = ratings.top_n(10)
+    top = ratings.top_n(15)
     new_pairs = []
-    for idx, t in enumerate(top[:5]):
+    for idx, t in enumerate(top[:10]):
         new_pairs += [[t[0], o[0]] for o in top[idx+1:idx+5]]
     print(new_pairs)
     _append_pairs(new_pairs, dry_run)
@@ -178,14 +181,22 @@ def zoo_loop(sgf_dir=None, max_jobs=40):
                           print("{:>30}: {:0.3f} ({:0.3f})".format(modelnum, rate[0], rate[1]))
                         desired_pairs = restore_pairs() or []
                     else:
-                        print("Out of pairs!  Sleeping")
-                        time.sleep(300)
+                        print("Out of pairs.  Sleeping ({} remain)".format(len(r.items)))
+                        time.sleep(600)
                         continue
 
                 next_pair = desired_pairs.pop()  # take our pair off
                 print("Enqueuing:", next_pair)
                 try:
                     same_run_eval(*next_pair)
+                except ApiException as err:
+                    if err.status == 409: # Conflict.  Flip the order and throw it on the pile.
+                        print("Conflict enqueing {}.  Continuing...".format(next_pair))
+                        next_pair = [next_pair[1], next_pair[0]]
+                        desired_pairs.append(next_pair)
+                        random.shuffle(desired_pairs)
+                    else:
+                        desired_pairs.append(next_pair)
                 except:
                     desired_pairs.append(next_pair)
                     raise
@@ -241,7 +252,8 @@ def cleanup(api_instance=None):
     """ Remove completed jobs from the cluster """
     api = api_instance or get_api()
     r = api.list_job_for_all_namespaces()
-    delete_opts = kubernetes.client.V1DeleteOptions()
+    delete_opts = kubernetes.client.V1DeleteOptions(
+            propagation_policy="Background")
     for job in r.items:
         if job.status.succeeded == job.spec.completions:
             print(job.metadata.name, "finished!")

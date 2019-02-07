@@ -232,7 +232,7 @@ def last_timestamp():
     return ts[0] if ts else None
 
 
-def suggest_pairs(top_n=10, per_n=3):
+def suggest_pairs(top_n=10, per_n=3, ignore_before=300):
     """ Find the maximally interesting pairs of players to match up
     First, sort the ratings by uncertainty.
     Then, take the ten highest players with the highest uncertainty
@@ -241,8 +241,9 @@ def suggest_pairs(top_n=10, per_n=3):
     nearest rated models. ('candidate_p2s')
     Choose pairings, (p1, p2), randomly from this list.
 
-    'ratings' is a list of (model_num, rating, uncertainty) tuples
-
+    `top_n` will pair the top n models by uncertainty.
+    `per_n` will give each of the top_n models this many opponents
+    `ignore_before` is the model number to `filter` off, i.e., the early models.
     Returns a list of *model numbers*, not model ids.
     """
     db = sqlite3.connect("ratings.db")
@@ -254,7 +255,7 @@ def suggest_pairs(top_n=10, per_n=3):
 
     ratings = [(model_num_for(k), v[0], v[1]) for k, v in compute_ratings(data).items()]
     ratings.sort()
-    ratings = ratings[100:]  # Filter off the first 100 models, which improve too fast.
+    ratings = ratings[ignore_before:]  # Filter off the first 100 models, which improve too fast.
 
     ratings.sort(key=lambda r: r[2], reverse=True)
 
@@ -262,7 +263,7 @@ def suggest_pairs(top_n=10, per_n=3):
     for p1 in ratings[:top_n]:
         candidate_p2s = sorted(ratings, key=lambda p2_tup: abs(p1[1] - p2_tup[1]))[1:20]
         choices = random.sample(candidate_p2s, per_n)
-        print("Pairing {}, sigma {:.2f}".format(p1[0], p1[2]))
+        print("Pairing {}, sigma {:.2f} (Rating {:.2f})".format(p1[0], p1[2], p1[1]))
         for p2 in choices:
             res.append([p1[0], p2[0]])
             print("   {}, ratings delta {:.2f}".format(p2[0], abs(p1[1] - p2[1])))
@@ -318,7 +319,11 @@ def main():
     print(db.execute("select count(*) from wins").fetchone()[0], "games")
     for m in models[-10:]:
         m_id = model_id(m[0])
-        print(m[1], r.get(m_id, "model id not found({})".format(m_id)))
+        if m_id in r:
+            rat, sigma = r[m_id]
+            print("{:>30}:  {:.2f} ({:.3f})".format(m[1], rat, sigma))
+        else:
+            print("{}, Model id not found({})".format(m[1], m_id))
 
 
 if __name__ == '__main__':

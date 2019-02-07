@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS models (
 );
 
 CREATE TABLE IF NOT EXISTS wins (
-    game_id primary key,
+    game_id integer primary key,
     model_winner integer not null,
     model_loser integer not null,
     foreign key(game_id) references games(game_id),

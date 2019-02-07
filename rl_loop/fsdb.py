@@ -43,6 +43,11 @@ flags.register_multi_flags_validator(
 
 FLAGS = flags.FLAGS
 
+def switch_base(new_base):
+    if FLAGS.base_dir:
+        FLAGS.base_dir = new_base
+    else:
+        FLAGS.bucket_name = new_base
 
 def _with_base(*args):
     def inner():

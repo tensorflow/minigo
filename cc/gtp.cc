@@ -86,8 +86,10 @@ void Gtp() {
   options.time_limit = FLAGS_time_limit;
   options.decay_factor = FLAGS_decay_factor;
 
-  auto model_factory = NewDualNetFactory();
+  MG_LOG(INFO) << options;
+
   std::unique_ptr<GtpPlayer> player;
+  auto model_factory = NewDualNetFactory();
   if (FLAGS_minigui) {
     player = absl::make_unique<MiniguiPlayer>(
         model_factory->NewDualNet(FLAGS_model), options);
