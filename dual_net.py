@@ -119,6 +119,18 @@ flags.DEFINE_bool(
     'use_random_symmetry', True,
     help='If true random symmetries be used when doing inference.')
 
+flags.DEFINE_bool(
+    'use_SE', False,
+    help='Use Squeeze and Excitation.')
+
+flags.DEFINE_bool(
+    'use_SE_bias', False,
+    help='Use Squeeze and Excitation with bias.')
+
+flags.DEFINE_integer(
+    'SE_ratio', 2,
+    help='Squeeze and Excitation ratio.')
+
 # TODO(seth): Verify if this is still required.
 flags.register_multi_flags_validator(
     ['use_tpu', 'iterations_per_loop', 'summary_steps'],
@@ -377,19 +389,62 @@ def model_inference_fn(features, training, params):
         data_format="channels_last",
         use_bias=False)
 
+    my_global_avgpool2d = functools.partial(
+        tf.layers.average_pooling2d,
+        pool_size=go.N,
+        strides=1,
+        padding="valid",
+        data_format="channels_last")
+
+    def residual_inner(inputs):
+        conv_layer1 = my_batchn(my_conv2d(inputs))
+        initial_output = tf.nn.relu(conv_layer1)
+        conv_layer2 = my_batchn(my_conv2d(initial_output))
+        return conv_layer2
+
     def my_res_layer(inputs):
-        int_layer1 = my_batchn(my_conv2d(inputs))
-        initial_output = tf.nn.relu(int_layer1)
-        int_layer2 = my_batchn(my_conv2d(initial_output))
-        output = tf.nn.relu(inputs + int_layer2)
+        residual = residual_inner(inputs)
+        output = tf.nn.relu(inputs + residual)
         return output
 
-    initial_output = tf.nn.relu(my_batchn(my_conv2d(features)))
+    def my_squeeze_excitation_layer(inputs):
+        # Hu, J., Shen, L., & Sun, G. (2018). Squeeze-and-Excitation Networks.
+        # 2018 IEEE/CVF Conference on Computer Vision, 7132-7141.
+        # arXiv:1709.01507 [cs.CV]
+
+        channels = params['conv_width']
+        ratio = FLAGS.SE_ratio
+        assert channels % ratio == 0
+
+        residual = residual_inner(inputs)
+        pool = my_global_avgpool2d(residual)
+        fc1 = tf.layers.dense(pool, units=channels // ratio)
+        squeeze = tf.nn.relu(fc1)
+
+        if FLAGS.use_SE_bias:
+            fc2 = tf.layers.dense(squeeze, units=2*channels)
+            # Channels_last so axis = 3 = -1
+            gamma, bias = tf.split(fc2, 2, axis=3)
+        else:
+            gamma = tf.layers.dense(squeeze, units=channels)
+            bias = 0
+
+        sig = tf.nn.sigmoid(gamma)
+        # Explicitly signal the broadcast.
+        scale = tf.reshape(sig, [-1, 1, 1, channels])
+
+        excitation = tf.multiply(scale, residual) + bias
+        return tf.nn.relu(inputs + excitation)
+
+    initial_block = tf.nn.relu(my_batchn(my_conv2d(features)))
 
     # the shared stack
-    shared_output = initial_output
+    shared_output = initial_block
     for _ in range(params['trunk_layers']):
-        shared_output = my_res_layer(shared_output)
+        if FLAGS.use_SE or FLAGS.use_SE_bias:
+            shared_output = my_squeeze_excitation_layer(shared_output)
+        else:
+            shared_output = my_res_layer(shared_output)
 
     # policy head
     policy_conv = my_conv2d(
