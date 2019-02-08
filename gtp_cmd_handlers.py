@@ -324,7 +324,6 @@ class MiniguiBasicCmdHandler(BasicCmdHandler):
          """
 
         root = self._player.get_root()
-        position = root.position
 
         msg = {
             "id": hex(id(root)),

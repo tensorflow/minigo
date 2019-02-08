@@ -53,6 +53,7 @@ flags.register_multi_flags_validator(
     lambda flags: flags['use_tpu'] if flags['use_bt'] else True,
     '`use_bt` flag only valid with `use_tpu` as well')
 
+
 @flags.multi_flags_validator(
     ['use_bt', 'cbt_project', 'cbt_instance', 'cbt_table'],
     message='Cloud Bigtable configuration flags not correct')

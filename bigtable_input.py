@@ -24,14 +24,15 @@ import operator
 import re
 import struct
 import time
-from tqdm import tqdm
-import numpy as np
+
+from absl import flags
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters as bigtable_row_filters
 from google.cloud.bigtable import column_family as bigtable_column_family
+from tqdm import tqdm
+import numpy as np
 import tensorflow as tf
 
-from absl import flags
 import utils
 
 
@@ -63,16 +64,16 @@ ROWCOUNT_PREFIX = 'ct_{:0>10}_'
 
 MAX_BT_CONCURRENCY = 100
 
-## Column family and qualifier constants.
+# Column family and qualifier constants.
 
-#### Column Families
+# Column Families
 
 METADATA = 'metadata'
 TFEXAMPLE = 'tfexample'
 
-#### Column Qualifiers
+# Column Qualifiers
 
-#### Note that in CBT, families are strings and qualifiers are bytes.
+# Note that in CBT, families are strings and qualifiers are bytes.
 
 TABLE_STATE = b'table_state'
 WAIT_CELL = b'wait_for_game_number'
@@ -276,6 +277,7 @@ class GameQueue:
             ROWCOUNT_PREFIX.format(end_game),
             filter_=bigtable_row_filters.ColumnRangeFilter(
                 METADATA, move_count, move_count))
+
         def parse(r):
             rk = str(r.row_key, 'utf-8')
             game = _game_from_counter.match(rk).groups()[0]
@@ -326,7 +328,6 @@ class GameQueue:
                 pool.map(_delete_rows, batches)
                 batches = []
 
-
     def trim_games_since(self, t, max_games=500000):
         """Trim off the games since the given time.
 
@@ -372,6 +373,7 @@ class GameQueue:
             ROW_PREFIX.format(end_game),
             filter_=bigtable_row_filters.ColumnRangeFilter(
                 METADATA, bleak, bleak))
+
         def parse(r):
             rk = str(r.row_key, 'utf-8')
             g, m = _game_row_key.match(rk).groups()
@@ -589,7 +591,7 @@ def set_fresh_watermark(game_queue, count_from, window_size,
     """
     already_played = game_queue.latest_game_number - count_from
     print("== already_played: ", already_played, flush=True)
-    if window_size > count_from: # How to handle the case when the window is not yet 'full'
+    if window_size > count_from:  # How to handle the case when the window is not yet 'full'
         game_queue.require_fresh_games(int(minimum_fresh * .9))
     else:
         num_to_play = max(0, math.ceil(window_size * .9 * fresh_fraction) - already_played)
