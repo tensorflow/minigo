@@ -78,7 +78,6 @@ function create_gcs_bucket() {
 #   PROJECT: The cloud project
 #   CBT_INSTANCE: The Cloud Bigtable instance to create within PROJECT
 #   CBT_ZONE:  The zone in which to create the instance
-#   CBT_TABLE:  The name of the Cloud Bigtable table within the instance
 function create_cbt_instance() {
   check_cbt_exists
   if [[ -z "${PROJECT}" ]]; then
@@ -87,10 +86,6 @@ function create_cbt_instance() {
   fi
   if [[ -z "${CBT_INSTANCE}" ]]; then
     echo >&2 "CBT_INSTANCE is not defined"
-    return 1
-  fi
-  if [[ -z "${CBT_TABLE}" ]]; then
-    echo >&2 "CBT_TABLE is not defined"
     return 1
   fi
   if ! ( cbt -project ${PROJECT} createinstance ${CBT_INSTANCE} ${CBT_INSTANCE} \
@@ -105,43 +100,73 @@ function create_cbt_instance() {
 # Globals:
 #   PROJECT: The cloud project
 #   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
-#   CBT_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
 # Params
 #   $1: family
 function create_cbt_family() {
   check_cbt_exists
-  family="$1"
-  if ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} ls ${CBT_TABLE} |& grep -wq "^${family}" ); then
-    echo "CBT family ${family} already exists in table ${PROJECT}:${CBT_INSTANCE}:${CBT_TABLE}"
+  table="$1"
+  family="$2"
+  if ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} ls ${table} |& grep -wq "^${family}" ); then
+    echo "CBT family ${family} already exists in table ${PROJECT}:${CBT_INSTANCE}:${table}"
     return 0
   fi
-  if ! ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${CBT_TABLE} ${family} &&
-         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${CBT_TABLE} ${family}  maxversions=1 ); then
-    echo "Could not create family ${family} in table ${CBT_TABLE}"
+  if ! ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createfamily ${table} ${family} &&
+         cbt -project ${PROJECT} -instance ${CBT_INSTANCE} setgcpolicy ${table} ${family}  maxversions=1 ); then
+    echo "Could not create family ${family} in table ${table}"
     return 1
   fi
 }
+
+
+# Creates a Cloud Bigtable table for storing games.
+# Globals:
+#   PROJECT: The cloud project
+#   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
+function create_cbt_table() {
+  check_cbt_exists
+  table="$1"
+  if ! ( cbt -project ${PROJECT} listinstances |& grep -wq "^${CBT_INSTANCE}" ); then
+    echo "Creating cbt instance: ${CBT_INSTANCE}"
+    create_cbt_instance
+  fi
+
+  if ! ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} ls |& grep -wq "^${table}" ); then
+    if ! ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createtable ${table} ); then
+      echo "Could not create table ${table} on instance ${CBT_INSTANCE} in project ${PROJECT}"
+      return 1
+    fi
+  fi
+}
+
 
 # Creates a Cloud Bigtable table for storing games.
 # Globals:
 #   PROJECT: The cloud project
 #   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
 #   CBT_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
-function create_cbt_table() {
+function create_cbt_game_table() {
   check_cbt_exists
-  if ! ( cbt -project ${PROJECT} listinstances |& grep -wq "^${CBT_INSTANCE}" ); then
-    echo "Creating cbt instance: ${CBT_INSTANCE}"
-    create_cbt_instance
+  if ! (create_cbt_table ${CBT_TABLE} ); then
+    return 1
   fi
+  if ! (create_cbt_family ${CBT_TABLE} tfexample &&
+        create_cbt_family ${CBT_TABLE} metadata ); then
+    return 1
+  fi
+}
 
-  if ! ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} ls |& grep -wq "^${CBT_TABLE}" ); then
-    if ! ( cbt -project ${PROJECT} -instance ${CBT_INSTANCE} createtable ${CBT_TABLE} ); then
-      echo "Could not create table ${CBT_TABLE} on instance ${CBT_INSTANCE} in project ${PROJECT}"
-      return 1
-    fi
+
+# Creates a Cloud Bigtable table for storing eval games.
+# Globals:
+#   PROJECT: The cloud project
+#   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
+#   CBT_EVAL_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
+function create_cbt_eval_game_table() {
+  check_cbt_exists
+  if ! (create_cbt_table ${CBT_EVAL_TABLE} ); then
+    return 1
   fi
-  if ! ( create_cbt_family tfexample &&
-         create_cbt_family metadata ); then
+  if ! (create_cbt_family ${CBT_EVAL_TABLE} metadata ); then
     return 1
   fi
 }

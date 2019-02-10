@@ -50,6 +50,7 @@ export BUCKET_LOCATION=${BUCKET_LOCATION:-"asia-east1"}
 export CBT_INSTANCE=${CBT_INSTANCE:-"minigo-instance"}
 export CBT_ZONE=${CBT_ZONE:-"us-central1-b"}
 export CBT_TABLE=${CBT_TABLE:-"games"}
+export CBT_EVAL_TABLE=${CBT_EVAL_TABLE:-"eval_games"}
 
 # Needed for Bigtable clients or any gRPC code running on a GCE VM
 export GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/etc/ssl/certs/ca-certificates.crt
