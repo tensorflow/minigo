@@ -46,6 +46,7 @@ gcloud beta container clusters create \
     --enable-tpu \
     --machine-type n1-standard-16 \
     --disk-size 45 \
+    --preemptible \
     --num-nodes $NUM_NODES \
     $CLUSTER_NAME
     #--tpu-ipv4-cidr=/18 \

@@ -93,6 +93,7 @@ def train():
 def freeze(save_path, rewrite_tpu=False):
     cmd = ['python3', 'freeze_graph.py',
            '--work_dir={}'.format(fsdb.working_dir()),
+           '--flagfile=rl_loop/distributed_flags',
            '--model_path={}'.format(save_path)]
 
     if rewrite_tpu:
@@ -131,6 +132,9 @@ def validate_pro():
 
 
 def loop(unused_argv):
+    if len(fsdb.get_models()) == 0:
+        # TODO(amj): Do bootstrap here.
+        pass
     while True:
         print("=" * 40, flush=True)
         with utils.timer("Train"):

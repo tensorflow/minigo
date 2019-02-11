@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: minigo-calibrator-container
-        image: gcr.io/tensor-go/minigo-calibrator:v15
+        image: gcr.io/tensor-go/minigo-calibrator:v17
         imagePullPolicy: Always
         volumeMounts:
         - name: service-credentials

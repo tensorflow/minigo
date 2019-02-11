@@ -8,6 +8,8 @@
 --conv_width=256
 --fc_width=256
 --trunk_layers=19
+--use_SE
+--use_SE_bias
 
 # Training-related flags
 --train_batch_size=256
@@ -22,10 +24,11 @@
 --window_size=500000
 --cbt_project=tensor-go
 --cbt_instance=minigo-instance
---cbt_table=v15-games
+--cbt_table=v17-games
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)
+--run_forever=true
 --inject_noise=true
 --soft_pick=true
 --random_symmetry=true
@@ -35,4 +38,5 @@
 --disable_resign_pct=0.00
 --resign_threshold=-0.999
 --value_init_penalty=2.0
---output_bigtable=tensor-go,minigo-instance,v15-games
+--policy_softmax_temp=0.98
+--output_bigtable=tensor-go,minigo-instance,v17-games

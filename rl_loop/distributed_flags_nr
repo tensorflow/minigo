@@ -5,9 +5,12 @@
 --conv_width=256
 --fc_width=256
 --trunk_layers=19
+--use_SE
+--use_SE_bias
 
 # Selfplay related flags.
 # These flags can be overwritten by --flags_path (see cc/main.cc for details)
+--run_forever=true
 --inject_noise=true
 --soft_pick=true
 --random_symmetry=true
@@ -15,6 +18,6 @@
 --parallel_games=8
 --num_readouts=800
 --disable_resign_pct=1.00
---resign_threshold=-0.99999
+--resign_threshold=-1.0
 --value_init_penalty=2.0
---output_bigtable=tensor-go,minigo-instance,v15-games-nr
+--output_bigtable=tensor-go,minigo-instance,v17-games-nr
