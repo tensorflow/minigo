@@ -101,5 +101,8 @@ players = {
 }
 EOL
 
-  ${MINIGUI_PYTHON} minigui/serve.py --control="${control_path}"
+  ${MINIGUI_PYTHON} minigui/serve.py \
+      --control="${control_path}" \
+      --port "${MINIGUI_PORT}" \
+      --host "${MINIGUI_HOST}"
 }

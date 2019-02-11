@@ -33,27 +33,27 @@ A UI for Minigo
 
 1. Install the [Google Cloud SDK](https://cloud.google.com/sdk/downloads)
 
-1. Pick a model. See http://cloudygo.com/ for the available models.
+1. Pick a model. See [Cloudy Go](http://cloudygo.com) for the available models.
 
 1. Change the variables you want (these are the defaults):
 
     ```shell
     export MINIGUI_BUCKET_NAME=minigo-pub
-    export MINIGUI_GCS_DIR=v5-19x19/models
-    export MINIGUI_MODEL=000363-auriga
+    export MINIGUI_GCS_DIR=v15-19x19/models
+    export MINIGUI_MODEL=000990-cormorant
     export MINIGUI_MODEL_TMPDIR=/tmp/minigo-models
     export MINIGUI_BOARD_SIZE=19
     ```
 
 1. Run `source minigui-common.sh`
 
-1. Compile the Typescript to JavaSCript. (Requires
+1. Compile the Typescript to JavaScript. (Requires
    [typescript compiler](https://www.typescriptlang.org/#download-links)).
    From the `minigui` directory run: `tsc`
 
 1. Run `./fetch-and-run.sh`
 
-1. open localhost:5001 (or whatever value you used for $PORT).
+1. open localhost:5001 (or whatever value you used for $MINIGUI_PORT).
 
 1. The buttons in the upper right that say 'Human' can be toggled to set which
    color Minigo will play.
