@@ -38,7 +38,9 @@ DATE=`date +%Y-%m-%d`
 bazel-bin/cc/eval \
   --model=$BASENAME_BLACK \
   --model_two=$BASENAME_WHITE \
-  --sgf_dir "gs://$SGF_BUCKET_NAME/sgf/eval/$DATE" \
+  --sgf_dir="gs://$SGF_BUCKET_NAME/sgf/eval/$DATE" \
+  --output_bigtable="tensor-go,minigo-instance,eval_games" \
+  --bigtable_tag="$JOBNAME" \
   --num_readouts=1000 \
   --parallel_games=1 \
   --value_init_penalty=2.00 \

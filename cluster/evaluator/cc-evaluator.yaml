@@ -30,6 +30,8 @@ spec:
           value: $MODEL_WHITE
         - name: MODEL_BLACK
           value: $MODEL_BLACK
+        - name: JOBNAME
+          value: $JOBNAME
         - name: LD_LIBRARY_PATH
           value: /usr/local/nvidia/lib64
       volumes:
