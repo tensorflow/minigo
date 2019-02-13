@@ -55,9 +55,13 @@ TEST(MctsNodeTest, UpperConfidenceBound) {
   // 0.02 are normalized to 1/82
   EXPECT_NEAR(1.0 / 82, root.child_P(0), epsilon);
   EXPECT_NEAR(1.0 / 82, root.child_P(1), epsilon);
-  double puct_policy = kPuct * 1.0 / 82;
+  auto puct_policy = [&](const int n) {
+    return 2.0 * (std::log((1.0f + n + kUct_base) / kUct_base) + kUct_init) *
+           1.0 / 82;
+  };
   ASSERT_EQ(1, root.N());
-  EXPECT_NEAR(puct_policy * std::sqrt(1) / (1 + 0), root.child_U(0), epsilon);
+  EXPECT_NEAR(puct_policy(1) * std::sqrt(1) / (1 + 0), root.child_U(0),
+              epsilon);
 
   leaf = root.SelectLeaf();
   leaf->IncorporateResults(0.0, probs, 0.5, &root);
@@ -67,8 +71,10 @@ TEST(MctsNodeTest, UpperConfidenceBound) {
 
   // With the first child expanded.
   ASSERT_EQ(2, root.N());
-  EXPECT_NEAR(puct_policy * std::sqrt(1) / (1 + 1), root.child_U(0), epsilon);
-  EXPECT_NEAR(puct_policy * std::sqrt(1) / (1 + 0), root.child_U(1), epsilon);
+  EXPECT_NEAR(puct_policy(2) * std::sqrt(1) / (1 + 1), root.child_U(0),
+              epsilon);
+  EXPECT_NEAR(puct_policy(2) * std::sqrt(1) / (1 + 0), root.child_U(1),
+              epsilon);
 
   auto* leaf2 = root.SelectLeaf();
   EXPECT_NE(&root, leaf2);
@@ -78,13 +84,16 @@ TEST(MctsNodeTest, UpperConfidenceBound) {
 
   // With the 2nd child expanded.
   ASSERT_EQ(3, root.N());
-  EXPECT_NEAR(puct_policy * std::sqrt(2) / (1 + 1), root.child_U(0), epsilon);
-  EXPECT_NEAR(puct_policy * std::sqrt(2) / (1 + 1), root.child_U(1), epsilon);
-  EXPECT_NEAR(puct_policy * std::sqrt(2) / (1 + 0), root.child_U(2), epsilon);
+  EXPECT_NEAR(puct_policy(3) * std::sqrt(2) / (1 + 1), root.child_U(0),
+              epsilon);
+  EXPECT_NEAR(puct_policy(3) * std::sqrt(2) / (1 + 1), root.child_U(1),
+              epsilon);
+  EXPECT_NEAR(puct_policy(3) * std::sqrt(2) / (1 + 0), root.child_U(2),
+              epsilon);
 }
 
-// Verifies that no matter who is to play, when we know nothing else, the priors
-// should be respected, and the same move should be picked.
+// Verifies that no matter who is to play, when we know nothing else, the
+// priors should be respected, and the same move should be picked.
 TEST(MctsNodeTest, ActionFlipping) {
   Random rnd(1);
 
@@ -160,12 +169,14 @@ TEST(MctsNodeTest, BackupIncorporateResults) {
   //     leaf
   //       |
   //       leaf2
-  // which happens in this test because root is W to play and leaf was a W win.
+  // which happens in this test because root is W to play and leaf was a W
+  // win.
   EXPECT_EQ(Color::kWhite, root.position.to_play());
   auto* leaf2 = root.SelectLeaf();
   ASSERT_EQ(leaf, leaf2->parent);
 
-  leaf2->IncorporateResults(0.0, probs, -0.2, &root);  // another white semi-win
+  leaf2->IncorporateResults(0.0, probs, -0.2,
+                            &root);  // another white semi-win
   EXPECT_EQ(3, root.N());
   // average of 0, 0, -1, -0.2
   EXPECT_FLOAT_EQ(-0.3, root.Q());
@@ -294,7 +305,8 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   for (float& prob : probs) {
     prob = 0.02;
   }
-  // let's say the NN were to accidentally put a high weight on an illegal move
+  // let's say the NN were to accidentally put a high weight on an illegal
+  // move
   probs[1] = 0.99;
 
   MctsNode::EdgeStats root_stats;
@@ -315,7 +327,8 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
   // the returned leaf should not be the illegal move
   EXPECT_NE(1, leaf->move);
 
-  // and even after injecting noise, we should still not select an illegal move
+  // and even after injecting noise, we should still not select an illegal
+  // move
   Random rnd(1);
   for (int i = 0; i < 10; ++i) {
     std::array<float, kNumMoves> noise;
@@ -466,7 +479,8 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
     }
   }
 
-  // and even after injecting noise, we should still not select an illegal move
+  // and even after injecting noise, we should still not select an illegal
+  // move
   Random rnd(1);
   std::array<float, kNumMoves> noise;
   rnd.Uniform(0, 1, &noise);
@@ -503,13 +517,13 @@ TEST(MctsNodeTest, TestSuperko) {
   };
   // clang-format on
 
-  // Superko detection inserts caches into the tree at regularly spaced depths.
-  // For nodes that don't have a superko dectection cache, a linear search up
-  // the tree, comparing the stone hashes at each node is performed until a
-  // superko cache is hit.
-  // In order to verify that there isn't a bug related to the linear-scan &
-  // cache-lookup pair of checks, we run the superko test multiple times, with a
-  // different number of moves played at the start each time.
+  // Superko detection inserts caches into the tree at regularly spaced
+  // depths. For nodes that don't have a superko dectection cache, a linear
+  // search up the tree, comparing the stone hashes at each node is performed
+  // until a superko cache is hit. In order to verify that there isn't a bug
+  // related to the linear-scan & cache-lookup pair of checks, we run the
+  // superko test multiple times, with a different number of moves played at
+  // the start each time.
   for (size_t iteration = 0; iteration < non_ko_moves.size(); ++iteration) {
     std::vector<std::unique_ptr<MctsNode>> nodes;
     MctsNode::EdgeStats root_stats;
@@ -530,8 +544,8 @@ TEST(MctsNodeTest, TestSuperko) {
       nodes.push_back(absl::make_unique<MctsNode>(nodes.back().get(), c));
     }
 
-    // Without superko checking, it should look like capturing the second ko at
-    // C1 is valid.
+    // Without superko checking, it should look like capturing the second ko
+    // at C1 is valid.
     auto c1 = Coord::FromGtp("C1");
     EXPECT_EQ(Position::MoveType::kCapture,
               nodes.back()->position.ClassifyMove(c1));

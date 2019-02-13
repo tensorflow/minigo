@@ -127,13 +127,14 @@ Coord MctsNode::GetMostVisitedMove() const {
 
   // Otherwise, break score using the child action score.
   float to_play = position.to_play() == Color::kBlack ? 1 : -1;
-  float U_scale = kPuct * std::sqrt(1.0f + N());
+  float U_common = U_scale() * std::sqrt(1.0f + N());
 
   Coord c = moves[0];
   float best_cas =
-      CalculateSingleMoveChildActionScore(to_play, U_scale, moves[0]);
+      CalculateSingleMoveChildActionScore(to_play, U_common, moves[0]);
   for (int i = 0; i < moves.size(); ++i) {
-    float cas = CalculateSingleMoveChildActionScore(to_play, U_scale, moves[i]);
+    float cas =
+        CalculateSingleMoveChildActionScore(to_play, U_common, moves[i]);
     if (cas > best_cas) {
       best_cas = cas;
       c = moves[i];
@@ -248,7 +249,8 @@ void MctsNode::GetMoveHistory(
   }
 }
 
-void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise, float mix) {
+void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise,
+                           float mix) {
   // NOTE: our interpretation is to only add dirichlet noise to legal moves.
   // Because dirichlet entries are independent we can simply zero and rescale.
 
@@ -413,11 +415,11 @@ void MctsNode::PruneChildren(Coord c) {
 
 std::array<float, kNumMoves> MctsNode::CalculateChildActionScore() const {
   float to_play = position.to_play() == Color::kBlack ? 1 : -1;
-  float U_scale = kPuct * std::sqrt(std::max<float>(1, N() - 1));
+  float U_common = U_scale() * std::sqrt(std::max<float>(1, N() - 1));
 
   std::array<float, kNumMoves> result;
   for (int i = 0; i < kNumMoves; ++i) {
-    result[i] = CalculateSingleMoveChildActionScore(to_play, U_scale, i);
+    result[i] = CalculateSingleMoveChildActionScore(to_play, U_common, i);
   }
   return result;
 }

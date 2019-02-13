@@ -24,13 +24,13 @@ import operator
 import re
 import struct
 import time
+import numpy as np
 
+from tqdm import tqdm
 from absl import flags
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters as bigtable_row_filters
 from google.cloud.bigtable import column_family as bigtable_column_family
-from tqdm import tqdm
-import numpy as np
 import tensorflow as tf
 
 import utils

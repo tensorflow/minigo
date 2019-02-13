@@ -73,10 +73,11 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # 0.02 are normalized to 1/82
         self.assertAlmostEqual(root.child_prior[0], 1/82)
         self.assertAlmostEqual(root.child_prior[1], 1/82)
-        puct_policy = FLAGS.c_puct * 1/82
+        puct_policy = lambda n: 2.0 * (math.log((1.0 + n + FLAGS.c_puct_base)
+                       / FLAGS.c_puct_base) + FLAGS.c_puct_init) * 1/82
         self.assertEqual(root.N, 1)
         self.assertAlmostEqual(
-            root.child_U[0], puct_policy * math.sqrt(1) / (1 + 0))
+            root.child_U[0], puct_policy(root.N) * math.sqrt(1) / (1 + 0))
 
         leaf = root.select_leaf()
         self.assertNotEqual(root, leaf)
@@ -84,9 +85,9 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # With the first child expanded.
         self.assertEqual(root.N, 1)
         self.assertAlmostEqual(
-            root.child_U[0], puct_policy * math.sqrt(1) / (1 + 0))
+            root.child_U[0], puct_policy(root.N) * math.sqrt(1) / (1 + 0))
         self.assertAlmostEqual(
-            root.child_U[1], puct_policy * math.sqrt(1) / (1 + 0))
+            root.child_U[1], puct_policy(root.N) * math.sqrt(1) / (1 + 0))
 
         leaf.add_virtual_loss(up_to=root)
         leaf2 = root.select_leaf()
@@ -100,11 +101,11 @@ class TestMctsNodes(test_utils.MiniGoUnitTest):
         # With the 2nd child expanded.
         self.assertEqual(root.N, 3)
         self.assertAlmostEqual(
-            root.child_U[0], puct_policy * math.sqrt(2) / (1 + 1))
+            root.child_U[0], puct_policy(root.N) * math.sqrt(2) / (1 + 1))
         self.assertAlmostEqual(
-            root.child_U[1], puct_policy * math.sqrt(2) / (1 + 1))
+            root.child_U[1], puct_policy(root.N) * math.sqrt(2) / (1 + 1))
         self.assertAlmostEqual(
-            root.child_U[2], puct_policy * math.sqrt(2) / (1 + 0))
+            root.child_U[2], puct_policy(root.N) * math.sqrt(2) / (1 + 0))
 
     def test_action_flipping(self):
         np.random.seed(1)

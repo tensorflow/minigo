@@ -31,8 +31,11 @@ import go
 flags.DEFINE_integer('max_game_length', int(go.N ** 2 * 2),
                      'Move number at which game is forcibly terminated')
 
-flags.DEFINE_float('c_puct', 0.96,
-                   'Exploration constant balancing priors vs. value net output.')
+flags.DEFINE_float('c_puct_base', 19652,
+                   'Exploration constants balancing priors vs. value net output.')
+
+flags.DEFINE_float('c_puct_init', 1.25,
+                   'Exploration constants balancing priors vs. value net output.')
 
 flags.DEFINE_float('dirichlet_noise_alpha', 0.03 * 361 / (go.N ** 2),
                    'Concentrated-ness of the noise being injected into priors.')
@@ -103,7 +106,9 @@ class MCTSNode(object):
 
     @property
     def child_U(self):
-        return (FLAGS.c_puct * math.sqrt(max(1, self.N - 1)) *
+        return ((2.0 * (math.log(
+                (1.0 + self.N + FLAGS.c_puct_base) / FLAGS.c_puct_base)
+                       + FLAGS.c_puct_init)) * math.sqrt(max(1, self.N - 1)) *
                 self.child_prior / (1 + self.child_N))
 
     @property
