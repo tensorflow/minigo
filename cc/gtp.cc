@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
+
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "cc/constants.h"
@@ -66,6 +68,7 @@ DEFINE_string(model, "",
               "inference engine. For engine=tf, the model should be a GraphDef "
               "proto. For engine=lite, the model should be .tflite "
               "flatbuffer.");
+DEFINE_int32(cache_size_mb, 512, "Size of the inference cache in MB.");
 
 namespace minigo {
 namespace {
@@ -90,12 +93,20 @@ void Gtp() {
 
   std::unique_ptr<GtpPlayer> player;
   auto model_factory = NewDualNetFactory();
+  std::unique_ptr<InferenceCache> cache;
+  if (FLAGS_cache_size_mb > 0) {
+    auto capacity = InferenceCache::CalculateCapacity(FLAGS_cache_size_mb);
+    std::cerr << "Will cache up to " << capacity
+              << " inferences, using roughly " << FLAGS_cache_size_mb
+              << "MB.\n";
+    cache = absl::make_unique<InferenceCache>(capacity);
+  }
   if (FLAGS_minigui) {
     player = absl::make_unique<MiniguiPlayer>(
-        model_factory->NewDualNet(FLAGS_model), options);
+        model_factory->NewDualNet(FLAGS_model), std::move(cache), options);
   } else {
     player = absl::make_unique<GtpPlayer>(
-        model_factory->NewDualNet(FLAGS_model), options);
+        model_factory->NewDualNet(FLAGS_model), std::move(cache), options);
   }
   player->Run();
 }

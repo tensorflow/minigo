@@ -98,7 +98,7 @@ void Puzzle() {
 
       // Create player.
       auto player = absl::make_unique<MctsPlayer>(
-          batcher.NewDualNet(FLAGS_model), options);
+          batcher.NewDualNet(FLAGS_model), nullptr, options);
       batcher.StartGame(player->network(), player->network());
 
       // Play through each game. For each position in the game, compare the

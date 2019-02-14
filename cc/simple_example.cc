@@ -53,7 +53,7 @@ void SimpleExample() {
   options.inject_noise = false;
   options.soft_pick = false;
   options.num_readouts = FLAGS_num_readouts;
-  MctsPlayer player(std::move(model), options);
+  MctsPlayer player(std::move(model), nullptr, options);
 
   // Create a game object that tracks the move history & final score.
   Game game(player.name(), player.name(), options.game_options);

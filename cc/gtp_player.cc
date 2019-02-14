@@ -30,8 +30,10 @@
 
 namespace minigo {
 
-GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
-    : MctsPlayer(std::move(network), options),
+GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network,
+                     std::unique_ptr<InferenceCache> inference_cache,
+                     const Options& options)
+    : MctsPlayer(std::move(network), std::move(inference_cache), options),
       courtesy_pass_(options.courtesy_pass),
       ponder_read_limit_(options.ponder_limit),
       game_(options.name, options.name, options.game_options) {

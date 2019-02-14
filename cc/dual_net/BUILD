@@ -81,6 +81,18 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
+    name = "inference_cache",
+    srcs = ["inference_cache.cc"],
+    hdrs = ["inference_cache.h"],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:logging",
+        "@com_google_absl//absl/container:node_hash_map",
+    ],
+)
+
+minigo_cc_library(
     name = "reloading_dual_net",
     srcs = ["reloading_dual_net.cc"],
     hdrs = ["reloading_dual_net.h"],
@@ -222,6 +234,15 @@ minigo_cc_test_9_only(
         "//cc:logging",
         "//cc:position",
         "//cc:test_utils",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+minigo_cc_test(
+    name = "inference_cache_test",
+    srcs = ["inference_cache_test.cc"],
+    deps = [
+        ":inference_cache",
         "@com_google_googletest//:gtest_main",
     ],
 )

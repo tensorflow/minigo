@@ -183,12 +183,12 @@ class Evaluator {
     player_options.verbose = false;
     player_options.name = black_model->name;
     auto black = absl::make_unique<MctsPlayer>(
-        batcher->NewDualNet(black_model->path), player_options);
+        batcher->NewDualNet(black_model->path), nullptr, player_options);
 
     player_options.verbose = false;
     player_options.name = white_model->name;
     auto white = absl::make_unique<MctsPlayer>(
-        batcher->NewDualNet(white_model->path), player_options);
+        batcher->NewDualNet(white_model->path), nullptr, player_options);
 
     Game game(black->name(), white->name(), player_options.game_options);
     auto* curr_player = black.get();

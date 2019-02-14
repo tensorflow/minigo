@@ -283,7 +283,8 @@ class SelfPlayer {
             << "Manually changing the model during selfplay is not supported.";
         thread_options.Init(thread_id, &rnd_);
         player = absl::make_unique<MctsPlayer>(
-            batcher_->NewDualNet(FLAGS_model), thread_options.player_options);
+            batcher_->NewDualNet(FLAGS_model), nullptr,
+            thread_options.player_options);
         game =
             absl::make_unique<Game>(player->name(), player->name(),
                                     thread_options.player_options.game_options);

@@ -28,6 +28,7 @@
 #include "cc/algorithm.h"
 #include "cc/constants.h"
 #include "cc/dual_net/dual_net.h"
+#include "cc/dual_net/inference_cache.h"
 #include "cc/game.h"
 #include "cc/mcts_node.h"
 #include "cc/position.h"
@@ -107,7 +108,9 @@ class MctsPlayer {
   // If position is non-null, the player will be initilized with that board
   // state. Otherwise, the player is initialized with an empty board with black
   // to play.
-  MctsPlayer(std::unique_ptr<DualNet> network, const Options& options);
+  MctsPlayer(std::unique_ptr<DualNet> network,
+             std::unique_ptr<InferenceCache> inference_cache,
+             const Options& options);
 
   virtual ~MctsPlayer();
 
@@ -213,6 +216,8 @@ class MctsPlayer {
 
   std::string model_;
   std::vector<InferenceInfo> inferences_;
+
+  std::unique_ptr<InferenceCache> inference_cache_;
 
   // Vectors reused when running TreeSearch.
   std::vector<TreePath> tree_search_paths_;

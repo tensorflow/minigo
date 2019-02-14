@@ -72,11 +72,14 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
          std::pow(decay_factor, std::max(player_move_num - core_moves, 0));
 }
 
-MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network, const Options& options)
+MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network,
+                       std::unique_ptr<InferenceCache> inference_cache,
+                       const Options& options)
     : network_(std::move(network)),
       game_root_(&root_stats_, {&bv_, &gv_, Color::kBlack}),
       rnd_(options.random_seed),
-      options_(options) {
+      options_(options),
+      inference_cache_(std::move(inference_cache)) {
   MG_CHECK(options.game_options.resign_threshold < 0);
 
   // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.

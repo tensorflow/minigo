@@ -43,16 +43,16 @@ static constexpr char kAlmostDoneBoard[] = R"(
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(const Options& options)
-      : MctsPlayer(absl::make_unique<FakeDualNet>(), options) {}
+      : MctsPlayer(absl::make_unique<FakeDualNet>(), nullptr, options) {}
 
   explicit TestablePlayer(std::unique_ptr<DualNet> network,
                           const Options& options)
-      : MctsPlayer(std::move(network), options) {}
+      : MctsPlayer(std::move(network), nullptr, options) {}
 
   TestablePlayer(absl::Span<const float> fake_priors, float fake_value,
                  const Options& options)
       : MctsPlayer(absl::make_unique<FakeDualNet>(fake_priors, fake_value),
-                   options) {}
+                   nullptr, options) {}
 
   using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;

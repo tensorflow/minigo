@@ -235,6 +235,7 @@ minigo_cc_library(
         ":symmetries",
         ":zobrist",
         "//cc/dual_net",
+        "//cc/dual_net:inference_cache",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/memory",

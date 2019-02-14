@@ -54,7 +54,9 @@ class GtpPlayer : public MctsPlayer {
     bool courtesy_pass = false;
   };
 
-  GtpPlayer(std::unique_ptr<DualNet> network, const Options& options);
+  GtpPlayer(std::unique_ptr<DualNet> network,
+            std::unique_ptr<InferenceCache> inference_cache,
+            const Options& options);
 
   void Run();
   void NewGame() override;

@@ -36,7 +36,9 @@ namespace minigo {
 
 class MiniguiPlayer : public GtpPlayer {
  public:
-  MiniguiPlayer(std::unique_ptr<DualNet> network, const Options& options);
+  MiniguiPlayer(std::unique_ptr<DualNet> network,
+                std::unique_ptr<InferenceCache> inference_cache,
+                const Options& options);
 
   void NewGame() override;
   Coord SuggestMove() override;

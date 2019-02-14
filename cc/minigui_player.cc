@@ -33,8 +33,9 @@
 namespace minigo {
 
 MiniguiPlayer::MiniguiPlayer(std::unique_ptr<DualNet> network,
+                             std::unique_ptr<InferenceCache> inference_cache,
                              const Options& options)
-    : GtpPlayer(std::move(network), options) {
+    : GtpPlayer(std::move(network), std::move(inference_cache), options) {
   RegisterCmd("clear_board", &MiniguiPlayer::HandleClearBoard);
   RegisterCmd("echo", &MiniguiPlayer::HandleEcho);
   RegisterCmd("genmove", &MiniguiPlayer::HandleGenmove);
