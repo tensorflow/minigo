@@ -37,13 +37,18 @@ InferenceCache::CompressedFeatures InferenceCache::CompressFeatures(
 }
 
 size_t InferenceCache::CalculateCapacity(size_t size_mb) {
-  // Maximum load factory of an absl::node_hash_map.
-  float max_load_factor = 0.875;
+  // Minimum load factory of an absl::node_hash_map at the time of writing,
+  // taken from https://abseil.io/docs/cpp/guides/container.
+  // This is a pessimistic estimate of the cache's load factor but since the
+  // size of each node pointer is much smaller than that of the node itself, it
+  // shouldn't make that much difference either way.
+  float load_factor = 0.4375;
 
   // absl::node_hash_map allocates each (key, value) pair on the heap and stores
-  // pointers to those pairs in the table itself.
+  // pointers to those pairs in the table itself, along with one byte of hash
+  // for each element.
   float element_size =
-      sizeof(Map::value_type) + sizeof(Map::value_type*) / max_load_factor;
+      sizeof(Map::value_type) + (sizeof(Map::value_type*) + 1) / load_factor;
 
   return static_cast<size_t>(size_mb * 1024.0f * 1024.0f / element_size);
 }
