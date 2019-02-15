@@ -49,7 +49,7 @@ You can copy it locally as follows:
 
 ```shell
 mkdir -p saved_models
-gsutil cp gs://tensor-go-minigo-v15-19/models/000990-cormorant.pb saved_models/
+gsutil cp gs://minigo-pub/v15-19x19/models/000990-cormorant.pb saved_models/
 ```
 
 Minigo can also read models directly from Google Cloud Storage but it doesn't
@@ -130,7 +130,8 @@ bazel-bin/cc/gtp \
 #### cc:puzzle
 
 Loads all SGF files found in the given `sgf_dir` and tries to predict the move
-made at each position in each game.
+made at each position in each game. After all games are processed, prints
+summary stats to about how many moves were correctly predicted.
 
 ```shell
 bazel build -c opt cc:puzzle
@@ -177,8 +178,8 @@ argument:
    the CPU.
    Compile by passing `--define=lite=1` to `bazel build`.
    Use by passing `--engine=lite` when you run your compiled binary.
- - **tpu**: perform inference on a Cloud TPU. Your code must be compiled and run
-   on a Cloud TPU-equipped VM for this to work.
+ - **tpu**: perform inference on a Cloud TPU. Your code must run on a Cloud
+   TPU-equipped VM for this to work.
    Compile by passing `--define=tpu=1` to `bazel build`.
    Use by passing `--engine=tpu` when you run your compiled binary.
  - **trt**: uses NVIDIA TensorRT.
