@@ -129,7 +129,11 @@ class GtpPlayer : public MctsPlayer {
   // If waiting for the opponent to play, consider thinking for a bit.
   // Returns true if we pondered.
   bool MaybePonder();
+
   virtual void Ponder();
+
+  // Begin pondering again if requested.
+  void MaybeStartPondering();
 
   // Handles a GTP command specified by `line`.
   // Returns a (bool, string) pair containing whether the GtpPlayer should

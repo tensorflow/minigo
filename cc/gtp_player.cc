@@ -58,6 +58,13 @@ GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network, const Options& options)
 }
 
 void GtpPlayer::Run() {
+  // Perform a warm-up inference: ML frameworks like TensorFlow often perform
+  // lazy initialization, causing the first inference to take substantially
+  // longer than subsequent ones, which can interfere with time keeping.
+  MG_LOG(INFO) << "Warming up...";
+  DualNet::BoardFeatures features;
+  DualNet::Output output;
+  network()->RunMany({&features}, {&output}, nullptr);
   MG_LOG(INFO) << "GTP engine ready";
 
   // Start a background thread that pushes lines read from stdin into the
@@ -111,6 +118,7 @@ void GtpPlayer::Run() {
 void GtpPlayer::NewGame() {
   game_.NewGame();
   MctsPlayer::NewGame();
+  MaybeStartPondering();
 }
 
 Coord GtpPlayer::SuggestMove() {
@@ -118,6 +126,16 @@ Coord GtpPlayer::SuggestMove() {
     return Coord::kPass;
   }
   return MctsPlayer::SuggestMove();
+}
+
+void GtpPlayer::MaybeStartPondering() {
+  if (ponder_type_ != PonderType::kOff) {
+    ponder_limit_reached_ = false;
+    ponder_read_count_ = 0;
+    if (ponder_type_ == PonderType::kTimeLimited) {
+      ponder_time_limit_ = absl::Now() + ponder_duration_;
+    }
+  }
 }
 
 bool GtpPlayer::MaybePonder() {
@@ -303,14 +321,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(CmdArgs args) {
   MG_LOG(INFO) << root()->Describe();
   MG_CHECK(PlayMove(c, &game_));
 
-  // Begin pondering again if requested.
-  if (ponder_type_ != PonderType::kOff) {
-    ponder_limit_reached_ = false;
-    ponder_read_count_ = 0;
-    if (ponder_type_ == PonderType::kTimeLimited) {
-      ponder_time_limit_ = absl::Now() + ponder_duration_;
-    }
-  }
+  MaybeStartPondering();
 
   return Response::Ok(c.ToGtp());
 }
