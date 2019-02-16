@@ -145,11 +145,14 @@ bazel-bin/cc/puzzle \
 
 Minigo's C++ unit tests operate on both 9x9 and 19x19, and some tests are only
 enabled for a particular board size. Consequently, you must run the tests
-multiple times:
+twice: once for 9x9 boards and once for 19x19 boards.
 
 ```shell
 bazel test --define=board_size=9 cc/...  &&  bazel test cc/...
 ```
+
+Note that Minigo is compiled for a 19x19 board by default, which explains the
+lack of a `--define=board_size=19` in the second `bazel test` invocation.
 
 ## Running with AddressSanitizer
 
