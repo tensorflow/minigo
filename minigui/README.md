@@ -9,7 +9,7 @@ Like other UIs, Minigui doesn't contain a Go playing engine and in fact doesn't
 even understand the rules of Go (it relies on the engine to tell it what stones
 are on the board after each move is played).
 
-Minigui communicates to the engine using Go Text protocol
+Minigui communicates to the engine using Go Text Protocol
 [GTP](https://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html),
 but requires some extensions (described later).
 
@@ -89,7 +89,7 @@ functionality.**
 ### Vs mode
 
 A mode that plays two models or engines against each other and displays the
-variations that each player is considering in real time.
+variations that each engine is considering in real time.
 
 ### Demo mode
 
@@ -127,11 +127,9 @@ field, other fields are required):
  - `parentId?: string`: an ID that uniquely identifies the previous board
    position (the parent node in the game tree). This field must be set for
    all board positions except the starting empty board.
- - `moveNum: number`: the current move number. Used for consistency checking
-   (both Minigui and the engine must agree on the move number).
+ - `moveNum: number`: the current move number.
  - `toPlay: string`: whether it is black or white to play. Must be either `"b"`
-   or `"w"`. Used for consistency checking (both Minigui and the engine must
-   agree on who is to play).
+   or `"w"`.
  - `stones?: string`: a string of N\*N characters (where N is the board size,
    usually 19) containing all stones concatenated together, where `.` is used
    to represent an empty point, `X` is a black stone and `O` is a white stone.
@@ -205,7 +203,7 @@ mg-position: {"gameOver":false,"id":"0x559687366c10","move":"G10","moveNum":36,"
 #### Update messages
 
 While an engine is thinking (in response to a `genmove` command or pondering
-while it's the other player's turn), an engine should also send incremental
+while it's the other player's turn), an engine can also send incremental
 updates for the current position, containing variations considered, expected win
 rate, number of visits, etc.
 
@@ -216,13 +214,11 @@ the prefix `mg-update:`.
  - `n?: number`: the number of reads for the position.
  - `q?: number`: estimated winrate for the position from black's perspective in
    the range [-1, 1].
- - `pv?: string`: the GTP coordinate of the variation in `variations` that
-   corresponds to the principal variation.
  - `treeStats?: TreeStats`: stats for the current search tree (see below).
  - `variations?: {string: Variation}`: a map from GTP coordinate to a variation
-   (see below). Some Minigui modes also display a live view of the current
-   variation being searched. This should be written to `variations` under the
-   `"live"`.
+   (see below), e.g. "K10" for the variation beginning on point K10. Some
+   Minigui modes also display a live view of the current variation being
+   searched. This should be written to `variations` under the key `"live"`.
 
 Where `TreeStats` is:
  - `numNodes: number`: total number of nodes in the search tree.

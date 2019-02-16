@@ -217,7 +217,6 @@ namespace Position {
     id: string;
     n?: number;
     q?: number;
-    pv?: string;
     childN?: number[];
     childQ?: number[];
     treeStats?: TreeStats;
