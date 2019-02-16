@@ -83,8 +83,7 @@ Minigui has various modes of operation.
 Study mode allows you to load previously recorded SGF games, explore variations
 and explore what the engine thinks of each position.
 
-**Minigui's study mode currently requires the C++ Minigo engine for full
-functionality.**
+**Minigui's study mode currently requires the C++ Minigo engine.**
 
 ### Vs mode
 
@@ -104,7 +103,6 @@ Pi.
 
 A self-play only version of the demo mode.
 
-
 ## Technical discussion
 
 A technical discussion of the features that a Go engine must implement to
@@ -123,7 +121,9 @@ The JSON object is made up of the following fields (a `?` denotes an optional
 field, other fields are required):
 
  - `id: string`: an ID that uniquely identifies the current board
-   position.
+   position. Note that using something like the Zobrist of the board stones is
+   insufficient for modes like Study that support multiple active variations
+   because multiple variations can lead to the same board state.
  - `parentId?: string`: an ID that uniquely identifies the previous board
    position (the parent node in the game tree). This field must be set for
    all board positions except the starting empty board.
@@ -144,8 +144,8 @@ field, other fields are required):
  - `comment?: string`: any comments for this position (perhaps from a loaded
    SGF).
  - `caps?: number[]`: the number of captured stones. Black captures should be
-   stored in `caps[0]` and white captures should be stored in `caps[1]`. If no
-   stones have been captured, the number of captures for both players is assumed
+   stored in `caps[0]` and white captures should be stored in `caps[1]`. If
+   `caps` is not provided, the number of captures for both players is assumed
    to be 0.
 
 These `mg-position` messages should be printed (and flushed) while processing
@@ -280,7 +280,17 @@ written to `stdout`.
 
 When processing a GTP command, the engine must ensure that both `stdout` and
 `stderr` stay in sync by printing and flushing the string `__GTP_CMD_DONE__` to
-`stderr` before it writes the GTP response to `stdout`.
+`stderr` before it writes the GTP response to `stdout`, e.g.:
+
+```
+stdin: genmove b
+stderr: mg-update: {...}
+stderr: mg-update: {...}
+stderr: mg-update: {...}
+stderr: mg-position: {...}
+stderr: __GTP_CMD_DONE__
+stdout: = D4
+```
 
 ### GTP extensions
 
