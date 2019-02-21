@@ -99,7 +99,7 @@ class Socket {
 
   // Sends a GTP command, returning a promise that is resolved when the
   // command succeeds or is rejected if the command fails.
-  send(cmd: string) {
+  send(cmd: string): Promise<any> {
     return new Promise((resolve, reject) => {
       this.cmdQueue.push({cmd: cmd, resolve: resolve, reject: reject});
       if (this.cmdQueue.length == 1) {
@@ -188,7 +188,13 @@ class Socket {
         } catch (e) {
           obj = stripped;
         }
-        handler(obj);
+        try {
+          handler(obj);
+        } catch (e) {
+          // Catch and log all exceptions to prevent them breaking the socket.
+          console.log(`Error handling ${trimText(line, 1024)}`);
+          console.log(e);
+        }
         handled = true;
       }
     }

@@ -551,7 +551,7 @@ class Search extends Variation {
   }
 
   update(props: Set<string>) {
-    return super.update(props) || props.has('search');
+    return super.update(props) || props.has('variations');
   }
 
   draw() {

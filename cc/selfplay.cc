@@ -67,7 +67,8 @@ DEFINE_bool(inject_noise, true,
             "If true, inject noise into the root position at the start of "
             "each tree search.");
 DEFINE_double(noise_mix, 0.25,
-              "If inject_noise is true, the amount of noise to mix into the root.");
+              "If inject_noise is true, the amount of noise to mix into the "
+              "root.");
 DEFINE_bool(soft_pick, true,
             "If true, choose moves early in the game with a probability "
             "proportional to the number of times visited during tree search. "
@@ -296,7 +297,7 @@ class SelfPlayer {
         absl::MutexLock lock(&mutex_);
         batcher_->StartGame(player->network(), player->network());
       }
-      while (!player->root()->game_over() && !player->root()->at_move_limit()) {
+      while (!game->game_over() && !player->root()->at_move_limit()) {
         auto move = player->SuggestMove();
         if (player->options().verbose) {
           const auto& position = player->root()->position;

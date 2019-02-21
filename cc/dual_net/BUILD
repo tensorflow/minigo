@@ -203,6 +203,7 @@ minigo_cc_test(
     srcs = ["batching_dual_net_test.cc"],
     deps = [
         ":batching_dual_net",
+        ":dual_net",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
@@ -233,6 +234,8 @@ minigo_cc_test_9_only(
         ":factory",
         "//cc:logging",
         "//cc:position",
+        "//cc:random",
+        "//cc:symmetries",
         "//cc:test_utils",
         "@com_google_googletest//:gtest_main",
     ],
@@ -243,6 +246,7 @@ minigo_cc_test(
     srcs = ["inference_cache_test.cc"],
     deps = [
         ":inference_cache",
+        "//cc:random",
         "@com_google_googletest//:gtest_main",
     ],
 )

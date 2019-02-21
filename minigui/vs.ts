@@ -553,6 +553,9 @@ class VsApp {
     }
     this.currPlayer.startGenmoveTimer();
     this.currPlayer.gtp.send(`genmove ${gtpCol}`).then((gtpMove: string) => {
+      if (gtpMove == 'resign') {
+        this.onGameOver();
+      }
       if (this.currPlayer.latestPosition != null &&
           this.currPlayer.latestPosition.gameOver) {
         this.onGameOver();
@@ -562,7 +565,7 @@ class VsApp {
         }
         this.nextPlayer.gtp.send(`play ${gtpCol} ${gtpMove}`).then(() => {
           [this.currPlayer, this.nextPlayer] = [this.nextPlayer, this.currPlayer];
-          if (!this.paused) {
+          if (!this.paused && !this.gameOver) {
             this.genmove();
           }
         });

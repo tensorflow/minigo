@@ -36,9 +36,11 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             });
         }
         newGame() {
-            super.newGame();
             this.log.clear();
-            this.winrateGraph.newGame(this.rootPosition);
+            this.winrateGraph.newGame();
+            return super.newGame().then(() => {
+                this.genmove();
+            });
         }
         onPositionUpdate(position, update) {
             if (position != this.activePosition) {
@@ -49,6 +51,17 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             }
             this.winrateGraph.update(position);
         }
+        genmove() {
+            let colorStr = this.activePosition.toPlay == base_1.Color.Black ? 'b' : 'w';
+            this.gtp.send(`genmove ${colorStr}`).then((gtpMove) => {
+                if (gtpMove == 'resign') {
+                    this.onGameOver();
+                }
+                else {
+                    this.genmove();
+                }
+            });
+        }
         onNewPosition(position) {
             this.activePosition = position;
             for (let board of this.boards) {
@@ -56,18 +69,15 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             }
             this.winrateGraph.setActive(position);
             this.log.scroll();
-            if (this.activePosition.gameOver) {
-                window.setTimeout(() => { this.newGame(); }, 3000);
-            }
-            else {
-                let colorStr = this.activePosition.toPlay == base_1.Color.Black ? 'b' : 'w';
-                this.gtp.send(`genmove ${colorStr}`);
+            if (position.gameOver) {
+                this.onGameOver();
             }
         }
         onGameOver() {
             this.gtp.send('final_score').then((result) => {
                 this.log.log(util_1.toPrettyResult(result));
                 this.log.scroll();
+                window.setTimeout(() => { this.newGame(); }, 3000);
             });
         }
     }

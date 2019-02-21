@@ -45,7 +45,15 @@ cc_library(
 
 cc_library(
     name = "file",
-    deps = [":path"] + select({
+    hdrs = [
+        "path.h",
+        "utils.h",
+    ],
+    deps = [
+        ":path",
+        "//cc/platform",
+        "@com_google_absl//absl/strings",
+    ] + select({
         "//cc/config:enable_tf": [":utils_tf"],
         "//conditions:default": [":utils_no_tf"],
     }),
@@ -66,6 +74,7 @@ cc_test(
     deps = [
         ":file",
         "//cc:base",
+        "//cc:logging",
         "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",
     ],

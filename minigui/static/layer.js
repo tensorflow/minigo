@@ -463,7 +463,7 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
             return false;
         }
         update(props) {
-            return super.update(props) || props.has('search');
+            return super.update(props) || props.has('variations');
         }
         draw() {
             if (this.showVariation != '') {

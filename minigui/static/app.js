@@ -6,6 +6,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             this.gtp = new gtp_socket_1.Socket();
             this.engineBusy = false;
             this.positionMap = new Map();
+            this.gameOver = false;
             this.gtp.onData('mg-update', (j) => {
                 let position = this.positionMap.get(j.id);
                 if (position === undefined) {
@@ -18,8 +19,12 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                 let position;
                 let def = j;
                 if (def.move == null) {
+                    let p = this.positionMap.get(def.id);
+                    if (p == null) {
+                        p = new position_1.Position(def);
+                        this.rootPosition = p;
+                    }
                     position = this.rootPosition;
-                    position.id = def.id;
                 }
                 else {
                     if (def.parentId === undefined) {
@@ -40,11 +45,11 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                 }
                 position.update(j);
                 this.onNewPosition(position);
-                if (position.gameOver) {
-                    this.onGameOver();
-                }
                 this.positionMap.set(position.id, position);
             });
+        }
+        onGameOver() {
+            this.gameOver = true;
         }
         connect() {
             let uri = `http://${document.domain}:${location.port}/minigui`;
@@ -70,11 +75,10 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
             });
         }
         newGame() {
+            this.gameOver = false;
             this.positionMap.clear();
             this.rootPosition.children = [];
             this.activePosition = this.rootPosition;
-            this.gtp.send('clear_board');
-            this.gtp.send('info');
             let containerElem = document.querySelector('.minigui');
             if (containerElem != null) {
                 let dataset = containerElem.dataset;
@@ -86,6 +90,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./util"],
                     }
                 }
             }
+            return this.gtp.send('clear_board');
         }
     }
     exports.App = App;

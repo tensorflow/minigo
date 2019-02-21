@@ -110,7 +110,8 @@ class DemoApp extends App {
         } else {
           elem.innerText = HUMAN;
         }
-        if (!this.engineBusy) {
+        if (!this.engineBusy && !this.gameOver &&
+          this.activePosition.toPlay == color) {
           this.onPlayerChanged();
         }
       });
@@ -120,17 +121,19 @@ class DemoApp extends App {
   }
 
   protected newGame() {
-    super.newGame();
     this.log.clear();
-    this.winrateGraph.newGame(this.rootPosition);
+    this.winrateGraph.newGame();
+    return super.newGame().then(() => {
+      for (let board of this.boards) {
+        board.newGame(this.rootPosition);
+      }
+      this.onPlayerChanged();
+    });
   }
 
   private onPlayerChanged() {
-    if (this.activePosition.gameOver) {
-      return;
-    }
-
-    if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
+    let color = this.activePosition.toPlay;
+    if (this.playerElems[color].innerText == MINIGO) {
       this.genmove();
     } else {
       this.mainBoard.enabled = true;
@@ -139,7 +142,7 @@ class DemoApp extends App {
   }
 
   private genmove() {
-    if (this.activePosition.gameOver || this.engineBusy) {
+    if (this.gameOver || this.engineBusy) {
       return;
     }
 
@@ -147,12 +150,23 @@ class DemoApp extends App {
     this.pvLayer.show = true;
     this.engineBusy = true;
     let colorStr = this.activePosition.toPlay == Color.Black ? 'b' : 'w';
-    this.gtp.send(`genmove ${colorStr}`).finally(() => {
+    this.gtp.send(`genmove ${colorStr}`).then((gtpMove: string) => {
       this.engineBusy = false;
-      if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
-        this.genmove();
+      if (gtpMove == 'resign') {
+        this.onGameOver();
+      } else {
+        this.onPlayerChanged();
       }
     });
+  }
+
+  protected onMovePlayed() {
+    if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
+      this.genmove();
+    } else {
+      this.mainBoard.enabled = true;
+      this.pvLayer.show = false;
+    }
   }
 
   protected onPositionUpdate(position: Position, update: Position.Update) {
@@ -172,16 +186,21 @@ class DemoApp extends App {
     }
     this.winrateGraph.setActive(position);
     this.log.scroll();
-    this.onPlayerChanged();
+    if (position.gameOver) {
+      this.onGameOver();
+    }
   }
 
   private playMove(color: Color, move: Move) {
     let colorStr = color == Color.Black ? 'b' : 'w';
     let moveStr = toGtp(move);
-    this.gtp.send(`play ${colorStr} ${moveStr}`);
+    this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
+      this.onMovePlayed();
+    });
   }
 
   protected onGameOver() {
+    super.onGameOver();
     this.gtp.send('final_score').then((result: string) => {
       this.log.log(toPrettyResult(result));
       this.log.scroll();

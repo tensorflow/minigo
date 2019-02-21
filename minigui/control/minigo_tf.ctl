@@ -9,7 +9,7 @@ players = {
                        " --value_init_penalty=0"
                        " --courtesy_pass=true"
                        " --virtual_losses=8"
-                       " --resign_threshold=-0.8",
+                       " --resign_threshold=-0.3",
                        startup_gtp_commands=[
                          "report_search_interval 100",
                        ]),

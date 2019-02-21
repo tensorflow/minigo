@@ -59,7 +59,7 @@ void SimpleExample() {
   Game game(player.name(), player.name(), options.game_options);
 
   // Play the game.
-  while (!player.root()->game_over() && !player.root()->at_move_limit()) {
+  while (!game.game_over() && !player.root()->at_move_limit()) {
     auto move = player.SuggestMove();
 
     const auto& position = player.root()->position;

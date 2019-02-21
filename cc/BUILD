@@ -142,6 +142,7 @@ minigo_cc_library(
     deps = [
         ":base",
         ":game",
+        ":logging",
         ":sgf",
         "//cc/file",
         "//cc/platform",
@@ -156,12 +157,15 @@ minigo_cc_library(
     hdrs = ["gtp_player.h"],
     deps = [
         ":base",
+        ":logging",
         ":mcts",
         ":sgf",
         "//cc:thread_safe_queue",
         "//cc/dual_net",
         "//cc/file",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -204,13 +208,16 @@ minigo_cc_library(
     deps = [
         ":base",
         ":gtp_player",
+        ":logging",
         ":mcts",
         ":sgf",
+        ":thread_safe_queue",
         "//cc/dual_net",
         "//cc/file",
         "@com_github_nlohmann_json//:json",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
     ],
@@ -277,10 +284,12 @@ minigo_cc_library(
     deps = [
         ":base",
         ":logging",
+        "//cc/platform",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -394,6 +403,7 @@ minigo_cc_test_9_only(
     deps = [
         ":base",
         ":mcts",
+        ":position",
         ":test_utils",
         ":zobrist",
         "//cc/dual_net:fake_dual_net",
@@ -470,6 +480,7 @@ minigo_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
+        ":game",
         ":game_utils",
         ":init",
         ":logging",
@@ -483,6 +494,7 @@ minigo_cc_binary(
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
     ],
 )
@@ -500,8 +512,10 @@ minigo_cc_binary(
         "//cc/dual_net:factory",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -523,6 +537,7 @@ minigo_cc_binary(
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
     ],
@@ -534,6 +549,7 @@ minigo_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
+        ":game",
         ":game_utils",
         ":init",
         ":logging",
@@ -566,6 +582,7 @@ minigo_cc_binary(
         ":mcts",
         ":random",
         ":zobrist",
+        "//cc:game",
         "//cc/dual_net:factory",
         "//cc/platform",
         "@com_github_gflags_gflags//:gflags",

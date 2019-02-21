@@ -56,9 +56,11 @@ class KioskApp extends App {
   }
 
   protected newGame() {
-    super.newGame();
     this.log.clear();
-    this.winrateGraph.newGame(this.rootPosition);
+    this.winrateGraph.newGame();
+    return super.newGame().then(() => {
+      this.genmove();
+    });
   }
 
   protected onPositionUpdate(position: Position, update: Position.Update) {
@@ -71,6 +73,17 @@ class KioskApp extends App {
     this.winrateGraph.update(position);
   }
 
+  protected genmove() {
+    let colorStr = this.activePosition.toPlay == Color.Black ? 'b' : 'w';
+    this.gtp.send(`genmove ${colorStr}`).then((gtpMove: string) => {
+      if (gtpMove == 'resign') {
+        this.onGameOver();
+      } else {
+        this.genmove();
+      }
+    });
+  }
+
   protected onNewPosition(position: Position) {
     this.activePosition = position
     for (let board of this.boards) {
@@ -78,12 +91,8 @@ class KioskApp extends App {
     }
     this.winrateGraph.setActive(position);
     this.log.scroll();
-
-    if (this.activePosition.gameOver) {
-      window.setTimeout(() => { this.newGame(); }, 3000);
-    } else {
-      let colorStr = this.activePosition.toPlay == Color.Black ? 'b' : 'w';
-      this.gtp.send(`genmove ${colorStr}`);
+    if (position.gameOver) {
+      this.onGameOver();
     }
   }
 
@@ -91,6 +100,7 @@ class KioskApp extends App {
     this.gtp.send('final_score').then((result: string) => {
       this.log.log(toPrettyResult(result));
       this.log.scroll();
+      window.setTimeout(() => { this.newGame(); }, 3000);
     });
   }
 }

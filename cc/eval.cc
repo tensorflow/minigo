@@ -194,8 +194,7 @@ class Evaluator {
     auto* curr_player = black.get();
     auto* next_player = white.get();
     batcher->StartGame(curr_player->network(), next_player->network());
-    while (!curr_player->root()->game_over() &&
-           !curr_player->root()->at_move_limit()) {
+    while (!game.game_over() && !curr_player->root()->at_move_limit()) {
       auto move = curr_player->SuggestMove();
       if (verbose) {
         std::cerr << curr_player->root()->Describe() << "\n";

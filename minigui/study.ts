@@ -394,11 +394,12 @@ class ExploreApp extends App {
   }
 
   protected newGame() {
-    super.newGame();
-    this.variationTree.newGame(this.rootPosition);
-    this.winrateGraph.newGame(this.rootPosition);
-    this.board.newGame(this.rootPosition);
     this.log.clear();
+    this.winrateGraph.newGame();
+    this.variationTree.newGame();
+    return super.newGame().then(() => {
+      this.board.newGame(this.rootPosition);
+    });
   }
 
   protected onPositionUpdate(position: Position, update: Position.Update) {
@@ -420,7 +421,9 @@ class ExploreApp extends App {
   }
 
   protected onNewPosition(position: Position) {
-    if (position.parent != null) {
+    if (position.parent == null) {
+      this.variationTree.setRoot(position);
+    } else {
       this.variationTree.addChild(position.parent, position);
     }
     this.selectPosition(position);

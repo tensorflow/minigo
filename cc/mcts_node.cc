@@ -82,6 +82,8 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
       stats(&parent->edges[move]),
       move(move),
       position(parent->position) {
+  MG_DCHECK(move >= 0);
+  MG_DCHECK(move < kNumMoves);
   position.PlayMove(move);
 
   // Insert a cache of ancestor Zobrist hashes at regular depths in the tree.

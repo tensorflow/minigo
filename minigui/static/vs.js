@@ -450,6 +450,9 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./graph",
             }
             this.currPlayer.startGenmoveTimer();
             this.currPlayer.gtp.send(`genmove ${gtpCol}`).then((gtpMove) => {
+                if (gtpMove == 'resign') {
+                    this.onGameOver();
+                }
                 if (this.currPlayer.latestPosition != null &&
                     this.currPlayer.latestPosition.gameOver) {
                     this.onGameOver();
@@ -460,7 +463,7 @@ define(["require", "exports", "./position", "./gtp_socket", "./base", "./graph",
                     }
                     this.nextPlayer.gtp.send(`play ${gtpCol} ${gtpMove}`).then(() => {
                         [this.currPlayer, this.nextPlayer] = [this.nextPlayer, this.currPlayer];
-                        if (!this.paused) {
+                        if (!this.paused && !this.gameOver) {
                             this.genmove();
                         }
                     });

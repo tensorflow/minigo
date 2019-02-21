@@ -116,7 +116,13 @@ define(["require", "exports"], function (require, exports) {
                     catch (e) {
                         obj = stripped;
                     }
-                    handler(obj);
+                    try {
+                        handler(obj);
+                    }
+                    catch (e) {
+                        console.log(`Error handling ${trimText(line, 1024)}`);
+                        console.log(e);
+                    }
                     handled = true;
                 }
             }

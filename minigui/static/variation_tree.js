@@ -94,12 +94,19 @@ define(["require", "exports", "./util", "./view"], function (require, exports, u
                 this.draw();
             });
         }
-        newGame(rootPosition) {
-            this.rootNode = new Node(null, rootPosition, PAD, PAD);
-            this.activeNode = this.rootNode;
+        newGame() {
+            this.rootNode = null;
+            this.activeNode = null;
             this.layout();
             this.scrollIntoView();
             this.draw();
+        }
+        setRoot(position) {
+            if (this.rootNode != null) {
+                throw new Error('Already have a root note, you should call newGame first');
+            }
+            this.rootNode = new Node(null, position, PAD, PAD);
+            this.activeNode = this.rootNode;
         }
         setActive(position) {
             if (this.activeNode != null && this.activeNode.position != position) {

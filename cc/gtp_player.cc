@@ -297,7 +297,7 @@ GtpPlayer::Response GtpPlayer::HandleFinalScore(CmdArgs args) {
   if (!response.ok) {
     return response;
   }
-  if (!root()->game_over()) {
+  if (!game_.game_over()) {
     // Game isn't over yet, calculate the current score using Tromp-Taylor
     // scoring.
     return Response::Ok(Game::FormatScore(

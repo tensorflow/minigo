@@ -147,12 +147,20 @@ class VariationTree extends View {
     });
   }
 
-  newGame(rootPosition: Position) {
-    this.rootNode = new Node(null, rootPosition, PAD, PAD);
-    this.activeNode = this.rootNode;
+  newGame() {
+    this.rootNode = null;
+    this.activeNode = null;
     this.layout();
     this.scrollIntoView();
     this.draw();
+  }
+
+  setRoot(position: Position) {
+    if (this.rootNode != null){
+      throw new Error('Already have a root note, you should call newGame first');
+    }
+    this.rootNode = new Node(null, position, PAD, PAD);
+    this.activeNode = this.rootNode;
   }
 
   setActive(position: Position) {

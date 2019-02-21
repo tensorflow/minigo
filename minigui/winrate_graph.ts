@@ -54,9 +54,9 @@ class WinrateGraph extends Graph {
     }
   }
 
-  newGame(rootPosition: Position) {
-    this.rootPosition = rootPosition;
-    this.activePosition = rootPosition;
+  newGame() {
+    this.rootPosition = null;
+    this.activePosition = null;
     this.mainLine = [];
     this.variation = [];
     this.xEnd = 10;
@@ -64,6 +64,9 @@ class WinrateGraph extends Graph {
   }
 
   setActive(position: Position) {
+    if (this.rootPosition == null && position.parent == null) {
+      this.rootPosition = position;
+    }
     if (position != this.activePosition) {
       this.xEnd = Math.max(this.xEnd, position.moveNum);
       this.activePosition = position;

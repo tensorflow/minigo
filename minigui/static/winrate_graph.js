@@ -32,15 +32,18 @@ define(["require", "exports", "./util", "./graph"], function (require, exports, 
                 parent = util_1.getElement(parent);
             }
         }
-        newGame(rootPosition) {
-            this.rootPosition = rootPosition;
-            this.activePosition = rootPosition;
+        newGame() {
+            this.rootPosition = null;
+            this.activePosition = null;
             this.mainLine = [];
             this.variation = [];
             this.xEnd = 10;
             this.draw();
         }
         setActive(position) {
+            if (this.rootPosition == null && position.parent == null) {
+                this.rootPosition = position;
+            }
             if (position != this.activePosition) {
                 this.xEnd = Math.max(this.xEnd, position.moveNum);
                 this.activePosition = position;

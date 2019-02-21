@@ -266,9 +266,8 @@ bool MctsPlayer::PlayMove(Coord c, Game* game) {
 
   // Handle resignations.
   if (c == Coord::kResign) {
-    root_ = root_->MaybeAddChild(c);
     if (game != nullptr) {
-      game->SetGameOverBecauseOfResign(root_->position.to_play());
+      game->SetGameOverBecauseOfResign(OtherColor(root_->position.to_play()));
     }
     return true;
   }

@@ -1,2 +1,3 @@
 build --define=tf=1
+test -c dbg
 

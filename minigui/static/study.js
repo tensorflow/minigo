@@ -304,11 +304,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.gtp.sendOne(`select_position ${position.id}`).catch(() => { });
         }
         newGame() {
-            super.newGame();
-            this.variationTree.newGame(this.rootPosition);
-            this.winrateGraph.newGame(this.rootPosition);
-            this.board.newGame(this.rootPosition);
             this.log.clear();
+            this.winrateGraph.newGame();
+            this.variationTree.newGame();
+            return super.newGame().then(() => {
+                this.board.newGame(this.rootPosition);
+            });
         }
         onPositionUpdate(position, update) {
             this.winrateGraph.update(position);
@@ -327,7 +328,10 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             return numReads.toFixed(places) + 'k';
         }
         onNewPosition(position) {
-            if (position.parent != null) {
+            if (position.parent == null) {
+                this.variationTree.setRoot(position);
+            }
+            else {
                 this.variationTree.addChild(position.parent, position);
             }
             this.selectPosition(position);

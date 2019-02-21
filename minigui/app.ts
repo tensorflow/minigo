@@ -34,11 +34,14 @@ abstract class App {
 
   protected positionMap = new Map<string, Position>();
 
-  protected abstract onGameOver(): void;
-
   protected abstract onPositionUpdate(position: Position, update: Position.Update): void;
 
   protected abstract onNewPosition(position: Position): void;
+
+  // We track game over state separately from the gameOver property of the
+  // latest position because when one player resigns, the game ends without a
+  // new Position with gameOver == true being generated.
+  protected gameOver = false;
 
   constructor() {
     this.gtp.onData('mg-update', (j: Position.Update) => {
@@ -58,8 +61,12 @@ abstract class App {
       let def = j as Position.Definition;
       if (def.move == null) {
         // No parent, this must be the root.
+        let p = this.positionMap.get(def.id);
+        if (p == null) {
+          p = new Position(def);
+          this.rootPosition = p;
+        }
         position = this.rootPosition;
-        position.id = def.id;
       } else {
         // Get the parent.
         if (def.parentId === undefined) {
@@ -81,11 +88,12 @@ abstract class App {
       }
       position.update(j);
       this.onNewPosition(position);
-      if (position.gameOver) {
-        this.onGameOver();
-      }
       this.positionMap.set(position.id, position);
     });
+  }
+
+  protected onGameOver() {
+    this.gameOver = true;
   }
 
   protected connect() {
@@ -117,13 +125,11 @@ abstract class App {
     });
   }
 
-  protected newGame() {
+  protected newGame(): Promise<any> {
+    this.gameOver = false;
     this.positionMap.clear();
     this.rootPosition.children = [];
     this.activePosition = this.rootPosition;
-
-    this.gtp.send('clear_board');
-    this.gtp.send('info');
 
     // TODO(tommadams): Move this functionality into .ctl files.
     // Iterate over the data-* attributes attached to the main minigui container
@@ -140,6 +146,8 @@ abstract class App {
         }
       }
     }
+
+    return this.gtp.send('clear_board');
   }
 }
 
