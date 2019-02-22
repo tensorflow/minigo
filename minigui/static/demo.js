@@ -87,6 +87,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.log.clear();
             this.winrateGraph.newGame();
             return super.newGame().then(() => {
+                this.engineBusy = false;
                 for (let board of this.boards) {
                     board.newGame(this.rootPosition);
                 }
@@ -121,15 +122,6 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 }
             });
         }
-        onMovePlayed() {
-            if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
-                this.genmove();
-            }
-            else {
-                this.mainBoard.enabled = true;
-                this.pvLayer.show = false;
-            }
-        }
         onPositionUpdate(position, update) {
             if (position != this.activePosition) {
                 return;
@@ -154,7 +146,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             let colorStr = color == base_1.Color.Black ? 'b' : 'w';
             let moveStr = base_1.toGtp(move);
             this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
-                this.onMovePlayed();
+                this.onPlayerChanged();
             });
         }
         onGameOver() {

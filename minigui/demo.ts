@@ -124,6 +124,7 @@ class DemoApp extends App {
     this.log.clear();
     this.winrateGraph.newGame();
     return super.newGame().then(() => {
+      this.engineBusy = false;
       for (let board of this.boards) {
         board.newGame(this.rootPosition);
       }
@@ -160,15 +161,6 @@ class DemoApp extends App {
     });
   }
 
-  protected onMovePlayed() {
-    if (this.playerElems[this.activePosition.toPlay].innerText == MINIGO) {
-      this.genmove();
-    } else {
-      this.mainBoard.enabled = true;
-      this.pvLayer.show = false;
-    }
-  }
-
   protected onPositionUpdate(position: Position, update: Position.Update) {
     if (position != this.activePosition) {
       return;
@@ -195,7 +187,7 @@ class DemoApp extends App {
     let colorStr = color == Color.Black ? 'b' : 'w';
     let moveStr = toGtp(move);
     this.gtp.send(`play ${colorStr} ${moveStr}`).then(() => {
-      this.onMovePlayed();
+      this.onPlayerChanged();
     });
   }
 

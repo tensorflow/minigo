@@ -17,12 +17,18 @@ import {Position} from './position'
 import {getElement, pixelRatio} from './util'
 import {Graph} from './graph'
 
-function arraysApproxEqual(a: number[], b: number[], threshold: number) {
+function arraysApproxEqual(a: Nullable<number>[], b: Nullable<number>[],
+                           threshold: number) {
   if (a.length != b.length) {
     return false;
   }
   for (let i = 0; i < a.length; ++i) {
-    if (Math.abs(a[i] - b[i]) > threshold) {
+    let ai = a[i];
+    let bi = b[i];
+    if ((ai == null) != (bi == null)) {
+      return false;
+    }
+    if (ai != null && bi != null && Math.abs(ai - bi) > threshold) {
       return false;
     }
   }
@@ -32,8 +38,8 @@ function arraysApproxEqual(a: number[], b: number[], threshold: number) {
 class WinrateGraph extends Graph {
   protected ctx: CanvasRenderingContext2D;
 
-  protected mainLine: number[] = [];
-  protected variation: number[] = [];
+  protected mainLine: Nullable<number>[] = [];
+  protected variation: Nullable<number>[] = [];
 
   protected rootPosition: Nullable<Position> = null;
   protected activePosition: Nullable<Position> = null;
@@ -153,46 +159,49 @@ class WinrateGraph extends Graph {
     // Draw the value label.
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffe';
-    let q = 0;
+    let q: Nullable<number> = 0;
     let values =
         this.activePosition.isMainLine ? this.mainLine : this.variation;
-    if (values.length > 0) {
-      q = values[Math.min(moveNum, values.length - 1)];
+    // Find the first valid Q value.
+    for (let i = Math.min(moveNum, values.length - 1); i >= 0; --i) {
+      if (values[i] != null) {
+        q = values[i];
+        break;
+      }
     }
-    let score = 50 + 50 * q;
-    let txt: string;
-    if (score > 50) {
-      txt = `B:${Math.round(score)}%`;
-    } else {
-      txt = `W:${Math.round(100 - score)}%`;
+    if (q != null) {
+      let score = 50 + 50 * q;
+      let txt: string;
+      if (score > 50) {
+        txt = `B:${Math.round(score)}%`;
+      } else {
+        txt = `W:${Math.round(100 - score)}%`;
+      }
+      this.drawText(txt, this.xEnd + 4 / this.xScale, q);
     }
-    this.drawText(txt, this.xEnd + 4 / this.xScale, q);
   }
 
   // Returns the win rate estimation for the prefix of `variation` that has
   // valid Q values (the backend has either performed tree search or win rate
   // evaluation on every position in the prefix at least once).
   private getWinRate(variation: Position[]) {
-    let result: number[] = [];
+    let result: Nullable<number>[] = [];
     for (let p of variation) {
-      if (p.q == null) {
-        // Stop when we reach the first position that doesn't have a valid Q.
-        break;
-      }
       result.push(p.q);
     }
     return result;
   }
 
-  private drawVariation(style: string, values: number[]) {
+  private drawVariation(style: string, values: Nullable<number>[]) {
     if (values.length < 2) {
       return;
     }
 
     let points: number[][] = [];
     for (let i = 0; i < values.length; ++i) {
-      if (values[i] != null) {
-        points[i] = [i, values[i]];
+      let v = values[i];
+      if (v != null) {
+        points.push([i, v]);
       }
     }
     super.drawPlot(points, {
