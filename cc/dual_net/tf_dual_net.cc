@@ -32,10 +32,10 @@
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/public/session.h"
-#include "tensorflow/stream_executor/platform.h"
 
 #if MINIGO_ENABLE_GPU
 #include "tensorflow/core/common_runtime/gpu/gpu_init.h"
+#include "tensorflow/stream_executor/platform.h"
 #endif
 
 using tensorflow::DT_FLOAT;
