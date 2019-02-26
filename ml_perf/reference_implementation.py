@@ -15,8 +15,7 @@
 """Runs a reinforcement learning loop to train a Go playing model."""
 
 import sys
-
-sys.path.insert(0, '.')
+sys.path.insert(0, '.')  # nopep8
 
 import logging
 import numpy
@@ -38,6 +37,8 @@ FLAGS = flags.FLAGS
 
 class State:
 
+  # TODO(tommadams): remove the random naming scheme and just use the generation
+  # number.
   _NAMES = ['bootstrap'] + random.Random(0).sample(shipname.NAMES,
                                                    len(shipname.NAMES))
 
@@ -93,6 +94,8 @@ class MakeSlice(object):
 make_slice = MakeSlice()
 
 
+# TODO(tommadams): replace cc_flags and py_flags with a single hyperparams
+# flagfile.
 def cc_flags(state):
   return [
       '--engine={}'.format(FLAGS.engine),
@@ -147,7 +150,14 @@ def selfplay(state):
   random.seed(state.seed)
   tensorflow.set_random_seed(state.seed)
   numpy.random.seed(state.seed)
+  # TODO(tommadams): This method of generating one golden chunk per generation
+  # is sub-optimal because each chunk gets reused multiple times for training,
+  # introducing bias. Instead, a fresh dataset should be uniformly sampled out
+  # of *all* games in the training window before the start of each training run.
   buffer = example_buffer.ExampleBuffer(sampling_frac=1.0)
+
+  # TODO(tommadams): parallel_fill is currently non-deterministic. Make it not
+  # so.
   buffer.parallel_fill(tensorflow.gfile.Glob(pattern))
   buffer.flush(
       os.path.join(fsdb.golden_chunk_dir(), play_output_name + '.tfrecord.zz'))
@@ -161,7 +171,7 @@ def train(state, tf_records):
       *tf_records,
       '--export_path={}'.format(state.train_model_path),
   ] + py_flags(state), 'training')
-  logging.info(get_lines(result, make_slice[-8:-8]))
+  logging.info(get_lines(result, make_slice[:-8]))
 
 
 # Validate the trained model against holdout games.
@@ -217,6 +227,11 @@ def rl_loop():
   while state.iter_num < 100:
     holdout_glob = os.path.join(fsdb.holdout_dir(), '%06d-*' % state.iter_num,
                                 '*')
+    # TODO(tommadams): potential improvments:
+    #   - "slow window": increment number of models in window by 1 every 2
+    #     generations.
+    #   - uniformly resample the window each iteration (see TODO in selfplay
+    #     for more info).
     tf_records = os.path.join(fsdb.golden_chunk_dir(), '*.zz')
     tf_records = sorted(tensorflow.gfile.Glob(tf_records), reverse=True)[:5]
 
@@ -234,6 +249,7 @@ def rl_loop():
     # This could run in parallel to the rest.
     selfplay(state)
 
+    # TODO(tommadams): 0.6 is required for 95% confidence at 100 eval games.
     if model_win_rate >= 0.55:
       # Promote the trained model to the play model.
       state.play_model_num = state.train_model_num
@@ -241,6 +257,7 @@ def rl_loop():
       state.train_model_num += 1
     elif model_win_rate < 0.4:
       # Bury the selfplay games which produced a significantly worse model.
+      # TODO(tommadams): determine if we really need this.
       logging.info('Burying %s.', tf_records[0])
       shutil.move(tf_records[0], tf_records[0] + '.bury')
 
@@ -275,5 +292,4 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-  sys.path.insert(0, '.')
   app.run(main)

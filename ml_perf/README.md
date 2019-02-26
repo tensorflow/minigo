@@ -49,29 +49,31 @@ during benchmarking.
 # 3. Model
 ### Publication/Attribution
 
-This benchmark is based on the minigo project (https://github.com/tensorflow/minigo); which is
-inspired by the work done by Deepmind with ["Mastering the Game of Go with Deep Neural Networks and
-Tree Search"](https://www.nature.com/articles/nature16961), ["Mastering the Game of Go without Human
-Knowledge"](https://www.nature.com/articles/nature24270), and ["Mastering Chess and Shogi by
-Self-Play with a General Reinforcement Learning Algorithm"](https://arxiv.org/abs/1712.01815).
-Note that MiniGo is an independent effort from AlphaGo, and that this fork is minigo is independent
-from minigo itself.
+This benchmark is based on the [MiniGo](https://github.com/tensorflow/minigo) project,
+which is and inspired by the work done by Deepmind with
+["Mastering the Game of Go with Deep Neural Networks and Tree Search"](https://www.nature.com/articles/nature16961),
+["Mastering the Game of Go without Human Knowledge"](https://www.nature.com/articles/nature24270), and
+["Mastering Chess and Shogi by Self-Play with a General Reinforcement Learning Algorithm"](https://arxiv.org/abs/1712.01815).
+
+Minigo is built on top of Brian Lee's [MuGo](https://github.com/brilee/MuGo), a pure Python
+implementation of the first AlphaGo paper.
+
+Note that MiniGo is an independent effort from AlphaGo.
 
 ### Reinforcement Setup
 This benchmark includes both the environment and training for 9x9 Go. There are four primary phases
 in this benchmark, these phases are repeated in order:
 
- - Selfplay: the *current best* model plays games against itself to produce board positions for
-   training.
- - Training: train the neural networks using selfplay data from recent models. We are not using the
-   selfplay data from the current iteration so that selfplay and the rest of the iteration may run
-   in parallel.
+ - Selfplay: the *current best* model plays games with itself as both black and white to produce
+   board positions for training.
+ - Training: train the neural networks using selfplay data from recent models. The neural network
+   weights are updated from the recent selfplay games.
  - Model Evaluation: the *current best* and the most recently trained model play a series of games.
    In order to become the new *current best*, the most recently trained model must win 55% of the
    games.
  - Target Evaluation: if the newly trained model has been promoted to the current best, play a series
-   of games against a previously trained model. The termination criteria for the benchmark is to win
-   at least 50% of the games.
+   of games against a target model that was previously trained via this reference benchmark. The
+   termination criteria for the benchmark is to win at least 50% of the games.
 
 ### Structure
 This task has a non-trivial network structure, including a search tree. A good overview of the
@@ -82,11 +84,11 @@ Network weights are initialized randomly. Initialization and loss are described 
 ["Mastering the Game of Go with Deep Neural Networks and Tree Search"](https://www.nature.com/articles/nature16961)
 
 ### Optimizer
-We use a MomentumOptimizer to train the primary network.
+We use a MomentumOptimizer to train the network.
 
 # 4. Quality
 Due to the difficulty of training a highly proficient Go model, our quality metric and termination
-criteria is based on winning against another Go progream at intermediate amateur strength.
+criteria is based on winning against a model of only intermediate amateur strength.
 
 ### Quality metric
 The quality of a model is measured as the number of games won in a playoff (alternating colors)

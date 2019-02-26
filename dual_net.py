@@ -23,7 +23,7 @@ import functools
 import logging
 import os.path
 import time
-import numpy
+import numpy as np
 import random
 
 import tensorflow as tf
@@ -509,7 +509,7 @@ def maybe_set_seed():
     if FLAGS.training_seed != 0:
         random.seed(FLAGS.training_seed)
         tf.set_random_seed(FLAGS.training_seed)
-        numpy.random.seed(FLAGS.training_seed)
+        np.random.seed(FLAGS.training_seed)
 
 
 def get_estimator():
