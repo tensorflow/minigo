@@ -62,7 +62,7 @@ SEND_TWO_RETURN_ONE = go.Position(
 )
 
 
-class TestMctsNodes(test_utils.MiniGoUnitTest):
+class TestMctsNodes(test_utils.MinigoUnitTest):
     def test_upper_bound_confidence(self):
         probs = np.array([.02] * (go.N * go.N + 1))
         root = mcts.MCTSNode(go.Position())

@@ -96,7 +96,7 @@ def initialize_almost_done_player():
     return player
 
 
-class TestMCTSPlayer(test_utils.MiniGoUnitTest):
+class TestMCTSPlayer(test_utils.MinigoUnitTest):
     def test_time_controls(self):
         secs_per_move = 5
         for time_limit in (10, 100, 1000):

@@ -33,7 +33,7 @@ def coords_from_gtp_set(string):
     return frozenset(map(coords.from_gtp, string.split()))
 
 
-class TestBasicFunctions(test_utils.MiniGoUnitTest):
+class TestBasicFunctions(test_utils.MinigoUnitTest):
     def test_load_board(self):
         self.assertEqualNPArray(go.EMPTY_BOARD, np.zeros([go.N, go.N]))
         self.assertEqualNPArray(
@@ -78,7 +78,7 @@ class TestBasicFunctions(test_utils.MiniGoUnitTest):
             self.assertEqual(go.is_eyeish(board, ne), None, str(ne))
 
 
-class TestLibertyTracker(test_utils.MiniGoUnitTest):
+class TestLibertyTracker(test_utils.MinigoUnitTest):
     def test_lib_tracker_init(self):
         board = test_utils.load_board('X........' + EMPTY_ROW * 8)
 
@@ -284,7 +284,7 @@ class TestLibertyTracker(test_utils.MiniGoUnitTest):
         self.assertEqual(captured, set())
 
 
-class TestPosition(test_utils.MiniGoUnitTest):
+class TestPosition(test_utils.MinigoUnitTest):
     def test_passing(self):
         start_position = Position(
             board=TEST_BOARD,

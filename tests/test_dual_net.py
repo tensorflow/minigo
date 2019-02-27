@@ -24,7 +24,7 @@ import train
 from tests import test_utils
 
 
-class TestDualNet(test_utils.MiniGoUnitTest):
+class TestDualNet(test_utils.MinigoUnitTest):
     def test_train(self):
         with tempfile.TemporaryDirectory() as working_dir, \
                 tempfile.NamedTemporaryFile() as tf_record:

@@ -26,7 +26,7 @@ CHINESE_HANDICAP_SGF = "(;GM[1]FF[4]CA[UTF-8]AP[CGoban:3]ST[2]RU[Chinese]SZ[9]HA
 NO_HANDICAP_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf];B[eg];W[dd];B[dc];W[cc];B[de];W[cd];B[ed];W[he];B[ce];W[be];B[df];W[bf];B[hd];W[ge];B[gd];W[gg];B[db];W[cb];B[cg];W[bg];B[gh];W[fh];B[hh];W[fg];B[eh];W[ei];B[di];W[fi];B[hg];W[dh];B[ch];W[ci];B[bh];W[ff];B[fe];W[hf];B[id];W[bi];B[ah];W[ef];B[dg];W[ee];B[di];W[ig];B[ai];W[ih];B[fb];W[hi];B[ag];W[ab];B[bd];W[bc];B[ae];W[ad];B[af];W[bd];B[ca];W[ba];B[da];W[ie])"
 
 
-class TestSgfGeneration(test_utils.MiniGoUnitTest):
+class TestSgfGeneration(test_utils.MinigoUnitTest):
     def test_translate_sgf_move(self):
         self.assertEqual(
             ";B[db]",
@@ -58,7 +58,7 @@ class TestSgfGeneration(test_utils.MiniGoUnitTest):
         self.assertEqualPositions(last_position, last_position2)
 
 
-class TestSgfWrapper(test_utils.MiniGoUnitTest):
+class TestSgfWrapper(test_utils.MinigoUnitTest):
     def test_sgf_props(self):
         sgf_replayer = replay_sgf(CHINESE_HANDICAP_SGF)
         initial = next(sgf_replayer)

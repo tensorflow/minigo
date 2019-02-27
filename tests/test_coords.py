@@ -19,7 +19,7 @@ import go
 from tests import test_utils
 
 
-class TestCoords(test_utils.MiniGoUnitTest):
+class TestCoords(test_utils.MinigoUnitTest):
     def test_upperleft(self):
         self.assertEqual((0, 0), coords.from_sgf('aa'))
         self.assertEqual((0, 0), coords.from_flat(0))

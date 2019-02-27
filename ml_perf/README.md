@@ -49,7 +49,7 @@ during benchmarking.
 # 3. Model
 ### Publication/Attribution
 
-This benchmark is based on the [MiniGo](https://github.com/tensorflow/minigo) project,
+This benchmark is based on the [Minigo](https://github.com/tensorflow/minigo) project,
 which is and inspired by the work done by Deepmind with
 ["Mastering the Game of Go with Deep Neural Networks and Tree Search"](https://www.nature.com/articles/nature16961),
 ["Mastering the Game of Go without Human Knowledge"](https://www.nature.com/articles/nature24270), and
@@ -58,7 +58,7 @@ which is and inspired by the work done by Deepmind with
 Minigo is built on top of Brian Lee's [MuGo](https://github.com/brilee/MuGo), a pure Python
 implementation of the first AlphaGo paper.
 
-Note that MiniGo is an independent effort from AlphaGo.
+Note that Minigo is an independent effort from AlphaGo.
 
 ### Reinforcement Setup
 This benchmark includes both the environment and training for 9x9 Go. There are four primary phases

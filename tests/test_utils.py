@@ -49,7 +49,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(0, utils.parse_game_result('Void'))
 
 
-class MiniGoUnitTest(unittest.TestCase):
+class MinigoUnitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.start_time = time.time()

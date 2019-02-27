@@ -343,7 +343,7 @@ command.
 
 ### Validating on holdout data
 
-By default, MiniGo will hold out 5% of selfplay games for validation. This can
+By default, Minigo will hold out 5% of selfplay games for validation. This can
 be changed by adjusting the `holdout_pct` flag on the `selfplay` command.
 
 With this setup, `rl_loop/train_and_validate.py` will validate on the same

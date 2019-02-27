@@ -26,10 +26,10 @@ import numpy as np
 import tensorflow as tf
 
 
-TEST_SGF = "(;CA[UTF-8]SZ[9]PB[Murakawa Daisuke]PW[Iyama Yuta]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf])"
+TEST_SGF = "(;CA[UTF-8]SZ[9]PB[Seth the best]PW[Andrew opens H4]KM[6.5]HA[0]RE[W+1.5]GM[1];B[fd];W[cf])"
 
 
-class TestPreprocessing(test_utils.MiniGoUnitTest):
+class TestPreprocessing(test_utils.MinigoUnitTest):
     def create_random_data(self, num_examples):
         raw_data = []
         for _ in range(num_examples):

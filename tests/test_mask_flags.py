@@ -16,7 +16,7 @@ import mask_flags
 import test_utils
 
 
-class TestMaskFlags(test_utils.MiniGoUnitTest):
+class TestMaskFlags(test_utils.MinigoUnitTest):
     def test_pyflags_extraction(self):
         self.assertEqual(mask_flags.parse_helpfull_output('''
             --some_flag: Flag description

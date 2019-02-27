@@ -63,7 +63,7 @@ for coord in ((0, 0), (0, 1), (0, 2), (0, 3), (1, 1)):
 # .........
 
 
-class TestFeatureExtraction(test_utils.MiniGoUnitTest):
+class TestFeatureExtraction(test_utils.MinigoUnitTest):
     def test_stone_features(self):
         f = features.stone_features(TEST_POSITION3)
         self.assertEqual(go.WHITE, TEST_POSITION3.to_play)
