@@ -534,6 +534,14 @@ TEST(MctsPlayerTest, UndoMove) {
   EXPECT_EQ(1, game.num_moves());
 }
 
+// Soft pick won't work correctly if none of the points on the board have been
+// visited (for example, if a model puts all its reads into pass). This is the
+// only case where soft pick should return kPass.
+TEST(MctsPlayerTest, SoftPickWithNoVisits) {
+  auto player = absl::make_unique<TestablePlayer>(MctsPlayer::Options());
+  EXPECT_EQ(Coord::kPass, player->PickMove());
+}
+
 }  // namespace
 }  // namespace minigo
 

@@ -207,6 +207,15 @@ Coord MctsPlayer::PickMove() {
   for (size_t i = 1; i < cdf.size(); ++i) {
     cdf[i] += cdf[i - 1];
   }
+
+  if (cdf.back() == 0) {
+    // It's actually possible for an early model to put all it's reads into pass,
+    // in which case the SearchSorted call below will always return 0. In this
+    // case, we'll just let the model have it's way and allow a pass. Yes, this
+    // actually happened and we crashed because a stone was already on that point.
+    return Coord::kPass;
+  }
+
   float e = rnd_();
   Coord c = SearchSorted(cdf, e * cdf.back());
   if (options_.verbose) {
@@ -274,6 +283,15 @@ bool MctsPlayer::PlayMove(Coord c, Game* game) {
 
   if (!root_->legal_moves[c]) {
     MG_LOG(ERROR) << "Move " << c << " is illegal";
+    // We're probably about to crash. Dump the player's options and the moves that
+    // got us to this point.
+    MG_LOG(ERROR) << "Options: " << options_;
+    if (game != nullptr) {
+      for (int i = 0; i < game->num_moves(); ++i) {
+        const auto* move = game->GetMove(i);
+        MG_LOG(ERROR) << move->color << "  " << move->c;
+      }
+    }
     return false;
   }
 
