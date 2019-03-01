@@ -211,8 +211,7 @@ Coord MctsPlayer::PickMove() {
   if (cdf.back() == 0) {
     // It's actually possible for an early model to put all its reads into pass,
     // in which case the SearchSorted call below will always return 0. In this
-    // case, we'll just let the model have its way and allow a pass. Yes, this
-    // actually happened and we crashed because a stone was already on that point.
+    // case, we'll just let the model have its way and allow a pass.
     return Coord::kPass;
   }
 
