@@ -202,8 +202,10 @@ class Evaluator {
       curr_player->PlayMove(move, &game);
       next_player->PlayMove(move, nullptr);
       if (verbose) {
-        MG_LOG(INFO) << absl::StreamFormat("%s Q: %0.5f", curr_player->name(),
-                                           curr_player->root()->Q());
+        MG_LOG(INFO) << absl::StreamFormat("%d: %s by %s\nQ: %0.4f",
+                     curr_player->root()->position.n(),
+                     move.ToGtp(), curr_player->name(),
+                     curr_player->root()->Q());
         MG_LOG(INFO) << curr_player->root()->position.ToPrettyString();
       }
       std::swap(curr_player, next_player);

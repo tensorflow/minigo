@@ -32,8 +32,12 @@ spec:
           value: $MODEL_BLACK
         - name: JOBNAME
           value: $JOBNAME
+        - name: EVAL_FLAGS_PATH
+          value: $EVAL_FLAGS_PATH
         - name: LD_LIBRARY_PATH
-          value: /usr/local/nvidia/lib64
+          value: /usr/local/nvidia/lib64:/usr/local/nvidia/lib
+        - name: NVIDIA_REQUIRE_CUDA
+          value: cuda>=10.0,driver>=410
       volumes:
       - name: service-credentials
         secret:

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,11 +20,34 @@
 
 set -e
 
-env
-echo creds: $GOOGLE_APPLICATION_CREDENTIALS
-echo bucket: $SGF_BUCKET_NAME
-echo black:  ${MODEL_BLACK}
-echo white:  ${MODEL_WHITE}
+: ${MODEL_WHITE?"Need to set MODEL_WHITE"}
+: ${MODEL_BLACK?"Need to set MODEL_BLACK"}
+: ${SGF_BUCKET_NAME?"Need to set SGF_BUCKET_NAME"}
+
+echo Creds: $GOOGLE_APPLICATION_CREDENTIALS
+echo Bucket: $SGF_BUCKET_NAME
+echo Black:  ${MODEL_BLACK}
+echo White:  ${MODEL_WHITE}
+echo Flags:  ${EVAL_FLAGS_PATH}
+
+gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+
+if [[ -z ${EVAL_FLAGS_PATH} ]]; then
+
+echo "No flags found, using default flags"
+cat <<EOF > flags.txt
+  --num_readouts=1000
+  --parallel_games=2
+  --value_init_penalty=2.00
+  --virtual_losses=8
+  --resign_threshold=0.70
+EOF
+
+else
+  echo "Using flags from ${EVAL_FLAGS_PATH}"
+  gsutil cp ${EVAL_FLAGS_PATH} flags.txt
+fi
+
 
 # TODO(amj) Check that cc/main runs with perms to read a gs:// path directly
 echo Retrieiving Models
@@ -35,16 +58,15 @@ BASENAME_BLACK=`basename $MODEL_BLACK`
 BASENAME_WHITE=`basename $MODEL_WHITE`
 DATE=`date +%Y-%m-%d`
 
-bazel-bin/cc/eval \
+python3 mask_flags.py bazel-bin/cc/eval \
   --model=$BASENAME_BLACK \
   --model_two=$BASENAME_WHITE \
   --sgf_dir="gs://$SGF_BUCKET_NAME/sgf/eval/$DATE" \
   --output_bigtable="tensor-go,minigo-instance,eval_games" \
   --bigtable_tag="$JOBNAME" \
-  --num_readouts=1000 \
-  --parallel_games=1 \
-  --value_init_penalty=2.00 \
-  --virtual_losses=8 \
-  --resign_threshold=0.70
+  --flagfile=flags.txt
 
-echo Finished an evaluation game!
+echo Finished an evaluation game!  Cleaning up...
+rm $BASENAME_BLACK
+rm $BASENAME_WHITE
+rm flags.txt

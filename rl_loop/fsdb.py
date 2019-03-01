@@ -65,6 +65,7 @@ sgf_dir = _with_base('sgf')
 eval_dir = _with_base('sgf', 'eval')
 golden_chunk_dir = _with_base('data', 'golden_chunks')
 flags_path = _with_base('flags.txt')
+eval_flags_path = _with_base('eval-flags.txt')
 
 
 def get_pbs():

@@ -119,4 +119,4 @@ def checked_run(cmd):
 
 if __name__ == '__main__':
     sys.argv.pop(0)
-    checked_run(['python3'] + sys.argv)
+    checked_run(sys.argv)

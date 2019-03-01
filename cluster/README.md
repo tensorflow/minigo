@@ -16,7 +16,7 @@ Make sure you have the following command line tools:
   - gsutil (via `gcloud components install gsutil`)
   - kubectl (via `gcloud components install kubectl`)
   - docker
-  
+
 And the Python [kubernetes-client](https://github.com/kubernetes-client/python)
 
 ```
@@ -80,8 +80,11 @@ The images used are:
   - `minigo-gpu-evaluator`: Same, but using the Python engine.
   - `minigo-player`: Python selfplay (with compiled tensorflow wheel in python,
     optimized for a target architecture, *not* using GPUs)
+  - `minigo-tpu-trainer`: An image to run training on a TPU
+  - `minigo-calibrator`: A simple script that updates the resign threshold used
+    by players.
 
-The engines using the C++ engine (`cc-player`, `cc-evaluator`, `tpu-player`) are
+The images using the C++ engine (`cc-player`, `cc-evaluator`, `tpu-player`) are
 all built off of the cc-base image.
 
 In order to build an image, `cd` to the appropriate directory, read the Makefile
