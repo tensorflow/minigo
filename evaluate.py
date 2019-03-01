@@ -86,6 +86,7 @@ def play_match(black_model, white_model, games, sgf_dir):
             if active.is_done():
                 fname = "{:d}-{:s}-vs-{:s}-{:d}.sgf".format(int(time.time()),
                                                             white_name, black_name, i)
+                active.set_result(active.root.position.result(), was_resign=False)
                 with gfile.GFile(os.path.join(sgf_dir, fname), 'w') as _file:
                     sgfstr = sgf_wrapper.make_sgf(active.position.recent,
                                                   active.result_string, black_name=black_name,

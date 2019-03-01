@@ -45,7 +45,7 @@ void SimpleExample() {
   const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
 
   // Load the model specified by the command line arguments.
-  auto model_factory = NewDualNetFactory();
+  auto model_factory = NewDualNetFactory(0);
   auto model = model_factory->NewDualNet(FLAGS_model);
 
   // Create the player.

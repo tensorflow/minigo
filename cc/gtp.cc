@@ -92,7 +92,7 @@ void Gtp() {
   MG_LOG(INFO) << options;
 
   std::unique_ptr<GtpPlayer> player;
-  auto model_factory = NewDualNetFactory();
+  auto model_factory = NewDualNetFactory(0);
   std::unique_ptr<InferenceCache> cache;
   if (FLAGS_cache_size_mb > 0) {
     auto capacity = InferenceCache::CalculateCapacity(FLAGS_cache_size_mb);

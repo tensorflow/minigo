@@ -60,7 +60,7 @@ namespace {
 void Puzzle() {
   auto start_time = absl::Now();
 
-  BatchingDualNetFactory batcher(NewDualNetFactory());
+  BatchingDualNetFactory batcher(NewDualNetFactory(0));
 
   MctsPlayer::Options options;
   options.game_options.resign_enabled = false;

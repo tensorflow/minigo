@@ -62,6 +62,7 @@ minigo_cc_library(
         ":dual_net",
         "//cc:logging",
         ":fake_dual_net",
+        ":random_dual_net",
         "//cc:base",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
@@ -89,6 +90,20 @@ minigo_cc_library(
         "//cc:base",
         "//cc:logging",
         "@com_google_absl//absl/container:node_hash_map",
+    ],
+)
+
+minigo_cc_library(
+    name = "random_dual_net",
+    srcs = ["random_dual_net.cc"],
+    hdrs = ["random_dual_net.h"],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:logging",
+        "//cc:random",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 

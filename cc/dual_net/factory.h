@@ -22,7 +22,7 @@
 namespace minigo {
 
 // Creates one of the DualNetFactory implementations based on the engine flags.
-std::unique_ptr<DualNetFactory> NewDualNetFactory();
+std::unique_ptr<DualNetFactory> NewDualNetFactory(uint64_t seed);
 
 }  // namespace minigo
 

@@ -108,7 +108,7 @@ class Evaluator {
  public:
   void Run() {
     auto start_time = absl::Now();
-    BatchingDualNetFactory batcher(NewDualNetFactory());
+    BatchingDualNetFactory batcher(NewDualNetFactory(FLAGS_seed));
 
     Model model_a(FLAGS_model);
     Model model_b(FLAGS_model_two);

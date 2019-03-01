@@ -47,6 +47,9 @@ flags.DEFINE_bool('use_bt', False,
                   'Whether to use Bigtable as input.  '
                   '(Only supported with --use_tpu, currently.)')
 
+flags.DEFINE_bool('freeze', False,
+                  'Whether to freeze the graph at the end of training.')
+
 
 flags.register_multi_flags_validator(
     ['use_bt', 'use_tpu'],
@@ -209,6 +212,11 @@ def main(argv):
         train(*tf_records)
     if FLAGS.export_path:
         dual_net.export_model(FLAGS.export_path)
+    if FLAGS.freeze:
+        if FLAGS.use_tpu:
+            dual_net.freeze_graph_tpu(FLAGS.export_path)
+        else:
+            dual_net.freeze_graph(FLAGS.export_path)
 
 
 if __name__ == "__main__":

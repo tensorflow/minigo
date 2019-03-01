@@ -49,7 +49,14 @@ AVG_GAMES_PER_MODEL = 20000
 
 
 def pick_examples_from_tfrecord(filename, sampling_frac=0.02):
+    # tf_record_iterator is deprecated. Silence those warnings for now.
+    # TODO(tommadams): remove this once
+    # https://github.com/tensorflow/minigo/issues/740 is fixed.
+    v = tf.logging.get_verbosity()
+    tf.logging.set_verbosity(tf.logging.ERROR)
     protos = list(tf.python_io.tf_record_iterator(filename, READ_OPTS))
+    tf.logging.set_verbosity(v)
+
     number_samples = np.random.poisson(len(protos) * sampling_frac)
     choices = random.sample(protos, min(len(protos), number_samples))
     return choices

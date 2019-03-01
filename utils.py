@@ -83,5 +83,4 @@ def logged_timer(message):
     tick = time.time()
     yield
     tock = time.time()
-    print("%s: %.3f seconds" % (message, (tock - tick)))
     logging.info("%s: %.3f seconds", message, (tock - tick))

@@ -16,6 +16,7 @@
 
 #include "absl/memory/memory.h"
 #include "cc/dual_net/fake_dual_net.h"
+#include "cc/dual_net/random_dual_net.h"
 #include "gflags/gflags.h"
 
 #ifdef MG_ENABLE_TF_DUAL_NET
@@ -60,9 +61,13 @@ DEFINE_string(
 
 namespace minigo {
 
-std::unique_ptr<DualNetFactory> NewDualNetFactory() {
+std::unique_ptr<DualNetFactory> NewDualNetFactory(uint64_t seed) {
   if (FLAGS_engine == "fake") {
     return absl::make_unique<FakeDualNetFactory>();
+  }
+
+  if (FLAGS_engine == "random") {
+    return absl::make_unique<RandomDualNetFactory>(seed);
   }
 
   if (FLAGS_engine == "tf") {

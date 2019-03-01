@@ -199,7 +199,7 @@ class SelfPlayer {
     auto start_time = absl::Now();
     {
       absl::MutexLock lock(&mutex_);
-      auto model_factory = NewDualNetFactory();
+      auto model_factory = NewDualNetFactory(FLAGS_seed);
       // If the model path contains a pattern, wrap the implementation factory
       // in a ReloadingDualNetFactory to automatically reload the latest model
       // that matches the pattern.
