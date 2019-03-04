@@ -35,6 +35,10 @@ flags.DEFINE_string('engine', 'tf', 'Engine to use for inference.')
 FLAGS = flags.FLAGS
 
 
+# Models are named with the current reinforcement learning loop iteration number
+# and the model generation (how many models have passed gating). For example, a
+# model named "000015-000007" was trained on the 15th iteration of the loop and
+# is the 7th models that passed gating.
 # Note that we rely on the iteration number being the first part of the model
 # name so that the training chunks sort correctly.
 class State:
