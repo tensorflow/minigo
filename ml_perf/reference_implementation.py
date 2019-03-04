@@ -34,26 +34,29 @@ flags.DEFINE_string('engine', 'tf', 'Engine to use for inference.')
 
 FLAGS = flags.FLAGS
 
-# Enable TF eager execution, which takes the non-deprecated path in
-# ExampleBuffer. Note that this doesn't affect selfplay, evaluation, training,
-# etc, which are run as subprocesses.
-tf.enable_eager_execution()
 
-
+# Note that we rely on the iteration number being the first part of the model
+# name so that the training chunks sort correctly.
 class State:
 
   def __init__(self):
     self.iter_num = 0
-    self.play_model_num = 0
-    self.train_model_num = 0
+    self.gen_num = 0
+
+    # We start playing using a random model.
+    # After the first round of selfplay has been completed, the engine is
+    # updated to FLAGS.engine.
+    self.engine = 'random'
+
+    self.best_model_name = 'random'
 
   @property
-  def play_model_name(self):
-    return '%06d-%06d' % (self.play_model_num, self.iter_num)
+  def output_model_name(self):
+    return '%06d-%06d' % (self.iter_num, self.gen_num)
 
   @property
   def train_model_name(self):
-    return '%06d-%06d' % (self.train_model_num, self.iter_num)
+    return '%06d-%06d' % (self.iter_num, self.gen_num + 1)
 
   @property
   def seed(self):
@@ -89,7 +92,7 @@ make_slice = MakeSlice()
 # flagfile.
 def cc_flags(state):
   return [
-      '--engine={}'.format(FLAGS.engine),
+      '--engine={}'.format(state.engine),
       '--virtual_losses=8',
       '--seed={}'.format(state.seed),
   ]
@@ -107,18 +110,20 @@ def py_flags(state):
 
 # Return up to num_records of golden chunks to train on.
 def get_golden_chunk_records(num_records):
+  # Sort the list of chunks so that the most recent ones are first and return
+  # the requested prefix.
   pattern = os.path.join(fsdb.golden_chunk_dir(), '*.zz')
   return sorted(tf.gfile.Glob(pattern), reverse=True)[:num_records]
 
 
 # Self-play a number of games.
-def selfplay(state, model_name):
-  output_dir = os.path.join(fsdb.selfplay_dir(), model_name)
-  holdout_dir = os.path.join(fsdb.holdout_dir(), model_name)
-  model_path = os.path.join(fsdb.models_dir(), model_name)
+def selfplay(state):
+  output_dir = os.path.join(fsdb.selfplay_dir(), state.output_model_name)
+  holdout_dir = os.path.join(fsdb.holdout_dir(), state.output_model_name)
+  model_path = os.path.join(fsdb.models_dir(), state.best_model_name)
 
   result = checked_run([
-      'bazel-bin/cc/selfplay', '--parallel_games=128',
+      'bazel-bin/cc/selfplay', '--parallel_games=2048',
       '--num_readouts=100', '--model={}.pb'.format(model_path),
       '--output_dir={}'.format(output_dir),
       '--holdout_dir={}'.format(holdout_dir)
@@ -138,10 +143,10 @@ def selfplay(state, model_name):
 
   # TODO(tommadams): parallel_fill is currently non-deterministic. Make it not
   # so.
-  logging.info('Extracting examples from "{}"'.format(pattern))
+  logging.info('Writing golden chunk from "{}"'.format(pattern))
   buffer.parallel_fill(tf.gfile.Glob(pattern))
-  buffer.flush(
-      os.path.join(fsdb.golden_chunk_dir(), model_name + '.tfrecord.zz'))
+  buffer.flush(os.path.join(fsdb.golden_chunk_dir(),
+                            state.output_model_name + '.tfrecord.zz'))
 
 
 # Train a new model.
@@ -158,41 +163,26 @@ def validate(state, holdout_glob):
       ['python3', 'validate.py', holdout_glob] + py_flags(state), 'validation')
 
 
-# Evaluate the trained model.
-def evaluate(state, args, name, slice):
-  sgf_dir = os.path.join(fsdb.eval_dir(), state.train_model_name)
-  train_model_path = os.path.join(fsdb.models_dir(), state.train_model_name)
+# Evaluate the trained model against some other model (previous best or target).
+def evaluate(state, against_model):
+  eval_model = state.train_model_name
+  eval_model_path = os.path.join(fsdb.models_dir(), eval_model)
+  against_model_path = os.path.join(fsdb.models_dir(), against_model)
+  sgf_dir = os.path.join(fsdb.eval_dir(), eval_model)
   result = checked_run([
-      'bazel-bin/cc/eval', '--parallel_games=100',
-      '--model={}.pb'.format(train_model_path), '--sgf_dir={}'.format(sgf_dir)
-  ] + args, name)
-  result = get_lines(result, slice)
+      'bazel-bin/cc/eval',
+      '--num_readouts=100', 
+      '--parallel_games=100',
+      '--model={}.pb'.format(eval_model_path),
+      '--model_two={}.pb'.format(against_model_path),
+      '--sgf_dir={}'.format(sgf_dir)
+  ] + cc_flags(state), 'evaluation against ' + against_model)
+  result = get_lines(result, make_slice[-7:])
   logging.info(result)
-  pattern = '{}\s+\d+\s+(\d+\.\d+)%'.format(state.train_model_name)
-  return float(re.search(pattern, result).group(1)) * 0.01
-
-
-# Evaluate trained model against previous best.
-def evaluate_model(state):
-  play_model_path = os.path.join(fsdb.models_dir(), state.play_model_name)
-  model_win_rate = evaluate(
-      state,
-      ['--num_readouts=100', '--model_two={}.pb'.format(play_model_path)] +
-      cc_flags(state), 'model evaluation', make_slice[-7:])
-  logging.info('Win rate %s vs %s: %.3f', state.train_model_name,
-               state.play_model_name, model_win_rate)
-  return model_win_rate
-
-
-# Evaluate trained model against a known target model.
-def evaluate_target(state):
-  target_win_rate = evaluate(
-      state,
-      ['--num_readouts=100', '--model_two={}'.format('ml_perf/target.pb')] +
-      cc_flags(state), 'target evaluation', make_slice[-7:])
-  logging.info('Win rate %s vs target: %.3f', state.train_model_name,
-               target_win_rate)
-  return target_win_rate
+  pattern = '{}\s+\d+\s+(\d+\.\d+)%'.format(eval_model)
+  win_rate = float(re.search(pattern, result).group(1)) * 0.01
+  logging.info('Win rate %s vs %s: %.3f', eval_model, against_model, win_rate)
+  return win_rate
 
 
 def rl_loop():
@@ -201,30 +191,28 @@ def rl_loop():
   # Play the first round of selfplay games with a fake model that returns
   # random noise. We do this instead of playing multiple games using a single
   # model bootstrapped with random noise to avoid any initial bias.
-
-  # TODO(tommadams): make this less hacky when we introduce a hyperparameters
-  # file.
   # TODO(tommadams): disable holdout games for first round of selfplay.
-  engine = FLAGS.engine
-  FLAGS.engine = 'random'
-  selfplay(state, 'bootstrap')
-  FLAGS.engine = engine
+  selfplay(state)
+  state.engine = FLAGS.engine
 
-  # Train the first real model from these random games.
+  # Train a real model from the random selfplay games.
   tf_records = get_golden_chunk_records(1)
+  state.iter_num += 1
   train(state, tf_records)
-  state.train_model_num += 1
 
-  # Run a round of selfplay with the first real model.
-  selfplay(state, state.play_model_name)
+  # Select the newly trained model as the best.
+  state.best_model_name = state.train_model_name
+  state.gen_num += 1
 
+  # Run selfplay using the new model.
+  selfplay(state)
+
+  # Now start the full training loop.
   while state.iter_num <= 100:
     # Build holdout glob before incrementing the iteration number because we
     # want to run validation on the previous generation.
     holdout_glob = os.path.join(fsdb.holdout_dir(), '%06d-*' % state.iter_num,
                                 '*')
-
-    state.iter_num += 1
 
     # Train on shuffled game data of the last 5 selfplay rounds, ignoring the
     # random bootstrapping round.
@@ -234,24 +222,24 @@ def rl_loop():
     #   - uniformly resample the window each iteration (see TODO in selfplay
     #     for more info).
     tf_records = get_golden_chunk_records(min(5, state.iter_num));
+    state.iter_num += 1
     train(state, tf_records)
 
     # These could all run in parallel.
     validate(state, holdout_glob)
-    model_win_rate = evaluate_model(state)
-    target_win_rate = evaluate_target(state)
-    selfplay(state, state.play_model_name)
+    model_win_rate = evaluate(state, state.best_model_name)
+    target_win_rate = evaluate(state, 'target')
+    selfplay(state)
 
     # TODO(tommadams): 0.6 is required for 95% confidence at 100 eval games.
+    # TODO(tommadams): if a model doesn't get promoted after N iterations,
+    # consider deleting the most recent N training checkpoints because training
+    # might have got stuck in a local minima.
     if model_win_rate >= 0.55:
-      # Promote the trained model to the play model.
-      state.play_model_num = state.train_model_num
-      state.train_model_num += 1
-    elif model_win_rate < 0.4:
-      # Bury the selfplay games which produced a significantly worse model.
-      # TODO(tommadams): determine if we really need this.
-      logging.info('Burying %s.', tf_records[0])
-      shutil.move(tf_records[0], tf_records[0] + '.bury')
+      # Promote the trained model to the best model and increment the generation
+      # number.
+      state.best_model_name = state.train_model_name
+      state.gen_num += 1
 
     yield target_win_rate
 
@@ -268,6 +256,9 @@ def main(unused_argv):
   utils.ensure_dir_exists(fsdb.eval_dir())
   utils.ensure_dir_exists(fsdb.golden_chunk_dir())
   utils.ensure_dir_exists(fsdb.working_dir())
+
+  # Copy the target model to the models directory so we can find it easily.
+  shutil.copy('ml_perf/target.pb', fsdb.models_dir())
 
   logging.getLogger().addHandler(
       logging.FileHandler(os.path.join(FLAGS.base_dir, 'reinforcement.log')))
