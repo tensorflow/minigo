@@ -1,0 +1,6 @@
+# Flags for training & validation.
+
+--conv_width=64
+--fc_width=64
+--trunk_layers=10
+--value_cost_weight=0.25

@@ -17,6 +17,7 @@
 import sys
 sys.path.insert(0, '.')  # nopep8
 
+from collections import OrderedDict
 import logging
 import numpy as np
 import os
@@ -30,7 +31,17 @@ import utils
 from absl import app, flags
 from rl_loop import example_buffer, fsdb
 
-flags.DEFINE_string('engine', 'tf', 'Engine to use for inference.')
+flags.DEFINE_integer('iterations', 100, 'Number of iterations of the RL loop.')
+
+flags.DEFINE_float('gating_win_rate', 0.55,
+                   'Win-rate against the current best required to promote a '
+                   'model to new best.')
+
+flags.DEFINE_string('flags_dir', None,
+                    'Directory in which to find the flag files for each stage '
+                    'of the RL loop. The directory must contain the following '
+                    'files: bootstrap.flags, selfplay.flags, eval.flags, '
+                    'train.flags.')
 
 FLAGS = flags.FLAGS
 
@@ -67,8 +78,31 @@ class State:
     return self.iter_num + 1
 
 
-def checked_run(cmd, name):
-  logging.info('Running %s:\n  %s', name, '  '.join(cmd))
+def expand_flags(cmd, *args):
+  """Expand & dedup any flagfile command line arguments."""
+
+  # Read any flagfile arguments and expand them into a new list.
+  expanded = flags.FlagValues().read_flags_from_files(args)
+
+  # When one flagfile includes & overrides a base one, the expanded list may
+  # contain multiple instances of the same flag with different values.
+  # Deduplicate, always taking the last occurance of the flag.
+  deduped = OrderedDict()
+  for arg in expanded:
+    flag = arg.split('=', 1)[0]
+    deduped[flag] = arg
+  return deduped.values()
+
+
+def checked_run(name, *cmd):
+  # Log the expanded & deduped list of command line arguments, so we can know
+  # exactly what's going on. Note that we don't pass the expanded list of
+  # arguments to the actual subprocess because of a quirk in how unknown flags
+  # are handled: unknown flags in flagfiles are silently ignored, while unknown
+  # flags on the command line will cause the subprocess to abort.
+  logging.info(
+      'Running %s:\n  %s  %s', name, cmd[0], '  '.join(expand_flags(*cmd)))
+
   with utils.logged_timer('%s finished' % name.capitalize()):
     completed_process = subprocess.run(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -92,26 +126,6 @@ class MakeSlice(object):
 make_slice = MakeSlice()
 
 
-# TODO(tommadams): replace cc_flags and py_flags with a single hyperparams
-# flagfile.
-def cc_flags(state):
-  return [
-      '--engine={}'.format(state.engine),
-      '--virtual_losses=8',
-      '--seed={}'.format(state.seed),
-  ]
-
-
-def py_flags(state):
-  return [
-      '--work_dir={}'.format(fsdb.working_dir()),
-      '--trunk_layers=10',
-      '--conv_width=64',
-      '--value_cost_weight=0.25',
-      '--training_seed={}'.format(state.seed),
-  ]
-
-
 # Return up to num_records of golden chunks to train on.
 def get_golden_chunk_records(num_records):
   # Sort the list of chunks so that the most recent ones are first and return
@@ -121,17 +135,18 @@ def get_golden_chunk_records(num_records):
 
 
 # Self-play a number of games.
-def selfplay(state):
+def selfplay(state, flagfile='selfplay'):
   output_dir = os.path.join(fsdb.selfplay_dir(), state.output_model_name)
   holdout_dir = os.path.join(fsdb.holdout_dir(), state.output_model_name)
   model_path = os.path.join(fsdb.models_dir(), state.best_model_name)
 
-  result = checked_run([
-      'bazel-bin/cc/selfplay', '--parallel_games=2048',
-      '--num_readouts=100', '--model={}.pb'.format(model_path),
+  result = checked_run('selfplay',
+      'bazel-bin/cc/selfplay',
+      '--flagfile={}.flags'.format(os.path.join(FLAGS.flags_dir, flagfile)),
+      '--model={}.pb'.format(model_path),
       '--output_dir={}'.format(output_dir),
-      '--holdout_dir={}'.format(holdout_dir)
-  ] + cc_flags(state), 'selfplay')
+      '--holdout_dir={}'.format(holdout_dir),
+      '--seed={}'.format(state.seed))
   logging.info(get_lines(result, make_slice[-2:]))
 
   # Write examples to a single record.
@@ -156,36 +171,42 @@ def selfplay(state):
 # Train a new model.
 def train(state, tf_records):
   model_path = os.path.join(fsdb.models_dir(), state.train_model_name)
-  result = checked_run([
-      'python3', 'train.py', *tf_records, '--export_path={}'.format(model_path),
-      '--freeze=true'] + py_flags(state), 'training')
+  checked_run('training',
+      'python3', 'train.py', *tf_records,
+      '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
+      '--work_dir={}'.format(fsdb.working_dir()),
+      '--export_path={}'.format(model_path),
+      '--training_seed={}'.format(state.seed),
+      '--freeze=true')
 
 
 # Validate the trained model against holdout games.
 def validate(state, holdout_glob):
-  result = checked_run(
-      ['python3', 'validate.py', holdout_glob] + py_flags(state), 'validation')
+  checked_run('validation',
+      'python3', 'validate.py', holdout_glob,
+      '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
+      '--work_dir={}'.format(fsdb.working_dir()))
 
 
-# Evaluate the trained model against some other model (previous best or target).
-def evaluate(state, against_model):
+# Evaluate the trained model against the current best model.
+def evaluate(state):
   eval_model = state.train_model_name
+  best_model = state.best_model_name
   eval_model_path = os.path.join(fsdb.models_dir(), eval_model)
-  against_model_path = os.path.join(fsdb.models_dir(), against_model)
+  best_model_path = os.path.join(fsdb.models_dir(), best_model)
   sgf_dir = os.path.join(fsdb.eval_dir(), eval_model)
-  result = checked_run([
+  result = checked_run('evaluation',
       'bazel-bin/cc/eval',
-      '--num_readouts=100', 
-      '--parallel_games=100',
+      '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'eval.flags')),
       '--model={}.pb'.format(eval_model_path),
-      '--model_two={}.pb'.format(against_model_path),
-      '--sgf_dir={}'.format(sgf_dir)
-  ] + cc_flags(state), 'evaluation against ' + against_model)
+      '--model_two={}.pb'.format(best_model_path),
+      '--sgf_dir={}'.format(sgf_dir),
+      '--seed={}'.format(state.seed))
   result = get_lines(result, make_slice[-7:])
   logging.info(result)
   pattern = '{}\s+\d+\s+(\d+\.\d+)%'.format(eval_model)
   win_rate = float(re.search(pattern, result).group(1)) * 0.01
-  logging.info('Win rate %s vs %s: %.3f', eval_model, against_model, win_rate)
+  logging.info('Win rate %s vs %s: %.3f', eval_model, best_model, win_rate)
   return win_rate
 
 
@@ -195,9 +216,7 @@ def rl_loop():
   # Play the first round of selfplay games with a fake model that returns
   # random noise. We do this instead of playing multiple games using a single
   # model bootstrapped with random noise to avoid any initial bias.
-  # TODO(tommadams): disable holdout games for first round of selfplay.
-  selfplay(state)
-  state.engine = FLAGS.engine
+  selfplay(state, 'bootstrap')
 
   # Train a real model from the random selfplay games.
   tf_records = get_golden_chunk_records(1)
@@ -212,7 +231,7 @@ def rl_loop():
   selfplay(state)
 
   # Now start the full training loop.
-  while state.iter_num <= 100:
+  while state.iter_num <= FLAGS.iterations:
     # Build holdout glob before incrementing the iteration number because we
     # want to run validation on the previous generation.
     holdout_glob = os.path.join(fsdb.holdout_dir(), '%06d-*' % state.iter_num,
@@ -225,27 +244,23 @@ def rl_loop():
     #     generations.
     #   - uniformly resample the window each iteration (see TODO in selfplay
     #     for more info).
-    tf_records = get_golden_chunk_records(min(5, state.iter_num));
+    tf_records = get_golden_chunk_records(min(5, state.iter_num))
     state.iter_num += 1
     train(state, tf_records)
 
     # These could all run in parallel.
     validate(state, holdout_glob)
-    model_win_rate = evaluate(state, state.best_model_name)
-    target_win_rate = evaluate(state, 'target')
+    model_win_rate = evaluate(state)
     selfplay(state)
 
-    # TODO(tommadams): 0.6 is required for 95% confidence at 100 eval games.
     # TODO(tommadams): if a model doesn't get promoted after N iterations,
     # consider deleting the most recent N training checkpoints because training
     # might have got stuck in a local minima.
-    if model_win_rate >= 0.55:
+    if model_win_rate >= FLAGS.gating_win_rate:
       # Promote the trained model to the best model and increment the generation
       # number.
       state.best_model_name = state.train_model_name
       state.gen_num += 1
-
-    yield target_win_rate
 
 
 def main(unused_argv):
@@ -272,10 +287,7 @@ def main(unused_argv):
     handler.setFormatter(formatter)
 
   with utils.logged_timer('Total time'):
-    for target_win_rate in rl_loop():
-      if target_win_rate > 0.5:
-        return logging.info('Passed exit criteria.')
-    logging.info('Failed to converge.')
+    rl_loop()
 
 
 if __name__ == '__main__':
