@@ -4,7 +4,8 @@
 # the RL loop.
 
 --engine=tf
---parallel_games=2048
+--num_games=2048
+--parallel_games=512
 --num_readouts=100
 --virtual_losses=8
 --value_init_penalty=2

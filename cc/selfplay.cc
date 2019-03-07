@@ -106,7 +106,8 @@ DEFINE_double(decay_factor, 0.98,
               "If time_limit is non-zero, the decay factor used to shorten the "
               "amount of time spent thinking as the game progresses.");
 DEFINE_bool(run_forever, false,
-            "When running 'selfplay' mode, whether to run forever.");
+            "When running 'selfplay' mode, whether to run forever. "
+            "Only one of run_forever and num_games must be set.");
 
 // Inference flags.
 DEFINE_string(model, "",
@@ -115,6 +116,9 @@ DEFINE_string(model, "",
               "proto. For engine=lite, the model should be .tflite "
               "flatbuffer.");
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
+DEFINE_int32(num_games, 0,
+             "Total number of games to play. Defaults to parallel_games. "
+             "Only one of num_games and run_forever must be set.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
@@ -198,6 +202,27 @@ class SelfPlayer {
  public:
   void Run() {
     auto start_time = absl::Now();
+
+    // Figure out how many games we should play.
+    MG_CHECK(FLAGS_parallel_games >= 1);
+
+    int num_games = 0;
+    if (run_forever_) {
+      MG_CHECK(FLAGS_num_games == 0)
+            << "num_games must not be set if run_forever is true";
+    } else {
+      if (FLAGS_num_games == 0) {
+        num_games = FLAGS_parallel_games;
+      } else {
+        MG_CHECK(FLAGS_num_games >= FLAGS_parallel_games)
+            << "if num_games is set, it must be >= parallel_games";
+        num_games = FLAGS_num_games;
+      }
+    }
+
+    num_remaining_games_ = num_games;
+    run_forever_ = FLAGS_run_forever;
+
     {
       absl::MutexLock lock(&mutex_);
       auto model_factory = NewDualNetFactory(FLAGS_seed);
@@ -222,7 +247,8 @@ class SelfPlayer {
     for (auto& t : threads_) {
       t.join();
     }
-    MG_LOG(INFO) << "Played " << FLAGS_parallel_games << " games, total time "
+
+    MG_LOG(INFO) << "Played " << num_games << " games, total time "
                  << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
   }
 
@@ -242,7 +268,6 @@ class SelfPlayer {
       }
       game_options.resign_enabled = (*rnd)() >= FLAGS_disable_resign_pct;
 
-      run_forever = FLAGS_run_forever;
       holdout_pct = FLAGS_holdout_pct;
       output_dir = FLAGS_output_dir;
       holdout_dir = FLAGS_holdout_dir;
@@ -251,7 +276,6 @@ class SelfPlayer {
 
     Game::Options game_options;
     MctsPlayer::Options player_options;
-    bool run_forever;
     float holdout_pct;
     std::string output_dir;
     std::string holdout_dir;
@@ -273,12 +297,21 @@ class SelfPlayer {
       return;
     }
 
-    do {
+    for (;;) {
       std::unique_ptr<Game> game;
       std::unique_ptr<MctsPlayer> player;
 
       {
         absl::MutexLock lock(&mutex_);
+
+	// Check if we've finished playing.
+	if (!run_forever_) {
+	  if (num_remaining_games_ == 0) {
+            break;
+          }
+          num_remaining_games_ -= 1;
+        }
+
         auto old_model = FLAGS_model;
         MaybeReloadFlags();
         MG_CHECK(old_model == FLAGS_model)
@@ -355,7 +388,7 @@ class SelfPlayer {
             GetOutputDir(now, file::JoinPath(thread_options.sgf_dir, "full")),
             output_name, *game, true);
       }
-    } while (thread_options.run_forever);
+    }
 
     MG_LOG(INFO) << "Thread " << thread_id << " stopping";
   }
@@ -405,6 +438,13 @@ class SelfPlayer {
   std::unique_ptr<BatchingDualNetFactory> batcher_ GUARDED_BY(&mutex_);
   Random rnd_ GUARDED_BY(&mutex_);
   std::vector<std::thread> threads_;
+
+  // True if we should run selfplay indefinitely.
+  bool run_forever_ GUARDED_BY(&mutex_) = false;
+
+  // If run_forever_ is false, how many games are left to play.
+  int num_remaining_games_ GUARDED_BY(&mutex_) = 0;
+
   uint64_t flags_timestamp_ = 0;
 };
 
