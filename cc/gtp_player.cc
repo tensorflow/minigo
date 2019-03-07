@@ -32,11 +32,10 @@ namespace minigo {
 
 GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network,
                      std::unique_ptr<InferenceCache> inference_cache,
-                     const Options& options)
-    : MctsPlayer(std::move(network), std::move(inference_cache), options),
+                     Game* game, const Options& options)
+    : MctsPlayer(std::move(network), std::move(inference_cache), game, options),
       courtesy_pass_(options.courtesy_pass),
-      ponder_read_limit_(options.ponder_limit),
-      game_(options.name, options.name, options.game_options) {
+      ponder_read_limit_(options.ponder_limit) {
   if (ponder_read_limit_ > 0) {
     ponder_type_ = PonderType::kReadLimited;
   }
@@ -118,7 +117,6 @@ void GtpPlayer::Run() {
 }
 
 void GtpPlayer::NewGame() {
-  game_.NewGame();
   MctsPlayer::NewGame();
   MaybeStartPondering();
 }
@@ -297,14 +295,14 @@ GtpPlayer::Response GtpPlayer::HandleFinalScore(CmdArgs args) {
   if (!response.ok) {
     return response;
   }
-  if (!game_.game_over()) {
+  if (!game()->game_over()) {
     // Game isn't over yet, calculate the current score using Tromp-Taylor
     // scoring.
     return Response::Ok(Game::FormatScore(
-        root()->position.CalculateScore(options().game_options.komi)));
+        root()->position.CalculateScore(game()->options().komi)));
   } else {
     // Game is over, we have the result available.
-    return Response::Ok(game_.result_string());
+    return Response::Ok(game()->result_string());
   }
 }
 
@@ -321,7 +319,7 @@ GtpPlayer::Response GtpPlayer::HandleGenmove(CmdArgs args) {
 
   auto c = SuggestMove();
   MG_LOG(INFO) << root()->Describe();
-  MG_CHECK(PlayMove(c, &game_));
+  MG_CHECK(PlayMove(c));
 
   MaybeStartPondering();
 
@@ -349,7 +347,7 @@ GtpPlayer::Response GtpPlayer::HandleKomi(CmdArgs args) {
   }
 
   double x;
-  if (!absl::SimpleAtod(args[0], &x) || x != options().game_options.komi) {
+  if (!absl::SimpleAtod(args[0], &x) || x != game()->options().komi) {
     return Response::Error("unacceptable komi");
   }
 
@@ -392,7 +390,7 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(CmdArgs args) {
 
   if (!trees.empty()) {
     for (const auto& move : trees[0]->ExtractMainLine()) {
-      if (!PlayMove(move.c, &game_)) {
+      if (!PlayMove(move.c)) {
         MG_LOG(ERROR) << "couldn't play move " << move.c;
         return Response::Error("cannot load file");
       }
@@ -438,7 +436,7 @@ GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {
     return Response::Error("illegal move");
   }
 
-  if (!PlayMove(c, &game_)) {
+  if (!PlayMove(c)) {
     return Response::Error("illegal move");
   }
 
@@ -528,7 +526,7 @@ GtpPlayer::Response GtpPlayer::HandleUndo(CmdArgs args) {
     return response;
   }
 
-  if (!UndoMove(&game_)) {
+  if (!UndoMove()) {
     return Response::Error("cannot undo");
   }
 

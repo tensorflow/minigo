@@ -44,9 +44,6 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
 class MctsPlayer {
  public:
   struct Options {
-    // Game-level options.
-    Game::Options game_options;
-
     // If inject_noise is true, the amount of noise to mix into the root.
     float noise_mix = 0.25;
     bool inject_noise = true;
@@ -109,7 +106,7 @@ class MctsPlayer {
   // state. Otherwise, the player is initialized with an empty board with black
   // to play.
   MctsPlayer(std::unique_ptr<DualNet> network,
-             std::unique_ptr<InferenceCache> inference_cache,
+             std::unique_ptr<InferenceCache> inference_cache, Game* game,
              const Options& options);
 
   virtual ~MctsPlayer();
@@ -123,7 +120,7 @@ class MctsPlayer {
   // Plays the move at point c.
   // If game is non-null, adds a new move to the game's move history and sets
   // the game over state if appropriate.
-  virtual bool PlayMove(Coord c, Game* game);
+  virtual bool PlayMove(Coord c);
 
   bool ShouldResign() const;
 
@@ -158,7 +155,7 @@ class MctsPlayer {
 
   // Moves the root_ node up to its parent, popping the last move off the game
   // history but preserving the game tree.
-  bool UndoMove(Game* game);
+  bool UndoMove();
 
   void TreeSearch();
 
@@ -168,6 +165,9 @@ class MctsPlayer {
   // Returns the root of the game tree.
   MctsNode* game_root() { return &game_root_; }
   const MctsNode* game_root() const { return &game_root_; }
+
+  Game* game() { return game_; }
+  const Game* game() const { return game_; }
 
   Random* rnd() { return &rnd_; }
 
@@ -197,7 +197,7 @@ class MctsPlayer {
     int last_move = 0;
   };
 
-  void UpdateGame(Coord c, Game* game);
+  void UpdateGame(Coord c);
 
   std::unique_ptr<DualNet> network_;
   int temperature_cutoff_;
@@ -209,6 +209,8 @@ class MctsPlayer {
 
   BoardVisitor bv_;
   GroupVisitor gv_;
+
+  Game* game_;
 
   Random rnd_;
 

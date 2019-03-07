@@ -17,6 +17,7 @@
 
 #include <array>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,15 @@ class Game {
     bool resign_enabled = true;
 
     float komi = kDefaultKomi;
+
+    // If true, repeated calls to AddMove with the same Color and Coord will
+    // be ignored. This should be set to true when two separate MctsPlayer
+    // instances are playing (because they both make AddMove calls to the same
+    // Game object), and set to false for self-play where a single MctsPlayer
+    // plays both back and white.
+    bool ignore_repeated_moves = false;
+
+    friend std::ostream& operator<<(std::ostream& os, const Options& options);
   };
 
   struct Move {

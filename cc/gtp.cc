@@ -74,22 +74,26 @@ namespace minigo {
 namespace {
 
 void Gtp() {
-  GtpPlayer::Options options;
-  options.game_options.resign_threshold = FLAGS_resign_threshold;
-  options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
-  options.ponder_limit = FLAGS_ponder_limit;
-  options.courtesy_pass = FLAGS_courtesy_pass;
-  options.inject_noise = false;
-  options.soft_pick = false;
-  options.random_symmetry = true;
-  options.value_init_penalty = FLAGS_value_init_penalty;
-  options.virtual_losses = FLAGS_virtual_losses;
-  options.num_readouts = FLAGS_num_readouts;
-  options.seconds_per_move = FLAGS_seconds_per_move;
-  options.time_limit = FLAGS_time_limit;
-  options.decay_factor = FLAGS_decay_factor;
+  Game::Options game_options;
+  game_options.resign_threshold = FLAGS_resign_threshold;
 
-  MG_LOG(INFO) << options;
+  GtpPlayer::Options player_options;
+  player_options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
+  player_options.ponder_limit = FLAGS_ponder_limit;
+  player_options.courtesy_pass = FLAGS_courtesy_pass;
+  player_options.inject_noise = false;
+  player_options.soft_pick = false;
+  player_options.random_symmetry = true;
+  player_options.value_init_penalty = FLAGS_value_init_penalty;
+  player_options.virtual_losses = FLAGS_virtual_losses;
+  player_options.num_readouts = FLAGS_num_readouts;
+  player_options.seconds_per_move = FLAGS_seconds_per_move;
+  player_options.time_limit = FLAGS_time_limit;
+  player_options.decay_factor = FLAGS_decay_factor;
+
+  MG_LOG(INFO) << game_options << " " << player_options;
+
+  Game game(player_options.name, player_options.name, game_options);
 
   std::unique_ptr<GtpPlayer> player;
   auto model_factory = NewDualNetFactory(0);
@@ -103,10 +107,12 @@ void Gtp() {
   }
   if (FLAGS_minigui) {
     player = absl::make_unique<MiniguiPlayer>(
-        model_factory->NewDualNet(FLAGS_model), std::move(cache), options);
+        model_factory->NewDualNet(FLAGS_model), std::move(cache), &game,
+        player_options);
   } else {
-    player = absl::make_unique<GtpPlayer>(
-        model_factory->NewDualNet(FLAGS_model), std::move(cache), options);
+    player =
+        absl::make_unique<GtpPlayer>(model_factory->NewDualNet(FLAGS_model),
+                                     std::move(cache), &game, player_options);
   }
   player->Run();
 }

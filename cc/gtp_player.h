@@ -55,7 +55,7 @@ class GtpPlayer : public MctsPlayer {
   };
 
   GtpPlayer(std::unique_ptr<DualNet> network,
-            std::unique_ptr<InferenceCache> inference_cache,
+            std::unique_ptr<InferenceCache> inference_cache, Game* game,
             const Options& options);
 
   void Run();
@@ -192,8 +192,6 @@ class GtpPlayer : public MctsPlayer {
 
   absl::flat_hash_map<std::string, std::function<Response(CmdArgs)>>
       cmd_handlers_;
-
-  Game game_;
 
   ThreadSafeQueue<std::string> stdin_queue_;
 };

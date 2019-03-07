@@ -29,7 +29,9 @@ void Init(uint64_t seed) {
   kBlackToPlayHash = rnd.UniformUint64();
   for (auto& x : kMoveHashes) {
     for (size_t i = 0; i < x.size(); ++i) {
-      x[i] = i == 0 ? 0 : rnd.UniformUint64();
+      // For simplicity, the hashes are indexed by kMoveHashes[coord][color].
+      // Set the empty hash to 0 for each position.
+      x[i] = i == static_cast<int>(Color::kEmpty) ? 0 : rnd.UniformUint64();
     }
   }
   for (auto& x : kKoHashes) {

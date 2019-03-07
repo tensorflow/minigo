@@ -33,12 +33,9 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
   os << "name:" << options.name << " inject_noise:" << options.inject_noise
      << " soft_pick:" << options.soft_pick
      << " random_symmetry:" << options.random_symmetry
-     << " resign_threshold:" << options.game_options.resign_threshold
-     << " resign_enabled:" << options.game_options.resign_enabled
      << " value_init_penalty:" << options.value_init_penalty
      << " policy_softmax_temp:" << options.policy_softmax_temp
      << " virtual_losses:" << options.virtual_losses
-     << " komi:" << options.game_options.komi
      << " num_readouts:" << options.num_readouts
      << " seconds_per_move:" << options.seconds_per_move
      << " time_limit:" << options.time_limit
@@ -74,14 +71,13 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
 
 MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network,
                        std::unique_ptr<InferenceCache> inference_cache,
-                       const Options& options)
+                       Game* game, const Options& options)
     : network_(std::move(network)),
       game_root_(&root_stats_, {&bv_, &gv_, Color::kBlack}),
+      game_(game),
       rnd_(options.random_seed),
       options_(options),
       inference_cache_(std::move(inference_cache)) {
-  MG_CHECK(options.game_options.resign_threshold < 0);
-
   // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.
   // divide 2, multiply 2 guarentees that white and black do even number.
   temperature_cutoff_ = !options_.soft_pick ? -1 : (((kN * kN / 12) / 2) * 2);
@@ -89,6 +85,9 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network,
 
   if (options_.verbose) {
     MG_LOG(INFO) << "MctsPlayer options: " << options_;
+    MG_LOG(INFO) << "Game options: " << game_->options();
+    // A time-based seed will be used when options_.random_seed == 0, so log
+    // that explicitly.
     MG_LOG(INFO) << "Random seed used: " << rnd_.seed();
   }
 
@@ -117,16 +116,17 @@ void MctsPlayer::NewGame() {
   ResetRoot();
 }
 
-void MctsPlayer::ResetRoot() { root_ = &game_root_; }
+void MctsPlayer::ResetRoot() {
+  root_ = &game_root_;
+  game_->NewGame();
+}
 
-bool MctsPlayer::UndoMove(Game* game) {
+bool MctsPlayer::UndoMove() {
   if (root_ == &game_root_) {
     return false;
   }
   root_ = root_->parent;
-  if (game != nullptr) {
-    game->UndoMove();
-  }
+  game_->UndoMove();
   return true;
 }
 
@@ -238,8 +238,7 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
     auto* leaf = root->SelectLeaf();
     if (leaf->game_over() || leaf->at_move_limit()) {
       float value =
-          leaf->position.CalculateScore(options_.game_options.komi) > 0 ? 1
-                                                                        : -1;
+          leaf->position.CalculateScore(game_->options().komi) > 0 ? 1 : -1;
       leaf->IncorporateEndGameResult(value, root);
     } else {
       leaf->AddVirtualLoss(root);
@@ -252,8 +251,8 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
 }
 
 bool MctsPlayer::ShouldResign() const {
-  return options_.game_options.resign_enabled &&
-         root_->Q_perspective() < options_.game_options.resign_threshold;
+  return game_->options().resign_enabled &&
+         root_->Q_perspective() < game_->options().resign_threshold;
 }
 
 std::string MctsPlayer::GetModelsUsedForInference() const {
@@ -266,7 +265,7 @@ std::string MctsPlayer::GetModelsUsedForInference() const {
   return absl::StrJoin(parts, ", ");
 }
 
-bool MctsPlayer::PlayMove(Coord c, Game* game) {
+bool MctsPlayer::PlayMove(Coord c) {
   if (root_->game_over()) {
     MG_LOG(ERROR) << "can't play move " << c << ", game is over";
     return false;
@@ -274,29 +273,24 @@ bool MctsPlayer::PlayMove(Coord c, Game* game) {
 
   // Handle resignations.
   if (c == Coord::kResign) {
-    if (game != nullptr) {
-      game->SetGameOverBecauseOfResign(OtherColor(root_->position.to_play()));
-    }
+    game_->SetGameOverBecauseOfResign(OtherColor(root_->position.to_play()));
     return true;
   }
 
   if (!root_->legal_moves[c]) {
     MG_LOG(ERROR) << "Move " << c << " is illegal";
-    // We're probably about to crash. Dump the player's options and the moves that
-    // got us to this point.
-    MG_LOG(ERROR) << "Options: " << options_;
-    if (game != nullptr) {
-      for (int i = 0; i < game->num_moves(); ++i) {
-        const auto* move = game->GetMove(i);
-        MG_LOG(ERROR) << move->color << "  " << move->c;
-      }
+    // We're probably about to crash. Dump the player's options and the moves
+    // that got us to this point.
+    MG_LOG(ERROR) << "MctsPlayer options: " << options_;
+    MG_LOG(ERROR) << "Game options: " << game_->options();
+    for (int i = 0; i < game_->num_moves(); ++i) {
+      const auto* move = game_->GetMove(i);
+      MG_LOG(ERROR) << move->color << "  " << move->c;
     }
     return false;
   }
 
-  if (game != nullptr) {
-    UpdateGame(c, game);
-  }
+  UpdateGame(c);
 
   root_ = root_->MaybeAddChild(c);
   if (options_.prune_orphaned_nodes) {
@@ -311,17 +305,15 @@ bool MctsPlayer::PlayMove(Coord c, Game* game) {
   }
 
   // Handle consecutive passing or termination by move limit.
-  if (game != nullptr) {
-    if (root_->game_over() || root_->at_move_limit()) {
-      game->SetGameOverBecauseOfPasses(
-          root_->position.CalculateScore(options_.game_options.komi));
-    }
+  if (root_->game_over() || root_->at_move_limit()) {
+    game_->SetGameOverBecauseOfPasses(
+        root_->position.CalculateScore(game_->options().komi));
   }
 
   return true;
 }
 
-void MctsPlayer::UpdateGame(Coord c, Game* game) {
+void MctsPlayer::UpdateGame(Coord c) {
   // Record which model(s) were used when running tree search for this move.
   std::vector<std::string> models;
   if (!inferences_.empty()) {
@@ -363,8 +355,8 @@ void MctsPlayer::UpdateGame(Coord c, Game* game) {
   }
 
   // Update the game history.
-  game->AddMove(root_->position.to_play(), c, root_->position.stones(),
-                std::move(comment), root_->Q(), search_pi, std::move(models));
+  game_->AddMove(root_->position.to_play(), c, root_->position.stones(),
+                 std::move(comment), root_->Q(), search_pi, std::move(models));
 }
 
 void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,

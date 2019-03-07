@@ -85,14 +85,16 @@ DEFINE_string(bigtable_tag, "", "Used in Bigtable metadata");
 namespace minigo {
 namespace {
 
-void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
-  options->game_options.resign_threshold = -std::abs(FLAGS_resign_threshold);
-  options->virtual_losses = FLAGS_virtual_losses;
-  options->random_seed = FLAGS_seed;
-  options->num_readouts = FLAGS_num_readouts;
-  options->inject_noise = false;
-  options->soft_pick = false;
-  options->random_symmetry = true;
+void ParseOptionsFromFlags(Game::Options* game_options,
+                           MctsPlayer::Options* player_options) {
+  game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
+  game_options->ignore_repeated_moves = true;
+  player_options->virtual_losses = FLAGS_virtual_losses;
+  player_options->random_seed = FLAGS_seed;
+  player_options->num_readouts = FLAGS_num_readouts;
+  player_options->inject_noise = false;
+  player_options->soft_pick = false;
+  player_options->random_symmetry = true;
 }
 
 class Evaluator {
@@ -117,7 +119,7 @@ class Evaluator {
                  << "\n  and " << FLAGS_model_two << " in "
                  << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
 
-    ParseMctsPlayerOptionsFromFlags(&options_);
+    ParseOptionsFromFlags(&game_options_, &player_options_);
 
     int num_games = FLAGS_parallel_games;
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
@@ -172,7 +174,9 @@ class Evaluator {
       return;
     }
 
-    auto player_options = options_;
+    Game game(black_model->name, white_model->name, game_options_);
+
+    auto player_options = player_options_;
     // If an random seed was explicitly specified, make sure we use a
     // different seed for each thread.
     if (player_options.random_seed != 0) {
@@ -181,16 +185,15 @@ class Evaluator {
 
     const bool verbose = thread_id == 0;
     player_options.verbose = false;
-    player_options.name = black_model->name;
+    player_options.name = game.black_name();
     auto black = absl::make_unique<MctsPlayer>(
-        batcher->NewDualNet(black_model->path), nullptr, player_options);
+        batcher->NewDualNet(black_model->path), nullptr, &game, player_options);
 
     player_options.verbose = false;
-    player_options.name = white_model->name;
+    player_options.name = game.white_name();
     auto white = absl::make_unique<MctsPlayer>(
-        batcher->NewDualNet(white_model->path), nullptr, player_options);
+        batcher->NewDualNet(white_model->path), nullptr, &game, player_options);
 
-    Game game(black->name(), white->name(), player_options.game_options);
     auto* curr_player = black.get();
     auto* next_player = white.get();
     batcher->StartGame(curr_player->network(), next_player->network());
@@ -199,13 +202,12 @@ class Evaluator {
       if (verbose) {
         std::cerr << curr_player->root()->Describe() << "\n";
       }
-      curr_player->PlayMove(move, &game);
-      next_player->PlayMove(move, nullptr);
+      curr_player->PlayMove(move);
+      next_player->PlayMove(move);
       if (verbose) {
-        MG_LOG(INFO) << absl::StreamFormat("%d: %s by %s\nQ: %0.4f",
-                     curr_player->root()->position.n(),
-                     move.ToGtp(), curr_player->name(),
-                     curr_player->root()->Q());
+        MG_LOG(INFO) << absl::StreamFormat(
+            "%d: %s by %s\nQ: %0.4f", curr_player->root()->position.n(),
+            move.ToGtp(), curr_player->name(), curr_player->root()->Q());
         MG_LOG(INFO) << curr_player->root()->position.ToPrettyString();
       }
       std::swap(curr_player, next_player);
@@ -246,7 +248,8 @@ class Evaluator {
     MG_LOG(INFO) << "Thread " << thread_id << " stopping";
   }
 
-  MctsPlayer::Options options_;
+  Game::Options game_options_;
+  MctsPlayer::Options player_options_;
   std::vector<std::thread> threads_;
 };
 

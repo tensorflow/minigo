@@ -48,15 +48,16 @@ void SimpleExample() {
   auto model_factory = NewDualNetFactory(0);
   auto model = model_factory->NewDualNet(FLAGS_model);
 
-  // Create the player.
-  MctsPlayer::Options options;
-  options.inject_noise = false;
-  options.soft_pick = false;
-  options.num_readouts = FLAGS_num_readouts;
-  MctsPlayer player(std::move(model), nullptr, options);
-
   // Create a game object that tracks the move history & final score.
-  Game game(player.name(), player.name(), options.game_options);
+  Game::Options game_options;
+  Game game("black", "white", game_options);
+
+  // Create the player.
+  MctsPlayer::Options player_options;
+  player_options.inject_noise = false;
+  player_options.soft_pick = false;
+  player_options.num_readouts = FLAGS_num_readouts;
+  MctsPlayer player(std::move(model), nullptr, &game, player_options);
 
   // Play the game.
   while (!game.game_over() && !player.root()->at_move_limit()) {
@@ -70,7 +71,7 @@ void SimpleExample() {
               << " O: " << position.num_captures()[1] << "\n";
     std::cout << player.root()->Describe() << "\n";
 
-    MG_CHECK(player.PlayMove(move, &game));
+    MG_CHECK(player.PlayMove(move));
   }
 
   std::cout << game.result_string() << std::endl;

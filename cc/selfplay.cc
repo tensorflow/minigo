@@ -138,20 +138,21 @@ std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
   return file::JoinPath(root_dir, sub_dirs);
 }
 
-void ParseMctsPlayerOptionsFromFlags(MctsPlayer::Options* options) {
-  options->noise_mix = FLAGS_noise_mix;
-  options->inject_noise = FLAGS_inject_noise;
-  options->soft_pick = FLAGS_soft_pick;
-  options->random_symmetry = FLAGS_random_symmetry;
-  options->value_init_penalty = FLAGS_value_init_penalty;
-  options->policy_softmax_temp = FLAGS_policy_softmax_temp;
-  options->game_options.resign_threshold = -std::abs(FLAGS_resign_threshold);
-  options->virtual_losses = FLAGS_virtual_losses;
-  options->random_seed = FLAGS_seed;
-  options->num_readouts = FLAGS_num_readouts;
-  options->seconds_per_move = FLAGS_seconds_per_move;
-  options->time_limit = FLAGS_time_limit;
-  options->decay_factor = FLAGS_decay_factor;
+void ParseOptionsFromFlags(Game::Options* game_options,
+                           MctsPlayer::Options* player_options) {
+  game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
+  player_options->noise_mix = FLAGS_noise_mix;
+  player_options->inject_noise = FLAGS_inject_noise;
+  player_options->soft_pick = FLAGS_soft_pick;
+  player_options->random_symmetry = FLAGS_random_symmetry;
+  player_options->value_init_penalty = FLAGS_value_init_penalty;
+  player_options->policy_softmax_temp = FLAGS_policy_softmax_temp;
+  player_options->virtual_losses = FLAGS_virtual_losses;
+  player_options->random_seed = FLAGS_seed;
+  player_options->num_readouts = FLAGS_num_readouts;
+  player_options->seconds_per_move = FLAGS_seconds_per_move;
+  player_options->time_limit = FLAGS_time_limit;
+  player_options->decay_factor = FLAGS_decay_factor;
 }
 
 void LogEndGameInfo(const Game& game, absl::Duration game_time) {
@@ -232,15 +233,14 @@ class SelfPlayer {
   // race conditions.
   struct ThreadOptions {
     void Init(int thread_id, Random* rnd) {
-      ParseMctsPlayerOptionsFromFlags(&player_options);
+      ParseOptionsFromFlags(&game_options, &player_options);
       player_options.verbose = thread_id == 0;
       // If an random seed was explicitly specified, make sure we use a
       // different seed for each thread.
       if (player_options.random_seed != 0) {
         player_options.random_seed += 1299283 * thread_id;
       }
-      player_options.game_options.resign_enabled =
-          (*rnd)() >= FLAGS_disable_resign_pct;
+      game_options.resign_enabled = (*rnd)() >= FLAGS_disable_resign_pct;
 
       run_forever = FLAGS_run_forever;
       holdout_pct = FLAGS_holdout_pct;
@@ -249,6 +249,7 @@ class SelfPlayer {
       sgf_dir = FLAGS_sgf_dir;
     }
 
+    Game::Options game_options;
     MctsPlayer::Options player_options;
     bool run_forever;
     float holdout_pct;
@@ -273,8 +274,8 @@ class SelfPlayer {
     }
 
     do {
-      std::unique_ptr<MctsPlayer> player;
       std::unique_ptr<Game> game;
+      std::unique_ptr<MctsPlayer> player;
 
       {
         absl::MutexLock lock(&mutex_);
@@ -283,12 +284,11 @@ class SelfPlayer {
         MG_CHECK(old_model == FLAGS_model)
             << "Manually changing the model during selfplay is not supported.";
         thread_options.Init(thread_id, &rnd_);
+        game = absl::make_unique<Game>(FLAGS_model, FLAGS_model,
+                                       thread_options.game_options);
         player = absl::make_unique<MctsPlayer>(
-            batcher_->NewDualNet(FLAGS_model), nullptr,
+            batcher_->NewDualNet(FLAGS_model), nullptr, game.get(),
             thread_options.player_options);
-        game =
-            absl::make_unique<Game>(player->name(), player->name(),
-                                    thread_options.player_options.game_options);
       }
 
       // Play the game.
@@ -308,7 +308,7 @@ class SelfPlayer {
                        << " O: " << position.num_captures()[1];
           MG_LOG(INFO) << player->root()->Describe();
         }
-        MG_CHECK(player->PlayMove(move, game.get()));
+        MG_CHECK(player->PlayMove(move));
       }
       {
         absl::MutexLock lock(&mutex_);
