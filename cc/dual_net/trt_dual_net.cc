@@ -132,7 +132,7 @@ class TrtDualNet : public DualNet {
 
  public:
   TrtDualNet(std::string graph_path, int device_count)
-      : graph_path_(std::move(graph_path)),
+      : graph_path_(graph_path),
         runtime_(nvinfer1::createInferRuntime(logger_)),
         parser_(nvuffparser::createUffParser()),
         batch_capacity_(0),
@@ -291,7 +291,7 @@ int TrtDualNetFactory::GetBufferCount() const { return device_count_ * 2; }
 
 std::unique_ptr<DualNet> TrtDualNetFactory::NewDualNet(
     const std::string& model) {
-  return absl::make_unique<TrtDualNet>(model);
+  return absl::make_unique<TrtDualNet>(model, device_count_);
 }
 
 }  // namespace minigo
