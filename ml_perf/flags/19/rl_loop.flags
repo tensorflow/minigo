@@ -1,5 +1,7 @@
 # Flags for the reinforcement learning loop.
 
---iterations=100
---gating_win_rate=0.55
 --flags_dir=ml_perf/flags/19/
+
+--iterations=100
+--gating_win_rate=0.5
+--window_size=5

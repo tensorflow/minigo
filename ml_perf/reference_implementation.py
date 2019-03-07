@@ -43,6 +43,9 @@ flags.DEFINE_string('flags_dir', None,
                     'files: bootstrap.flags, selfplay.flags, eval.flags, '
                     'train.flags.')
 
+flags.DEFINE_integer('window_size', 5,
+                     'Maximum number of recent selfplay rounds to train on.')
+
 FLAGS = flags.FLAGS
 
 
@@ -237,14 +240,15 @@ def rl_loop():
     holdout_glob = os.path.join(fsdb.holdout_dir(), '%06d-*' % state.iter_num,
                                 '*')
 
-    # Train on shuffled game data of the last 5 selfplay rounds, ignoring the
+    # Train on shuffled game data from recent selfplay rounds, ignoring the
     # random bootstrapping round.
     # TODO(tommadams): potential improvments:
     #   - "slow window": increment number of models in window by 1 every 2
     #     generations.
     #   - uniformly resample the window each iteration (see TODO in selfplay
     #     for more info).
-    tf_records = get_golden_chunk_records(min(5, state.iter_num))
+    tf_records = get_golden_chunk_records(min(FLAGS.window_size,
+                                              state.iter_num))
     state.iter_num += 1
     train(state, tf_records)
 
