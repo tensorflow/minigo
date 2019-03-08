@@ -8,3 +8,6 @@
 
 # Don't perform holdout for the first bootstrap round.
 --holdout_pct=0
+
+# No need to peer deeply into randomness.
+--num_readouts=10

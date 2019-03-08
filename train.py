@@ -40,6 +40,10 @@ flags.DEFINE_integer('steps_to_train', None,
 flags.DEFINE_integer('window_size', 500000,
                      'Number of games to include in the window')
 
+flags.DEFINE_float('filter_amount', 1.0,
+                     'Fraction of positions to filter from golden chunks,'
+                     'default, 1.0 (no filter)')
+
 flags.DEFINE_string('export_path', None,
                     'Where to export the model after training.')
 
@@ -170,7 +174,7 @@ def train(*tf_records: "Records to train on"):
             return preprocessing.get_input_tensors(
                 FLAGS.train_batch_size,
                 tf_records,
-                filter_amount=1.0,
+                filter_amount=FLAGS.filter_amount,
                 shuffle_buffer_size=FLAGS.shuffle_buffer_size,
                 random_rotation=True)
 

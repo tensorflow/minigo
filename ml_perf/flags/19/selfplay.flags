@@ -5,10 +5,10 @@
 
 --engine=tf
 --num_games=2048
---parallel_games=512
---num_readouts=100
---virtual_losses=8
+--parallel_games=256
+--num_readouts=400
+--virtual_losses=16
 --value_init_penalty=2
 --holdout_pct=0.03
 --disable_resign_pct=0.1
---resign_threshold=-0.99
+--resign_threshold=-0.999

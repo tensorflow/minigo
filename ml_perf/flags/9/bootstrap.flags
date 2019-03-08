@@ -8,3 +8,6 @@
 
 # Don't perform holdout for the first bootstrap round.
 --holdout_pct=0
+
+# Don't look for signal in what is known to be noise.
+--num_readouts=50

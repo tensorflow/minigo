@@ -2,6 +2,6 @@
 
 --flags_dir=ml_perf/flags/19/
 
---iterations=100
+--iterations=200
 --gating_win_rate=0.5
---window_size=5
+--window_size=25

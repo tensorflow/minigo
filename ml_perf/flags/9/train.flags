@@ -4,3 +4,5 @@
 --fc_width=64
 --trunk_layers=9
 --value_cost_weight=0.25
+--shuffle_buffer_size=10000
+--filter_amount=0.1

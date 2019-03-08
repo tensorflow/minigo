@@ -4,4 +4,4 @@
 
 --iterations=100
 --gating_win_rate=0.5
---window_size=5
+--window_size=10
