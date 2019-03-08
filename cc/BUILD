@@ -87,6 +87,8 @@ cc_library(
     name = "tensorrt",
     tags = ["manual"],
     deps = [
+        "@local_config_cuda//:cuda_headers",
+        "@local_config_cuda//:cudart",
         "@local_config_tensorrt//:nv_infer",
         "@local_config_tensorrt//:nvparsers",
         "@local_config_tensorrt//:tensorrt_headers",
