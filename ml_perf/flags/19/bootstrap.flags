@@ -1,6 +1,5 @@
 # Flags for the first bootstrap round of selfplay.
 
-# Import the base selfplay flags.
 --flagfile=ml_perf/flags/19/selfplay.flags
 
 # Use a fake model that produces random values.

@@ -1,0 +1,6 @@
+# Flags that control the model architecture.
+
+--conv_width=64
+--fc_width=64
+--trunk_layers=5
+--value_cost_weight=0.125

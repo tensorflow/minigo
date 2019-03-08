@@ -5,3 +5,4 @@
 --iterations=200
 --gating_win_rate=0.5
 --window_size=25
+--slow_window=1

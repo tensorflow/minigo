@@ -203,7 +203,9 @@ class Evaluator {
         std::cerr << curr_player->root()->Describe() << "\n";
       }
       curr_player->PlayMove(move);
-      next_player->PlayMove(move);
+      if (!game.game_over()) {
+        next_player->PlayMove(move);
+      }
       if (verbose) {
         MG_LOG(INFO) << absl::StreamFormat(
             "%d: %s by %s\nQ: %0.4f", curr_player->root()->position.n(),

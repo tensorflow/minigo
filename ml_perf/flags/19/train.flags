@@ -1,8 +1,6 @@
-# Flags for training & validation.
+# Flags for training.
 
---conv_width=64
---fc_width=64
---trunk_layers=5
---value_cost_weight=0.125
+--flagfile=ml_perf/flags/19/architecture.flags
+
 --filter_amount=0.1
 --shuffle_buffer_size=10000

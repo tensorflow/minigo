@@ -1,0 +1,3 @@
+# Flags for validation.
+
+--flagfile=ml_perf/flags/19/architecture.flags
