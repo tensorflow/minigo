@@ -17,7 +17,7 @@
 import sys
 sys.path.insert(0, '.')  # nopep8
 
-from collections import OrderedDict
+from tensorflow import gfile
 import logging
 import numpy as np
 import os
@@ -26,6 +26,7 @@ import re
 import shutil
 import subprocess
 import tensorflow as tf
+import time
 import utils
 
 from absl import app, flags
@@ -66,6 +67,8 @@ FLAGS = flags.FLAGS
 class State:
 
   def __init__(self):
+    self.start_time = time.time()
+
     self.iter_num = 0
     self.gen_num = 0
 
@@ -170,6 +173,12 @@ def train(state, tf_records):
       '--export_path={}'.format(model_path),
       '--training_seed={}'.format(state.seed),
       '--freeze=true')
+  # Append the time elapsed from when the RL was started to when this model
+  # was trained.
+  elapsed = time.time() - state.start_time
+  timestamps_path = os.path.join(fsdb.models_dir(), 'train_times.txt')
+  with gfile.Open(timestamps_path, 'a') as f:
+     print('{:.3f} {}'.format(elapsed, state.train_model_name), file=f)
 
 
 # Validate the trained model against holdout games.
@@ -180,26 +189,29 @@ def validate(state, holdout_glob):
       '--work_dir={}'.format(fsdb.working_dir()))
 
 
-# Evaluate the trained model against the current best model.
-def evaluate(state):
-  eval_model = state.train_model_name
-  best_model = state.best_model_name
+# Evaluate one model against a target.
+def evaluate_model(eval_model, target_model, sgf_dir, seed):
   eval_model_path = os.path.join(fsdb.models_dir(), eval_model)
-  best_model_path = os.path.join(fsdb.models_dir(), best_model)
-  sgf_dir = os.path.join(fsdb.eval_dir(), eval_model)
+  target_model_path = os.path.join(fsdb.models_dir(), target_model)
   result = checked_run('evaluation',
       'bazel-bin/cc/eval',
       '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'eval.flags')),
       '--model={}.pb'.format(eval_model_path),
-      '--model_two={}.pb'.format(best_model_path),
+      '--model_two={}.pb'.format(target_model_path),
       '--sgf_dir={}'.format(sgf_dir),
-      '--seed={}'.format(state.seed))
+      '--seed={}'.format(seed))
   result = get_lines(result, make_slice[-7:])
   logging.info(result)
   pattern = '{}\s+\d+\s+(\d+\.\d+)%'.format(eval_model)
   win_rate = float(re.search(pattern, result).group(1)) * 0.01
-  logging.info('Win rate %s vs %s: %.3f', eval_model, best_model, win_rate)
+  logging.info('Win rate %s vs %s: %.3f', eval_model, target_model, win_rate)
   return win_rate
+
+
+# Evaluate the trained model against the current best model.
+def evaluate_trained_model(state):
+  return evalute_model(state.train_model_name, state.best_model_name,
+                       state.seed, os.path.join(fsdb.eval_dir(), eval_model))
 
 
 def rl_loop():
@@ -243,7 +255,7 @@ def rl_loop():
 
     # These could all run in parallel.
     validate(state, holdout_glob)
-    model_win_rate = evaluate(state)
+    model_win_rate = evaluate_trained_model(state)
     selfplay(state)
 
     # TODO(tommadams): if a model doesn't get promoted after N iterations,
