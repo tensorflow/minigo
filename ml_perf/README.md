@@ -39,9 +39,15 @@ commands. This may vary on a different operating system or graphics card.
     gsutil -m cp gs://tensor-go-ml-perf/models/9x9/target.* ml_perf/
 
     # Run training loop
-    BOARD_SIZE=9  python  ml_perf/reference_implementation.py  \
+    BOARD_SIZE=9  python  ml_perf/reference_implementation.py \
       --base_dir=$(pwd)/results/$(date +%Y-%m-%d) \
       --flagfile=ml_perf/flags/9/rl_loop.flags
+
+    # Once the training loop has finished, run model evaluation to find the
+    # first trained model that's better than the target
+    BOARD_SIZE=9  python  ml_perf/eval_models.py \
+      --base_dir=$(pwd)/results/$(date +%Y-%m-%d) \
+      --flags_dir=ml_perf/flags/9
 ```
 
 ### Steps to download and verify data
