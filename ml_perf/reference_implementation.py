@@ -43,14 +43,16 @@ flags.DEFINE_string('flags_dir', None,
                     'files: bootstrap.flags, selfplay.flags, eval.flags, '
                     'train.flags.')
 
-flags.DEFINE_integer('window_size', 5,
+flags.DEFINE_integer('max_window_size', 5,
                      'Maximum number of recent selfplay rounds to train on.')
 
-flags.DEFINE_integer('slow_window', 1,
-                     'Speed at which the training window increases in size. '
-                     'Starting at 1, the training window grows every '
-                     'slow_window iterations of the RL loop until it reaches '
-                     'window_size.')
+flags.DEFINE_integer('slow_window_size', 5,
+                     'Window size after which the window starts growing by '
+                     '1 every slow_window_speed iterations of the RL loop.')
+
+flags.DEFINE_integer('slow_window_speed', 1,
+                     'Speed at which the training window increases in size '
+                     'once the window size passes slow_window_size.')
 
 FLAGS = flags.FLAGS
 
@@ -227,12 +229,14 @@ def rl_loop():
     holdout_glob = os.path.join(fsdb.holdout_dir(), '%06d-*' % state.iter_num,
                                 '*')
 
-    # Train on shuffled game data from recent selfplay rounds, ignoring the
-    # random bootstrapping round.
-    # TODO(tommadams): potential improvments:
-    #   - uniformly resample the window each iteration (see TODO in selfplay
-    #     for more info).
-    window = min(1 + state.iter_num // FLAGS.slow_window, FLAGS.window_size)
+    # Calculate the window size from which we'll select training chunks.
+    window = 1 + state.iter_num
+    if window >= FLAGS.slow_window_size:
+      window = (FLAGS.slow_window_size +
+                (window - FLAGS.slow_window_size) // FLAGS.slow_window_speed)
+    window = min(window, FLAGS.max_window_size)
+
+    # Train on shuffled game data from recent selfplay rounds.
     tf_records = get_golden_chunk_records(window)
     state.iter_num += 1
     train(state, tf_records)
