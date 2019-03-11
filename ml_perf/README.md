@@ -21,15 +21,19 @@ commands. This may vary on a different operating system or graphics card.
     # Install dependencies
     apt-get install -y python3 python3-pip rsync git wget pkg-config zip g++ zlib1g-dev unzip
 
-    # Install python dependencies
+    # Install Python dependencies
     pip3 install -r requirements.txt
+
+    # Install Python Tensorflow for GPU
+    # (alternatively use "tensorflow>=1.11,<1.12" for CPU Tensorflow)
+    pip3 install "tensorflow-gpu>=1.11,<1.12"
 
     # Install bazel
     wget https://github.com/bazelbuild/bazel/releases/download/0.17.1/bazel-0.17.1-installer-linux-x86_64.sh
     chmod +x bazel-0.17.1-installer-linux-x86_64.sh
     ./bazel-0.17.1-installer-linux-x86_64.sh
 
-    # Compile TensorFlow
+    # Compile TensorFlow C++ libraries
     ./cc/configure_tensorflow.sh
 
     # Compile and run C++ self-play and evaluation binaries
@@ -38,15 +42,17 @@ commands. This may vary on a different operating system or graphics card.
     # Download target model
     gsutil -m cp gs://tensor-go-ml-perf/models/9x9/target.* ml_perf/
 
+    BASE_DIR=$(pwd)/results/$(date +%Y-%m-%d)
+
     # Run training loop
     BOARD_SIZE=9  python  ml_perf/reference_implementation.py \
-      --base_dir=$(pwd)/results/$(date +%Y-%m-%d) \
+      --base_dir=$BASE_DIR \
       --flagfile=ml_perf/flags/9/rl_loop.flags
 
     # Once the training loop has finished, run model evaluation to find the
     # first trained model that's better than the target
     BOARD_SIZE=9  python  ml_perf/eval_models.py \
-      --base_dir=$(pwd)/results/$(date +%Y-%m-%d) \
+      --base_dir=$BASE_DIR \
       --flags_dir=ml_perf/flags/9
 ```
 
