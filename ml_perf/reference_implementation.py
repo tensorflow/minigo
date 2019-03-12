@@ -17,7 +17,7 @@
 import sys
 sys.path.insert(0, '.')  # nopep8
 
-from tensorflow import gfile
+import asyncio
 import logging
 import numpy as np
 import os
@@ -31,6 +31,7 @@ import utils
 
 from absl import app, flags
 from rl_loop import example_buffer, fsdb
+from tensorflow import gfile
 
 flags.DEFINE_integer('iterations', 100, 'Number of iterations of the RL loop.')
 
@@ -55,16 +56,23 @@ flags.DEFINE_integer('slow_window_speed', 1,
                      'Speed at which the training window increases in size '
                      'once the window size passes slow_window_size.')
 
+flags.DEFINE_boolean('parallel_post_train', False,
+                     'If true, run the post-training stages (eval, validation '
+                     '& selfplay) in parallel.')
+
 FLAGS = flags.FLAGS
 
 
-# Models are named with the current reinforcement learning loop iteration number
-# and the model generation (how many models have passed gating). For example, a
-# model named "000015-000007" was trained on the 15th iteration of the loop and
-# is the 7th models that passed gating.
-# Note that we rely on the iteration number being the first part of the model
-# name so that the training chunks sort correctly.
 class State:
+  """State data used in each iteration of the RL loop.
+
+  Models are named with the current reinforcement learning loop iteration number
+  and the model generation (how many models have passed gating). For example, a
+  model named "000015-000007" was trained on the 15th iteration of the loop and
+  is the 7th models that passed gating.
+  Note that we rely on the iteration number being the first part of the model
+  name so that the training chunks sort correctly.
+  """
 
   def __init__(self):
     self.start_time = time.time()
@@ -92,57 +100,122 @@ class State:
     return self.iter_num + 1
 
 
-def checked_run(name, *cmd):
-  # Read & expand any flagfiles specified on the commandline so we can know
-  # exactly what's going on.
-  expanded = flags.FlagValues().read_flags_from_files(cmd)
-  logging.info('Running %s:\n  %s', name, '  '.join(expanded))
-
-  with utils.logged_timer('%s finished' % name.capitalize()):
-    completed_process = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    if completed_process.returncode:
-      logging.error('Error running %s: %s', name,
-                    completed_process.stdout.decode())
-      raise RuntimeError('Non-zero return code executing %s' % ' '.join(cmd))
-  return completed_process
+def expand_cmd_str(cmd):
+  return '  '.join(flags.FlagValues().read_flags_from_files(cmd))
 
 
-def get_lines(completed_process, slice):
-  return '\n'.join(completed_process.stdout.decode()[:-1].split('\n')[slice])
+def get_cmd_name(cmd):
+  if cmd[0] == 'python' or cmd[0] == 'python3':
+    return ' '.join(cmd[:2])
+  else:
+    return cmd[0]
 
 
-class MakeSlice(object):
+async def checked_run(*cmd):
+  """Run the given subprocess command in a coroutine.
 
-  def __getitem__(self, item):
-    return item
+  Args:
+    *cmd: the command to run and its arguments.
+
+  Returns:
+    The output that the command wrote to stdout as a list of strings, one line
+    per element (stderr output is piped to stdout).
+
+  Raises:
+    RuntimeError: if the command returns a non-zero result.
+  """
+
+  # Start the subprocess.
+  logging.info('Running: %s', expand_cmd_str(cmd))
+  with utils.logged_timer('{} finished'.format(get_cmd_name(cmd))):
+    p = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+
+    # Stream output from the process stdout.
+    chunks = []
+    while True:
+      chunk = await p.stdout.read(16 * 1024)
+      if not chunk:
+        break
+      chunks.append(chunk)
+
+    # Wait for the process to finish, check it was successful & build stdout.
+    await p.wait()
+    stdout = b''.join(chunks).decode()[:-1]
+    if p.returncode:
+      raise RuntimeError('Return code {} from process: {}\n{}'.format(
+          p.returncode, expand_cmd_str(cmd), stdout))
+
+    # Split stdout into lines.
+    return stdout.split('\n')
 
 
-make_slice = MakeSlice()
+def wait(aws):
+  """Waits for all of the awaitable objects (e.g. coroutines) in aws to finish.
+
+  All the awaitable objects are waited for, even if one of them raises an
+  exception. When one or more awaitable raises an exception, the exception from
+  the awaitable with the lowest index in the aws list will be reraised.
+
+  Args:
+    aws: a single awaitable, or list awaitables.
+
+  Returns:
+    If aws is a single awaitable, its result.
+    If aws is a list of awaitables, a list containing the of each awaitable in
+    the list.
+
+  Raises:
+    Exception: if any of the awaitables raises.
+  """
+
+  aws_list = aws if isinstance(aws, list) else [aws]
+  results = asyncio.get_event_loop().run_until_complete(asyncio.gather(
+      *aws_list, return_exceptions=True))
+  # If any of the cmds failed, re-raise the error.
+  for result in results:
+    if isinstance(result, Exception):
+      raise result
+  return results if isinstance(aws, list) else results[0]
 
 
-# Return up to num_records of golden chunks to train on.
 def get_golden_chunk_records(num_records):
-  # Sort the list of chunks so that the most recent ones are first and return
-  # the requested prefix.
+  """Return up to num_records of golden chunks to train on.
+
+  Args:
+    num_records: maximum number of records to return.
+
+  Returns:
+    A list of golden chunks up to num_records in length, sorted by path.
+  """
+
   pattern = os.path.join(fsdb.golden_chunk_dir(), '*.zz')
   return sorted(tf.gfile.Glob(pattern), reverse=True)[:num_records]
 
 
 # Self-play a number of games.
-def selfplay(state, flagfile='selfplay'):
+async def selfplay(state, flagfile='selfplay'):
+  """Run selfplay and write a training chunk to the fsdb golden_chunk_dir.
+
+  Args:
+    state: the RL loop State instance.
+    flagfile: the name of the flagfile to use for selfplay, either 'selfplay'
+        (the default) or 'boostrap'.
+  """
+
   output_dir = os.path.join(fsdb.selfplay_dir(), state.output_model_name)
   holdout_dir = os.path.join(fsdb.holdout_dir(), state.output_model_name)
   model_path = os.path.join(fsdb.models_dir(), state.best_model_name)
 
-  result = checked_run('selfplay',
+  lines = await checked_run(
       'bazel-bin/cc/selfplay',
       '--flagfile={}.flags'.format(os.path.join(FLAGS.flags_dir, flagfile)),
       '--model={}.pb'.format(model_path),
       '--output_dir={}'.format(output_dir),
       '--holdout_dir={}'.format(holdout_dir),
       '--seed={}'.format(state.seed))
-  logging.info(get_lines(result, make_slice[-2:]))
+  result = '\n'.join(lines[-2:])
+  logging.info(result)
 
   # Write examples to a single record.
   pattern = os.path.join(output_dir, '*', '*.zz')
@@ -163,10 +236,16 @@ def selfplay(state, flagfile='selfplay'):
                             state.output_model_name + '.tfrecord.zz'))
 
 
-# Train a new model.
-def train(state, tf_records):
+async def train(state, tf_records):
+  """Run training and write a new model to the fsdb models_dir.
+
+  Args:
+    state: the RL loop State instance.
+    tf_records: a list of paths to TensorFlow records to train on.
+  """
+
   model_path = os.path.join(fsdb.models_dir(), state.train_model_name)
-  checked_run('training',
+  await checked_run(
       'python3', 'train.py', *tf_records,
       '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
       '--work_dir={}'.format(fsdb.working_dir()),
@@ -178,29 +257,46 @@ def train(state, tf_records):
   elapsed = time.time() - state.start_time
   timestamps_path = os.path.join(fsdb.models_dir(), 'train_times.txt')
   with gfile.Open(timestamps_path, 'a') as f:
-     print('{:.3f} {}'.format(elapsed, state.train_model_name), file=f)
+    print('{:.3f} {}'.format(elapsed, state.train_model_name), file=f)
 
 
-# Validate the trained model against holdout games.
-def validate(state, holdout_glob):
-  checked_run('validation',
+async def validate(state, holdout_glob):
+  """Validate the trained model against holdout games.
+
+  Args:
+    state: the RL loop State instance.
+    holdout_glob: a glob that matches holdout games.
+  """
+
+  await checked_run(
       'python3', 'validate.py', holdout_glob,
       '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'validate.flags')),
       '--work_dir={}'.format(fsdb.working_dir()))
 
 
-# Evaluate one model against a target.
-def evaluate_model(eval_model, target_model, sgf_dir, seed):
+async def evaluate_model(eval_model, target_model, sgf_dir, seed):
+  """Evaluate one model against a target.
+
+  Args:
+    eval_model: the name of the model to evaluate.
+    target_model: the name of the model to compare to.
+    sgf_dif: directory path to write SGF output to.
+    seed: random seed to use when running eval.
+
+  Returns:
+    The win-rate of eval_model against target_model in the range [0, 1].
+  """
+
   eval_model_path = os.path.join(fsdb.models_dir(), eval_model)
   target_model_path = os.path.join(fsdb.models_dir(), target_model)
-  result = checked_run('evaluation',
+  lines = await checked_run(
       'bazel-bin/cc/eval',
       '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'eval.flags')),
       '--model={}.pb'.format(eval_model_path),
       '--model_two={}.pb'.format(target_model_path),
       '--sgf_dir={}'.format(sgf_dir),
       '--seed={}'.format(seed))
-  result = get_lines(result, make_slice[-7:])
+  result = '\n'.join(lines[-7:])
   logging.info(result)
   pattern = '{}\s+\d+\s+(\d+\.\d+)%'.format(eval_model)
   win_rate = float(re.search(pattern, result).group(1)) * 0.01
@@ -208,32 +304,39 @@ def evaluate_model(eval_model, target_model, sgf_dir, seed):
   return win_rate
 
 
-# Evaluate the trained model against the current best model.
-def evaluate_trained_model(state):
-  return evaluate_model(
+async def evaluate_trained_model(state):
+  """Evaluate the most recently trained model against the current best model.
+
+  Args:
+    state: the RL loop State instance.
+  """
+
+  return await evaluate_model(
       state.train_model_name, state.best_model_name,
       os.path.join(fsdb.eval_dir(), state.train_model_name), state.seed)
 
 
 def rl_loop():
+  """The main reinforcement learning (RL) loop."""
+
   state = State()
 
   # Play the first round of selfplay games with a fake model that returns
   # random noise. We do this instead of playing multiple games using a single
   # model bootstrapped with random noise to avoid any initial bias.
-  selfplay(state, 'bootstrap')
+  wait(selfplay(state, 'bootstrap'))
 
   # Train a real model from the random selfplay games.
   tf_records = get_golden_chunk_records(1)
   state.iter_num += 1
-  train(state, tf_records)
+  wait(train(state, tf_records))
 
   # Select the newly trained model as the best.
   state.best_model_name = state.train_model_name
   state.gen_num += 1
 
   # Run selfplay using the new model.
-  selfplay(state)
+  wait(selfplay(state))
 
   # Now start the full training loop.
   while state.iter_num <= FLAGS.iterations:
@@ -252,12 +355,19 @@ def rl_loop():
     # Train on shuffled game data from recent selfplay rounds.
     tf_records = get_golden_chunk_records(window)
     state.iter_num += 1
-    train(state, tf_records)
+    wait(train(state, tf_records))
 
-    # These could all run in parallel.
-    validate(state, holdout_glob)
-    model_win_rate = evaluate_trained_model(state)
-    selfplay(state)
+    if FLAGS.parallel_post_train:
+      # Run eval, validation & selfplay in parallel.
+      model_win_rate, _, _ = wait([
+          evaluate_trained_model(state),
+          validate(state, holdout_glob),
+          selfplay(state)])
+    else:
+      # Run eval, validation & selfplay sequentially.
+      model_win_rate = wait(evaluate_trained_model(state))
+      wait(validate(state, holdout_glob))
+      wait(selfplay(state))
 
     # TODO(tommadams): if a model doesn't get promoted after N iterations,
     # consider deleting the most recent N training checkpoints because training
@@ -293,7 +403,10 @@ def main(unused_argv):
     handler.setFormatter(formatter)
 
   with utils.logged_timer('Total time'):
-    rl_loop()
+    try:
+      rl_loop()
+    finally:
+      asyncio.get_event_loop().close()
 
 
 if __name__ == '__main__':

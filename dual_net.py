@@ -520,9 +520,12 @@ def get_estimator():
 
 
 def _get_nontpu_estimator():
+    session_config = tf.ConfigProto()
+    session_config.gpu_options.allow_growth = True
     run_config = tf.estimator.RunConfig(
         save_summary_steps=FLAGS.summary_steps,
-        keep_checkpoint_max=FLAGS.keep_checkpoint_max)
+        keep_checkpoint_max=FLAGS.keep_checkpoint_max,
+        session_config=session_config)
     return tf.estimator.Estimator(
         model_fn,
         model_dir=FLAGS.work_dir,
