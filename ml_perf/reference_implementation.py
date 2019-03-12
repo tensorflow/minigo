@@ -210,8 +210,9 @@ def evaluate_model(eval_model, target_model, sgf_dir, seed):
 
 # Evaluate the trained model against the current best model.
 def evaluate_trained_model(state):
-  return evaluate_model(state.train_model_name, state.best_model_name,
-                        state.seed, os.path.join(fsdb.eval_dir(), eval_model))
+  return evaluate_model(
+      state.train_model_name, state.best_model_name,
+      os.path.join(fsdb.eval_dir(), state.train_model_name), state.seed)
 
 
 def rl_loop():
