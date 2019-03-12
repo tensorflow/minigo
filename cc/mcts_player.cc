@@ -305,7 +305,10 @@ bool MctsPlayer::PlayMove(Coord c) {
   }
 
   // Handle consecutive passing or termination by move limit.
-  if (root_->game_over() || root_->at_move_limit()) {
+  if (root_->at_move_limit()) {
+    game_->SetGameOverBecauseMoveLimitReached(
+        root_->position.CalculateScore(game_->options().komi));
+  } else if (root_->game_over()) {
     game_->SetGameOverBecauseOfPasses(
         root_->position.CalculateScore(game_->options().komi));
   }

@@ -87,6 +87,7 @@ void Game::UndoMove() {
 void Game::SetGameOverBecauseOfPasses(float score) {
   MG_CHECK(!game_over_);
   game_over_ = true;
+  game_over_reason_ = GameOverReason::kBothPassed;
   result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
   result_string_ = FormatScore(score);
 }
@@ -94,6 +95,7 @@ void Game::SetGameOverBecauseOfPasses(float score) {
 void Game::SetGameOverBecauseOfResign(Color winner) {
   MG_CHECK(!game_over_);
   game_over_ = true;
+  game_over_reason_ = GameOverReason::kOpponentResigned;
   if (winner == Color::kBlack) {
     result_ = 1;
     result_string_ = "B+R";
@@ -101,6 +103,14 @@ void Game::SetGameOverBecauseOfResign(Color winner) {
     result_ = -1;
     result_string_ = "W+R";
   }
+}
+
+void Game::SetGameOverBecauseMoveLimitReached(float score) {
+  MG_CHECK(!game_over_);
+  game_over_ = true;
+  game_over_reason_ = GameOverReason::kMoveLimitReached;
+  result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
+  result_string_ = FormatScore(score);
 }
 
 void Game::GetStoneHistory(

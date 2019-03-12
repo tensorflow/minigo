@@ -250,6 +250,12 @@ class SelfPlayer {
 
     MG_LOG(INFO) << "Played " << num_games << " games, total time "
                  << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
+
+    std::string model_name(file::Stem(file::Basename(FLAGS_model)));
+    {
+      absl::MutexLock lock(&mutex_);
+      MG_LOG(INFO) << FormatWinStatsTable({{model_name, win_stats_}});
+    }
   }
 
  private:
@@ -353,6 +359,7 @@ class SelfPlayer {
         // outputs from multiple threads being interleaved.
         absl::MutexLock lock(&mutex_);
         LogEndGameInfo(*game, absl::Now() - start_time);
+        win_stats_.Update(*game);
       }
 
       // Write the outputs.
@@ -444,6 +451,9 @@ class SelfPlayer {
 
   // If run_forever_ is false, how many games are left to play.
   int num_remaining_games_ GUARDED_BY(&mutex_) = 0;
+
+  // Stats about how every game was won.
+  WinStats win_stats_ GUARDED_BY(&mutex_);
 
   uint64_t flags_timestamp_ = 0;
 };

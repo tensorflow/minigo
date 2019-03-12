@@ -100,6 +100,29 @@ class State:
     return self.iter_num + 1
 
 
+class ColorWinStats:
+  """Win-rate stats for a single model & color."""
+
+  def __init__(self, total, both_passed, opponent_resigned, move_limit_reached):
+    self.total = total
+    self.both_passed = both_passed
+    self.opponent_resigned = opponent_resigned
+    self.move_limit_reached = move_limit_reached
+    # Verify that the total is correct
+    assert total == both_passed + opponent_resigned + move_limit_reached
+
+
+class WinStats:
+  """Win-rate stats for a single model."""
+
+  def __init__(self, model_name, stats_str):
+    pattern = model_name + '\s+(\d+)' * 8
+    raw_stats = [float(x) for x in re.search(pattern, stats_str).groups()]
+    self.black_wins = ColorWinStats(*raw_stats[:4])
+    self.white_wins = ColorWinStats(*raw_stats[4:])
+    self.total_wins = self.black_wins.total + self.white_wins.total
+
+
 def expand_cmd_str(cmd):
   return '  '.join(flags.FlagValues().read_flags_from_files(cmd))
 
@@ -214,8 +237,13 @@ async def selfplay(state, flagfile='selfplay'):
       '--output_dir={}'.format(output_dir),
       '--holdout_dir={}'.format(holdout_dir),
       '--seed={}'.format(state.seed))
-  result = '\n'.join(lines[-2:])
+  result = '\n'.join(lines[-6:])
   logging.info(result)
+  stats = WinStats(state.best_model_name, result)
+  num_games = stats.total_wins
+  logging.info('Black won %0.3f, white won %0.3f',
+               stats.black_wins.total / num_games,
+               stats.white_wins.total / num_games)
 
   # Write examples to a single record.
   pattern = os.path.join(output_dir, '*', '*.zz')
@@ -298,8 +326,10 @@ async def evaluate_model(eval_model, target_model, sgf_dir, seed):
       '--seed={}'.format(seed))
   result = '\n'.join(lines[-7:])
   logging.info(result)
-  pattern = '{}\s+\d+\s+(\d+\.\d+)%'.format(eval_model)
-  win_rate = float(re.search(pattern, result).group(1)) * 0.01
+  eval_stats = WinStats(eval_model, result)
+  target_stats = WinStats(target_model, result)
+  num_games = eval_stats.total_wins + target_stats.total_wins
+  win_rate = eval_stats.total_wins / num_games
   logging.info('Win rate %s vs %s: %.3f', eval_model, target_model, win_rate)
   return win_rate
 

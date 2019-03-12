@@ -74,6 +74,12 @@ class Game {
     Position::Stones stones;
   };
 
+  enum class GameOverReason {
+    kBothPassed,
+    kOpponentResigned,
+    kMoveLimitReached,
+  };
+
   static std::string FormatScore(float score);
 
   Game(std::string black_name, std::string white_name, const Options& options);
@@ -92,6 +98,8 @@ class Game {
   void SetGameOverBecauseOfPasses(float score);
 
   void SetGameOverBecauseOfResign(Color winner);
+
+  void SetGameOverBecauseMoveLimitReached(float score);
 
   // Returns up to the last `num_moves` of moves that lead up to the requested
   // `move`, including the move itself.
@@ -114,6 +122,10 @@ class Game {
   const std::string& black_name() const { return black_name_; }
   const std::string& white_name() const { return white_name_; }
   bool game_over() const { return game_over_; }
+  GameOverReason game_over_reason() const {
+    MG_CHECK(game_over());
+    return game_over_reason_;
+  }
   float result() const {
     MG_CHECK(game_over());
     return result_;
@@ -137,6 +149,7 @@ class Game {
   const std::string black_name_;
   const std::string white_name_;
   bool game_over_ = false;
+  GameOverReason game_over_reason_;
   float result_;
   std::string result_string_;
   std::string comment_;

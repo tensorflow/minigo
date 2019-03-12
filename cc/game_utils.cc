@@ -15,9 +15,11 @@
 #include "cc/game_utils.h"
 
 #include <cstring>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
 #include "cc/logging.h"
@@ -25,6 +27,40 @@
 #include "cc/sgf.h"
 
 namespace minigo {
+
+std::string FormatWinStatsTable(
+    const std::vector<std::pair<std::string, WinStats>>& stats) {
+  size_t name_length = 4;
+  for (const auto& name_stats : stats) {
+    name_length = std::max(name_length, name_stats.first.size());
+  }
+
+  std::string result;
+
+  auto append_header = [&](absl::string_view name, absl::string_view str) {
+    absl::StrAppendFormat(&result, "%*s %s", name_length, name, str);
+  };
+
+  auto append_stats = [&](absl::string_view name, const WinStats& stats) {
+    const auto& b = stats.black_wins;
+    const auto& w = stats.white_wins;
+    absl::StrAppendFormat(
+        &result, "\n%-*s %7d %7d %7d %7d %7d %7d %7d %7d", name_length, name,
+        b.total(), b.both_passed, b.opponent_resigned, b.move_limit_reached,
+        w.total(), w.both_passed, w.opponent_resigned, w.move_limit_reached);
+  };
+
+  append_header(
+      "wins",
+      "  Black   Black   Black   Black   White   White   White   White\n");
+  append_header(
+      "", "  total   passes  resign  m.lmt.  total   passes  resign  m.lmt.");
+  for (const auto& name_stats : stats) {
+    append_stats(name_stats.first, name_stats.second);
+  }
+
+  return result;
+}
 
 std::string GetOutputName(absl::Time now, size_t game_id) {
   return absl::StrCat(absl::ToUnixSeconds(now), "-", GetHostname(), "-",

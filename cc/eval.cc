@@ -98,13 +98,29 @@ void ParseOptionsFromFlags(Game::Options* game_options,
 }
 
 class Evaluator {
-  struct Model {
+  class Model {
+   public:
     explicit Model(const std::string& path)
-        : path(path), name(file::Stem(path)), black_wins(0), white_wins(0) {}
-    const std::string path;
-    const std::string name;
-    std::atomic<int> black_wins;
-    std::atomic<int> white_wins;
+        : path_(path), name_(file::Stem(path)) {}
+
+    const std::string& path() const { return path_; }
+    const std::string& name() const { return name_; }
+
+    WinStats GetWinStats() const {
+      absl::MutexLock lock(&mutex_);
+      return win_stats_;
+    }
+
+    void UpdateWinStats(const Game& game) {
+      absl::MutexLock lock(&mutex_);
+      win_stats_.Update(game);
+    }
+
+   private:
+    mutable absl::Mutex mutex_;
+    const std::string path_;
+    const std::string name_;
+    WinStats win_stats_ GUARDED_BY(&mutex_);
   };
 
  public:
@@ -136,27 +152,9 @@ class Evaluator {
     MG_LOG(INFO) << "Evaluated " << num_games << " games, total time "
                  << (absl::Now() - start_time);
 
-    auto name_length = std::max(model_a.name.size(), model_b.name.size());
-    auto format_name = [&](const std::string& name) {
-      return absl::StrFormat("%-*s", name_length, name);
-    };
-    auto format_wins = [&](int wins) {
-      return absl::StrFormat(" %5d %6.2f%%", wins, wins * 100.0f / num_games);
-    };
-    auto print_result = [&](const Model& model) {
-      MG_LOG(INFO) << format_name(model.name)
-                   << format_wins(model.black_wins + model.white_wins)
-                   << format_wins(model.black_wins)
-                   << format_wins(model.white_wins);
-    };
-
-    MG_LOG(INFO) << format_name("Wins")
-                 << "        Total         Black         White";
-    print_result(model_a);
-    print_result(model_b);
-    MG_LOG(INFO) << format_name("") << "              "
-                 << format_wins(model_a.black_wins + model_b.black_wins)
-                 << format_wins(model_a.white_wins + model_b.white_wins);
+    MG_LOG(INFO) << FormatWinStatsTable({
+        {model_a.name(), model_a.GetWinStats()},
+        {model_b.name(), model_b.GetWinStats()}});
   }
 
  private:
@@ -174,7 +172,7 @@ class Evaluator {
       return;
     }
 
-    Game game(black_model->name, white_model->name, game_options_);
+    Game game(black_model->name(), white_model->name(), game_options_);
 
     auto player_options = player_options_;
     // If an random seed was explicitly specified, make sure we use a
@@ -187,12 +185,14 @@ class Evaluator {
     player_options.verbose = false;
     player_options.name = game.black_name();
     auto black = absl::make_unique<MctsPlayer>(
-        batcher->NewDualNet(black_model->path), nullptr, &game, player_options);
+        batcher->NewDualNet(black_model->path()), nullptr, &game,
+        player_options);
 
     player_options.verbose = false;
     player_options.name = game.white_name();
     auto white = absl::make_unique<MctsPlayer>(
-        batcher->NewDualNet(white_model->path), nullptr, &game, player_options);
+        batcher->NewDualNet(white_model->path()), nullptr, &game,
+        player_options);
 
     auto* curr_player = black.get();
     auto* next_player = white.get();
@@ -217,9 +217,9 @@ class Evaluator {
     batcher->EndGame(curr_player->network(), next_player->network());
 
     if (game.result() > 0) {
-      ++black_model->black_wins;
+      black_model->UpdateWinStats(game);
     } else if (game.result() < 0) {
-      ++white_model->white_wins;
+      white_model->UpdateWinStats(game);
     }
 
     if (verbose) {
