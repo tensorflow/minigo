@@ -40,7 +40,7 @@ commands. This may vary on a different operating system or graphics card.
     bazel build  -c opt  --define=tf=1  --define=board_size=9  cc:selfplay  cc:eval
 
     # Download target model
-    gsutil -m cp gs://tensor-go-ml-perf/models/9x9/target.* ml_perf/
+    gsutil -m cp gs://tensor-go-ml-perf/models/9x9/target.pb ml_perf/
 
     BASE_DIR=$(pwd)/results/$(date +%Y-%m-%d)
 
