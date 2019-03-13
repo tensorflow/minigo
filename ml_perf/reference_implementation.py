@@ -129,9 +129,10 @@ def expand_cmd_str(cmd):
 
 def get_cmd_name(cmd):
   if cmd[0] == 'python' or cmd[0] == 'python3':
-    return ' '.join(cmd[:2])
+    path = cmd[1]
   else:
-    return cmd[0]
+    path = cmd[0]
+  return os.path.splitext(os.path.basename(path))[0]
 
 
 async def checked_run(*cmd):
@@ -168,6 +169,13 @@ async def checked_run(*cmd):
     if p.returncode:
       raise RuntimeError('Return code {} from process: {}\n{}'.format(
           p.returncode, expand_cmd_str(cmd), stdout))
+
+    log_path = os.path.join(FLAGS.base_dir, get_cmd_name(cmd) + '.log')
+    with gfile.Open(log_path, 'a') as f:
+      f.write(expand_cmd_str(cmd))
+      f.write('\n')
+      f.write(stdout)
+      f.write('\n')
 
     # Split stdout into lines.
     return stdout.split('\n')
@@ -422,11 +430,17 @@ def main(unused_argv):
   utils.ensure_dir_exists(fsdb.golden_chunk_dir())
   utils.ensure_dir_exists(fsdb.working_dir())
 
+  # Copy the flag files so there's no chance of them getting accidentally
+  # overwritten while the RL loop is running.
+  flags_dir = os.path.join(FLAGS.base_dir, 'flags')
+  shutil.copytree(FLAGS.flags_dir, flags_dir)
+  FLAGS.flags_dir = flags_dir
+
   # Copy the target model to the models directory so we can find it easily.
   shutil.copy('ml_perf/target.pb', fsdb.models_dir())
 
   logging.getLogger().addHandler(
-      logging.FileHandler(os.path.join(FLAGS.base_dir, 'reinforcement.log')))
+      logging.FileHandler(os.path.join(FLAGS.base_dir, 'rl_loop.log')))
   formatter = logging.Formatter('[%(asctime)s] %(message)s',
                                 '%Y-%m-%d %H:%M:%S')
   for handler in logging.getLogger().handlers:

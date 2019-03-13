@@ -160,6 +160,10 @@ class Evaluator {
  private:
   void ThreadRun(int thread_id, BatchingDualNetFactory* batcher,
                  Model* black_model, Model* white_model) {
+    // Only print the board using ANSI colors if stderr is sent to the
+    // terminal.
+    const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
+
     // The player and other_player reference this pointer.
     std::unique_ptr<DualNet> dual_net;
 
@@ -210,7 +214,8 @@ class Evaluator {
         MG_LOG(INFO) << absl::StreamFormat(
             "%d: %s by %s\nQ: %0.4f", curr_player->root()->position.n(),
             move.ToGtp(), curr_player->name(), curr_player->root()->Q());
-        MG_LOG(INFO) << curr_player->root()->position.ToPrettyString();
+        MG_LOG(INFO) << curr_player->root()->position.ToPrettyString(
+            use_ansi_colors);
       }
       std::swap(curr_player, next_player);
     }
