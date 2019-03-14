@@ -52,6 +52,18 @@ class Random {
     Uniform(0, 1, array_like);
   }
 
+  // Draw multiple random samples from a normal distribution.
+  template <typename T>
+  void NormalDistribution(float mean, float stddev, T* array_like) {
+    NormalDistribution(mean, stddev, {array_like->data(), array_like->size()});
+  }
+
+  // Draw multiple random samples from a normal distribution.
+  void NormalDistribution(float mean, float stddev, absl::Span<float> samples);
+
+  // Draw a single random sample from a normal distribution.
+  float NormalDistribution(float mean, float stddev);
+
   // Returns a uniform random integer in the closed range [mn, mx].
   int UniformInt(int mn, int mx) {
     std::uniform_int_distribution<int> distribution(mn, mx);

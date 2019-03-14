@@ -67,7 +67,9 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(uint64_t seed) {
   }
 
   if (FLAGS_engine == "random") {
-    return absl::make_unique<RandomDualNetFactory>(seed);
+    // TODO(tommadams): expose policy_stddev & value_stddev as command line
+    // arguments.
+    return absl::make_unique<RandomDualNetFactory>(13 * seed, 0.4, 0.4);
   }
 
   if (FLAGS_engine == "tf") {

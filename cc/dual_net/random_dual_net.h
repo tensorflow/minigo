@@ -25,23 +25,32 @@ namespace minigo {
 
 class RandomDualNet : public DualNet {
  public:
-  RandomDualNet(uint64_t seed);
+  RandomDualNet(uint64_t seed, float policy_stddev, float value_stddev);
 
+  // Output policy is a normal distribution with a mean of 0.5 and a standard
+  // deviation of policy_stddev, followed by a softmax.
+  // Output value is a normal distribution with a mean of 0 and a standard
+  // deviation of value_stddev. The output value is repeatedly sampled from the
+  // normal distribution until a value is found in the range [-1, 1].
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override;
 
  private:
   Random rnd_;
+  const float policy_stddev_;
+  const float value_stddev_;
 };
 
 class RandomDualNetFactory : public DualNetFactory {
  public:
-  RandomDualNetFactory(uint64_t seed);
+  RandomDualNetFactory(uint64_t seed, float policy_stddev, float value_stddev);
   std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
 
  private:
   absl::Mutex mutex_;
   Random rnd_;
+  const float policy_stddev_;
+  const float value_stddev_;
 };
 
 }  // namespace minigo

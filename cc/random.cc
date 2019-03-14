@@ -48,4 +48,16 @@ void Random::Uniform(float mn, float mx, absl::Span<float> samples) {
   }
 }
 
+float Random::NormalDistribution(float mean, float stddev) {
+  return std::normal_distribution<float>(mean, stddev)(impl_);
+}
+
+void Random::NormalDistribution(float mean, float stddev,
+                                absl::Span<float> samples) {
+  std::normal_distribution<float> distribution(mean, stddev);
+  for (float& sample : samples) {
+    sample = distribution(impl_);
+  }
+}
+
 }  // namespace minigo

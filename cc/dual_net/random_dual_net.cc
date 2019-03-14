@@ -14,33 +14,44 @@
 
 #include "cc/dual_net/random_dual_net.h"
 
+#include <cmath>
+
 #include "absl/memory/memory.h"
 #include "cc/logging.h"
 
 namespace minigo {
 
-RandomDualNet::RandomDualNet(uint64_t seed) : rnd_(seed) {}
+RandomDualNet::RandomDualNet(uint64_t seed, float policy_stddev,
+                             float value_stddev)
+    : rnd_(seed), policy_stddev_(policy_stddev), value_stddev_(value_stddev) {}
 
-void RandomDualNet::RunMany(std::vector<const DualNet::BoardFeatures*> features,
-                          std::vector<Output*> outputs, std::string* model) {
+void RandomDualNet::RunMany(std::vector<const BoardFeatures*> features,
+                            std::vector<Output*> outputs, std::string* model) {
   for (auto* output : outputs) {
-    rnd_.Uniform(0, 1, &output->policy);
+    rnd_.NormalDistribution(0.5, policy_stddev_, &output->policy);
+    for (auto& p : output->policy) {
+      p = std::exp(p);
+    }
     float sum = 0;
-    for (const auto& p : output->policy) {
+    for (auto p : output->policy) {
       sum += p;
     }
-    float scale = 1.0 / sum;
     for (auto& p : output->policy) {
-      p *= scale;
+      p /= sum;
     }
-    output->value = 2.0 * rnd_() - 1;
+
+    do {
+      output->value = rnd_.NormalDistribution(0, value_stddev_);
+    } while (output->value < -1 || output->value > 1);
   }
   if (model != nullptr) {
     *model = "RandomDualNet";
   }
 }
 
-RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : rnd_(13 * seed) {}
+RandomDualNetFactory::RandomDualNetFactory(uint64_t seed, float policy_stddev,
+                                           float value_stddev)
+    : rnd_(seed), policy_stddev_(policy_stddev), value_stddev_(value_stddev) {}
 
 std::unique_ptr<DualNet> RandomDualNetFactory::NewDualNet(
     const std::string& model) {
@@ -49,7 +60,7 @@ std::unique_ptr<DualNet> RandomDualNetFactory::NewDualNet(
     absl::MutexLock lock(&mutex_);
     seed = rnd_.UniformUint64();
   }
-  return absl::make_unique<RandomDualNet>(seed);
+  return absl::make_unique<RandomDualNet>(seed, policy_stddev_, value_stddev_);
 }
 
 }  // namespace minigo
