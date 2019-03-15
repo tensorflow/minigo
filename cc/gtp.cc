@@ -91,8 +91,9 @@ void Gtp() {
   MG_LOG(INFO) << game_options << " " << player_options;
 
   std::unique_ptr<GtpPlayer> player;
-  auto model_factory = NewDualNetFactory(0);
-  auto model = model_factory->NewDualNet(FLAGS_model);
+  auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
+  auto model_factory = NewDualNetFactory(model_desc.engine);
+  auto model = model_factory->NewDualNet(model_desc.model);
   std::unique_ptr<InferenceCache> cache;
   if (FLAGS_cache_size_mb > 0) {
     auto capacity = InferenceCache::CalculateCapacity(FLAGS_cache_size_mb);

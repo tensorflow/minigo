@@ -44,9 +44,7 @@ DEFINE_int32(virtual_losses, 8,
 DEFINE_string(sgf_dir, "", "SGF directory containing puzzles.");
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
-              "inference engine. For engine=tf, the model should be a GraphDef "
-              "proto. For engine=lite, the model should be .tflite "
-              "flatbuffer.");
+              "inference engine.");
 DEFINE_double(value_init_penalty, 0.0,
               "New children value initialize penaly.\n"
               "child's value = parent's value - value_init_penalty * color, "
@@ -60,7 +58,8 @@ namespace {
 void Puzzle() {
   auto start_time = absl::Now();
 
-  BatchingDualNetFactory batcher(NewDualNetFactory(0));
+  auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
+  BatchingDualNetFactory batcher(NewDualNetFactory(model_desc.engine));
 
   Game::Options game_options;
   game_options.resign_enabled = false;
@@ -98,11 +97,12 @@ void Puzzle() {
 
       total_moves += moves.size();
 
-      Game game(FLAGS_model, FLAGS_model, game_options);
+      auto model = batcher.NewDualNet(model_desc.model);
+      Game game(model->name(), model->name(), game_options);
 
       // Create player.
-      auto player = absl::make_unique<MctsPlayer>(
-          batcher.NewDualNet(FLAGS_model), nullptr, &game, player_options);
+      auto player = absl::make_unique<MctsPlayer>(std::move(model), nullptr,
+                                                  &game, player_options);
       batcher.StartGame(player->network(), player->network());
 
       // Play through each game. For each position in the game, compare the

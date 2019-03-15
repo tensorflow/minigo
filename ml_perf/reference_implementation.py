@@ -60,7 +60,7 @@ flags.DEFINE_boolean('parallel_post_train', False,
                      'If true, run the post-training stages (eval, validation '
                      '& selfplay) in parallel.')
 
-flags.DEFINE_string('selfplay_engine', 'tf', 'The engine to use for selfplay.')
+flags.DEFINE_string('engine', 'tf', 'The engine to use for selfplay.')
 
 FLAGS = flags.FLAGS
 
@@ -98,15 +98,13 @@ class State:
       # We don't have a good model yet, use a random fake model implementation.
       return 'random:0,0.4:0.4'
     else:
-      return os.path.join(
-          fsdb.models_dir(),
-          '{},{}.pb'.format(FLAGS.engine, state.best_model_name + '.pb'))
+      return '{},{}.pb'.format(
+         FLAGS.engine, os.path.join(fsdb.models_dir(), self.best_model_name))
 
   @property
   def train_model_path(self):
-    return os.path.join(
-        fsdb.models_dir(),
-        '{},{}.pb'.format(FLAGS.engine, state.train_model_name + '.pb'))
+    return '{},{}.pb'.format(
+         FLAGS.engine, os.path.join(fsdb.models_dir(), self.train_model_name))
 
   @property
   def seed(self):
@@ -130,10 +128,10 @@ class WinStats:
 
   def __init__(self, line):
     pattern = '\s*(\S+)' + '\s+(\d+)' * 8
-    match = re.search(pattern, stats_str)
+    match = re.search(pattern, line)
     if match is None:
         raise ValueError('Can\t parse line "{}"'.format(line))
-    self.model_name = match.group(0)
+    self.model_name = match.group(1)
     raw_stats = [float(x) for x in match.groups()[1:]]
     self.black_wins = ColorWinStats(*raw_stats[:4])
     self.white_wins = ColorWinStats(*raw_stats[4:])
@@ -148,10 +146,11 @@ def parse_win_stats_table(stats_str, num_lines):
     assert len(lines) > 1
     if 'Black' in lines[0] and 'White' in lines[0] and 'm.lmt.' in lines[1]:
         break
+    lines = lines[1:]
 
-    # Parse the expected number of lines from the table.
-    for line in lines[2:2 + num_lines]:
-      result.append(WinStats(line))
+  # Parse the expected number of lines from the table.
+  for line in lines[2:2 + num_lines]:
+    result.append(WinStats(line))
 
   return result
 
@@ -279,7 +278,7 @@ async def selfplay(state, flagfile='selfplay'):
       '--seed={}'.format(state.seed))
   result = '\n'.join(lines[-6:])
   logging.info(result)
-  stats = ParseWinStatsTable(result, 1)[0]
+  stats = parse_win_stats_table(result, 1)[0]
   num_games = stats.total_wins
   logging.info('Black won %0.3f, white won %0.3f',
                stats.black_wins.total / num_games,
@@ -365,10 +364,11 @@ async def evaluate_model(eval_model_path, target_model_path, sgf_dir, seed):
       '--seed={}'.format(seed))
   result = '\n'.join(lines[-7:])
   logging.info(result)
-  eval_stats, target_stats = ParseWinStatsTable(result, 2)
+  eval_stats, target_stats = parse_win_stats_table(result, 2)
   num_games = eval_stats.total_wins + target_stats.total_wins
   win_rate = eval_stats.total_wins / num_games
-  logging.info('Win rate %s vs %s: %.3f', eval_model, target_model, win_rate)
+  logging.info('Win rate %s vs %s: %.3f', eval_stats.model_name,
+               target_stats.model_name, win_rate)
   return win_rate
 
 

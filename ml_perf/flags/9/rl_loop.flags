@@ -7,4 +7,4 @@
 --max_window_size=10
 --slow_window_size=5
 --slow_window_speed=2
---selfplay_engine=tf
+--engine=tf

@@ -59,6 +59,8 @@ ModelDescriptor ParseModelDescriptor(absl::string_view descriptor) {
 
 std::unique_ptr<DualNetFactory> NewDualNetFactory(
     absl::string_view engine_desc) {
+  MG_CHECK(!engine_desc.empty());
+
   std::vector<absl::string_view> args = absl::StrSplit(engine_desc, ':');
   auto engine = args[0];
   args.erase(args.begin());
