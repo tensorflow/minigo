@@ -28,9 +28,7 @@
 // Inference flags.
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
-              "inference engine. For engine=tf, the model should be a GraphDef "
-              "proto. For engine=lite, the model should be .tflite "
-              "flatbuffer.");
+              "inference engine.");
 DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
 
@@ -45,8 +43,9 @@ void SimpleExample() {
   const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
 
   // Load the model specified by the command line arguments.
-  auto model_factory = NewDualNetFactory(0);
-  auto model = model_factory->NewDualNet(FLAGS_model);
+  auto descriptor = ParseModelDescriptor(FLAGS_model);
+  auto model_factory = NewDualNetFactory(descriptor.engine);
+  auto model = model_factory->NewDualNet(descriptor.model);
 
   // Create a game object that tracks the move history & final score.
   Game::Options game_options;

@@ -21,6 +21,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
 #include "cc/constants.h"
+#include "cc/file/path.h"
 #include "cc/logging.h"
 #include "cc/thread_safe_queue.h"
 #include "cuda/include/cuda_runtime_api.h"
@@ -132,7 +133,8 @@ class TrtDualNet : public DualNet {
 
  public:
   TrtDualNet(std::string graph_path, int device_count)
-      : graph_path_(graph_path),
+      : DualNet(std::string(file::Stem(graph_path))),
+        graph_path_(graph_path),
         runtime_(nvinfer1::createInferRuntime(logger_)),
         parser_(nvuffparser::createUffParser()),
         batch_capacity_(0),

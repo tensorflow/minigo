@@ -35,7 +35,7 @@ class ReloadingDualNetUpdater;
 // model when a newer one is found.
 class ReloadingDualNet : public DualNet {
  public:
-  ReloadingDualNet(ReloadingDualNetUpdater* updater,
+  ReloadingDualNet(std::string name, ReloadingDualNetUpdater* updater,
                    std::unique_ptr<DualNet> impl);
   ~ReloadingDualNet() override;
 
@@ -122,8 +122,15 @@ class ReloadingDualNetUpdater {
                             const std::string& pattern, int* generation);
 
  private:
+  // The directory we're watching for new files.
   std::string directory_;
+
+  // Pattern used to match files in directory_.
   std::string basename_pattern_;
+
+  // basename_pattern_ with "%n" appended, which is used to ensure that the full
+  // basename matches the pattern (and not just a prefix).
+  std::string basename_and_length_pattern_;
 
   mutable absl::Mutex mutex_;
   DualNetFactory* factory_impl_ GUARDED_BY(&mutex_);

@@ -3,7 +3,6 @@
 # This flagfile also serves as the base for the boostrap & eval stages of
 # the RL loop.
 
---engine=tf
 --num_games=2048
 --parallel_games=2048
 --num_readouts=160

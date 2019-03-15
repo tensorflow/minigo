@@ -66,6 +66,7 @@ minigo_cc_library(
         "//cc:base",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
     ] + factory_engine_deps,
 )
 
@@ -141,6 +142,7 @@ minigo_cc_library(
         "//cc:logging",
         "//cc:tensorflow",
         "//cc:thread_safe_queue",
+        "//cc/file:path",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
@@ -157,6 +159,7 @@ minigo_cc_library(
         "//cc:base",
         "//cc:logging",
         "//cc:tf_lite",
+        "//cc/file:path",
         "//cc/platform",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -191,6 +194,7 @@ minigo_cc_library(
         "//cc:logging",
         "//cc:tensorrt",
         "//cc:thread_safe_queue",
+        "//cc/file:path",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

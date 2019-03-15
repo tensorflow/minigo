@@ -52,10 +52,6 @@ bool ReloadingDualNetUpdater::ParseModelPathPattern(
                   << " exactly one \"%d\" and no other matchers";
     return false;
   }
-
-  // Append "%n" to the end of the basename pattern. This is used when calling
-  // sscanf to ensure we match the model's full basename and not just a prefix.
-  *basename_pattern = absl::StrCat(pair.second, "%n");
   return true;
 }
 
@@ -76,6 +72,10 @@ ReloadingDualNetUpdater::ReloadingDualNetUpdater(const std::string& pattern,
                                                  DualNetFactory* factory_impl)
     : factory_impl_(factory_impl) {
   MG_CHECK(ParseModelPathPattern(pattern, &directory_, &basename_pattern_));
+
+  // Append "%n" to the end of the basename pattern. This is used when calling
+  // sscanf to ensure we match the model's full basename and not just a prefix.
+  basename_and_length_pattern_ = absl::StrCat(basename_pattern_, "%n");
 
   // Wait for at least one matching model to be found.
   if (!Poll()) {
@@ -99,7 +99,7 @@ bool ReloadingDualNetUpdater::Poll() {
   int latest_generation = -1;
   for (const auto& basename : basenames) {
     int generation = 0;
-    if (!MatchBasename(basename, basename_pattern_, &generation)) {
+    if (!MatchBasename(basename, basename_and_length_pattern_, &generation)) {
       continue;
     }
     if (latest_basename == nullptr || generation > latest_generation) {
@@ -145,7 +145,8 @@ ReloadingDualNetUpdater::NewReloadingDualNet() {
   auto model_impl = factory_impl_->NewDualNet(latest_model_path_);
 
   // Wrap the model.
-  auto model = absl::make_unique<ReloadingDualNet>(this, std::move(model_impl));
+  auto model = absl::make_unique<ReloadingDualNet>(basename_pattern_, this,
+                                                   std::move(model_impl));
 
   // Register the wrapped model.
   MG_CHECK(models_.emplace(model.get()).second);
@@ -154,9 +155,12 @@ ReloadingDualNetUpdater::NewReloadingDualNet() {
 
 // ReloadingDualNet methods follow.
 
-ReloadingDualNet::ReloadingDualNet(ReloadingDualNetUpdater* updater,
+ReloadingDualNet::ReloadingDualNet(std::string name,
+                                   ReloadingDualNetUpdater* updater,
                                    std::unique_ptr<DualNet> impl)
-    : updater_(updater), model_impl_(std::move(impl)) {}
+    : DualNet(std::move(name)),
+      updater_(updater),
+      model_impl_(std::move(impl)) {}
 
 ReloadingDualNet::~ReloadingDualNet() { updater_->UnregisterModel(this); }
 

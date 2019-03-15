@@ -28,9 +28,9 @@ TEST(ReloadingDualNetTest, ParseModelPathPattern_Valid) {
   };
 
   std::vector<Test> tests = {
-      {"foo/%d-bar.pb", "foo", "%d-bar.pb%n"},
-      {"foo/bar/%d-bar.pb", "foo/bar", "%d-bar.pb%n"},
-      {"foo/bar/%d", "foo/bar", "%d%n"},
+      {"foo/%d-bar.pb", "foo", "%d-bar.pb"},
+      {"foo/bar/%d-bar.pb", "foo/bar", "%d-bar.pb"},
+      {"foo/bar/%d", "foo/bar", "%d"},
   };
 
   for (const auto& test : tests) {

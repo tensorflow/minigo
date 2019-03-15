@@ -60,6 +60,8 @@ flags.DEFINE_boolean('parallel_post_train', False,
                      'If true, run the post-training stages (eval, validation '
                      '& selfplay) in parallel.')
 
+flags.DEFINE_string('selfplay_engine', 'tf', 'The engine to use for selfplay.')
+
 FLAGS = flags.FLAGS
 
 
@@ -80,12 +82,7 @@ class State:
     self.iter_num = 0
     self.gen_num = 0
 
-    # We start playing using a random model.
-    # After the first round of selfplay has been completed, the engine is
-    # updated to FLAGS.engine.
-    self.engine = 'random'
-
-    self.best_model_name = 'random'
+    self.best_model_name = None
 
   @property
   def output_model_name(self):
@@ -94,6 +91,22 @@ class State:
   @property
   def train_model_name(self):
     return '%06d-%06d' % (self.iter_num, self.gen_num + 1)
+
+  @property
+  def best_model_path(self):
+    if self.best_model_name is None:
+      # We don't have a good model yet, use a random fake model implementation.
+      return 'random:0,0.4:0.4'
+    else:
+      return os.path.join(
+          fsdb.models_dir(),
+          '{},{}.pb'.format(FLAGS.engine, state.best_model_name + '.pb'))
+
+  @property
+  def train_model_path(self):
+    return os.path.join(
+        fsdb.models_dir(),
+        '{},{}.pb'.format(FLAGS.engine, state.train_model_name + '.pb'))
 
   @property
   def seed(self):
@@ -115,12 +128,32 @@ class ColorWinStats:
 class WinStats:
   """Win-rate stats for a single model."""
 
-  def __init__(self, model_name, stats_str):
-    pattern = model_name + '\s+(\d+)' * 8
-    raw_stats = [float(x) for x in re.search(pattern, stats_str).groups()]
+  def __init__(self, line):
+    pattern = '\s*(\S+)' + '\s+(\d+)' * 8
+    match = re.search(pattern, stats_str)
+    if match is None:
+        raise ValueError('Can\t parse line "{}"'.format(line))
+    self.model_name = match.group(0)
+    raw_stats = [float(x) for x in match.groups()[1:]]
     self.black_wins = ColorWinStats(*raw_stats[:4])
     self.white_wins = ColorWinStats(*raw_stats[4:])
     self.total_wins = self.black_wins.total + self.white_wins.total
+
+
+def parse_win_stats_table(stats_str, num_lines):
+  result = []
+  lines = stats_str.split('\n')
+  while True:
+    # Find the start of the win stats table.
+    assert len(lines) > 1
+    if 'Black' in lines[0] and 'White' in lines[0] and 'm.lmt.' in lines[1]:
+        break
+
+    # Parse the expected number of lines from the table.
+    for line in lines[2:2 + num_lines]:
+      result.append(WinStats(line))
+
+  return result
 
 
 def expand_cmd_str(cmd):
@@ -236,18 +269,17 @@ async def selfplay(state, flagfile='selfplay'):
 
   output_dir = os.path.join(fsdb.selfplay_dir(), state.output_model_name)
   holdout_dir = os.path.join(fsdb.holdout_dir(), state.output_model_name)
-  model_path = os.path.join(fsdb.models_dir(), state.best_model_name)
 
   lines = await checked_run(
       'bazel-bin/cc/selfplay',
       '--flagfile={}.flags'.format(os.path.join(FLAGS.flags_dir, flagfile)),
-      '--model={}.pb'.format(model_path),
+      '--model={}'.format(state.best_model_path),
       '--output_dir={}'.format(output_dir),
       '--holdout_dir={}'.format(holdout_dir),
       '--seed={}'.format(state.seed))
   result = '\n'.join(lines[-6:])
   logging.info(result)
-  stats = WinStats(state.best_model_name, result)
+  stats = ParseWinStatsTable(result, 1)[0]
   num_games = stats.total_wins
   logging.info('Black won %0.3f, white won %0.3f',
                stats.black_wins.total / num_games,
@@ -310,12 +342,12 @@ async def validate(state, holdout_glob):
       '--work_dir={}'.format(fsdb.working_dir()))
 
 
-async def evaluate_model(eval_model, target_model, sgf_dir, seed):
+async def evaluate_model(eval_model_path, target_model_path, sgf_dir, seed):
   """Evaluate one model against a target.
 
   Args:
-    eval_model: the name of the model to evaluate.
-    target_model: the name of the model to compare to.
+    eval_model_path: the path to the model to evaluate.
+    target_model_path: the path to the model to compare to.
     sgf_dif: directory path to write SGF output to.
     seed: random seed to use when running eval.
 
@@ -323,19 +355,17 @@ async def evaluate_model(eval_model, target_model, sgf_dir, seed):
     The win-rate of eval_model against target_model in the range [0, 1].
   """
 
-  eval_model_path = os.path.join(fsdb.models_dir(), eval_model)
-  target_model_path = os.path.join(fsdb.models_dir(), target_model)
+  # TODO(tommadams): Don't append .pb to model name for random model.
   lines = await checked_run(
       'bazel-bin/cc/eval',
       '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'eval.flags')),
-      '--model={}.pb'.format(eval_model_path),
-      '--model_two={}.pb'.format(target_model_path),
+      '--model={}'.format(eval_model_path),
+      '--model_two={}'.format(target_model_path),
       '--sgf_dir={}'.format(sgf_dir),
       '--seed={}'.format(seed))
   result = '\n'.join(lines[-7:])
   logging.info(result)
-  eval_stats = WinStats(eval_model, result)
-  target_stats = WinStats(target_model, result)
+  eval_stats, target_stats = ParseWinStatsTable(result, 2)
   num_games = eval_stats.total_wins + target_stats.total_wins
   win_rate = eval_stats.total_wins / num_games
   logging.info('Win rate %s vs %s: %.3f', eval_model, target_model, win_rate)
@@ -350,7 +380,7 @@ async def evaluate_trained_model(state):
   """
 
   return await evaluate_model(
-      state.train_model_name, state.best_model_name,
+      state.train_model_path, state.best_model_path,
       os.path.join(fsdb.eval_dir(), state.train_model_name), state.seed)
 
 

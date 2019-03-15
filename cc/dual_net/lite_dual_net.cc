@@ -18,6 +18,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "cc/constants.h"
+#include "cc/file/path.h"
 #include "cc/logging.h"
 #include "cc/platform/utils.h"
 #include "tensorflow/contrib/lite/context.h"
@@ -63,8 +64,10 @@ class LiteDualNet : public DualNet {
 };
 
 minigo::LiteDualNet::LiteDualNet(std::string graph_path)
-    : graph_path_(graph_path), batch_capacity_(0) {
-  model_ = FlatBufferModel::BuildFromFile(graph_path.c_str());
+    : DualNet(std::string(file::Stem(graph_path))),
+      graph_path_(std::move(graph_path)),
+      batch_capacity_(0) {
+  model_ = FlatBufferModel::BuildFromFile(graph_path_.c_str());
   MG_CHECK(model_ != nullptr);
 
   BuiltinOpResolver resolver;

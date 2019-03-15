@@ -28,6 +28,8 @@
 
 namespace minigo {
 
+namespace internal {
+
 // The ModelBatcher is responsible for batching up inference requests from
 // from multiple BatchingDualNet clients into larger (and therefore more
 // efficient) inferences.
@@ -47,6 +49,8 @@ class ModelBatcher {
 
   ModelBatcher(std::unique_ptr<DualNet> model_impl, size_t buffering);
   ~ModelBatcher();
+
+  const std::string& name() const { return model_impl_->name(); }
 
   void StartGame() LOCKS_EXCLUDED(&mutex_);
   void EndGame() LOCKS_EXCLUDED(&mutex_);
@@ -80,13 +84,15 @@ class ModelBatcher {
   size_t num_inferences_ GUARDED_BY(&mutex_) = 0;
 };
 
+}  // namespace internal
+
 // The BatchingDualNet is a thin client for a ModelBatcher, which does all
 // the real work. The only tricky thing here is that in two player games,
 // BatchingDualNet keeps track of who the other player is so that its
 // ModelBatcher knows whose turn it is.
 class BatchingDualNet : public DualNet {
  public:
-  explicit BatchingDualNet(std::shared_ptr<ModelBatcher> batcher);
+  explicit BatchingDualNet(std::shared_ptr<internal::ModelBatcher> batcher);
 
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override;
@@ -96,19 +102,19 @@ class BatchingDualNet : public DualNet {
   void SetOther(BatchingDualNet* other);
 
  private:
-  friend class ModelBatcher;
+  friend class internal::ModelBatcher;
 
   // The ModelBatcher used to batch our RunMany calls.
-  std::shared_ptr<ModelBatcher> batcher_;
+  std::shared_ptr<internal::ModelBatcher> batcher_;
 
   // In a two player game where StartGame was called with different
   // BatchingDualNet instances, other_batcher_ points to the ModelBatcher
   // used by the other player in the game. It's possible that batcher_ ==
   // other_batcher_ if both players are using the same model.
-  std::shared_ptr<ModelBatcher> other_batcher_ = nullptr;
+  std::shared_ptr<internal::ModelBatcher> other_batcher_ = nullptr;
 };
 
-// BatchingDualNetFactory managers the per-model ModelBathers and creates
+// BatchingDualNetFactory managers the per-model ModelBatchers and creates
 // their BatchingDualNet clients.
 class BatchingDualNetFactory : public DualNetFactory {
  public:
@@ -118,16 +124,16 @@ class BatchingDualNetFactory : public DualNetFactory {
 
   std::unique_ptr<DualNet> NewDualNet(const std::string& model_path);
 
-  void StartGame(DualNet* black, DualNet* white);
-  void EndGame(DualNet* black, DualNet* white);
+  static void StartGame(DualNet* black, DualNet* white);
+  static void EndGame(DualNet* black, DualNet* white);
 
  private:
   absl::Mutex mutex_;
   std::unique_ptr<DualNetFactory> factory_impl_;
 
   // Map from model to BatchingService for that model.
-  absl::flat_hash_map<std::string, std::shared_ptr<ModelBatcher>> batchers_
-      GUARDED_BY(&mutex_);
+  absl::flat_hash_map<std::string, std::shared_ptr<internal::ModelBatcher>>
+      batchers_ GUARDED_BY(&mutex_);
 };
 
 }  // namespace minigo

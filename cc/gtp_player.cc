@@ -405,7 +405,7 @@ GtpPlayer::Response GtpPlayer::HandleName(CmdArgs args) {
   if (!response.ok) {
     return response;
   }
-  return Response::Ok(options().name);
+  return Response::Ok(absl::StrCat("minigo-", network()->name()));
 }
 
 GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {

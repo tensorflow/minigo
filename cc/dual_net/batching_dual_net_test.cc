@@ -115,7 +115,7 @@ class WaitingDualNetFactory : public DualNetFactory {
 
 WaitingDualNet::WaitingDualNet(WaitingDualNetFactory* factory,
                                std::string model)
-    : factory_(factory), model_(std::move(model)) {}
+    : DualNet("Waiting"), factory_(factory), model_(std::move(model)) {}
 
 void WaitingDualNet::RunMany(std::vector<const BoardFeatures*> features,
                              std::vector<Output*> outputs, std::string* model) {

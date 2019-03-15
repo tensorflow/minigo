@@ -37,8 +37,8 @@ std::string FormatWinStatsTable(
 
   std::string result;
 
-  auto append_header = [&](absl::string_view name, absl::string_view str) {
-    absl::StrAppendFormat(&result, "%*s %s", name_length, name, str);
+  auto append_header = [&](absl::string_view str) {
+    absl::StrAppendFormat(&result, "%*s %s", name_length, "", str);
   };
 
   auto append_stats = [&](absl::string_view name, const WinStats& stats) {
@@ -51,10 +51,9 @@ std::string FormatWinStatsTable(
   };
 
   append_header(
-      "wins",
       "  Black   Black   Black   Black   White   White   White   White\n");
   append_header(
-      "", "  total   passes  resign  m.lmt.  total   passes  resign  m.lmt.");
+      "  total   passes  resign  m.lmt.  total   passes  resign  m.lmt.");
   for (const auto& name_stats : stats) {
     append_stats(name_stats.first, name_stats.second);
   }

@@ -21,6 +21,8 @@
 
 namespace minigo {
 
+namespace internal {
+
 ModelBatcher::ModelBatcher(std::unique_ptr<DualNet> model_impl,
                            size_t buffering)
     : model_impl_(std::move(model_impl)), buffering_(buffering) {}
@@ -159,8 +161,11 @@ void ModelBatcher::RunBatch() {
   mutex_.Lock();
 }
 
-BatchingDualNet::BatchingDualNet(std::shared_ptr<ModelBatcher> batcher)
-    : batcher_(std::move(batcher)) {}
+}  // namespace internal
+
+BatchingDualNet::BatchingDualNet(
+    std::shared_ptr<internal::ModelBatcher> batcher)
+    : DualNet(batcher->name()), batcher_(std::move(batcher)) {}
 
 void BatchingDualNet::RunMany(std::vector<const BoardFeatures*> features,
                               std::vector<Output*> outputs,
@@ -202,7 +207,7 @@ std::unique_ptr<DualNet> BatchingDualNetFactory::NewDualNet(
   // Find or create a service for the requested model.
   auto it = batchers_.find(model_path);
   if (it == batchers_.end()) {
-    auto batcher = std::make_shared<ModelBatcher>(
+    auto batcher = std::make_shared<internal::ModelBatcher>(
         factory_impl_->NewDualNet(model_path), GetBufferCount());
     it = batchers_.emplace(model_path, std::move(batcher)).first;
   }

@@ -65,9 +65,7 @@ DEFINE_double(decay_factor, 0.98,
 // Inference flags.
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
-              "inference engine. For engine=tf, the model should be a GraphDef "
-              "proto. For engine=lite, the model should be .tflite "
-              "flatbuffer.");
+              "inference engine.");
 DEFINE_int32(cache_size_mb, 512, "Size of the inference cache in MB.");
 
 namespace minigo {
@@ -78,7 +76,6 @@ void Gtp() {
   game_options.resign_threshold = FLAGS_resign_threshold;
 
   GtpPlayer::Options player_options;
-  player_options.name = absl::StrCat("minigo-", file::Basename(FLAGS_model));
   player_options.ponder_limit = FLAGS_ponder_limit;
   player_options.courtesy_pass = FLAGS_courtesy_pass;
   player_options.inject_noise = false;
@@ -93,10 +90,9 @@ void Gtp() {
 
   MG_LOG(INFO) << game_options << " " << player_options;
 
-  Game game(player_options.name, player_options.name, game_options);
-
   std::unique_ptr<GtpPlayer> player;
   auto model_factory = NewDualNetFactory(0);
+  auto model = model_factory->NewDualNet(FLAGS_model);
   std::unique_ptr<InferenceCache> cache;
   if (FLAGS_cache_size_mb > 0) {
     auto capacity = InferenceCache::CalculateCapacity(FLAGS_cache_size_mb);
@@ -105,14 +101,14 @@ void Gtp() {
               << "MB.\n";
     cache = absl::make_unique<InferenceCache>(capacity);
   }
+
+  Game game(model->name(), model->name(), game_options);
   if (FLAGS_minigui) {
     player = absl::make_unique<MiniguiPlayer>(
-        model_factory->NewDualNet(FLAGS_model), std::move(cache), &game,
-        player_options);
+        std::move(model), std::move(cache), &game, player_options);
   } else {
-    player =
-        absl::make_unique<GtpPlayer>(model_factory->NewDualNet(FLAGS_model),
-                                     std::move(cache), &game, player_options);
+    player = absl::make_unique<GtpPlayer>(std::move(model), std::move(cache),
+                                          &game, player_options);
   }
   player->Run();
 }

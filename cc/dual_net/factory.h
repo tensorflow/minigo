@@ -16,13 +16,25 @@
 #define MINIGO_CC_DUAL_NET_FACTORY_H_
 
 #include <memory>
+#include <ostream>
+#include <string>
 
+#include "absl/strings/string_view.h"
 #include "cc/dual_net/dual_net.h"
 
 namespace minigo {
 
-// Creates one of the DualNetFactory implementations based on the engine flags.
-std::unique_ptr<DualNetFactory> NewDualNetFactory(uint64_t seed);
+struct ModelDescriptor {
+  std::string engine;
+  std::string model;
+};
+
+std::ostream& operator<<(std::ostream& os, const ModelDescriptor& desc);
+
+ModelDescriptor ParseModelDescriptor(absl::string_view descriptor);
+
+std::unique_ptr<DualNetFactory> NewDualNetFactory(
+    absl::string_view engine_desc);
 
 }  // namespace minigo
 

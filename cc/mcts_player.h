@@ -60,8 +60,6 @@ class MctsPlayer {
 
     int virtual_losses = 8;
 
-    std::string name = "minigo";
-
     // Seed used from random permutations.
     // If the default value of 0 is used, a time-based seed is chosen.
     uint64_t random_seed = 0;
@@ -133,7 +131,7 @@ class MctsPlayer {
   const MctsNode* root() const { return root_; }
 
   const Options& options() const { return options_; }
-  const std::string& name() const { return options_.name; }
+  const std::string& name() const { return network_->name(); }
   DualNet* network() { return network_.get(); }
 
  protected:
@@ -216,7 +214,12 @@ class MctsPlayer {
 
   Options options_;
 
-  std::string model_;
+  // The name of the model used for inferences. In the case of ReloadingDualNet,
+  // this is different from the model's name: the model name is the pattern used
+  // to match each generation of model, while the inference model name is the
+  // path to the actual serialized model file.
+  std::string inference_model_;
+
   std::vector<InferenceInfo> inferences_;
 
   std::unique_ptr<InferenceCache> inference_cache_;

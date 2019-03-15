@@ -11,8 +11,7 @@ players = {
 
   "minigo" : Player("bazel-bin/cc/gtp"
                     " --minigui=true"
-                    " --engine=tf"
-                    " --model=saved_models/000990-cormorant.pb"
+                    " --model=tf,saved_models/000990-cormorant.pb"
                     " --num_readouts=200"
                     " --value_init_penalty=0"
                     " --courtesy_pass=true"

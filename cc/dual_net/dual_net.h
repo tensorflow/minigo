@@ -71,7 +71,10 @@ class DualNet {
     float value;
   };
 
+  explicit DualNet(std::string name) : name_(std::move(name)) {}
   virtual ~DualNet();
+
+  const std::string& name() const { return name_; }
 
   // Runs inference on a batch of input features.
   // TODO(tommadams): rename model -> model_name.
@@ -83,6 +86,9 @@ class DualNet {
   virtual void Reserve(size_t capacity);
 
   virtual InputLayout GetInputLayout() const;
+
+ private:
+  const std::string name_;
 };
 
 // Factory that creates DualNet instances.
@@ -95,8 +101,8 @@ class DualNetFactory {
   // instances created by this factory.
   virtual int GetBufferCount() const;
 
-  // TODO(tommadams): rename model to model_path
-  virtual std::unique_ptr<DualNet> NewDualNet(const std::string& model) = 0;
+  virtual std::unique_ptr<DualNet> NewDualNet(
+      const std::string& model_path) = 0;
 };
 
 }  // namespace minigo

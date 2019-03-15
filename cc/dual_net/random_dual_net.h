@@ -25,7 +25,8 @@ namespace minigo {
 
 class RandomDualNet : public DualNet {
  public:
-  RandomDualNet(uint64_t seed, float policy_stddev, float value_stddev);
+  RandomDualNet(std::string name, uint64_t seed, float policy_stddev,
+                float value_stddev);
 
   // Output policy is a normal distribution with a mean of 0.5 and a standard
   // deviation of policy_stddev, followed by a softmax.
@@ -43,14 +44,15 @@ class RandomDualNet : public DualNet {
 
 class RandomDualNetFactory : public DualNetFactory {
  public:
-  RandomDualNetFactory(uint64_t seed, float policy_stddev, float value_stddev);
+  RandomDualNetFactory(uint64_t seed);
+
+  // Model specifies the policy and value standard deviation as a
+  // colon-separated string, e.g. "0.4:0.4".
   std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
 
  private:
   absl::Mutex mutex_;
   Random rnd_;
-  const float policy_stddev_;
-  const float value_stddev_;
 };
 
 }  // namespace minigo

@@ -14,97 +14,95 @@
 
 #include "cc/dual_net/factory.h"
 
+#include <vector>
+
 #include "absl/memory/memory.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
 #include "cc/dual_net/fake_dual_net.h"
 #include "cc/dual_net/random_dual_net.h"
 #include "gflags/gflags.h"
 
 #ifdef MG_ENABLE_TF_DUAL_NET
 #include "cc/dual_net/tf_dual_net.h"
-#ifndef MG_DEFAULT_ENGINE
-#define MG_DEFAULT_ENGINE "tf"
-#endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_TF_DUAL_NET
 
 #ifdef MG_ENABLE_LITE_DUAL_NET
 #include "cc/dual_net/lite_dual_net.h"
-#ifndef MG_DEFAULT_ENGINE
-#define MG_DEFAULT_ENGINE "lite"
-#endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_LITE_DUAL_NET
 
 #ifdef MG_ENABLE_TPU_DUAL_NET
 #include "cc/dual_net/tpu_dual_net.h"
-#ifndef MG_DEFAULT_ENGINE
-#define MG_DEFAULT_ENGINE "tpu"
-#endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_TPU_DUAL_NET
 
 #ifdef MG_ENABLE_TRT_DUAL_NET
 #include "cc/dual_net/trt_dual_net.h"
-#ifndef MG_DEFAULT_ENGINE
-#define MG_DEFAULT_ENGINE "trt"
-#endif  // MG_DEFAULT_ENGINE
 #endif  // MG_ENABLE_TRT_DUAL_NET
-
-#ifndef MG_DEFAULT_ENGINE
-#define MG_DEFAULT_ENGINE "fake"
-#endif  // MG_DEFAULT_ENGINE
-
-// Inference engine flags.
-DEFINE_string(engine, MG_DEFAULT_ENGINE, "The inference engine to use.");
-
-// TPU flags.
-DEFINE_string(
-    tpu_name, "",
-    "Cloud TPU name to run inference on, e.g. \"grpc://10.240.2.10:8470\"");
 
 namespace minigo {
 
-std::unique_ptr<DualNetFactory> NewDualNetFactory(uint64_t seed) {
-  if (FLAGS_engine == "fake") {
+std::ostream& operator<<(std::ostream& os, const ModelDescriptor& desc) {
+  return os << desc.engine << "," << desc.model;
+}
+
+ModelDescriptor ParseModelDescriptor(absl::string_view descriptor) {
+  std::vector<std::string> parts =
+      absl::StrSplit(descriptor, absl::MaxSplits(',', 1));
+  MG_CHECK(parts.size() == 1 || parts.size() == 2);
+  ModelDescriptor result;
+  result.engine = std::move(parts[0]);
+  if (parts.size() == 2) {
+    result.model = std::move(parts[1]);
+  }
+  return result;
+}
+
+std::unique_ptr<DualNetFactory> NewDualNetFactory(
+    absl::string_view engine_desc) {
+  std::vector<absl::string_view> args = absl::StrSplit(engine_desc, ':');
+  auto engine = args[0];
+  args.erase(args.begin());
+
+  if (engine == "fake") {
     return absl::make_unique<FakeDualNetFactory>();
   }
 
-  if (FLAGS_engine == "random") {
-    // TODO(tommadams): expose policy_stddev & value_stddev as command line
-    // arguments.
-    return absl::make_unique<RandomDualNetFactory>(13 * seed, 0.4, 0.4);
+  if (engine == "random") {
+    MG_CHECK(args.size() == 1);
+    uint64_t seed = 0;
+    MG_CHECK(absl::SimpleAtoi(args[0], &seed));
+    return absl::make_unique<RandomDualNetFactory>(seed);
   }
 
-  if (FLAGS_engine == "tf") {
 #ifdef MG_ENABLE_TF_DUAL_NET
+  if (engine == "tf") {
+    MG_CHECK(args.size() == 0);
     return absl::make_unique<TfDualNetFactory>();
-#else
-    MG_LOG(FATAL) << "Binary wasn't compiled with tf inference support";
+  }
 #endif  // MG_ENABLE_TF_DUAL_NET
-  }
 
-  if (FLAGS_engine == "lite") {
 #ifdef MG_ENABLE_LITE_DUAL_NET
+  if (engine == "lite") {
+    MG_CHECK(args.size() == 0);
     return absl::make_unique<LiteDualNetFactory>();
-#else
-    MG_LOG(FATAL) << "Binary wasn't compiled with lite inference support";
+  }
 #endif  // MG_ENABLE_LITE_DUAL_NET
-  }
 
-  if (FLAGS_engine == "tpu") {
 #ifdef MG_ENABLE_TPU_DUAL_NET
-    return absl::make_unique<TpuDualNetFactory>(FLAGS_tpu_name);
-#else
-    MG_LOG(FATAL) << "Binary wasn't compiled with tpu inference support";
+  if (engine == "tpu") {
+    MG_CHECK(args.size() == 1);
+    return absl::make_unique<TpuDualNetFactory>(args[0]);
+  }
 #endif  // MG_ENABLE_TPU_DUAL_NET
-  }
 
-  if (FLAGS_engine == "trt") {
 #ifdef MG_ENABLE_TRT_DUAL_NET
+  if (engine == "trt") {
+    MG_CHECK(args.size() == 0);
     return absl::make_unique<TrtDualNetFactory>();
-#else
-    MG_LOG(FATAL) << "Binary wasn't compiled with trt inference support";
-#endif  // MG_ENABLE_TRT_DUAL_NET
   }
+#endif  // MG_ENABLE_TRT_DUAL_NET
 
-  MG_LOG(FATAL) << "Unrecognized inference engine \"" << FLAGS_engine << "\"";
+  MG_LOG(FATAL) << "Unrecognized inference engine \"" << engine << "\"";
   return nullptr;
 }
 

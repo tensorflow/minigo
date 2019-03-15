@@ -433,6 +433,8 @@ TEST_F(MctsPlayerTest, ExtractDataResignEnd) {
 // four connected neighbor is set true the policy is set to 0.01.
 class MergeFeaturesNet : public DualNet {
  public:
+  MergeFeaturesNet() : DualNet("MergeFeatures") {}
+
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override {
     for (size_t i = 0; i < features.size(); ++i) {
