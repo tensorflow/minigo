@@ -55,7 +55,7 @@ def get_95_percentile_bleak(games_nr, n_back=500):
 
 def update_flagfile(flags_path, new_threshold):
     """Updates the flagfile at `flags_path`, changing the value for
-    `resign_threshold` to `new_threshold` 
+    `resign_threshold` to `new_threshold`
     """
     if abs(new_threshold) > 1:
         raise ValueError("Invalid new percentile for resign threshold")
