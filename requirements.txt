@@ -11,5 +11,7 @@ pylint
 sgf==0.5
 six
 tqdm>=4.17
+pyasn1>=0.4.1
+setuptools>=34.0.0
 
 oauth2client==4.1
