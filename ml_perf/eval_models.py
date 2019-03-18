@@ -21,7 +21,7 @@ from tensorflow import gfile
 import os
 
 from absl import app
-from reference_implementation import evaluate_model
+from reference_implementation import evaluate_model, wait
 from rl_loop import fsdb
 
 
@@ -33,15 +33,17 @@ def load_train_times():
       line = line.strip()
       if line:
         timestamp, name = line.split(' ')
-        models.append((float(timestamp), name))
+        models.append((float(timestamp), 
+            'tf,' + os.path.join(fsdb.models_dir(), name + '.pb')))
   return models
 
 
 def main(unused_argv):
   sgf_dir = os.path.join(fsdb.eval_dir(), 'target')
+  target = 'tf,' + os.path.join(fsdb.models_dir(), 'target.pb')
   models = load_train_times()
   for i, (timestamp, name) in enumerate(models):
-    winrate = evaluate_model(name, 'target', sgf_dir, i + 1)
+    winrate = wait(evaluate_model(name, target, sgf_dir, i + 1))
     if winrate > 0.55:
       break
 
