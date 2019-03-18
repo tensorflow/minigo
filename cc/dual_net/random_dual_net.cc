@@ -25,6 +25,7 @@
 
 namespace minigo {
 
+
 RandomDualNet::RandomDualNet(std::string name, uint64_t seed,
                              float policy_stddev, float value_stddev)
     : DualNet(std::move(name)),
@@ -56,7 +57,9 @@ void RandomDualNet::RunMany(std::vector<const BoardFeatures*> features,
   }
 }
 
-RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : rnd_(seed) {}
+RandomDualNetFactory::RandomDualNetFactory(uint64_t seed, float policy_stddev,
+                                           float value_stddev)
+  : rnd_(seed), policy_stddev_(policy_stddev), value_stddev_(value_stddev) {}
 
 std::unique_ptr<DualNet> RandomDualNetFactory::NewDualNet(
     const std::string& model) {

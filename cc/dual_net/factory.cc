@@ -68,12 +68,13 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
   if (engine == "fake") {
     return absl::make_unique<FakeDualNetFactory>();
   }
-
   if (engine == "random") {
     MG_CHECK(args.size() == 1);
     uint64_t seed = 0;
     MG_CHECK(absl::SimpleAtoi(args[0], &seed));
-    return absl::make_unique<RandomDualNetFactory>(seed);
+    // TODO(tommadams): expose policy_stddev & value_stddev as command line
+    // arguments.
+    return absl::make_unique<RandomDualNetFactory>(13 * seed, 0.4, 0.4);
   }
 
 #ifdef MG_ENABLE_TF_DUAL_NET
