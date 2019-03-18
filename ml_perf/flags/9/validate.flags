@@ -1,3 +1,7 @@
-# Flags for validation.
+# validate.flags Flags for validation.
 
 --flagfile=ml_perf/flags/9/architecture.flags
+
+--examples_to_validate=256
+--train_batch_size=64
+--summary_steps=2

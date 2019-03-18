@@ -1,9 +1,9 @@
-# Flags for the reinforcement learning loop.
+# rl_loop.flags: Flags for the reinforcement learning loop.
 
 --flags_dir=ml_perf/flags/9/
 
---iterations=100
---gating_win_rate=0.5
+--iterations=200
+--gating_win_rate=0.49
 --max_window_size=10
 --slow_window_size=5
 --slow_window_speed=2

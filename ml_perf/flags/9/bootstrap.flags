@@ -1,3 +1,4 @@
+# bootstrap.flags
 # Flags for the first bootstrap round of selfplay.
 
 --flagfile=ml_perf/flags/9/selfplay.flags
@@ -5,5 +6,5 @@
 # Don't perform holdout for the first bootstrap round.
 --holdout_pct=0
 
-# Don't look for signal in what is known to be noise.
---num_readouts=50
+--num_games=8192
+--num_readouts=20
