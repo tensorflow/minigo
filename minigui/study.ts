@@ -276,7 +276,10 @@ class ExploreApp extends App {
     let clearElem = getElement('clear-board');
     clearElem.addEventListener('click', () => { this.newGame(); });
 
-    // Load an SGF file.
+    // Load an SGF file. There's no way to get the selected file's path, so
+    // we POST the file contents to the server, which writes the file to a
+    // temporary location and responds with that path. We can then issue a
+    // loadsgf command to load the file from the temporary location.
     let loadSgfElem = getElement('load-sgf-input') as HTMLInputElement;
     loadSgfElem.addEventListener('change', () => {
       let files: File[] = Array.prototype.slice.call(loadSgfElem.files);
@@ -286,11 +289,11 @@ class ExploreApp extends App {
       let reader = new FileReader();
       reader.onload = () => {
         this.newGame();
-        let sgf = (reader.result as string).replace(/\n/g, '\\n');
-
         this.board.enabled = false;
         this.board.showSearch = false;
-        this.gtp.send(`playsgf ${sgf}`).catch((error) => {
+        this.uploadTmpFile(reader.result as string).then((path) => {
+          return this.gtp.send(`loadsgf ${path}`);
+        }).catch((error) => {
           window.alert(error);
         }).finally(() => {
           this.board.enabled = true;
@@ -453,6 +456,16 @@ class ExploreApp extends App {
     } else {
       this.searchElem.innerText = 'Show search';
     }
+  }
+
+  private uploadTmpFile(contents: string) {
+    return fetch('write_tmp_file', {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: contents,
+    }).then((response) => {
+      return response.text();
+    });
   }
 }
 

@@ -12,20 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-import threading
-import subprocess
-import select
-import logging
-import json
-import functools
-from flask_socketio import SocketIO
-import absl.app
-from flask import Flask
-from absl import flags
-import os
 import sys
-sys.path.insert(0, ".")  # to run from minigo/ dir
+sys.path.insert(0, '.')  # nopep8
+
+import functools
+import json
+import logging
+import os
+import select
+import shutil
+import subprocess
+import tempfile
+import threading
+import time
+
+import absl.app
+from absl import flags
+from flask import Flask
+import flask
+from flask_socketio import SocketIO
 
 
 flags.DEFINE_integer("port", 5001, "Port to listen on.")
@@ -48,6 +53,8 @@ socketio = SocketIO(app, logger=log, engineio_logger=log)
 
 board_size = None
 connections = {}
+
+tmp_dir = os.path.join(tempfile.gettempdir(), '.minigui_tmp')
 
 
 class Player(object):
@@ -150,7 +157,20 @@ def player_list():
     })
 
 
+@app.route("/write_tmp_file", methods=["POST"])
+def write_tmp_file():
+    os.makedirs(tmp_dir, exist_ok=True)
+    fd, path = tempfile.mkstemp(dir=tmp_dir)
+    try:
+      os.write(fd, flask.request.data)
+    finally:
+      os.close(fd)
+    return flask.Response(path, mimetype='text/plain')
+
+
 def main(unused_argv):
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
     # Compile and execute the control script.
     result = {"Player": Player, "players": None, "board_size": 19}
     with open(FLAGS.control, "r") as f:

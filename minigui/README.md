@@ -303,15 +303,6 @@ stdout: = D4
      used as part of the handshaking protocol when establishing a connection
      with the backend.
 
- - **playsgf**
-   - *arguments*: `string*` - the contents of an SGF file with newline
-     characters escaped: `sgf_str.replace("\n", "\\n")`.
-   - *effects*: The SGF is played back as if it had been loaded via `loadsgf`.
-   - *output*: none
-   - *fails*: If arguments cannot be parsed, fails with the error message
-     "cannot load file".
-   - *comments*: Required because due to unfortunate technical limitations.
-
  - **select\_position**
    - *arguments*: `string id` - the id of a position.
    - *effects*: The game is reset to the position that has the given id.

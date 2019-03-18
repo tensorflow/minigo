@@ -216,10 +216,11 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                 let reader = new FileReader();
                 reader.onload = () => {
                     this.newGame();
-                    let sgf = reader.result.replace(/\n/g, '\\n');
                     this.board.enabled = false;
                     this.board.showSearch = false;
-                    this.gtp.send(`playsgf ${sgf}`).catch((error) => {
+                    this.uploadTmpFile(reader.result).then((path) => {
+                        return this.gtp.send(`loadsgf ${path}`);
+                    }).catch((error) => {
                         window.alert(error);
                     }).finally(() => {
                         this.board.enabled = true;
@@ -359,6 +360,15 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             else {
                 this.searchElem.innerText = 'Show search';
             }
+        }
+        uploadTmpFile(contents) {
+            return fetch('write_tmp_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: contents,
+            }).then((response) => {
+                return response.text();
+            });
         }
     }
     new ExploreApp();

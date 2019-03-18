@@ -42,7 +42,6 @@ MiniguiPlayer::MiniguiPlayer(std::unique_ptr<DualNet> network,
   RegisterCmd("info", &MiniguiPlayer::HandleInfo);
   RegisterCmd("loadsgf", &MiniguiPlayer::HandleLoadsgf);
   RegisterCmd("play", &MiniguiPlayer::HandlePlay);
-  RegisterCmd("playsgf", &MiniguiPlayer::HandlePlaysgf);
   RegisterCmd("prune_nodes", &MiniguiPlayer::HandlePruneNodes);
   RegisterCmd("report_search_interval",
               &MiniguiPlayer::HandleReportSearchInterval);
@@ -202,7 +201,7 @@ GtpPlayer::Response MiniguiPlayer::HandleLoadsgf(CmdArgs args) {
 
   std::vector<std::unique_ptr<sgf::Node>> trees;
   response = ParseSgf(contents, &trees);
-  if (response.ok) {
+  if (!response.ok) {
     return response;
   }
   return ProcessSgf(trees);
@@ -214,16 +213,6 @@ GtpPlayer::Response MiniguiPlayer::HandlePlay(CmdArgs args) {
     ReportPosition(root());
   }
   return response;
-}
-
-GtpPlayer::Response MiniguiPlayer::HandlePlaysgf(CmdArgs args) {
-  auto sgf_str = absl::StrReplaceAll(absl::StrJoin(args, " "), {{"\\n", "\n"}});
-  std::vector<std::unique_ptr<sgf::Node>> trees;
-  auto response = ParseSgf(sgf_str, &trees);
-  if (!response.ok) {
-    return response;
-  }
-  return ProcessSgf(trees);
 }
 
 GtpPlayer::Response MiniguiPlayer::HandlePruneNodes(CmdArgs args) {

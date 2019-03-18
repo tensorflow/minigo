@@ -93,7 +93,6 @@ class MiniguiPlayer : public GtpPlayer {
 
   Response HandleEcho(CmdArgs args);
   Response HandleInfo(CmdArgs args);
-  Response HandlePlaysgf(CmdArgs args);
   Response HandlePruneNodes(CmdArgs args);
   Response HandleReportSearchInterval(CmdArgs args);
   Response HandleSelectPosition(CmdArgs args);
