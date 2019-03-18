@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 Script to process debug SGFs for upload to BigQuery.
 
 Handles one model per invocation, for easy sharding of work.
 
 Usage:
 python oneoffs/prepare_bigquery.py 000001-model-name
-
 
 The load commands look like:
 bq load --project_id=$PROJECT_ID \
@@ -33,8 +32,8 @@ bq load --project_id=$PROJECT_ID \
     $PROJECT_ID:minigo_v5_19.moves \
     gs://$BUCKET_NAME/bigquery/holdout/moves/* \
     oneoffs/bigquery_moves_schema.json
+"""
 
-'''
 import sys
 sys.path.insert(0, '.')
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''GTP-compliant entry point for Minigo.'''
+"""GTP-compliant entry point for Minigo."""
 
 import os
 import sys
@@ -43,7 +43,7 @@ FLAGS = flags.FLAGS
 
 def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False,
                       minigui_mode=False):
-    '''Takes a path to model files and set up a GTP engine instance.'''
+    """Takes a path to model files and set up a GTP engine instance."""
     n = DualNetwork(load_file)
     if cgos_mode:
         player = CGOSPlayer(network=n, seconds_per_move=5, timed_match=True,
@@ -71,7 +71,7 @@ def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False,
 
 
 def main(argv):
-    '''Run Minigo in GTP mode.'''
+    """Run Minigo in GTP mode."""
     del argv
     engine = make_gtp_instance(FLAGS.load_file,
                                cgos_mode=FLAGS.cgos_mode,

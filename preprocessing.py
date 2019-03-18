@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''Utilities to create, read, write tf.Examples.'''
+"""Utilities to create, read, write tf.Examples."""
 import functools
 import random
 
@@ -37,12 +37,12 @@ def _one_hot(index):
 
 
 def make_tf_example(features, pi, value):
-    '''
+    """
     Args:
         features: [N, N, FEATURE_DIM] nparray of uint8
         pi: [N * N + 1] nparray of float32
         value: float
-    '''
+    """
     return tf.train.Example(features=tf.train.Features(feature={
         'x': tf.train.Feature(
             bytes_list=tf.train.BytesList(
@@ -56,12 +56,12 @@ def make_tf_example(features, pi, value):
 
 
 def write_tf_examples(filename, tf_examples, serialize=True):
-    '''
+    """
     Args:
         filename: Where to write tf.records
         tf_examples: An iterable of tf.Example
         serialize: whether to serialize the examples.
-    '''
+    """
     with tf.python_io.TFRecordWriter(
             filename, options=TF_RECORD_CONFIG) as writer:
         for ex in tf_examples:
@@ -72,12 +72,12 @@ def write_tf_examples(filename, tf_examples, serialize=True):
 
 
 def batch_parse_tf_example(batch_size, example_batch):
-    '''
+    """
     Args:
         example_batch: a batch of tf.Example
     Returns:
         A tuple (feature_tensor, dict of output tensors)
-    '''
+    """
     features = {
         'x': tf.FixedLenFeature([], tf.string),
         'pi': tf.FixedLenFeature([], tf.string),
@@ -99,7 +99,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
                     shuffle_records=True, shuffle_examples=True,
                     shuffle_buffer_size=None, interleave=True,
                     filter_amount=1.0):
-    '''
+    """
     Args:
         batch_size: batch size to return
         tf_records: a list of tf_record filenames
@@ -111,7 +111,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
         filter_amount: what fraction of records to keep
     Returns:
         a tf dataset of batched tensors
-    '''
+    """
     if shuffle_examples and not shuffle_buffer_size:
         raise ValueError("Must set shuffle buffer size if shuffling examples")
 
@@ -182,11 +182,12 @@ def get_input_tensors(batch_size, tf_records, num_repeats=1,
                       shuffle_records=True, shuffle_examples=True,
                       shuffle_buffer_size=None,
                       filter_amount=0.05, random_rotation=True):
-    '''Read tf.Records and prepare them for ingestion by dual_net.  See
-    `read_tf_records` for parameter documentation.
+    """Read tf.Records and prepare them for ingestion by dual_net.
+
+    See `read_tf_records` for parameter documentation.
 
     Returns a dict of tensors (see return value of batch_parse_tf_example)
-    '''
+    """
     print("Reading tf_records from {} inputs".format(len(tf_records)))
     dataset = read_tf_records(
         batch_size,
@@ -262,11 +263,11 @@ def get_tpu_bt_input_tensors(games, games_nr, batch_size, num_repeats=1,
 
 
 def make_dataset_from_selfplay(data_extracts):
-    '''
+    """
     Returns an iterable of tf.Examples.
     Args:
         data_extracts: An iterable of (position, pi, result) tuples
-    '''
+    """
     tf_examples = (make_tf_example(features_lib.extract_features(pos), pi, result)
                    for pos, pi, result in data_extracts)
     return tf_examples

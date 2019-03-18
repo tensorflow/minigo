@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-'''Python implementation of selfplay worker.
+"""Python implementation of selfplay worker.
 
-This worker is used to set up many parallel selfplay instances.'''
+This worker is used to set up many parallel selfplay instances."""
 
 
 import random
@@ -47,11 +47,12 @@ FLAGS = flags.FLAGS
 
 
 def play(network):
-    ''' Plays out a self-play match, returning a MCTSPlayer object containing:
+    """Plays out a self-play match, returning a MCTSPlayer object containing:
         - the final position
         - the n x 362 tensor of floats representing the mcts search probabilities
         - the n-ary tensor of floats representing the original value-net estimate
-          where n is the number of moves in the game'''
+          where n is the number of moves in the game
+    """
     readouts = FLAGS.num_readouts  # defined in strategies.py
     # Disable resign in 5% of games
     if random.random() < FLAGS.resign_disable_pct:
@@ -108,7 +109,7 @@ def play(network):
 
 def run_game(load_file, selfplay_dir=None, holdout_dir=None,
              sgf_dir=None, holdout_pct=0.05):
-    '''Takes a played game and record results and game data.'''
+    """Takes a played game and record results and game data."""
     if sgf_dir is not None:
         minimal_sgf_dir = os.path.join(sgf_dir, 'clean')
         full_sgf_dir = os.path.join(sgf_dir, 'full')
@@ -147,7 +148,7 @@ def run_game(load_file, selfplay_dir=None, holdout_dir=None,
 
 
 def main(argv):
-    '''Entry point for running one selfplay game.'''
+    """Entry point for running one selfplay game."""
     del argv  # Unused
     flags.mark_flag_as_required('load_file')
 

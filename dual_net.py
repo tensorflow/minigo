@@ -211,7 +211,9 @@ def get_inference_input():
 
 
 def model_fn(features, labels, mode, params):
-    '''
+    """
+    Create the model for estimator api
+
     Args:
         features: tensor with shape
             [BATCH_SIZE, go.N, go.N, features_lib.NEW_FEATURES_PLANES]
@@ -230,7 +232,7 @@ def model_fn(features, labels, mode, params):
         eval_metric_ops
     return dict of tensors
         logits: [BATCH_SIZE, go.N * go.N + 1]
-    '''
+    """
 
     policy_output, value_output, logits = model_inference_fn(
         features, mode == tf.estimator.ModeKeys.TRAIN, params)

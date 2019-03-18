@@ -53,13 +53,13 @@ FLAGS = flags.FLAGS
 
 def time_recommendation(move_num, seconds_per_move=5, time_limit=15 * 60,
                         decay_factor=0.98):
-    '''Given the current move number and the 'desired' seconds per move, return
+    """Given the current move number and the 'desired' seconds per move, return
     how much time should actually be used. This is intended specifically for
     CGOS time controls, which has an absolute 15-minute time limit.
 
     The strategy is to spend the maximum possible moves using seconds_per_move,
     and then switch to an exponentially decaying time usage, calibrated so that
-    we have enough time for an infinite number of moves.'''
+    we have enough time for an infinite number of moves."""
 
     # Divide by two since you only play half the moves in a game.
     player_move_num = move_num / 2
@@ -121,10 +121,11 @@ class MCTSPlayer(MCTSPlayerInterface):
         self.searches_pi = []
 
     def suggest_move(self, position):
-        ''' Used for playing a single game.
+        """Used for playing a single game.
+
         For parallel play, use initialize_move, select_leaf,
         incorporate_results, and pick_move
-        '''
+        """
         start = time.time()
 
         if self.timed_match:
@@ -148,13 +149,12 @@ class MCTSPlayer(MCTSPlayerInterface):
         return self.pick_move()
 
     def play_move(self, c):
-        '''
-        Notable side effects:
+        """Notable side effects:
           - finalizes the probability distribution according to
           this roots visit counts into the class' running tally, `searches_pi`
           - Makes the node associated with this move the root, for future
             `inject_noise` calls.
-        '''
+        """
         if not self.two_player_mode:
             self.searches_pi.append(self.root.children_as_pi(
                 self.root.position.n < self.temp_threshold))
@@ -173,10 +173,10 @@ class MCTSPlayer(MCTSPlayerInterface):
         return True  # GTP requires positive result.
 
     def pick_move(self):
-        '''Picks a move to play, based on MCTS readout statistics.
+        """Picks a move to play, based on MCTS readout statistics.
 
         Highest N is most robust indicator. In the early stage of the game, pick
-        a move weighted by visit count; later on, pick the absolute max.'''
+        a move weighted by visit count; later on, pick the absolute max."""
         if self.root.position.n >= self.temp_threshold:
             fcoord = self.root.best_child()
         else:
@@ -233,7 +233,7 @@ class MCTSPlayer(MCTSPlayerInterface):
         return self.result != 0 or self.root.is_done()
 
     def should_resign(self):
-        '''Returns true if the player resigned.  No further moves should be played'''
+        """Returns true if the player resigned. No further moves should be played"""
         return self.root.Q_perspective < self.resign_threshold
 
     def set_result(self, winner, was_resign):

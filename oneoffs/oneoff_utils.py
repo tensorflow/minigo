@@ -96,7 +96,7 @@ def find_and_filter_sgf_files(base_dir, min_year=None, komi=None):
 
 
 def get_model_paths(model_dir):
-    '''Returns all model paths in the model_dir.'''
+    """Returns all model paths in the model_dir."""
     all_models = gfile.Glob(os.path.join(model_dir, '*.meta'))
     model_filenames = [os.path.basename(m) for m in all_models]
     model_numbers_names = [

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 Code to extract a series of positions + their next moves from an SGF.
 
 Most of the complexity here is dealing with two features of SGF:
@@ -20,7 +20,7 @@ Most of the complexity here is dealing with two features of SGF:
   to configure L+D puzzles, but also for initial handicap placement.
 - Plays don't necessarily alternate colors; they can be repeated B or W moves
   This feature is used to handle free handicap placement.
-'''
+"""
 import numpy as np
 import itertools
 
@@ -60,7 +60,7 @@ def make_sgf(
     black_name=PROGRAM_IDENTIFIER,
     comments=[]
 ):
-    '''Turn a game into SGF.
+    """Turn a game into SGF.
 
     Doesn't handle handicap games or positions with incomplete history.
 
@@ -68,7 +68,7 @@ def make_sgf(
         move_history: iterable of PlayerMoves
         result_string: "B+R", "W+0.5", etc.
         comments: iterable of string/None. Will be zipped with move_history.
-    '''
+    """
     boardsize = go.N
     game_moves = ''.join(translate_sgf_move(*z)
                          for z in itertools.zip_longest(move_history, comments))
@@ -140,8 +140,7 @@ def get_sgf_root_node(sgf_contents):
 
 
 def replay_sgf(sgf_contents):
-    '''
-    Wrapper for sgf files, returning go.PositionWithContext instances.
+    """Wrapper for sgf files, returning go.PositionWithContext instances.
 
     It does NOT return the very final position, as there is no follow up.
     To get the final position, call pwc.position.play_move(pwc.next_move)
@@ -151,7 +150,7 @@ def replay_sgf(sgf_contents):
     with open(filename) as f:
         for position_w_context in replay_sgf(f.read()):
             print(position_w_context.position)
-    '''
+    """
     root_node = get_sgf_root_node(sgf_contents)
     props = root_node.properties
     assert int(sgf_prop(props.get('GM', ['1']))) == 1, "Not a Go SGF!"

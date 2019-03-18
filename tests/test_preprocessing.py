@@ -70,9 +70,12 @@ class TestPreprocessing(test_utils.MinigoUnitTest):
         return self.get_data_tensors(pos_tensor, label_tensors)
 
     def assertEqualData(self, data1, data2):
-        '''Assert that two data are equal, where both are of form:
-        data = List<Tuple<feature_array, pi_array, value>>
-        '''
+        """Assert that the two datas are equal.
+
+        Args:
+            data1: List<Tuple<feature_array, pi_array, value>>
+            data2: Same form as data1
+        """
         self.assertEqual(len(data1), len(data2))
         for datum1, datum2 in zip(data1, data2):
             # feature

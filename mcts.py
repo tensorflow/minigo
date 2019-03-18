@@ -233,9 +233,8 @@ class MCTSNode(object):
         self.parent.backup_value(value, up_to)
 
     def is_done(self):
-        '''True if the last two moves were Pass or if the position is at a move
-        greater than the max depth.
-        '''
+        """True if the last two moves were Pass or if the position is at a move
+        greater than the max depth."""
         return self.position.is_game_over() or self.position.n >= FLAGS.max_game_length
 
     def inject_noise(self):

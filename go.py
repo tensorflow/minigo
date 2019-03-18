@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 A board is a NxN numpy array.
 A Coordinate is a tuple index into the board.
 A Move is a (Coordinate c | None).
 A PlayerMove is a (Color, Move) tuple
 
 (0, 0) is considered to be the upper left corner of the board, and (18, 0) is the lower left.
-'''
+"""
 from collections import namedtuple
 import copy
 import itertools
@@ -69,7 +69,7 @@ def place_stones(board, color, stones):
 
 
 def replay_position(position, result):
-    '''
+    """
     Wrapper for a go.Position which replays its history.
     Assumes an empty start position! (i.e. no handicap, and history must be exhaustive.)
 
@@ -78,7 +78,7 @@ def replay_position(position, result):
 
     for position_w_context in replay_position(position):
         print(position_w_context.position)
-    '''
+    """
     assert position.n == len(position.recent), "Position history is incomplete"
     pos = Position(komi=position.komi)
     for player_move in position.recent:
@@ -136,11 +136,11 @@ def is_eyeish(board, c):
 
 
 class Group(namedtuple('Group', ['id', 'stones', 'liberties', 'color'])):
-    '''
+    """
     stones: a frozenset of Coordinates belonging to this group
     liberties: a frozenset of Coordinates that are empty and adjacent to this group.
     color: color of this group
-    '''
+    """
 
     def __eq__(self, other):
         return self.stones == other.stones and self.liberties == other.liberties and self.color == other.color
@@ -288,7 +288,7 @@ class Position():
     def __init__(self, board=None, n=0, komi=7.5, caps=(0, 0),
                  lib_tracker=None, ko=None, recent=tuple(),
                  board_deltas=None, to_play=BLACK):
-        '''
+        """
         board: a numpy array
         n: an int representing moves played so far
         komi: a float, representing points given to the second player.
@@ -300,7 +300,7 @@ class Position():
             made to the board at each move (played move and captures).
             Should satisfy next_pos.board - next_pos.board_deltas[0] == pos.board
         to_play: BLACK or WHITE
-        '''
+        """
         assert type(recent) is tuple
         self.board = board if board is not None else np.copy(EMPTY_BOARD)
         # With a full history, self.n == len(self.recent) == num moves played
