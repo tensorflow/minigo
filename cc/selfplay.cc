@@ -256,8 +256,7 @@ class SelfPlayer {
 
     {
       absl::MutexLock lock(&mutex_);
-      auto model_name = batcher_->NewDualNet(model_)->name();
-      MG_LOG(INFO) << FormatWinStatsTable({{model_name, win_stats_}});
+      MG_LOG(INFO) << FormatWinStatsTable({{model_name_, win_stats_}});
     }
   }
 
@@ -331,6 +330,9 @@ class SelfPlayer {
         player = absl::make_unique<MctsPlayer>(batcher_->NewDualNet(model_),
                                                nullptr, game.get(),
                                                thread_options.player_options);
+        if (model_name_.empty()) {
+          model_name_ = player->network()->name();
+        }
       }
 
       // Play the game.
@@ -447,6 +449,7 @@ class SelfPlayer {
   absl::Mutex mutex_;
   std::unique_ptr<BatchingDualNetFactory> batcher_ GUARDED_BY(&mutex_);
   Random rnd_ GUARDED_BY(&mutex_);
+  std::string model_name_ GUARDED_BY(&mutex_);
   std::vector<std::thread> threads_;
 
   // True if we should run selfplay indefinitely.
