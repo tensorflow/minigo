@@ -138,7 +138,16 @@ class GroupVisitor {
 // instances of the Position class.
 class Position {
  public:
-  Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play, int n = 0);
+  // Interface for enforcing positional superko.
+  class Superko {
+   public:
+    virtual bool HasPositionBeenPlayedBefore(
+        zobrist::Hash stone_hash) const = 0;
+  };
+
+  // Initializes an empty board.
+  // All moves are considered legal.
+  Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play);
 
   // Copies the position's state from another instance, while preserving the
   // BoardVisitor and GroupVisitor it was constructed with.
@@ -149,15 +158,12 @@ class Position {
 
   using Stones = std::array<Stone, kN * kN>;
 
-  void PlayMove(Coord c, Color color = Color::kEmpty);
-
-  // Adds the stone to the board.
-  // Removes newly surrounded opponent groups.
-  // Updates liberty counts of remaining groups.
-  // Updates num_captures_.
-  // If the move captures a single stone, sets ko_ to the coordinate of that
-  // stone. Sets ko_ to kInvalid otherwise.
-  void AddStoneToBoard(Coord c, Color color);
+  // Plays the given move and updates which moves are legal.
+  // If superko is non-null, move legality considers positional superko (as
+  // determined by the given superko instance). If superko is null, superko is
+  // not considered when updating the legal moves, only ko.
+  void PlayMove(Coord c, Color color = Color::kEmpty,
+                Superko* superko = nullptr);
 
   const std::array<int, 2>& num_captures() const { return num_captures_; }
 
@@ -167,7 +173,7 @@ class Position {
 
   // Returns true if playing this move is legal.
   // Does not check positional superko.
-  // MctsNode::legal_moves can be used to check for positional superko.
+  // legal_move(c) can be used to check for positional superko.
   enum class MoveType {
     // The position is illegal:
     //  - a stone is already at that position.
@@ -177,12 +183,10 @@ class Position {
 
     // The move will not capture an opponent's group.
     // The move is not necessarily legal because of superko.
-    // Use MctsNode::legal_moves to check for positional superko.
     kNoCapture,
 
     // The move will capture an opponent's group.
     // The move is not necessarily legal because of superko.
-    // Use MctsNode::legal_moves to check for positional superko.
     kCapture,
   };
   MoveType ClassifyMove(Coord c) const;
@@ -194,6 +198,10 @@ class Position {
   const Stones& stones() const { return stones_; }
   int n() const { return n_; }
   zobrist::Hash stone_hash() const { return stone_hash_; }
+  bool legal_move(Coord c) const {
+    MG_DCHECK(c < kNumMoves);
+    return legal_moves_[c];
+  }
 
   // The following methods are protected to enable direct testing by unit tests.
  protected:
@@ -207,6 +215,21 @@ class Position {
   // sides by stones of color C.
   // Returns Color::kEmpty otherwise.
   Color IsKoish(Coord c) const;
+
+  // Adds the stone to the board.
+  // Removes newly surrounded opponent groups.
+  // DOES NOT update legal_moves_: callers of AddStoneToBoard must explicitly
+  // call UpdateLegalMoves afterwards (this is because UpdateLegalMoves uses
+  // AddStoneToBoard internally).
+  // Updates liberty counts of remaining groups.
+  // Updates num_captures_.
+  // If the move captures a single stone, sets ko_ to the coordinate of that
+  // stone. Sets ko_ to kInvalid otherwise.
+  void AddStoneToBoard(Coord c, Color color);
+
+  // Updates legal_moves_.
+  // If superko is non-null, this takes into account positional superko.
+  void UpdateLegalMoves(Superko* superko);
 
  private:
   // Removes the group with a stone at the given coordinate from the board,
@@ -232,7 +255,9 @@ class Position {
   // Number of captures for (B, W).
   std::array<int, 2> num_captures_{{0, 0}};
 
-  int n_;
+  int n_ = 0;
+
+  std::array<bool, kNumMoves> legal_moves_;
 
   // Zobrist hash of the stones. It can be used for positional superko.
   // This has does not include number of consecutive passes or ko, so should not

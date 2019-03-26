@@ -52,15 +52,15 @@ std::string CleanBoardString(absl::string_view str) {
   return absl::StrJoin(SplitBoardString(str), "\n");
 }
 
-TestablePosition::TestablePosition(absl::string_view board_str, Color to_play,
-                                   int n)
-    : Position(&board_visitor, &group_visitor, to_play, n) {
+TestablePosition::TestablePosition(absl::string_view board_str, Color to_play)
+    : Position(&board_visitor, &group_visitor, to_play) {
   auto stones = ParseBoard(board_str);
   for (int i = 0; i < kN * kN; ++i) {
     if (stones[i] != Color::kEmpty) {
       AddStoneToBoard(i, stones[i]);
     }
   }
+  UpdateLegalMoves(nullptr);
 }
 
 std::array<Color, kN * kN> ParseBoard(absl::string_view str) {

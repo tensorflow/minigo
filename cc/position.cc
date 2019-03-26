@@ -14,6 +14,7 @@
 
 #include "cc/position.h"
 
+#include <algorithm>
 #include <sstream>
 #include <utility>
 
@@ -53,12 +54,11 @@ const std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
   return result;
 }();
 
-Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play, int n)
-    : board_visitor_(bv),
-      group_visitor_(gv),
-      to_play_(to_play),
-      n_(n),
-      stone_hash_(0) {}
+Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play)
+    : board_visitor_(bv), group_visitor_(gv), to_play_(to_play) {
+  // All moves are initiallly legal.
+  std::fill(legal_moves_.begin(), legal_moves_.end(), true);
+}
 
 Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
     : Position(position) {
@@ -66,26 +66,22 @@ Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
   group_visitor_ = gv;
 }
 
-void Position::PlayMove(Coord c, Color color) {
+void Position::PlayMove(Coord c, Color color, Superko* superko) {
   if (c == Coord::kPass || c == Coord::kResign) {
-    n_ += 1;
     ko_ = Coord::kInvalid;
-    to_play_ = OtherColor(to_play_);
-    return;
-  }
-
-  if (color == Color::kEmpty) {
-    color = to_play_;
   } else {
-    to_play_ = color;
+    if (color == Color::kEmpty) {
+      color = to_play_;
+    } else {
+      to_play_ = color;
+    }
+    MG_DCHECK(ClassifyMove(c) != MoveType::kIllegal) << c;
+    AddStoneToBoard(c, color);
   }
-
-  MG_DCHECK(ClassifyMove(c) != MoveType::kIllegal) << c;
-
-  AddStoneToBoard(c, color);
 
   n_ += 1;
   to_play_ = OtherColor(to_play_);
+  UpdateLegalMoves(superko);
 }
 
 std::string Position::ToSimpleString() const {
@@ -426,6 +422,53 @@ float Position::CalculateScore(float komi) {
   }
 
   return static_cast<float>(score) - komi;
+}
+
+void Position::UpdateLegalMoves(Superko* superko) {
+  legal_moves_[Coord::kPass] = true;
+
+  if (superko == nullptr) {
+    // We're not checking for superko, use the basic result from ClassifyMove to
+    // determine whether each move is legal.
+    for (int c = 0; c < kN * kN; ++c) {
+      legal_moves_[c] = ClassifyMove(c) != MoveType::kIllegal;
+    }
+  } else {
+    // We're using superko, things are a bit trickier.
+    for (int c = 0; c < kN * kN; ++c) {
+      switch (ClassifyMove(c)) {
+        case Position::MoveType::kIllegal: {
+          // The move is trivially not legal.
+          legal_moves_[c] = false;
+          break;
+        }
+
+        case Position::MoveType::kNoCapture: {
+          // The move will not capture any stones: we can calculate the new
+          // position's stone hash directly.
+          auto new_hash = stone_hash_ ^ zobrist::MoveHash(c, to_play_);
+          legal_moves_[c] = !superko->HasPositionBeenPlayedBefore(new_hash);
+          break;
+        }
+
+        case Position::MoveType::kCapture: {
+          // The move will capture some opponent stones: in order to calculate
+          // the stone hash, we actually have to play the move.
+
+          Position new_position(*this);
+          // It's safe to call AddStoneToBoard instead of PlayMove because:
+          //  - we know the move is not kPass.
+          //  - the move is legal (modulo superko).
+          //  - we only care about new_position's stone_hash and not the rest of
+          //    the bookkeeping that PlayMove updates.
+          new_position.AddStoneToBoard(c, to_play_);
+          auto new_hash = new_position.stone_hash();
+          legal_moves_[c] = !superko->HasPositionBeenPlayedBefore(new_hash);
+          break;
+        }
+      }
+    }
+  }
 }
 
 }  // namespace minigo

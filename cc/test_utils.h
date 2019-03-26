@@ -30,8 +30,7 @@ namespace minigo {
 // for testing purposes.
 class TestablePosition : public Position {
  public:
-  TestablePosition(absl::string_view board_str, Color to_play = Color::kBlack,
-                   int n = 0);
+  TestablePosition(absl::string_view board_str, Color to_play = Color::kBlack);
 
   using Position::PlayMove;
 

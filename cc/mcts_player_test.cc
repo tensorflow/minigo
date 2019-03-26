@@ -107,7 +107,7 @@ class MctsPlayerTest : public ::testing::Test {
     return player;
   }
 
-  std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer(int n) {
+  std::unique_ptr<TestablePlayer> CreateAlmostDonePlayer() {
     Game::Options game_options;
     game_options.komi = 2.5;
     game_ = absl::make_unique<Game>("b", "w", game_options);
@@ -131,7 +131,7 @@ class MctsPlayerTest : public ::testing::Test {
 
     auto player = absl::make_unique<TestablePlayer>(probs, 0, game_.get(),
                                                     player_options);
-    auto board = TestablePosition(kAlmostDoneBoard, Color::kBlack, n);
+    auto board = TestablePosition(kAlmostDoneBoard, Color::kBlack);
     player->InitializeGame(board);
     return player;
   }
@@ -245,7 +245,7 @@ TEST_F(MctsPlayerTest, PickMoveSoft) {
 }
 
 TEST_F(MctsPlayerTest, DontPassIfLosing) {
-  auto player = CreateAlmostDonePlayer(0);
+  auto player = CreateAlmostDonePlayer();
   auto* root = player->root();
   EXPECT_EQ(-0.5, root->position.CalculateScore(game_->options().komi));
 
@@ -267,7 +267,7 @@ TEST_F(MctsPlayerTest, DontPassIfLosing) {
 }
 
 TEST_F(MctsPlayerTest, ParallelTreeSearch) {
-  auto player = CreateAlmostDonePlayer(0);
+  auto player = CreateAlmostDonePlayer();
   auto* root = player->root();
 
   // Initialize the tree so that the root node has populated children.
@@ -292,7 +292,7 @@ TEST_F(MctsPlayerTest, ParallelTreeSearch) {
 }
 
 TEST_F(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
-  auto player = CreateAlmostDonePlayer(0);
+  auto player = CreateAlmostDonePlayer();
   auto* root = player->root();
 
   for (int i = 0; i < 10; ++i) {
@@ -306,7 +306,23 @@ TEST_F(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
 }
 
 TEST_F(MctsPlayerTest, LongGameTreeSearch) {
-  auto player = CreateAlmostDonePlayer(kMaxSearchDepth - 2);
+  MctsPlayer::Options options;
+  auto player = CreateBasicPlayer(options);
+
+  // Play the first legal move we find until we're almost at the move limit.
+  for (int i = 0; i < kMaxSearchDepth - 2; ++i) {
+    auto c = Coord::kInvalid;
+    for (int j = 0; j < kN * kN; ++j) {
+      MG_LOG(INFO) << player->root()->position.ToPrettyString();
+      if (player->root()->position.legal_move(j)) {
+        c = Coord(j);
+        break;
+      }
+    }
+    ASSERT_NE(Coord::kInvalid, c);
+    player->PlayMove(c);
+  }
+
   // Test that an almost complete game.
   for (int i = 0; i < 10; ++i) {
     player->TreeSearch(8);

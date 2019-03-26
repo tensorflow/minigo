@@ -463,7 +463,7 @@ TEST(PositionTest, PlayRandomLegalMoves) {
   for (int i = 0; i < 10000; ++i) {
     std::vector<Coord> legal_moves;
     for (int c = 0; c < kN * kN; ++c) {
-      if (position.ClassifyMove(c) != Position::MoveType::kIllegal) {
+      if (position.legal_move(c)) {
         legal_moves.push_back(c);
       }
     }

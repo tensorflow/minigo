@@ -472,7 +472,7 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
   float uniform_policy = 1.0 / 6;
 
   for (int i = 0; i < kNumMoves; ++i) {
-    if (root.legal_moves[i]) {
+    if (root.position.legal_move(i)) {
       EXPECT_FLOAT_EQ(uniform_policy, root.edges[i].P);
     } else {
       EXPECT_FLOAT_EQ(0, root.edges[i].P);
@@ -487,7 +487,7 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
   root.InjectNoise(noise, 0.25);
 
   for (int i = 0; i < kNumMoves; ++i) {
-    if (root.legal_moves[i]) {
+    if (root.position.legal_move(i)) {
       EXPECT_LT(0.75 * uniform_policy, root.edges[i].P);
       EXPECT_GT(0.75 * uniform_policy + 0.25, root.edges[i].P);
     } else {
@@ -534,13 +534,13 @@ TEST(MctsNodeTest, TestSuperko) {
 
     for (size_t move_idx = 0; move_idx < iteration; ++move_idx) {
       Coord c = Coord::FromGtp(non_ko_moves[move_idx]);
-      ASSERT_TRUE(nodes.back()->legal_moves[c]);
+      ASSERT_TRUE(nodes.back()->position.legal_move(c));
       nodes.push_back(absl::make_unique<MctsNode>(nodes.back().get(), c));
     }
 
     for (const auto& move : ko_moves) {
       Coord c = Coord::FromGtp(move);
-      ASSERT_TRUE(nodes.back()->legal_moves[c]);
+      ASSERT_TRUE(nodes.back()->position.legal_move(c));
       nodes.push_back(absl::make_unique<MctsNode>(nodes.back().get(), c));
     }
 
@@ -552,7 +552,7 @@ TEST(MctsNodeTest, TestSuperko) {
 
     // When checking superko however, playing at C1 is not legal because it
     // repeats a position.
-    EXPECT_FALSE(nodes.back()->legal_moves[c1]);
+    EXPECT_FALSE(nodes.back()->position.legal_move(c1));
   }
 }
 

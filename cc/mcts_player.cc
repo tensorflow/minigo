@@ -277,7 +277,7 @@ bool MctsPlayer::PlayMove(Coord c) {
     return true;
   }
 
-  if (!root_->legal_moves[c]) {
+  if (!root_->position.legal_move(c)) {
     MG_LOG(ERROR) << "Move " << c << " is illegal";
     // We're probably about to crash. Dump the player's options and the moves
     // that got us to this point.
