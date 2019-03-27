@@ -66,7 +66,7 @@ Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
   group_visitor_ = gv;
 }
 
-void Position::PlayMove(Coord c, Color color, Superko* superko) {
+void Position::PlayMove(Coord c, Color color, ZobristHistory* zobrist_history) {
   if (c == Coord::kPass || c == Coord::kResign) {
     ko_ = Coord::kInvalid;
   } else {
@@ -81,7 +81,7 @@ void Position::PlayMove(Coord c, Color color, Superko* superko) {
 
   n_ += 1;
   to_play_ = OtherColor(to_play_);
-  UpdateLegalMoves(superko);
+  UpdateLegalMoves(zobrist_history);
 }
 
 std::string Position::ToSimpleString() const {
@@ -424,10 +424,10 @@ float Position::CalculateScore(float komi) {
   return static_cast<float>(score) - komi;
 }
 
-void Position::UpdateLegalMoves(Superko* superko) {
+void Position::UpdateLegalMoves(ZobristHistory* zobrist_history) {
   legal_moves_[Coord::kPass] = true;
 
-  if (superko == nullptr) {
+  if (zobrist_history == nullptr) {
     // We're not checking for superko, use the basic result from ClassifyMove to
     // determine whether each move is legal.
     for (int c = 0; c < kN * kN; ++c) {
@@ -447,7 +447,8 @@ void Position::UpdateLegalMoves(Superko* superko) {
           // The move will not capture any stones: we can calculate the new
           // position's stone hash directly.
           auto new_hash = stone_hash_ ^ zobrist::MoveHash(c, to_play_);
-          legal_moves_[c] = !superko->HasPositionBeenPlayedBefore(new_hash);
+          legal_moves_[c] =
+              !zobrist_history->HasPositionBeenPlayedBefore(new_hash);
           break;
         }
 
@@ -463,7 +464,8 @@ void Position::UpdateLegalMoves(Superko* superko) {
           //    the bookkeeping that PlayMove updates.
           new_position.AddStoneToBoard(c, to_play_);
           auto new_hash = new_position.stone_hash();
-          legal_moves_[c] = !superko->HasPositionBeenPlayedBefore(new_hash);
+          legal_moves_[c] =
+              !zobrist_history->HasPositionBeenPlayedBefore(new_hash);
           break;
         }
       }

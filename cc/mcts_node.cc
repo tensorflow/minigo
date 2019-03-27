@@ -29,9 +29,9 @@ namespace minigo {
 namespace {
 
 // Superko implementation that uses MctsNode::superko_cache.
-class Superko : public Position::Superko {
+class ZobristHistory : public Position::ZobristHistory {
  public:
-  explicit Superko(const MctsNode* node) : node_(node) {}
+  explicit ZobristHistory(const MctsNode* node) : node_(node) {}
 
   bool HasPositionBeenPlayedBefore(zobrist::Hash stone_hash) const {
     for (const auto* node = node_; node != nullptr; node = node->parent) {
@@ -68,8 +68,8 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
   MG_DCHECK(move >= 0);
   MG_DCHECK(move < kNumMoves);
 
-  Superko superko(this);
-  position.PlayMove(move, position.to_play(), &superko);
+  ZobristHistory zobrist_history(this);
+  position.PlayMove(move, position.to_play(), &zobrist_history);
 
   // Insert a cache of ancestor Zobrist hashes at regular depths in the tree.
   // See the comment for superko_cache in the mcts_node.h for more details.

@@ -138,8 +138,9 @@ class GroupVisitor {
 // instances of the Position class.
 class Position {
  public:
-  // Interface for enforcing positional superko.
-  class Superko {
+  // Interface used to enforce positional superko based on the Zobrist hash of
+  // a position.
+  class ZobristHistory {
    public:
     virtual bool HasPositionBeenPlayedBefore(
         zobrist::Hash stone_hash) const = 0;
@@ -159,11 +160,11 @@ class Position {
   using Stones = std::array<Stone, kN * kN>;
 
   // Plays the given move and updates which moves are legal.
-  // If superko is non-null, move legality considers positional superko (as
-  // determined by the given superko instance). If superko is null, superko is
-  // not considered when updating the legal moves, only ko.
+  // If zobrist_history is non-null, move legality considers positional superko.
+  // If zobrist_history is null, positional superko is not considered when
+  // updating the legal moves, only ko.
   void PlayMove(Coord c, Color color = Color::kEmpty,
-                Superko* superko = nullptr);
+                ZobristHistory* zobrist_history = nullptr);
 
   const std::array<int, 2>& num_captures() const { return num_captures_; }
 
@@ -228,8 +229,8 @@ class Position {
   void AddStoneToBoard(Coord c, Color color);
 
   // Updates legal_moves_.
-  // If superko is non-null, this takes into account positional superko.
-  void UpdateLegalMoves(Superko* superko);
+  // If zobrist_history is non-null, this takes into account positional superko.
+  void UpdateLegalMoves(ZobristHistory* zobrist_history);
 
  private:
   // Removes the group with a stone at the given coordinate from the board,
