@@ -63,6 +63,19 @@ TestablePosition::TestablePosition(absl::string_view board_str, Color to_play)
   UpdateLegalMoves(nullptr);
 }
 
+Coord GetRandomLegalMove(const Position& position, Random* rnd) {
+  std::vector<Coord> valid_moves;
+  for (int i = 0; i < kN * kN; ++i) {
+    if (position.legal_move(i)) {
+      valid_moves.push_back(i);
+    }
+  }
+  if (valid_moves.empty()) {
+    valid_moves.push_back(Coord::kPass);
+  }
+  return valid_moves[rnd->UniformInt(0, valid_moves.size() - 1)];
+}
+
 std::array<Color, kN * kN> ParseBoard(absl::string_view str) {
   std::array<Color, kN * kN> result;
   auto lines = SplitBoardString(str);

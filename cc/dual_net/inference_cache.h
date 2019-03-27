@@ -16,11 +16,15 @@
 #define CC_DUAL_NET_INFERENCE_CACHE_H_
 
 #include <array>
-
-#include "cc/constants.h"
-#include "cc/dual_net/dual_net.h"
+#include <ostream>
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/str_format.h"
+#include "cc/constants.h"
+#include "cc/coord.h"
+#include "cc/dual_net/dual_net.h"
+#include "cc/position.h"
+#include "cc/zobrist.h"
 
 namespace minigo {
 
@@ -28,12 +32,38 @@ namespace minigo {
 // Not thread safe.
 class InferenceCache {
  public:
-  using CompressedFeatures =
-      std::array<uint64_t, (DualNet::kNumBoardFeatures + 63) / 64>;
+  // The key used for the inference cache.
+  // Takes into account:
+  //  - the stones on the board.
+  //  - who is to play.
+  //  - which moves are legal.
+  //  - whether the previous move was a pass.
+  class Key {
+   public:
+    // Constructs a cache key from the given position and previous move made to
+    // get to that position.
+    Key(Coord prev_move, const Position& position);
 
-  // Compresses the given BoardFeatures into a more compact representation.
-  static CompressedFeatures CompressFeatures(
-      const DualNet::BoardFeatures& features);
+    template <typename H>
+    friend H AbslHashValue(H h, Key key) {
+      return H::combine(std::move(h), key.cache_hash_);
+    }
+
+    friend bool operator==(Key a, Key b) {
+      return a.cache_hash_ == b.cache_hash_ && a.stone_hash_ == b.stone_hash_;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, Key key);
+
+   private:
+    // There is a vanishingly small chance that two Positions could have
+    // different stone hashes but the same computed hash for the inference
+    // cache key. To avoid potential crashes in this case, the key compares both
+    // for equality. Note that it's sufficient to use cache_hash_ for the Key's
+    // actual hash value.
+    zobrist::Hash cache_hash_;
+    zobrist::Hash stone_hash_;
+  };
 
   // Calculates a reasonable approximation for how many elements can fit in
   // an InferenceCache of size_mb MB.
@@ -43,11 +73,11 @@ class InferenceCache {
 
   // Adds the (features, inference output) pair to the cache.
   // If the cache is full, the least-recently-used pair is evicted.
-  void Add(const CompressedFeatures& f, DualNet::Output& o);
+  void Add(Key key, const DualNet::Output& output);
 
   // Looks up the inference output for the given features.
   // If found, the features are marked as most-recently-used.
-  bool TryGet(const CompressedFeatures& f, DualNet::Output* o);
+  bool TryGet(Key key, DualNet::Output* output);
 
  private:
   struct ListNode {
@@ -56,19 +86,9 @@ class InferenceCache {
   };
 
   struct Element : public ListNode {
-    // The constructor doesn't initialize the features pointer because it will
-    // point to the key inside map_, the address of which isn't known until
-    // after the element is inserted.
-    explicit Element(const DualNet::Output& output) : output(output) {}
-
-    // A pointer to the compressed features, which is stored as the map key.
-    // We don't want to store the compressed features here by value because
-    // they're 768 bytes and we already have to store them in the map as keys.
-    // We can't store a map iterator instead because iterators get invalidated
-    // when the map performs a rehash operation.
-    const CompressedFeatures* features;
-
-    // The result of inference.
+    Element(Key key, const DualNet::Output& output)
+        : key(key), output(output) {}
+    Key key;
     DualNet::Output output;
   };
 
@@ -97,7 +117,7 @@ class InferenceCache {
   // We use a node_hash_map because it guarantees that the address of both
   // the key and the value do not change during a rehash operation. This is
   // important the linked list keeps pointers to the map's keys.
-  using Map = absl::node_hash_map<CompressedFeatures, Element>;
+  using Map = absl::node_hash_map<Key, Element>;
   Map map_;
 
   const size_t capacity_;

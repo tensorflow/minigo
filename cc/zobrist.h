@@ -28,19 +28,31 @@ namespace zobrist {
 
 using Hash = uint64_t;
 
+namespace internal {
 extern Hash kBlackToPlayHash;
+extern Hash kOpponentPassedHash;
 extern std::array<std::array<Hash, 3>, kNumMoves> kMoveHashes;
-extern std::array<Hash, kN * kN> kKoHashes;
+extern std::array<Hash, kN * kN> kIllegalEmptyPointHashes;
+}  // namespace internal
 
+// Non-zero when it's black's turn.
 inline Hash ToPlayHash(Color color) {
-  return color == Color::kBlack ? kBlackToPlayHash : 0;
+  return color == Color::kBlack ? internal::kBlackToPlayHash : 0;
 }
 
+// Hash set when the previous move was a pass.
+inline Hash OpponentPassedHash() { return internal::kOpponentPassedHash; }
+
+// Hashes for moves by black and white.
 inline Hash MoveHash(Coord c, Color color) {
-  return kMoveHashes[c][static_cast<int>(color)];
+  return internal::kMoveHashes[c][static_cast<int>(color)];
 }
 
-inline Hash KoHash(Coord c) { return c == Coord::kInvalid ? 0 : kKoHashes[c]; }
+// Hashes used for empty points that can't be played because of (e.g.) ko or
+// position superko.
+inline Hash IllegalEmptyPointHash(Coord c) {
+  return internal::kIllegalEmptyPointHashes[c];
+}
 
 void Init(uint64_t seed);
 

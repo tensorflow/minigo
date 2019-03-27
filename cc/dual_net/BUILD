@@ -266,6 +266,8 @@ minigo_cc_test(
     deps = [
         ":inference_cache",
         "//cc:random",
-        "@com_google_googletest//:gtest_main",
+        "//cc:test_utils",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest",
     ],
 )

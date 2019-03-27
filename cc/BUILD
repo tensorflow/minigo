@@ -370,6 +370,7 @@ minigo_cc_library(
         ":logging",
         ":mcts",
         ":position",
+        ":random",
         "@com_google_absl//absl/strings",
     ],
 )

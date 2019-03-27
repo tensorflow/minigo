@@ -40,6 +40,18 @@ static constexpr char kAlmostDoneBoard[] = R"(
     XXXXXOOOO
     XXXXOOOOO)";
 
+// Tromp taylor means black can win if we hit the move limit.
+static constexpr char kTtFtwBoard[] = R"(
+    .XXOOOOOO
+    X.XOO...O
+    .XXOO...O
+    X.XOO...O
+    .XXOO..OO
+    X.XOOOOOO
+    .XXOOOOOO
+    X.XXXXXXX
+    XXXXXXXXX)";
+
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(Game* game, const MctsPlayer::Options& player_options)
@@ -309,21 +321,19 @@ TEST_F(MctsPlayerTest, LongGameTreeSearch) {
   MctsPlayer::Options options;
   auto player = CreateBasicPlayer(options);
 
-  // Play the first legal move we find until we're almost at the move limit.
+  auto board = TestablePosition(kTtFtwBoard, Color::kBlack);
+
+  // Pass until the Position's move count is close to the limit.
+  // Since the Position doesn't actually track what the previous move was, this
+  // won't end the game.
   for (int i = 0; i < kMaxSearchDepth - 2; ++i) {
-    auto c = Coord::kInvalid;
-    for (int j = 0; j < kN * kN; ++j) {
-      MG_LOG(INFO) << player->root()->position.ToPrettyString();
-      if (player->root()->position.legal_move(j)) {
-        c = Coord(j);
-        break;
-      }
-    }
-    ASSERT_NE(Coord::kInvalid, c);
-    player->PlayMove(c);
+    board.PlayMove(Coord::kPass);
   }
 
-  // Test that an almost complete game.
+  player->InitializeGame(board);
+
+  // Test that MCTS can deduce that B wins because of TT-scoring triggered by
+  // move limit.
   for (int i = 0; i < 10; ++i) {
     player->TreeSearch(8);
   }

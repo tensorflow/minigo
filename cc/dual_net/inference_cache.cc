@@ -14,26 +14,29 @@
 
 #include "cc/dual_net/inference_cache.h"
 
+#include <tuple>
+
 namespace minigo {
 
-InferenceCache::CompressedFeatures InferenceCache::CompressFeatures(
-    const DualNet::BoardFeatures& features) {
-  CompressedFeatures result;
-  auto num_full_u64s = (features.size() + 63) / 64 - 1;
-  const auto* src = features.data();
-  for (size_t i = 0; i < num_full_u64s; ++i) {
-    uint64_t bits = 0;
-    for (uint64_t j = 0; j < 64; ++j) {
-      bits |= static_cast<uint64_t>(*src++ != 0) << j;
+std::ostream& operator<<(std::ostream& os, InferenceCache::Key key) {
+  return os << absl::StreamFormat("%016x:%016x", key.cache_hash_,
+                                  key.stone_hash_);
+}
+
+InferenceCache::Key::Key(Coord prev_move, const Position& position)
+    : cache_hash_(position.stone_hash()), stone_hash_(position.stone_hash()) {
+  cache_hash_ ^= zobrist::ToPlayHash(position.to_play());
+
+  if (prev_move == Coord::kPass) {
+    cache_hash_ ^= zobrist::OpponentPassedHash();
+  }
+
+  const auto& stones = position.stones();
+  for (int i = 0; i < kN * kN; ++i) {
+    if (stones[i].color() == Color::kEmpty && !position.legal_move(i)) {
+      cache_hash_ ^= zobrist::IllegalEmptyPointHash(i);
     }
-    result[i] = bits;
   }
-  uint64_t bits = 0;
-  for (uint64_t j = 0; src != features.end(); ++j) {
-    bits |= static_cast<uint64_t>(*src++ != 0) << j;
-  }
-  result[num_full_u64s] = bits;
-  return result;
 }
 
 size_t InferenceCache::CalculateCapacity(size_t size_mb) {
@@ -59,24 +62,26 @@ InferenceCache::InferenceCache(size_t capacity) : capacity_(capacity) {
   list_.next = &list_;
 }
 
-void InferenceCache::Add(const CompressedFeatures& f, DualNet::Output& o) {
+void InferenceCache::Add(Key key, const DualNet::Output& output) {
   if (map_.size() == capacity_) {
     // Cache is full, remove an element.
-    auto it = map_.find(*static_cast<Element*>(list_.prev)->features);
+    auto it = map_.find(static_cast<Element*>(list_.prev)->key);
     MG_CHECK(it != map_.end());
     Unlink(&it->second);
     map_.erase(it);
   }
 
-  auto result = map_.emplace(f, o);
+  // Insert the key into the map without making temporary copies of the Element.
+  auto result =
+      map_.emplace(std::piecewise_construct, std::forward_as_tuple(key),
+                   std::forward_as_tuple(key, output));
   MG_CHECK(result.second);
   auto* elem = &result.first->second;
-  elem->features = &result.first->first;
   PushFront(elem);
 }
 
-bool InferenceCache::TryGet(const CompressedFeatures& f, DualNet::Output* o) {
-  auto it = map_.find(f);
+bool InferenceCache::TryGet(Key key, DualNet::Output* output) {
+  auto it = map_.find(key);
   if (it == map_.end()) {
     return false;
   }
@@ -84,7 +89,7 @@ bool InferenceCache::TryGet(const CompressedFeatures& f, DualNet::Output* o) {
   auto* elem = &it->second;
   Unlink(elem);
   PushFront(elem);
-  *o = elem->output;
+  *output = elem->output;
   return true;
 }
 

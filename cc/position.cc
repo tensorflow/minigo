@@ -56,7 +56,7 @@ const std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
 
 Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play)
     : board_visitor_(bv), group_visitor_(gv), to_play_(to_play) {
-  // All moves are initiallly legal.
+  // All moves are initially legal.
   std::fill(legal_moves_.begin(), legal_moves_.end(), true);
 }
 
