@@ -7,8 +7,9 @@
 
 # Device specific hyperparameters re: batch size and LR schedules.
 --train_batch_size=4096
---lr_rates=0.01
---lr_rates=0.002
+--lr_rates=0.16
+--lr_rates=0.016
+--lr_rates=0.0016
 --lr_boundaries=25000
---l2_strength=0.001
-
+--lr_boundaries=37500
+--l2_strength=0.0001

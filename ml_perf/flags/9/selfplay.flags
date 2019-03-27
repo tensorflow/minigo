@@ -12,4 +12,4 @@
 
 # Device-specific selfplay flags.
 --parallel_games=2048
---virtual_losses=16
+--virtual_losses=8

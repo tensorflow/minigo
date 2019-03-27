@@ -44,7 +44,7 @@ def main(unused_argv):
   models = load_train_times()
   for i, (timestamp, name) in enumerate(models):
     winrate = wait(evaluate_model(name, target, sgf_dir, i + 1))
-    if winrate > 0.55:
+    if winrate >= 0.50:
       break
 
 
