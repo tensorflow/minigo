@@ -39,8 +39,8 @@ commands. This may vary on a different operating system or graphics card.
     # Compile and run C++ self-play and evaluation binaries
     bazel build  -c opt  --define=tf=1  --define=board_size=9  cc:selfplay  cc:eval
 
-    # Download target model
-    gsutil -m cp gs://tensor-go-ml-perf/models/9x9/target.pb ml_perf/
+    # Download required files from Google Cloud Storage
+    BOARD_SIZE=9 python ml_perf/get_data.py
 
     BASE_DIR=$(pwd)/results/$(date +%Y-%m-%d)
 
