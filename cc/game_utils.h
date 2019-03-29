@@ -16,9 +16,9 @@
 #define CC_GAME_UTILS_H_
 
 #include <cstddef>
+#include <string>
 #include <utility>
 #include <vector>
-#include <string>
 
 #include "absl/time/time.h"
 #include "cc/game.h"
@@ -62,7 +62,8 @@ std::string FormatWinStatsTable(
     const std::vector<std::pair<std::string, WinStats>>& stats);
 
 // Returns the name (specifically the basename stem) for an output game file
-// (e.g. SGF, TF example, etc) based on the current time, hostname and game ID.
+// (e.g. SGF, TF example, etc) based on the current time, hostname, process ID
+// and game ID.
 std::string GetOutputName(absl::Time now, size_t game_id);
 
 // Writes an SGF of the given game.

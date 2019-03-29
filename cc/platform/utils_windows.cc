@@ -14,9 +14,6 @@
 
 #include "cc/platform/utils.h"
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
 #include <cstring>
 
 namespace minigo {
@@ -28,6 +25,8 @@ int GetNumLogicalCpus() {
   GetSystemInfo(&sysinfo);
   return sysinfo.dwNumberOfProcessors;
 }
+
+ProcessId GetProcessId() { return ::GetCurrentProcessId(); }
 
 std::string GetHostname() {
   char hostname[256];

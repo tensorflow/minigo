@@ -15,7 +15,6 @@
 #include "cc/platform/utils.h"
 
 #include <sys/sysinfo.h>
-#include <unistd.h>
 #include <cstring>
 
 namespace minigo {
@@ -23,6 +22,8 @@ namespace minigo {
 bool FdSupportsAnsiColors(int fd) { return isatty(fd); }
 
 int GetNumLogicalCpus() { return get_nprocs(); }
+
+ProcessId GetProcessId() { return getpid(); }
 
 std::string GetHostname() {
   char hostname[256];

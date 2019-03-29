@@ -15,14 +15,11 @@
 #include "cc/platform/utils.h"
 
 #include <sys/sysctl.h>
-#include <unistd.h>
 #include <cstring>
 
 #include "cc/logging.h"
 
 namespace minigo {
-
-bool FdSupportsAnsiColors(int fd) { return isatty(fd); }
 
 int GetNumLogicalCpus() {
   int nproc = 0;
@@ -31,6 +28,10 @@ int GetNumLogicalCpus() {
   MG_CHECK(len == sizeof(nproc));
   return nproc;
 }
+
+bool FdSupportsAnsiColors(int fd) { return isatty(fd); }
+
+ProcessId GetProcessId() { return getpid(); }
 
 std::string GetHostname() {
   char hostname[256];

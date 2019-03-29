@@ -19,10 +19,15 @@
 
 #if defined(_MSC_VER)
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 #define MG_ALIGN(x) __declspec(align(x))
 #define MG_WARN_UNUSED_RESULT _Check_return_
 
 #elif defined(__GNUC__)
+
+#include <unistd.h>
 
 #define MG_ALIGN(x) __attribute__((aligned(x)))
 #define MG_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
@@ -31,11 +36,21 @@
 
 namespace minigo {
 
+// The underlying type of a process ID is platform-specific, unfortunately.
+#if defined(_MSC_VER)
+using ProcessId = DWORD;
+#elif defined(__GNUC__)
+using ProcessId = pid_t;
+#endif
+
 // Returns the number of logical CPUs.
 int GetNumLogicalCpus();
 
 // Returns true if the given file descriptor supports ANSI color codes.
 bool FdSupportsAnsiColors(int fd);
+
+// Returns ID of this process.
+ProcessId GetProcessId();
 
 // Returns the hostname if possible, or "unknown".
 std::string GetHostname();
