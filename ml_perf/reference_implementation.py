@@ -133,12 +133,42 @@ class WinStats:
     pattern = '\s*(\S+)' + '\s+(\d+)' * 8
     match = re.search(pattern, line)
     if match is None:
-        raise ValueError('Can\t parse line "{}"'.format(line))
+      raise ValueError('Can\t parse line "{}"'.format(line))
     self.model_name = match.group(1)
     raw_stats = [float(x) for x in match.groups()[1:]]
     self.black_wins = ColorWinStats(*raw_stats[:4])
     self.white_wins = ColorWinStats(*raw_stats[4:])
     self.total_wins = self.black_wins.total + self.white_wins.total
+
+
+def initialize_from_checkpoint(state):
+  """Initialize the reinforcement learning loop from a checkpoint."""
+
+  # The checkpoint's work_dir should contain the most recently trained model.
+  model_paths = glob.glob(os.path.join(FLAGS.checkpoint_dir,
+                                       'work_dir/model.ckpt-*.pb'))
+  if len(model_paths) != 1:
+    raise RuntimeError('Expected exactly one model in the checkpoint work_dir, '
+                       'got [{}]'.format(', '.join(model_paths)))
+  start_model_path = model_paths[0]
+
+  # Copy the latest trained model into the models directory and use it on the
+  # first round of selfplay.
+  state.best_model_name = 'checkpoint'
+  shutil.copy(start_model_path,
+              os.path.join(fsdb.models_dir(), state.best_model_name + '.pb'))
+
+  # Copy the training chunks.
+  golden_chunks_dir = os.path.join(FLAGS.checkpoint_dir, 'golden_chunks')
+  for basename in os.listdir(golden_chunks_dir):
+    path = os.path.join(golden_chunks_dir, basename)
+    shutil.copy(path, fsdb.golden_chunk_dir())
+
+  # Copy the training files.
+  work_dir = os.path.join(FLAGS.checkpoint_dir, 'work_dir')
+  for basename in os.listdir(work_dir):
+    path = os.path.join(work_dir, basename)
+    shutil.copy(path, fsdb.working_dir())
 
 
 def parse_win_stats_table(stats_str, num_lines):
@@ -334,7 +364,7 @@ def rl_loop():
 
   if FLAGS.checkpoint_dir:
     # Start from a partially trained model.
-    state.best_model_name = 'start'
+    initialize_from_checkpoint(state)
   else:
     # Play the first round of selfplay games with a fake model that returns
     # random noise. We do this instead of playing multiple games using a single
@@ -377,41 +407,11 @@ def rl_loop():
       wait(validate(state, holdout_glob))
       wait(selfplay(state))
 
-    # TODO(tommadams): if a model doesn't get promoted after N iterations,
-    # consider deleting the most recent N training checkpoints because training
-    # might have got stuck in a local minima.
     if model_win_rate >= FLAGS.gating_win_rate:
       # Promote the trained model to the best model and increment the generation
       # number.
       state.best_model_name = state.train_model_name
       state.gen_num += 1
-
-
-def initialize_checkpoint():
-  """Initialize the reinforcement learning loop from a checkpoint."""
-
-  # Copy the start model to the models directory.
-  start_model_path = os.path.join(FLAGS.checkpoint_dir, 'start')
-  shutil.copy(start_model_path + '.pb', fsdb.models_dir())
-
-  # Copy the start model into the working directory as a checkpoint.
-  for ext in ['.data-00000-of-00001', '.index', '.meta']:
-    shutil.copy(start_model_path + ext,
-                os.path.join(fsdb.working_dir(), 'model.ckpt-1' + ext))
-
-  # Write a dummy checkpoint file so the trainer starts from the start model's
-  # weights. Without this, the trainer will start training from a bootstrap
-  # model.
-  with gfile.Open(os.path.join(fsdb.working_dir(), 'checkpoint'), 'w') as f:
-    f.write('''
-        model_checkpoint_path: "model.ckpt-1"
-        all_model_checkpoint_paths: "model.ckpt-1"
-        ''')
-
-  # Copy the golden chunks to the golden chunks directory.
-  golden_chunk_path = os.path.join(FLAGS.checkpoint_dir, '*.tfrecord.zz')
-  for f in glob.glob(golden_chunk_path):
-    shutil.copy(f, fsdb.golden_chunk_dir())
 
 
 def main(unused_argv):
@@ -432,9 +432,6 @@ def main(unused_argv):
 
   # Copy the target model to the models directory so we can find it easily.
   shutil.copy(FLAGS.target_path, os.path.join(fsdb.models_dir(), 'target.pb'))
-
-  if FLAGS.checkpoint_dir:
-    initialize_checkpoint()
 
   logging.getLogger().addHandler(
       logging.FileHandler(os.path.join(FLAGS.base_dir, 'rl_loop.log')))

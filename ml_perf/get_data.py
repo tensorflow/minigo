@@ -18,22 +18,28 @@ import sys
 sys.path.insert(0, '.')  # nopep8
 
 import asyncio
+import glob
 import os
 
 from absl import app, flags
 from ml_perf import utils
 
-N = int(os.environ.get('BOARD_SIZE', 19))
-
-FLAGS = flags.FLAGS
+N = os.environ.get('BOARD_SIZE', '19')
 
 flags.DEFINE_string('src_dir', 'gs://minigo-pub/ml_perf/',
-                    'Directory on GCS to copy source data from.')
+                    'Directory on GCS to copy source data from. Files will be '
+                    'copied from subdirectories of src_dir corresponding to '
+                    'the BOARD_SIZE environment variable (defaults to 19).')
 
-flags.DEFINE_string('dst_dir', 'ml_perf/', 'Local directory to write to.')
+flags.DEFINE_string('dst_dir', 'ml_perf/',
+                    'Local directory to write to. Files will be written to '
+                    'subdirectories of dst_dir corresponding to the BOARD_SIZE '
+                    'environment variable (defaults to 19).')
 
 flags.DEFINE_boolean('use_tpu', False,
                      'Set to true to generate models that can run on Cloud TPU')
+
+FLAGS = flags.FLAGS
 
 
 def freeze_graph(path):
@@ -44,17 +50,21 @@ def freeze_graph(path):
 
 def main(unused_argv):
   try:
-    # Pull the required training checkpoints and models from GCS.
     for d in ['checkpoint', 'target']:
-      src = os.path.join(FLAGS.src_dir, d, str(N))
+      # Pull the required training checkpoints and models from GCS.
+      src = os.path.join(FLAGS.src_dir, d, N)
       dst = os.path.join(FLAGS.dst_dir, d)
       utils.ensure_dir_exists(dst)
-
       utils.wait(utils.checked_run('gsutil', '-m', 'cp', '-r', src, dst))
 
-    # Freeze the models to protos.
-    freeze_graph('ml_perf/target/{}/target'.format(N))
-    freeze_graph('ml_perf/checkpoint/{}/start'.format(N))
+    # Freeze the target model.
+    freeze_graph(os.path.join(FLAGS.dst_dir, 'target', N, 'target'))
+
+    # Freeze the training checkpoint models.
+    pattern = os.path.join(FLAGS.dst_dir, 'checkpoint', N, 'work_dir', '*.index')
+    for path in glob.glob(pattern):
+      freeze_graph(os.path.splitext(path)[0])
+
   finally:
     asyncio.get_event_loop().close()
 
