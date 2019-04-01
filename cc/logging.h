@@ -48,8 +48,6 @@ class LogStream {
 
  private:
   std::stringstream stream_;
-  const char* file_;
-  int line_;
   LogLevel level_;
 };
 
@@ -59,7 +57,6 @@ void ABSL_ATTRIBUTE_NOINLINE CheckFail(const char* cond, const char* file,
 class CheckFailStream {
  public:
   CheckFailStream(const char* cond, const char* file, int line);
-  ~CheckFailStream();
 
   template <typename T>
   CheckFailStream& operator<<(const T& t) {

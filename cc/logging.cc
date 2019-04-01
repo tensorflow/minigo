@@ -24,15 +24,40 @@
 
 namespace minigo {
 namespace internal {
+
 namespace {
+
 absl::Mutex* mutex() {
   static auto* m = new absl::Mutex();
   return m;
 }
+
+void DumpStackTrace(std::ostream* os) {
+  void* stack[64];
+  int depth = absl::GetStackTrace(stack, 64, 1);
+  char buffer[256];
+  for (int i = 0; i < depth; ++i) {
+    (*os) << "  " << stack[i] << "  ";
+    if (absl::Symbolize(stack[i], buffer, 256)) {
+      (*os) << buffer;
+    } else {
+      (*os) << "??";
+    }
+    (*os) << '\n';
+  }
+}
+
 }  // namespace
 
 LogStream::LogStream(const char* file, int line, LogLevel level)
-    : line_(line), level_(level) {
+    : level_(level) {
+  if (level == LogLevel::INFO) {
+    // We don't add a prefix to MG_LOG(INFO) log lines because many things rely
+    // on the exact string being printed (GTP, correct formatting of position &
+    // node descriptions, etc).
+    return;
+  }
+
   char c;
   switch (level) {
     case LogLevel::INFO:
@@ -51,30 +76,28 @@ LogStream::LogStream(const char* file, int line, LogLevel level)
       c = 'U';
       break;
   }
-  file_ = std::strrchr(file, '/');
-  if (file_ == nullptr) {
-    file_ = std::strrchr(file, '\\');
+  file = std::strrchr(file, '/');
+  if (file == nullptr) {
+    file = std::strrchr(file, '\\');
   }
-  if (file_ == nullptr) {
-    file_ = file;
+  if (file == nullptr) {
+    file = file;
   } else {
-    file_ += 1;
+    file += 1;
   }
-
-  // We don't add a prefix to MG_LOG(INFO) log lines because many things rely
-  // on the exact string being printed (GTP, correct formatting of position &
-  // node descriptions, etc).
-  if (level != LogLevel::INFO) {
-    *this << '[' << c << "] " << file_ << ':' << line_ << " : ";
-  }
+  *this << '[' << c << "] " << file << ':' << line << " : ";
 }
 
 LogStream::~LogStream() {
-  *this << '\n';
   {
     absl::MutexLock lock(mutex());
-    std::cerr << stream_.rdbuf() << std::flush;
+    std::cerr << stream_.rdbuf() << '\n';
+    if (level_ == LogLevel::FATAL) {
+      DumpStackTrace(&std::cerr);
+    }
+    std::cerr << std::flush;
   }
+
   if (level_ == LogLevel::FATAL) {
     exit(1);
   }
@@ -83,22 +106,6 @@ LogStream::~LogStream() {
 CheckFailStream::CheckFailStream(const char* cond, const char* file, int line)
     : impl_(file, line, LogLevel::FATAL) {
   impl_ << "check failed: " << cond << '\n';
-}
-
-CheckFailStream::~CheckFailStream() {
-  void* stack[64];
-  int depth = absl::GetStackTrace(stack, 64, 1);
-  char buffer[256];
-  impl_ << '\n';
-  for (int i = 0; i < depth; ++i) {
-    impl_ << "  " << stack[i] << "  ";
-    if (absl::Symbolize(stack[i], buffer, 256)) {
-      impl_ << buffer;
-    } else {
-      impl_ << "??";
-    }
-    impl_ << '\n';
-  }
 }
 
 }  // namespace internal
