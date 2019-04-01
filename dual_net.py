@@ -298,10 +298,13 @@ def model_fn(features, labels, mode, params):
             policy_output,
             tf.one_hot(policy_target_top_1, tf.shape(policy_output)[1]))
 
+        value_cost_normalized = value_cost / params['value_cost_weight']
+
         with tf.variable_scope("metrics"):
             metric_ops = {
                 'policy_cost': tf.metrics.mean(policy_cost),
                 'value_cost': tf.metrics.mean(value_cost),
+                'value_cost_normalized': tf.metrics.mean(value_cost_normalized),
                 'l2_cost': tf.metrics.mean(l2_cost),
                 'policy_entropy': tf.metrics.mean(policy_entropy),
                 'combined_cost': tf.metrics.mean(combined_cost),
