@@ -48,8 +48,8 @@ inline Hash MoveHash(Coord c, Color color) {
   return internal::kMoveHashes[c][static_cast<int>(color)];
 }
 
-// Hashes used for empty points that can't be played because of (e.g.) ko or
-// position superko.
+// Hashes used for empty points that can't be played because of things like
+// self-capture, ko or positional superko.
 inline Hash IllegalEmptyPointHash(Coord c) {
   return internal::kIllegalEmptyPointHashes[c];
 }
