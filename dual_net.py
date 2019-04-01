@@ -136,6 +136,7 @@ flags.DEFINE_integer(
     'SE_ratio', 2,
     help='Squeeze and Excitation ratio.')
 
+
 # TODO(seth): Verify if this is still required.
 flags.register_multi_flags_validator(
     ['use_tpu', 'iterations_per_loop', 'summary_steps'],
@@ -379,7 +380,7 @@ def model_inference_fn(features, training, params):
         (policy_output, value_output, logits) tuple of tensors.
     """
 
-    my_batchn = functools.partial(
+    mg_batchn = functools.partial(
         tf.layers.batch_normalization,
         axis=-1,
         momentum=.95,
@@ -389,7 +390,7 @@ def model_inference_fn(features, training, params):
         fused=True,
         training=training)
 
-    my_conv2d = functools.partial(
+    mg_conv2d = functools.partial(
         tf.layers.conv2d,
         filters=params['conv_width'],
         kernel_size=3,
@@ -397,25 +398,29 @@ def model_inference_fn(features, training, params):
         data_format="channels_last",
         use_bias=False)
 
-    my_global_avgpool2d = functools.partial(
+    mg_global_avgpool2d = functools.partial(
         tf.layers.average_pooling2d,
         pool_size=go.N,
         strides=1,
         padding="valid",
         data_format="channels_last")
 
+    def mg_activation(inputs):
+        return tf.nn.relu(inputs)
+
+
     def residual_inner(inputs):
-        conv_layer1 = my_batchn(my_conv2d(inputs))
-        initial_output = tf.nn.relu(conv_layer1)
-        conv_layer2 = my_batchn(my_conv2d(initial_output))
+        conv_layer1 = mg_batchn(mg_conv2d(inputs))
+        initial_output = mg_activation(conv_layer1)
+        conv_layer2 = mg_batchn(mg_conv2d(initial_output))
         return conv_layer2
 
-    def my_res_layer(inputs):
+    def mg_res_layer(inputs):
         residual = residual_inner(inputs)
-        output = tf.nn.relu(inputs + residual)
+        output = mg_activation(inputs + residual)
         return output
 
-    def my_squeeze_excitation_layer(inputs):
+    def mg_squeeze_excitation_layer(inputs):
         # Hu, J., Shen, L., & Sun, G. (2018). Squeeze-and-Excitation Networks.
         # 2018 IEEE/CVF Conference on Computer Vision, 7132-7141.
         # arXiv:1709.01507 [cs.CV]
@@ -425,9 +430,9 @@ def model_inference_fn(features, training, params):
         assert channels % ratio == 0
 
         residual = residual_inner(inputs)
-        pool = my_global_avgpool2d(residual)
+        pool = mg_global_avgpool2d(residual)
         fc1 = tf.layers.dense(pool, units=channels // ratio)
-        squeeze = tf.nn.relu(fc1)
+        squeeze = mg_activation(fc1)
 
         if FLAGS.use_SE_bias:
             fc2 = tf.layers.dense(squeeze, units=2*channels)
@@ -442,22 +447,22 @@ def model_inference_fn(features, training, params):
         scale = tf.reshape(sig, [-1, 1, 1, channels])
 
         excitation = tf.multiply(scale, residual) + bias
-        return tf.nn.relu(inputs + excitation)
+        return mg_activation(inputs + excitation)
 
-    initial_block = tf.nn.relu(my_batchn(my_conv2d(features)))
+    initial_block = mg_activation(mg_batchn(mg_conv2d(features)))
 
     # the shared stack
     shared_output = initial_block
     for _ in range(params['trunk_layers']):
         if FLAGS.use_SE or FLAGS.use_SE_bias:
-            shared_output = my_squeeze_excitation_layer(shared_output)
+            shared_output = mg_squeeze_excitation_layer(shared_output)
         else:
-            shared_output = my_res_layer(shared_output)
+            shared_output = mg_res_layer(shared_output)
 
-    # policy head
-    policy_conv = my_conv2d(
+    # Policy head
+    policy_conv = mg_conv2d(
         shared_output, filters=params['policy_conv_width'], kernel_size=1)
-    policy_conv = tf.nn.relu(my_batchn(policy_conv, center=False, scale=False))
+    policy_conv = mg_activation(mg_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
         tf.reshape(
             policy_conv, [-1, params['policy_conv_width'] * go.N * go.N]),
@@ -465,12 +470,12 @@ def model_inference_fn(features, training, params):
 
     policy_output = tf.nn.softmax(logits, name='policy_output')
 
-    # value head
-    value_conv = my_conv2d(
+    # Value head
+    value_conv = mg_conv2d(
         shared_output, filters=params['value_conv_width'], kernel_size=1)
-    value_conv = tf.nn.relu(my_batchn(value_conv, center=False, scale=False))
+    value_conv = mg_activation(mg_batchn(value_conv, center=False, scale=False))
 
-    value_fc_hidden = tf.nn.relu(tf.layers.dense(
+    value_fc_hidden = mg_activation(tf.layers.dense(
         tf.reshape(value_conv, [-1, params['value_conv_width'] * go.N * go.N]),
         params['fc_width']))
     value_output = tf.nn.tanh(
