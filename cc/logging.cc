@@ -60,9 +60,6 @@ LogStream::LogStream(const char* file, int line, LogLevel level)
 
   char c;
   switch (level) {
-    case LogLevel::INFO:
-      c = 'I';
-      break;
     case LogLevel::WARNING:
       c = 'W';
       break;
@@ -97,7 +94,6 @@ LogStream::~LogStream() {
     }
     std::cerr << std::flush;
   }
-
   if (level_ == LogLevel::FATAL) {
     exit(1);
   }
