@@ -16,6 +16,8 @@
 
 #include <tuple>
 
+#include "absl/memory/memory.h"
+
 namespace minigo {
 
 std::ostream& operator<<(std::ostream& os, InferenceCache::Key key) {
@@ -39,7 +41,7 @@ InferenceCache::Key::Key(Coord prev_move, const Position& position)
   }
 }
 
-size_t InferenceCache::CalculateCapacity(size_t size_mb) {
+size_t BasicInferenceCache::CalculateCapacity(size_t size_mb) {
   // Minimum load factory of an absl::node_hash_map at the time of writing,
   // taken from https://abseil.io/docs/cpp/guides/container.
   // This is a pessimistic estimate of the cache's load factor but since the
@@ -56,13 +58,20 @@ size_t InferenceCache::CalculateCapacity(size_t size_mb) {
   return static_cast<size_t>(size_mb * 1024.0f * 1024.0f / element_size);
 }
 
-InferenceCache::InferenceCache(size_t capacity) : capacity_(capacity) {
+BasicInferenceCache::BasicInferenceCache(size_t capacity)
+    : capacity_(capacity) {
+  MG_CHECK(capacity_ > 0);
+  Clear();
+}
+
+void BasicInferenceCache::Clear() {
   // Init the LRU list.
   list_.prev = &list_;
   list_.next = &list_;
+  map_.clear();
 }
 
-void InferenceCache::Add(Key key, const DualNet::Output& output) {
+void BasicInferenceCache::Add(Key key, const DualNet::Output& output) {
   if (map_.size() == capacity_) {
     // Cache is full, remove an element.
     auto it = map_.find(static_cast<Element*>(list_.prev)->key);
@@ -75,12 +84,14 @@ void InferenceCache::Add(Key key, const DualNet::Output& output) {
   auto result =
       map_.emplace(std::piecewise_construct, std::forward_as_tuple(key),
                    std::forward_as_tuple(key, output));
-  MG_CHECK(result.second);
   auto* elem = &result.first->second;
+  if (!result.second) {
+    Unlink(elem);  // The element was already in the cache.
+  }
   PushFront(elem);
 }
 
-bool InferenceCache::TryGet(Key key, DualNet::Output* output) {
+bool BasicInferenceCache::TryGet(Key key, DualNet::Output* output) {
   auto it = map_.find(key);
   if (it == map_.end()) {
     return false;
@@ -91,6 +102,39 @@ bool InferenceCache::TryGet(Key key, DualNet::Output* output) {
   PushFront(elem);
   *output = elem->output;
   return true;
+}
+
+ThreadSafeInferenceCache::ThreadSafeInferenceCache(size_t total_capacity,
+                                                   int num_shards) {
+  shards_.reserve(num_shards);
+  size_t shard_capacity_sum = 0;
+  for (int i = 0; i < num_shards; ++i) {
+    auto a = i * total_capacity / num_shards;
+    auto b = (i + 1) * total_capacity / num_shards;
+    auto shard_capacity = b - a;
+    shard_capacity_sum += shard_capacity;
+    shards_.push_back(absl::make_unique<Shard>(shard_capacity));
+  }
+  MG_CHECK(shard_capacity_sum == total_capacity);
+}
+
+void ThreadSafeInferenceCache::Clear() {
+  for (auto& shard : shards_) {
+    absl::MutexLock lock(&shard->mutex);
+    shard->cache.Clear();
+  }
+}
+
+void ThreadSafeInferenceCache::Add(Key key, const DualNet::Output& output) {
+  auto* shard = shards_[key.Shard(shards_.size())].get();
+  absl::MutexLock lock(&shard->mutex);
+  shard->cache.Add(key, output);
+}
+
+bool ThreadSafeInferenceCache::TryGet(Key key, DualNet::Output* output) {
+  auto* shard = shards_[key.Shard(shards_.size())].get();
+  absl::MutexLock lock(&shard->mutex);
+  return shard->cache.TryGet(key, output);
 }
 
 }  // namespace minigo

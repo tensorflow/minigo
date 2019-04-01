@@ -48,6 +48,8 @@ DEFINE_double(value_init_penalty, 0.0,
               "clamped to [-1, 1].\n"
               "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
               "This behaves similiarly to leela's FPU \"First Play Urgency\".");
+DEFINE_bool(tree_reuse, true,
+            "Enable reuse of shared subtrees between consecutive moves.");
 
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
@@ -66,7 +68,7 @@ DEFINE_double(decay_factor, 0.98,
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
               "inference engine.");
-DEFINE_int32(cache_size_mb, 512, "Size of the inference cache in MB.");
+DEFINE_int32(cache_size_mb, 0, "Size of the inference cache in MB.");
 
 namespace minigo {
 namespace {
@@ -82,6 +84,7 @@ void Gtp() {
   player_options.soft_pick = false;
   player_options.random_symmetry = true;
   player_options.value_init_penalty = FLAGS_value_init_penalty;
+  player_options.tree_reuse = FLAGS_tree_reuse;
   player_options.virtual_losses = FLAGS_virtual_losses;
   player_options.num_readouts = FLAGS_num_readouts;
   player_options.seconds_per_move = FLAGS_seconds_per_move;
@@ -94,13 +97,13 @@ void Gtp() {
   auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
   auto model_factory = NewDualNetFactory(model_desc.engine);
   auto model = model_factory->NewDualNet(model_desc.model);
-  std::unique_ptr<InferenceCache> cache;
+  std::unique_ptr<BasicInferenceCache> cache;
   if (FLAGS_cache_size_mb > 0) {
-    auto capacity = InferenceCache::CalculateCapacity(FLAGS_cache_size_mb);
+    auto capacity = BasicInferenceCache::CalculateCapacity(FLAGS_cache_size_mb);
     std::cerr << "Will cache up to " << capacity
               << " inferences, using roughly " << FLAGS_cache_size_mb
               << "MB.\n";
-    cache = absl::make_unique<InferenceCache>(capacity);
+    cache = absl::make_unique<BasicInferenceCache>(capacity);
   }
 
   Game game(model->name(), model->name(), game_options);

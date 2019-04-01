@@ -90,6 +90,12 @@ class MctsPlayer {
     // moves, it makes sense to keep the full tree around.
     bool prune_orphaned_nodes = true;
 
+    // If true, the subtree of a played move that was expanded during tree
+    // search will be kept.
+    // If false, all children of the current root will be deleted before each
+    // move is played.
+    bool tree_reuse = true;
+
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 

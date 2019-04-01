@@ -31,9 +31,9 @@ struct Inference {
   DualNet::Output output;
 };
 
-// Verify the LRU behavior of the cache.
-TEST(InferenceCacheTest, LruCache) {
-  InferenceCache cache(3);
+// Verify the LRU behavior of the basic cache.
+TEST(InferenceCacheTest, Basic) {
+  BasicInferenceCache cache(3);
 
   // Create some positions & inference outputs.
   Random rnd(614944751);

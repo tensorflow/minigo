@@ -91,6 +91,8 @@ minigo_cc_library(
         "//cc:base",
         "//cc:logging",
         "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 

@@ -16,10 +16,13 @@
 #define CC_DUAL_NET_INFERENCE_CACHE_H_
 
 #include <array>
+#include <memory>
 #include <ostream>
+#include <vector>
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_format.h"
+#include "absl/synchronization/mutex.h"
 #include "cc/constants.h"
 #include "cc/coord.h"
 #include "cc/dual_net/dual_net.h"
@@ -29,7 +32,6 @@
 namespace minigo {
 
 // An LRU cache for inferences.
-// Not thread safe.
 class InferenceCache {
  public:
   // The key used for the inference cache.
@@ -53,6 +55,8 @@ class InferenceCache {
       return a.cache_hash_ == b.cache_hash_ && a.stone_hash_ == b.stone_hash_;
     }
 
+    int Shard(int num_shards) const { return cache_hash_ % num_shards; }
+
     friend std::ostream& operator<<(std::ostream& os, Key key);
 
    private:
@@ -65,19 +69,30 @@ class InferenceCache {
     zobrist::Hash stone_hash_;
   };
 
+  // Clears the cache.
+  virtual void Clear() = 0;
+
+  // Adds the (features, inference output) pair to the cache.
+  // If the cache is full, the least-recently-used pair is evicted.
+  virtual void Add(Key key, const DualNet::Output& output) = 0;
+
+  // Looks up the inference output for the given features.
+  // If found, the features are marked as most-recently-used.
+  virtual bool TryGet(Key key, DualNet::Output* output) = 0;
+};
+
+// Not thread safe.
+class BasicInferenceCache : public InferenceCache {
+ public:
   // Calculates a reasonable approximation for how many elements can fit in
   // an InferenceCache of size_mb MB.
   static size_t CalculateCapacity(size_t size_mb);
 
-  explicit InferenceCache(size_t capacity);
+  explicit BasicInferenceCache(size_t capacity);
 
-  // Adds the (features, inference output) pair to the cache.
-  // If the cache is full, the least-recently-used pair is evicted.
-  void Add(Key key, const DualNet::Output& output);
-
-  // Looks up the inference output for the given features.
-  // If found, the features are marked as most-recently-used.
-  bool TryGet(Key key, DualNet::Output* output);
+  void Clear() override;
+  void Add(Key key, const DualNet::Output& output) override;
+  bool TryGet(Key key, DualNet::Output* output) override;
 
  private:
   struct ListNode {
@@ -121,6 +136,41 @@ class InferenceCache {
   Map map_;
 
   const size_t capacity_;
+};
+
+// Thread safe wrapper around BasicInferenceCache.
+// In order to reduce lock contention when playing large numbers of games in
+// parallel, ThreadSafeInferenceCache can use multiple BasicInferenceCaches,
+// each guarded by their own mutex lock. The cache a element is assigned to is
+// determined by InferenceCache::Key::Shard.
+class ThreadSafeInferenceCache : public InferenceCache {
+ public:
+  static size_t CalculateCapacity(size_t size_mb) {
+    // Ignore the size taken up by shards_ for now.
+    return BasicInferenceCache::CalculateCapacity(size_mb);
+  }
+
+  // `total_capacity` is the total number of elements the cache can hold.
+  // `num_shards` is the number BasicInferenceCaches to shard between.
+  ThreadSafeInferenceCache(size_t total_capacity, int num_shards);
+
+  // Note that each shard is locked and cleared in turn: if a Clear call is
+  // made concurrently with multiple Add calls, there may never be a point in
+  // time where the cache is completely empty (unless num_shards == 1).
+  void Clear() override;
+
+  void Add(Key key, const DualNet::Output& output) override;
+
+  bool TryGet(Key key, DualNet::Output* output) override;
+
+ private:
+  struct Shard {
+    explicit Shard(size_t capacity) : cache(capacity) {}
+    absl::Mutex mutex;
+    BasicInferenceCache cache;
+  };
+
+  std::vector<std::unique_ptr<Shard>> shards_;
 };
 
 }  // namespace minigo

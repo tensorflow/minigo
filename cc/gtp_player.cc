@@ -165,9 +165,7 @@ void GtpPlayer::Ponder() {
   // Remember the number of reads at the root.
   int n = root()->N();
 
-  std::vector<TreePath> paths;
-  SelectLeaves(root(), options().virtual_losses, &paths);
-  ProcessLeaves(absl::MakeSpan(paths), options().random_symmetry);
+  TreeSearch();
 
   // Increment the ponder count by difference new and old reads.
   ponder_read_count_ += root()->N() - n;
