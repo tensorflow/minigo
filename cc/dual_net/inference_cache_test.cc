@@ -73,6 +73,39 @@ TEST(InferenceCacheTest, Basic) {
   EXPECT_FALSE(cache.TryGet(inferences[0].key, &output));
 }
 
+TEST(InferenceCacheTest, ThreadSafe) {
+  ThreadSafeInferenceCache cache(4, 2);
+
+  // Create some positions & inference outputs.
+  Random rnd(614944751);
+  std::vector<Inference> inferences;
+  auto prev_move = Coord::kInvalid;
+  TestablePosition position("");
+  for (int i = 0; i < 4; ++i) {
+    auto key = InferenceCache::Key::CreateTestKey(i, i);
+    prev_move = GetRandomLegalMove(position, &rnd);
+    position.PlayMove(prev_move);
+
+    DualNet::Output output;
+    rnd.Uniform(&output.policy);
+    output.value = rnd();
+    inferences.emplace_back(key, output);
+  }
+
+  // Fill the cache.
+  for (const auto& inference : inferences) {
+    cache.Add(inference.key, inference.output);
+  }
+
+  // Verify that the elements stored in the cache are as expected.
+  DualNet::Output output;
+  for (const auto& inference : inferences) {
+    ASSERT_TRUE(cache.TryGet(inference.key, &output));
+    EXPECT_EQ(inference.output.policy, output.policy);
+    EXPECT_EQ(inference.output.value, output.value);
+  }
+}
+
 }  // namespace
 }  // namespace minigo
 

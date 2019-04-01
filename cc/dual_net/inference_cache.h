@@ -42,6 +42,11 @@ class InferenceCache {
   //  - whether the previous move was a pass.
   class Key {
    public:
+    // Constructs a test key directly.
+    // Provided to make testing possible.
+    static Key CreateTestKey(zobrist::Hash cache_hash,
+                             zobrist::Hash stone_hash);
+
     // Constructs a cache key from the given position and previous move made to
     // get to that position.
     Key(Coord prev_move, const Position& position);
@@ -60,6 +65,9 @@ class InferenceCache {
     friend std::ostream& operator<<(std::ostream& os, Key key);
 
    private:
+    Key(zobrist::Hash cache_hash, zobrist::Hash stone_hash)
+        : cache_hash_(cache_hash), stone_hash_(stone_hash) {}
+
     // There is a vanishingly small chance that two Positions could have
     // different stone hashes but the same computed hash for the inference
     // cache key. To avoid potential crashes in this case, the key compares both

@@ -25,8 +25,13 @@ std::ostream& operator<<(std::ostream& os, InferenceCache::Key key) {
                                   key.stone_hash_);
 }
 
+InferenceCache::Key InferenceCache::Key::CreateTestKey(
+    zobrist::Hash cache_hash, zobrist::Hash stone_hash) {
+  return InferenceCache::Key(cache_hash, stone_hash);
+}
+
 InferenceCache::Key::Key(Coord prev_move, const Position& position)
-    : cache_hash_(position.stone_hash()), stone_hash_(position.stone_hash()) {
+    : Key(position.stone_hash(), position.stone_hash()) {
   cache_hash_ ^= zobrist::ToPlayHash(position.to_play());
 
   if (prev_move == Coord::kPass) {
