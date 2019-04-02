@@ -24,6 +24,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "cc/constants.h"
+#include "cc/file/path.h"
 #include "cc/logging.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -163,7 +164,8 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
 
 TpuDualNet::TpuDualNet(const std::string& tpu_name,
                        const std::string& graph_path)
-    : graph_path_(graph_path) {
+    : DualNet(std::string(file::Stem(graph_path))),
+      graph_path_(graph_path) {
   // Make sure tpu_name looks like a valid name.
   MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
 

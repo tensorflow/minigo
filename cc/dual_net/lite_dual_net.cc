@@ -21,10 +21,10 @@
 #include "cc/file/path.h"
 #include "cc/logging.h"
 #include "cc/platform/utils.h"
-#include "tensorflow/contrib/lite/context.h"
-#include "tensorflow/contrib/lite/interpreter.h"
-#include "tensorflow/contrib/lite/kernels/register.h"
-#include "tensorflow/contrib/lite/model.h"
+#include "tensorflow/lite/context.h"
+#include "tensorflow/lite/interpreter.h"
+#include "tensorflow/lite/kernels/register.h"
+#include "tensorflow/lite/model.h"
 
 using tflite::FlatBufferModel;
 using tflite::InterpreterBuilder;

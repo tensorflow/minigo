@@ -27,7 +27,7 @@ cc_library(
             "**/*.a",
             "**/*.so",
             "tensorflow/flatbuffers/**",
-            "tensorflow/tensorflow/contrib/lite/**",
+            "tensorflow/tensorflow/lite/**",
         ],
     ),
     includes = [
@@ -62,7 +62,7 @@ cc_library(
     hdrs = glob(
         [
             "tensorflow/flatbuffers/*.h",
-            "tensorflow/tensorflow/contrib/lite/**",
+            "tensorflow/tensorflow/lite/**",
         ],
         exclude = ["**/*.so"],
     ),

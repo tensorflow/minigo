@@ -61,17 +61,20 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
     absl::string_view engine_desc) {
   MG_CHECK(!engine_desc.empty());
 
-  std::vector<absl::string_view> args = absl::StrSplit(engine_desc, ':');
-  auto engine = args[0];
-  args.erase(args.begin());
+  std::vector<std::string> parts = absl::StrSplit(engine_desc, absl::MaxSplits(':', 1));
+  auto engine = parts[0];
+  std::string arg_str;
+  if (parts.size() == 2) {
+    arg_str = std::move(parts[1]);
+  }
 
   if (engine == "fake") {
     return absl::make_unique<FakeDualNetFactory>();
   }
   if (engine == "random") {
-    MG_CHECK(args.size() == 1);
+    MG_CHECK(!arg_str.empty());
     uint64_t seed = 0;
-    MG_CHECK(absl::SimpleAtoi(args[0], &seed));
+    MG_CHECK(absl::SimpleAtoi(arg_str, &seed));
     // TODO(tommadams): expose policy_stddev & value_stddev as command line
     // arguments.
     return absl::make_unique<RandomDualNetFactory>(13 * seed, 0.4, 0.4);
@@ -79,28 +82,28 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
 
 #ifdef MG_ENABLE_TF_DUAL_NET
   if (engine == "tf") {
-    MG_CHECK(args.size() == 0);
+    MG_CHECK(arg_str.empty());
     return absl::make_unique<TfDualNetFactory>();
   }
 #endif  // MG_ENABLE_TF_DUAL_NET
 
 #ifdef MG_ENABLE_LITE_DUAL_NET
   if (engine == "lite") {
-    MG_CHECK(args.size() == 0);
+    MG_CHECK(arg_str.empty());
     return absl::make_unique<LiteDualNetFactory>();
   }
 #endif  // MG_ENABLE_LITE_DUAL_NET
 
 #ifdef MG_ENABLE_TPU_DUAL_NET
   if (engine == "tpu") {
-    MG_CHECK(args.size() == 1);
-    return absl::make_unique<TpuDualNetFactory>(args[0]);
+    MG_CHECK(!arg_str.empty());
+    return absl::make_unique<TpuDualNetFactory>(arg_str);
   }
 #endif  // MG_ENABLE_TPU_DUAL_NET
 
 #ifdef MG_ENABLE_TRT_DUAL_NET
   if (engine == "trt") {
-    MG_CHECK(args.size() == 0);
+    MG_CHECK(arg_str.empty());
     return absl::make_unique<TrtDualNetFactory>();
   }
 #endif  // MG_ENABLE_TRT_DUAL_NET
