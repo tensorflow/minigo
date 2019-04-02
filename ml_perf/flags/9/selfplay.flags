@@ -4,7 +4,7 @@
 # the RL loop.
 
 --num_games=4096
---num_readouts=320
+--num_readouts=240
 --value_init_penalty=0.2
 --holdout_pct=0.03
 --disable_resign_pct=0.1

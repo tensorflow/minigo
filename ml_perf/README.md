@@ -21,6 +21,12 @@ commands. This may vary on a different operating system or graphics card.
     # Install dependencies
     apt-get install -y python3 python3-pip rsync git wget pkg-config zip g++ zlib1g-dev unzip
 
+    # Create a virtualenv (this step is optional but highly recommended).
+    pip3 install virtualenv
+    pip3 install virtualenvwrapper
+    virtualenv -p /usr/bin/python3 --system-site-packages $HOME/.venvs/minigo
+    source $HOME/.venvs/minigo/bin/activate
+
     # Install Python dependencies
     pip3 install -r requirements.txt
 
