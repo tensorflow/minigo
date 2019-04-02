@@ -240,34 +240,37 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
   int num_cache_hits = 0;
   while (num_cache_misses < max_cache_misses) {
     auto* leaf = root->SelectLeaf();
+
     if (leaf->game_over() || leaf->at_move_limit()) {
       float value =
           leaf->position.CalculateScore(game_->options().komi) > 0 ? 1 : -1;
       leaf->IncorporateEndGameResult(value, root);
       ++num_cache_misses;
-    } else {
-      if (inference_cache_ != nullptr) {
-        InferenceCache::Key key(leaf->move, leaf->position);
-        if (inference_cache_->TryGet(key, &cached_output)) {
-          ++num_cache_hits;
-          leaf->IncorporateResults(options_.value_init_penalty,
-                                   cached_output.policy, cached_output.value,
-                                   root);
-          continue;
-        }
-      }
-      ++num_cache_misses;
+      continue;
+    }
 
-      leaf->AddVirtualLoss(root);
-      paths->emplace_back(root, leaf);
-      if (++num_selected == num_leaves) {
-        // We found enough leaves.
-        break;
+    if (inference_cache_ != nullptr) {
+      InferenceCache::Key key(leaf->move, leaf->position);
+      if (inference_cache_->TryGet(key, &cached_output)) {
+        ++num_cache_hits;
+        leaf->IncorporateResults(options_.value_init_penalty,
+                                 cached_output.policy, cached_output.value,
+                                 root);
+        continue;
       }
-      if (leaf == root) {
-        // If the root is a leaf, we can't possibly find any other leaves.
-        break;
-      }
+    }
+
+    ++num_cache_misses;
+
+    leaf->AddVirtualLoss(root);
+    paths->emplace_back(root, leaf);
+    if (++num_selected == num_leaves) {
+      // We found enough leaves.
+      break;
+    }
+    if (leaf == root) {
+      // If the root is a leaf, we can't possibly find any other leaves.
+      break;
     }
   }
 }

@@ -68,7 +68,9 @@ DEFINE_double(decay_factor, 0.98,
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
               "inference engine.");
-DEFINE_int32(cache_size_mb, 0, "Size of the inference cache in MB.");
+DEFINE_int32(cache_size_mb, 0,
+             "Size of the inference cache in MB. A value of 0 (the default) "
+             "disables the cache.");
 
 namespace minigo {
 namespace {
