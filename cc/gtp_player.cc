@@ -30,42 +30,39 @@
 
 namespace minigo {
 
-GtpPlayer::GtpPlayer(std::unique_ptr<DualNet> network,
-                     std::unique_ptr<InferenceCache> inference_cache,
-                     Game* game, const Options& options)
-    : MctsPlayer(std::move(network), std::move(inference_cache), game, options),
-      courtesy_pass_(options.courtesy_pass),
-      ponder_read_limit_(options.ponder_limit) {
-  if (ponder_read_limit_ > 0) {
+GtpClient::GtpClient(std::unique_ptr<MctsPlayer> player, const Options& options)
+    : player_(std::move(player)), options_(options) {
+  if (options_.ponder_limit > 0) {
     ponder_type_ = PonderType::kReadLimited;
   }
-  RegisterCmd("benchmark", &GtpPlayer::HandleBenchmark);
-  RegisterCmd("boardsize", &GtpPlayer::HandleBoardsize);
-  RegisterCmd("clear_board", &GtpPlayer::HandleClearBoard);
-  RegisterCmd("final_score", &GtpPlayer::HandleFinalScore);
-  RegisterCmd("genmove", &GtpPlayer::HandleGenmove);
-  RegisterCmd("known_command", &GtpPlayer::HandleKnownCommand);
-  RegisterCmd("komi", &GtpPlayer::HandleKomi);
-  RegisterCmd("list_commands", &GtpPlayer::HandleListCommands);
-  RegisterCmd("loadsgf", &GtpPlayer::HandleLoadsgf);
-  RegisterCmd("name", &GtpPlayer::HandleName);
-  RegisterCmd("play", &GtpPlayer::HandlePlay);
-  RegisterCmd("ponder", &GtpPlayer::HandlePonder);
-  RegisterCmd("readouts", &GtpPlayer::HandleReadouts);
-  RegisterCmd("showboard", &GtpPlayer::HandleShowboard);
-  RegisterCmd("undo", &GtpPlayer::HandleUndo);
-  RegisterCmd("verbosity", &GtpPlayer::HandleVerbosity);
+  RegisterCmd("benchmark", &GtpClient::HandleBenchmark);
+  RegisterCmd("boardsize", &GtpClient::HandleBoardsize);
+  RegisterCmd("clear_board", &GtpClient::HandleClearBoard);
+  RegisterCmd("final_score", &GtpClient::HandleFinalScore);
+  RegisterCmd("genmove", &GtpClient::HandleGenmove);
+  RegisterCmd("known_command", &GtpClient::HandleKnownCommand);
+  RegisterCmd("komi", &GtpClient::HandleKomi);
+  RegisterCmd("list_commands", &GtpClient::HandleListCommands);
+  RegisterCmd("loadsgf", &GtpClient::HandleLoadsgf);
+  RegisterCmd("name", &GtpClient::HandleName);
+  RegisterCmd("play", &GtpClient::HandlePlay);
+  RegisterCmd("ponder", &GtpClient::HandlePonder);
+  RegisterCmd("readouts", &GtpClient::HandleReadouts);
+  RegisterCmd("showboard", &GtpClient::HandleShowboard);
+  RegisterCmd("undo", &GtpClient::HandleUndo);
   NewGame();
 }
 
-void GtpPlayer::Run() {
+GtpClient::~GtpClient() = default;
+
+void GtpClient::Run() {
   // Perform a warm-up inference: ML frameworks like TensorFlow often perform
   // lazy initialization, causing the first inference to take substantially
   // longer than subsequent ones, which can interfere with time keeping.
   MG_LOG(INFO) << "Warming up...";
   DualNet::BoardFeatures features;
   DualNet::Output output;
-  network()->RunMany({&features}, {&output}, nullptr);
+  player_->network()->RunMany({&features}, {&output}, nullptr);
   MG_LOG(INFO) << "GTP engine ready";
 
   // Start a background thread that pushes lines read from stdin into the
@@ -116,19 +113,12 @@ void GtpPlayer::Run() {
   running = false;
 }
 
-void GtpPlayer::NewGame() {
-  MctsPlayer::NewGame();
+void GtpClient::NewGame() {
+  player_->NewGame();
   MaybeStartPondering();
 }
 
-Coord GtpPlayer::SuggestMove() {
-  if (courtesy_pass_ && root()->move == Coord::kPass) {
-    return Coord::kPass;
-  }
-  return MctsPlayer::SuggestMove();
-}
-
-void GtpPlayer::MaybeStartPondering() {
+void GtpClient::MaybeStartPondering() {
   if (ponder_type_ != PonderType::kOff) {
     ponder_limit_reached_ = false;
     ponder_read_count_ = 0;
@@ -138,15 +128,15 @@ void GtpPlayer::MaybeStartPondering() {
   }
 }
 
-bool GtpPlayer::MaybePonder() {
-  if (root()->game_over() || ponder_type_ == PonderType::kOff ||
+bool GtpClient::MaybePonder() {
+  if (player_->root()->game_over() || ponder_type_ == PonderType::kOff ||
       ponder_limit_reached_) {
     return false;
   }
 
   // Check if we're finished pondering.
   if ((ponder_type_ == PonderType::kReadLimited &&
-       ponder_read_count_ >= ponder_read_limit_) ||
+       ponder_read_count_ >= options_.ponder_limit) ||
       (ponder_type_ == PonderType::kTimeLimited &&
        absl::Now() >= ponder_time_limit_)) {
     if (!ponder_limit_reached_) {
@@ -161,17 +151,17 @@ bool GtpPlayer::MaybePonder() {
   return true;
 }
 
-void GtpPlayer::Ponder() {
+void GtpClient::Ponder() {
   // Remember the number of reads at the root.
-  int n = root()->N();
+  int n = player_->root()->N();
 
-  TreeSearch();
+  player_->TreeSearch();
 
   // Increment the ponder count by difference new and old reads.
-  ponder_read_count_ += root()->N() - n;
+  ponder_read_count_ += player_->root()->N() - n;
 }
 
-GtpPlayer::Response GtpPlayer::HandleCmd(const std::string& line) {
+GtpClient::Response GtpClient::HandleCmd(const std::string& line) {
   std::vector<absl::string_view> args =
       absl::StrSplit(line, absl::ByAnyChar(" \t\r\n"), absl::SkipWhitespace());
   if (args.empty()) {
@@ -202,7 +192,7 @@ GtpPlayer::Response GtpPlayer::HandleCmd(const std::string& line) {
   return response;
 }
 
-GtpPlayer::Response GtpPlayer::CheckArgsExact(size_t expected_num_args,
+GtpClient::Response GtpClient::CheckArgsExact(size_t expected_num_args,
                                               CmdArgs args) {
   if (args.size() != expected_num_args) {
     return Response::Error("expected ", expected_num_args, " args, got ",
@@ -211,7 +201,7 @@ GtpPlayer::Response GtpPlayer::CheckArgsExact(size_t expected_num_args,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::CheckArgsRange(size_t expected_min_args,
+GtpClient::Response GtpClient::CheckArgsRange(size_t expected_min_args,
                                               size_t expected_max_args,
                                               CmdArgs args) {
   if (args.size() < expected_min_args || args.size() > expected_max_args) {
@@ -222,7 +212,7 @@ GtpPlayer::Response GtpPlayer::CheckArgsRange(size_t expected_min_args,
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::DispatchCmd(const std::string& cmd,
+GtpClient::Response GtpClient::DispatchCmd(const std::string& cmd,
                                            CmdArgs args) {
   auto it = cmd_handlers_.find(cmd);
   if (it == cmd_handlers_.end()) {
@@ -231,7 +221,7 @@ GtpPlayer::Response GtpPlayer::DispatchCmd(const std::string& cmd,
   return it->second(args);
 }
 
-GtpPlayer::Response GtpPlayer::HandleBenchmark(CmdArgs args) {
+GtpClient::Response GtpClient::HandleBenchmark(CmdArgs args) {
   // benchmark [readouts] [virtual_losses]
   // Note: By default use current time_control (readouts or time).
   auto response = CheckArgsRange(0, 2, args);
@@ -239,8 +229,8 @@ GtpPlayer::Response GtpPlayer::HandleBenchmark(CmdArgs args) {
     return response;
   }
 
-  auto saved_options = options();
-  MctsPlayer::Options temp_options = options();
+  auto saved_options = player_->options();
+  auto temp_options = saved_options;
 
   if (args.size() > 0) {
     temp_options.seconds_per_move = 0;
@@ -255,17 +245,14 @@ GtpPlayer::Response GtpPlayer::HandleBenchmark(CmdArgs args) {
     }
   }
 
-  // Set options.
-  *mutable_options() = temp_options;
-  // Run benchmark.
-  MctsPlayer::SuggestMove();
-  // Reset options.
-  *mutable_options() = saved_options;
+  player_->SetOptions(temp_options);
+  player_->SuggestMove();
+  player_->SetOptions(saved_options);
 
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleBoardsize(CmdArgs args) {
+GtpClient::Response GtpClient::HandleBoardsize(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
@@ -279,7 +266,7 @@ GtpPlayer::Response GtpPlayer::HandleBoardsize(CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleClearBoard(CmdArgs args) {
+GtpClient::Response GtpClient::HandleClearBoard(CmdArgs args) {
   auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
@@ -288,43 +275,49 @@ GtpPlayer::Response GtpPlayer::HandleClearBoard(CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleFinalScore(CmdArgs args) {
+GtpClient::Response GtpClient::HandleFinalScore(CmdArgs args) {
   auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
-  if (!game()->game_over()) {
+  if (!player_->game()->game_over()) {
     // Game isn't over yet, calculate the current score using Tromp-Taylor
     // scoring.
-    return Response::Ok(Game::FormatScore(
-        root()->position.CalculateScore(game()->options().komi)));
+    return Response::Ok(
+        Game::FormatScore(player_->root()->position.CalculateScore(
+            player_->game()->options().komi)));
   } else {
     // Game is over, we have the result available.
-    return Response::Ok(game()->result_string());
+    return Response::Ok(player_->game()->result_string());
   }
 }
 
-GtpPlayer::Response GtpPlayer::HandleGenmove(CmdArgs args) {
+GtpClient::Response GtpClient::HandleGenmove(CmdArgs args) {
   auto response = CheckArgsRange(0, 1, args);
   if (!response.ok) {
     return response;
   }
-  if (root()->game_over()) {
+  if (player_->root()->game_over()) {
     return Response::Error("game is over");
   }
 
   // TODO(tommadams): Handle out of turn moves.
 
-  auto c = SuggestMove();
-  MG_LOG(INFO) << root()->Describe();
-  MG_CHECK(PlayMove(c));
+  Coord c = Coord::kInvalid;
+  if (options_.courtesy_pass && player_->root()->move == Coord::kPass) {
+    c = Coord::kPass;
+  } else {
+    c = player_->SuggestMove();
+  }
+  MG_LOG(INFO) << player_->root()->Describe();
+  MG_CHECK(player_->PlayMove(c));
 
   MaybeStartPondering();
 
   return Response::Ok(c.ToGtp());
 }
 
-GtpPlayer::Response GtpPlayer::HandleKnownCommand(CmdArgs args) {
+GtpClient::Response GtpClient::HandleKnownCommand(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
@@ -338,21 +331,21 @@ GtpPlayer::Response GtpPlayer::HandleKnownCommand(CmdArgs args) {
   return Response::Ok(result);
 }
 
-GtpPlayer::Response GtpPlayer::HandleKomi(CmdArgs args) {
+GtpClient::Response GtpClient::HandleKomi(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
 
   double x;
-  if (!absl::SimpleAtod(args[0], &x) || x != game()->options().komi) {
+  if (!absl::SimpleAtod(args[0], &x) || x != player_->game()->options().komi) {
     return Response::Error("unacceptable komi");
   }
 
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleListCommands(CmdArgs args) {
+GtpClient::Response GtpClient::HandleListCommands(CmdArgs args) {
   auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
@@ -367,7 +360,7 @@ GtpPlayer::Response GtpPlayer::HandleListCommands(CmdArgs args) {
   return response;
 }
 
-GtpPlayer::Response GtpPlayer::HandleLoadsgf(CmdArgs args) {
+GtpClient::Response GtpClient::HandleLoadsgf(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
@@ -388,7 +381,7 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(CmdArgs args) {
 
   if (!trees.empty()) {
     for (const auto& move : trees[0]->ExtractMainLine()) {
-      if (!PlayMove(move.c)) {
+      if (!player_->PlayMove(move.c)) {
         MG_LOG(ERROR) << "couldn't play move " << move.c;
         return Response::Error("cannot load file");
       }
@@ -398,20 +391,20 @@ GtpPlayer::Response GtpPlayer::HandleLoadsgf(CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleName(CmdArgs args) {
+GtpClient::Response GtpClient::HandleName(CmdArgs args) {
   auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
-  return Response::Ok(absl::StrCat("minigo-", network()->name()));
+  return Response::Ok(absl::StrCat("minigo-", player_->network()->name()));
 }
 
-GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {
+GtpClient::Response GtpClient::HandlePlay(CmdArgs args) {
   auto response = CheckArgsExact(2, args);
   if (!response.ok) {
     return response;
   }
-  if (root()->game_over()) {
+  if (player_->root()->game_over()) {
     return Response::Error("game is over");
   }
 
@@ -424,7 +417,7 @@ GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {
     MG_LOG(ERROR) << "expected b or w for player color, got " << args[0];
     return Response::Error("illegal move");
   }
-  if (color != root()->position.to_play()) {
+  if (color != player_->root()->position.to_play()) {
     return Response::Error("out of turn moves are not yet supported");
   }
 
@@ -434,14 +427,14 @@ GtpPlayer::Response GtpPlayer::HandlePlay(CmdArgs args) {
     return Response::Error("illegal move");
   }
 
-  if (!PlayMove(c)) {
+  if (!player_->PlayMove(c)) {
     return Response::Error("illegal move");
   }
 
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandlePonder(CmdArgs args) {
+GtpClient::Response GtpClient::HandlePonder(CmdArgs args) {
   auto response = CheckArgsRange(1, 2, args);
   if (!response.ok) {
     return response;
@@ -451,7 +444,7 @@ GtpPlayer::Response GtpPlayer::HandlePonder(CmdArgs args) {
     // Disable pondering.
     ponder_type_ = PonderType::kOff;
     ponder_read_count_ = 0;
-    ponder_read_limit_ = 0;
+    options_.ponder_limit = 0;
     ponder_duration_ = {};
     ponder_time_limit_ = absl::InfinitePast();
     ponder_limit_reached_ = true;
@@ -470,7 +463,7 @@ GtpPlayer::Response GtpPlayer::HandlePonder(CmdArgs args) {
     if (!absl::SimpleAtoi(args[1], &read_limit) || read_limit <= 0) {
       return Response::Error("couldn't parse read limit");
     }
-    ponder_read_limit_ = read_limit;
+    options_.ponder_limit = read_limit;
     ponder_type_ = PonderType::kReadLimited;
     ponder_read_count_ = 0;
     ponder_limit_reached_ = false;
@@ -493,7 +486,7 @@ GtpPlayer::Response GtpPlayer::HandlePonder(CmdArgs args) {
   return Response::Error("unrecognized ponder mode");
 }
 
-GtpPlayer::Response GtpPlayer::HandleReadouts(CmdArgs args) {
+GtpClient::Response GtpClient::HandleReadouts(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
@@ -503,50 +496,37 @@ GtpPlayer::Response GtpPlayer::HandleReadouts(CmdArgs args) {
   if (!absl::SimpleAtoi(args[0], &x) || x <= 0) {
     return Response::Error("couldn't parse ", args[0], " as an integer > 0");
   } else {
-    mutable_options()->num_readouts = x;
+    auto options = player_->options();
+    options.num_readouts = x;
+    player_->SetOptions(options);
   }
 
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleShowboard(CmdArgs args) {
+GtpClient::Response GtpClient::HandleShowboard(CmdArgs args) {
   auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
   return Response::Ok(
-      absl::StrCat("\n", root()->position.ToPrettyString(false)));
+      absl::StrCat("\n", player_->root()->position.ToPrettyString(false)));
 }
 
-GtpPlayer::Response GtpPlayer::HandleUndo(CmdArgs args) {
+GtpClient::Response GtpClient::HandleUndo(CmdArgs args) {
   auto response = CheckArgsExact(0, args);
   if (!response.ok) {
     return response;
   }
 
-  if (!UndoMove()) {
+  if (!player_->UndoMove()) {
     return Response::Error("cannot undo");
   }
 
   return Response::Ok();
 }
 
-GtpPlayer::Response GtpPlayer::HandleVerbosity(CmdArgs args) {
-  auto response = CheckArgsRange(0, 1, args);
-  if (!response.ok) {
-    return response;
-  }
-
-  int x;
-  if (!absl::SimpleAtoi(args[0], &x)) {
-    return Response::Error("bad verbosity");
-  }
-  mutable_options()->verbose = x != 0;
-
-  return Response::Ok();
-}
-
-GtpPlayer::Response GtpPlayer::ParseSgf(
+GtpClient::Response GtpClient::ParseSgf(
     const std::string& sgf_str,
     std::vector<std::unique_ptr<sgf::Node>>* trees) {
   sgf::Ast ast;

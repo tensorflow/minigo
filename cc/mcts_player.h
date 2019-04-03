@@ -106,6 +106,16 @@ class MctsPlayer {
     const MctsNode* node = nullptr;
   };
 
+  // Path in the game tree from leaf to root.
+  struct TreePath {
+    TreePath(MctsNode* root, MctsNode* leaf) : root(root), leaf(leaf) {}
+    MctsNode* root;
+    MctsNode* leaf;
+  };
+
+  // Callback invoked on each batch of leaves expanded during tree search.
+  using TreeSearchCallback = std::function<void(absl::Span<TreePath>)>;
+
   // If position is non-null, the player will be initilized with that board
   // state. Otherwise, the player is initialized with an empty board with black
   // to play.
@@ -119,6 +129,8 @@ class MctsPlayer {
 
   virtual void NewGame();
 
+  // If visitor is non-null, it is called on each batch of leaves visited during
+  // tree search.
   virtual Coord SuggestMove();
 
   // Plays the move at point c.
@@ -126,57 +138,50 @@ class MctsPlayer {
   // the game over state if appropriate.
   virtual bool PlayMove(Coord c);
 
+  // Moves the root_ node up to its parent, popping the last move off the game
+  // history but preserving the game tree.
+  virtual bool UndoMove();
+
   bool ShouldResign() const;
+
+  void SetTreeSearchCallback(TreeSearchCallback cb);
 
   // Returns a string containing the list of all models used for inference, and
   // which moves they were used for.
   std::string GetModelsUsedForInference() const;
 
   // Returns the root of the current search tree, i.e. the current board state.
+  // TODO(tommadams): Remove mutable access to the root once MiniguiGtpPlayer
+  // no longer calls SelectLeaves directly.
   MctsNode* root() { return root_; }
   const MctsNode* root() const { return root_; }
+
+  Game* game() { return game_; }
 
   const Options& options() const { return options_; }
   const std::string& name() const { return network_->name(); }
   DualNet* network() { return network_.get(); }
 
- protected:
-  // Path in the game tree from leaf to root.
-  struct TreePath {
-    TreePath(MctsNode* root, MctsNode* leaf) : root(root), leaf(leaf) {}
-    MctsNode* root;
-    MctsNode* leaf;
-  };
+  void SetOptions(const Options& options) { options_ = options; }
 
-  Options* mutable_options() { return &options_; }
-
-  Coord PickMove();
-
+  // TODO(tommadams): remove this once the inference cache is integrated and we
+  // no longer rely on tree reuse for Minigui.
   // Resets the root_ node back to the game_root_, clearing the game history but
   // preserving the game tree.
   // This is used to rewind the game during review.
   void ResetRoot();
-
-  // Moves the root_ node up to its parent, popping the last move off the game
-  // history but preserving the game tree.
-  bool UndoMove();
 
   void TreeSearch();
 
   void SelectLeaves(MctsNode* root, int num_leaves,
                     std::vector<MctsPlayer::TreePath>* paths);
 
-  // Returns the root of the game tree.
-  MctsNode* game_root() { return &game_root_; }
-  const MctsNode* game_root() const { return &game_root_; }
-
-  Game* game() { return game_; }
-  const Game* game() const { return game_; }
-
-  Random* rnd() { return &rnd_; }
-
   // Run inference for the given leaf nodes & incorportate the inference output.
-  virtual void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);
+  void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry);
+
+  // Protected methods that get exposed for testing.
+ protected:
+  Coord PickMove();
 
  private:
   // State that tracks which model is used for each inference.
@@ -236,6 +241,8 @@ class MctsPlayer {
   std::vector<DualNet::Output> outputs_;
   std::vector<symmetry::Symmetry> symmetries_used_;
   std::vector<const Position::Stones*> recent_positions_;
+
+  TreeSearchCallback tree_search_cb_ = nullptr;
 };
 
 }  // namespace minigo

@@ -280,6 +280,10 @@ bool MctsPlayer::ShouldResign() const {
          root_->Q_perspective() < game_->options().resign_threshold;
 }
 
+void MctsPlayer::SetTreeSearchCallback(TreeSearchCallback cb) {
+  tree_search_cb_ = std::move(cb);
+}
+
 std::string MctsPlayer::GetModelsUsedForInference() const {
   std::vector<std::string> parts;
   parts.reserve(inferences_.size());
@@ -489,6 +493,10 @@ void MctsPlayer::ProcessLeaves(absl::Span<TreePath> paths,
     }
 
     leaf->RevertVirtualLoss(root);
+  }
+
+  if (tree_search_cb_ != nullptr) {
+    tree_search_cb_(paths);
   }
 }
 

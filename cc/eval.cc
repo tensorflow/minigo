@@ -127,7 +127,8 @@ class Evaluator {
     }
 
    private:
-    std::unique_ptr<DualNet> NewDualNetImpl() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
+    std::unique_ptr<DualNet> NewDualNetImpl()
+        EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
       auto dual_net = batcher_->NewDualNet(path_);
       if (name_.empty()) {
         name_ = dual_net->name();
@@ -217,12 +218,12 @@ class Evaluator {
 
     const bool verbose = thread_id == 0;
     player_options.verbose = false;
-    auto black = absl::make_unique<MctsPlayer>(
-        black_model->NewDualNet(), nullptr, &game, player_options);
+    auto black = absl::make_unique<MctsPlayer>(black_model->NewDualNet(),
+                                               nullptr, &game, player_options);
 
     player_options.verbose = false;
-    auto white = absl::make_unique<MctsPlayer>(
-        white_model->NewDualNet(), nullptr, &game, player_options);
+    auto white = absl::make_unique<MctsPlayer>(white_model->NewDualNet(),
+                                               nullptr, &game, player_options);
 
     BatchingDualNetFactory::StartGame(black->network(), white->network());
     auto* curr_player = black.get();

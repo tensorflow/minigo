@@ -38,9 +38,9 @@
 
 namespace minigo {
 
-class GtpPlayer : public MctsPlayer {
+class GtpClient {
  public:
-  struct Options : public MctsPlayer::Options {
+  struct Options {
     // If non-zero, GtpPlayer will print the current state of its tree search
     // every report_search_interval to stderr in a format recognized by Minigui.
     absl::Duration report_search_interval;
@@ -54,13 +54,11 @@ class GtpPlayer : public MctsPlayer {
     bool courtesy_pass = false;
   };
 
-  GtpPlayer(std::unique_ptr<DualNet> network,
-            std::unique_ptr<InferenceCache> inference_cache, Game* game,
-            const Options& options);
+  GtpClient(std::unique_ptr<MctsPlayer> player, const Options& options);
+  virtual ~GtpClient();
 
-  void Run();
-  void NewGame() override;
-  Coord SuggestMove() override;
+  virtual void Run();
+  virtual void NewGame();
 
  protected:
   // Response from the GTP command handler.
@@ -122,8 +120,8 @@ class GtpPlayer : public MctsPlayer {
   // Templated to allow commands from subclasses to be registered.
   template <typename T>
   void RegisterCmd(const std::string& cmd, Response (T::*handler)(CmdArgs)) {
-    static_assert(std::is_base_of<GtpPlayer, T>::value,
-                  "T must be derived from GtpPlayer");
+    static_assert(std::is_base_of<GtpClient, T>::value,
+                  "T must be derived from GtpClient");
     cmd_handlers_[cmd] =
         std::bind(handler, static_cast<T*>(this), std::placeholders::_1);
   }
@@ -165,15 +163,12 @@ class GtpPlayer : public MctsPlayer {
   virtual Response HandleReadouts(CmdArgs args);
   virtual Response HandleShowboard(CmdArgs args);
   virtual Response HandleUndo(CmdArgs args);
-  virtual Response HandleVerbosity(CmdArgs args);
 
   // Utilities for processing SGF files.
   Response ParseSgf(const std::string& sgf_str,
                     std::vector<std::unique_ptr<sgf::Node>>* trees);
 
-  bool courtesy_pass_;
-  absl::Duration report_search_interval_;
-  absl::Time last_report_time_;
+  std::unique_ptr<MctsPlayer> player_;
 
   // There are two kinds of pondering supported:
   //   kReadLimited: pondering will run for a maximum number of reads.
@@ -185,10 +180,11 @@ class GtpPlayer : public MctsPlayer {
   };
   PonderType ponder_type_ = PonderType::kOff;
   int ponder_read_count_ = 0;
-  int ponder_read_limit_ = 0;
   absl::Duration ponder_duration_ = {};
   absl::Time ponder_time_limit_ = absl::InfinitePast();
   bool ponder_limit_reached_ = false;
+
+  Options options_;
 
   absl::flat_hash_map<std::string, std::function<Response(CmdArgs)>>
       cmd_handlers_;

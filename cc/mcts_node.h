@@ -102,7 +102,9 @@ class MctsNode {
   };
 
   void SetFlag(Flag flag) { flags |= static_cast<uint8_t>(flag); }
-  bool HasFlag(Flag flag) { return (flags & static_cast<uint8_t>(flag)) != 0; }
+  bool HasFlag(Flag flag) const {
+    return (flags & static_cast<uint8_t>(flag)) != 0;
+  }
 
   // Finds the best move by visit count, N. Ties are broken using the child
   // action score.

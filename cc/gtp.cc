@@ -79,9 +79,7 @@ void Gtp() {
   Game::Options game_options;
   game_options.resign_threshold = FLAGS_resign_threshold;
 
-  GtpPlayer::Options player_options;
-  player_options.ponder_limit = FLAGS_ponder_limit;
-  player_options.courtesy_pass = FLAGS_courtesy_pass;
+  MctsPlayer::Options player_options;
   player_options.inject_noise = false;
   player_options.soft_pick = false;
   player_options.random_symmetry = true;
@@ -93,9 +91,12 @@ void Gtp() {
   player_options.time_limit = FLAGS_time_limit;
   player_options.decay_factor = FLAGS_decay_factor;
 
+  GtpClient::Options client_options;
+  client_options.ponder_limit = FLAGS_ponder_limit;
+  client_options.courtesy_pass = FLAGS_courtesy_pass;
+
   MG_LOG(INFO) << game_options << " " << player_options;
 
-  std::unique_ptr<GtpPlayer> player;
   auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
   auto model_factory = NewDualNetFactory(model_desc.engine);
   auto model = model_factory->NewDualNet(model_desc.model);
@@ -109,14 +110,17 @@ void Gtp() {
   }
 
   Game game(model->name(), model->name(), game_options);
+  auto player = absl::make_unique<MctsPlayer>(
+      std::move(model), std::move(cache), &game, player_options);
+
+  std::unique_ptr<GtpClient> client;
   if (FLAGS_minigui) {
-    player = absl::make_unique<MiniguiPlayer>(
-        std::move(model), std::move(cache), &game, player_options);
+    client =
+        absl::make_unique<MiniguiGtpClient>(std::move(player), client_options);
   } else {
-    player = absl::make_unique<GtpPlayer>(std::move(model), std::move(cache),
-                                          &game, player_options);
+    client = absl::make_unique<GtpClient>(std::move(player), client_options);
   }
-  player->Run();
+  client->Run();
 }
 
 }  // namespace

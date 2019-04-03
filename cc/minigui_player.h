@@ -34,18 +34,12 @@
 
 namespace minigo {
 
-class MiniguiPlayer : public GtpPlayer {
+class MiniguiGtpClient : public GtpClient {
  public:
-  MiniguiPlayer(std::unique_ptr<DualNet> network,
-                std::unique_ptr<InferenceCache> inference_cache, Game* game,
-                const Options& options);
+  MiniguiGtpClient(std::unique_ptr<MctsPlayer> player, const Options& options);
+  ~MiniguiGtpClient() override;
 
   void NewGame() override;
-  Coord SuggestMove() override;
-  bool PlayMove(Coord c) override;
-
- protected:
-  void ProcessLeaves(absl::Span<TreePath> paths, bool random_symmetry) override;
 
  private:
   // We maintain some auxiliary data structures about nodes in the search tree
@@ -86,13 +80,11 @@ class MiniguiPlayer : public GtpPlayer {
   void Ponder() override;
 
   Response HandleCmd(const std::string& line) override;
-  Response HandleClearBoard(CmdArgs args) override;
   Response HandleGenmove(CmdArgs args) override;
   Response HandleLoadsgf(CmdArgs args) override;
   Response HandlePlay(CmdArgs args) override;
 
   Response HandleEcho(CmdArgs args);
-  Response HandleInfo(CmdArgs args);
   Response HandlePruneNodes(CmdArgs args);
   Response HandleReportSearchInterval(CmdArgs args);
   Response HandleSelectPosition(CmdArgs args);
@@ -110,18 +102,14 @@ class MiniguiPlayer : public GtpPlayer {
   // Writes the position data for the node to stderr as a JSON object.
   void ReportPosition(MctsNode* node);
 
-  // Registers the given node as having been played during the game,
-  // assigning the node a unique ID and constructing AuxInfo for it.
-  AuxInfo* RegisterNode(MctsNode* node);
-
   // Gets the AuxInfo for the given node.
-  // CHECK fails if there isn't any AuxInfo, which means that RegisterNode
-  // hasn't previously been called: this node doesn't correspond to a move
-  // played during the game or a variation (it's a node from tree search).
-  AuxInfo* GetAuxInfo(MctsNode* node) const;
+  // If AuxInfo doesn't yet exist, create it.
+  AuxInfo* GetAuxInfo(MctsNode* node);
 
   // Clears the to_eval_ win rate evaluation queue and repopulates it.
   void RefreshPendingWinRateEvals();
+
+  void TreeSearchCb(absl::Span<MctsPlayer::TreePath> paths);
 
   // Map from MctsNode to auxiliary info about that node used by the GtpPlayer.
   absl::flat_hash_map<MctsNode*, std::unique_ptr<AuxInfo>> node_to_info_;
@@ -141,6 +129,10 @@ class MiniguiPlayer : public GtpPlayer {
   // estimation reads (while there are still some remaining) and regular
   // pondering.
   bool do_winrate_eval_reads_ = true;
+
+  // Used to track when to print the current tree search status to stderr.
+  absl::Duration report_search_interval_;
+  absl::Time last_report_time_;
 };
 
 }  // namespace minigo

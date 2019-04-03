@@ -71,16 +71,9 @@ class TestablePlayer : public MctsPlayer {
   using MctsPlayer::PlayMove;
   using MctsPlayer::ProcessLeaves;
   using MctsPlayer::ResetRoot;
-  using MctsPlayer::rnd;
   using MctsPlayer::TreePath;
   using MctsPlayer::TreeSearch;
   using MctsPlayer::UndoMove;
-
-  std::array<float, kNumMoves> Noise() {
-    std::array<float, kNumMoves> noise;
-    rnd()->Dirichlet(kDirichletAlpha, &noise);
-    return noise;
-  }
 
   DualNet::Output Run(const DualNet::BoardFeatures& features) {
     DualNet::Output output;
@@ -89,7 +82,9 @@ class TestablePlayer : public MctsPlayer {
   }
 
   void TreeSearch(int virtual_losses) {
-    mutable_options()->virtual_losses = virtual_losses;
+    auto o = options();
+    o.virtual_losses = virtual_losses;
+    SetOptions(o);
     TreeSearch();
   }
 };
@@ -187,7 +182,10 @@ TEST_F(MctsPlayerTest, InjectNoise) {
     EXPECT_EQ(root->child_U(0), root->child_U(i));
   }
 
-  root->InjectNoise(player->Noise(), 0.25);
+  Random rnd(456943875);
+  std::array<float, kNumMoves> noise;
+  rnd.Dirichlet(kDirichletAlpha, &noise);
+  root->InjectNoise(noise, 0.25);
 
   // Priors should still be normalized after injecting noise.
   sum_P = 0;
@@ -346,7 +344,7 @@ TEST_F(MctsPlayerTest, ColdStartParallelTreeSearch) {
   options.random_seed = 17;
   auto player = absl::make_unique<TestablePlayer>(absl::Span<const float>(),
                                                   0.17, game_.get(), options);
-  auto* root = player->root();
+  const auto* root = player->root();
 
   // Test that parallel tree search doesn't trip on an empty tree.
   EXPECT_EQ(0, root->N());

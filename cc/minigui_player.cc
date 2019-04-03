@@ -32,46 +32,34 @@
 
 namespace minigo {
 
-MiniguiPlayer::MiniguiPlayer(std::unique_ptr<DualNet> network,
-                             std::unique_ptr<InferenceCache> inference_cache,
-                             Game* game, const Options& options)
-    : GtpPlayer(std::move(network), std::move(inference_cache), game, options) {
-  RegisterCmd("clear_board", &MiniguiPlayer::HandleClearBoard);
-  RegisterCmd("echo", &MiniguiPlayer::HandleEcho);
-  RegisterCmd("genmove", &MiniguiPlayer::HandleGenmove);
-  RegisterCmd("info", &MiniguiPlayer::HandleInfo);
-  RegisterCmd("loadsgf", &MiniguiPlayer::HandleLoadsgf);
-  RegisterCmd("play", &MiniguiPlayer::HandlePlay);
-  RegisterCmd("prune_nodes", &MiniguiPlayer::HandlePruneNodes);
+MiniguiGtpClient::MiniguiGtpClient(std::unique_ptr<MctsPlayer> player,
+                                   const Options& options)
+    : GtpClient(std::move(player), options) {
+  RegisterCmd("echo", &MiniguiGtpClient::HandleEcho);
+  RegisterCmd("genmove", &MiniguiGtpClient::HandleGenmove);
+  RegisterCmd("loadsgf", &MiniguiGtpClient::HandleLoadsgf);
+  RegisterCmd("play", &MiniguiGtpClient::HandlePlay);
+  RegisterCmd("prune_nodes", &MiniguiGtpClient::HandlePruneNodes);
   RegisterCmd("report_search_interval",
-              &MiniguiPlayer::HandleReportSearchInterval);
-  RegisterCmd("select_position", &MiniguiPlayer::HandleSelectPosition);
-  RegisterCmd("winrate_evals", &MiniguiPlayer::HandleWinrateEvals);
+              &MiniguiGtpClient::HandleReportSearchInterval);
+  RegisterCmd("select_position", &MiniguiGtpClient::HandleSelectPosition);
+  RegisterCmd("winrate_evals", &MiniguiGtpClient::HandleWinrateEvals);
+
+  player_->SetTreeSearchCallback(
+      std::bind(&MiniguiGtpClient::TreeSearchCb, this, std::placeholders::_1));
 }
 
-void MiniguiPlayer::NewGame() {
+MiniguiGtpClient::~MiniguiGtpClient() = default;
+
+void MiniguiGtpClient::NewGame() {
   node_to_info_.clear();
   id_to_info_.clear();
   to_eval_.clear();
-  GtpPlayer::NewGame();
-  RegisterNode(root());
+  GtpClient::NewGame();
+  ReportPosition(player_->root());
 }
 
-Coord MiniguiPlayer::SuggestMove() {
-  auto move = GtpPlayer::SuggestMove();
-  ReportSearchStatus(root(), nullptr, true);
-  return move;
-}
-
-bool MiniguiPlayer::PlayMove(Coord c) {
-  if (!GtpPlayer::PlayMove(c)) {
-    return false;
-  }
-  RefreshPendingWinRateEvals();
-  return true;
-}
-
-void MiniguiPlayer::Ponder() {
+void MiniguiGtpClient::Ponder() {
   // Decide whether to perform normal pondering or win rate evaluation.
   if (to_eval_.empty()) {
     // Nothing needs win rate evaluation.
@@ -87,24 +75,25 @@ void MiniguiPlayer::Ponder() {
   }
 
   if (!do_winrate_eval_reads_) {
-    GtpPlayer::Ponder();
+    GtpClient::Ponder();
     return;
   }
 
   // Remember the number of reads at the root.
-  int n = root()->N();
+  int n = player_->root()->N();
 
   // First populate the batch with any nodes that require win rate evaluation.
-  std::vector<TreePath> paths;
-  for (int i = 0; i < options().virtual_losses; ++i) {
+  std::vector<MctsPlayer::TreePath> paths;
+  for (int i = 0; i < player_->options().virtual_losses; ++i) {
     if (to_eval_.empty()) {
       break;
     }
-    SelectLeaves(to_eval_.front()->node, 1, &paths);
+    player_->SelectLeaves(to_eval_.front()->node, 1, &paths);
     to_eval_.pop_front();
   }
 
-  ProcessLeaves(absl::MakeSpan(paths), options().random_symmetry);
+  player_->ProcessLeaves(absl::MakeSpan(paths),
+                         player_->options().random_symmetry);
 
   // Send updated visit and Q data for all the nodes we performed win rate
   // evaluation on. This updates Minigui's win rate graph.
@@ -119,7 +108,7 @@ void MiniguiPlayer::Ponder() {
   }
 
   // Increment the ponder count by difference new and old reads.
-  ponder_read_count_ += root()->N() - n;
+  ponder_read_count_ += player_->root()->N() - n;
 
   // Increment the number of reads for all the nodes we performed win rate
   // evaluation on, pushing nodes that require more reads onto the back of the
@@ -132,8 +121,8 @@ void MiniguiPlayer::Ponder() {
   }
 }
 
-GtpPlayer::Response MiniguiPlayer::HandleCmd(const std::string& line) {
-  auto response = GtpPlayer::HandleCmd(line);
+GtpClient::Response MiniguiGtpClient::HandleCmd(const std::string& line) {
+  auto response = GtpClient::HandleCmd(line);
   // Write __GTP_CMD_DONE__ to stderr to signify that handling a GTP command is
   // done. The Minigui Python server waits for this magic string before it
   // consumes the output of each GTP command. This keeps the outputs written to
@@ -144,51 +133,21 @@ GtpPlayer::Response MiniguiPlayer::HandleCmd(const std::string& line) {
   return response;
 }
 
-void MiniguiPlayer::ProcessLeaves(absl::Span<TreePath> paths,
-                                  bool random_symmetry) {
-  GtpPlayer::ProcessLeaves(paths, random_symmetry);
-  if (!paths.empty() && report_search_interval_ != absl::ZeroDuration()) {
-    auto now = absl::Now();
-    if (now - last_report_time_ > report_search_interval_) {
-      last_report_time_ = now;
-      ReportSearchStatus(paths.back().root, paths.back().leaf, false);
-    }
-  }
-}
-
-GtpPlayer::Response MiniguiPlayer::HandleClearBoard(CmdArgs args) {
-  auto response = GtpPlayer::HandleClearBoard(args);
-  if (response.ok) {
-    ReportPosition(root());
-  }
-  return response;
-}
-
-GtpPlayer::Response MiniguiPlayer::HandleEcho(CmdArgs args) {
+GtpClient::Response MiniguiGtpClient::HandleEcho(CmdArgs args) {
   return Response::Ok(absl::StrJoin(args, " "));
 }
 
-GtpPlayer::Response MiniguiPlayer::HandleGenmove(CmdArgs args) {
-  auto response = GtpPlayer::HandleGenmove(args);
+GtpClient::Response MiniguiGtpClient::HandleGenmove(CmdArgs args) {
+  ReportSearchStatus(player_->root(), nullptr, true);
+  auto response = GtpClient::HandleGenmove(args);
   if (response.ok) {
-    ReportPosition(root());
+    ReportPosition(player_->root());
   }
+  RefreshPendingWinRateEvals();
   return response;
 }
 
-GtpPlayer::Response MiniguiPlayer::HandleInfo(CmdArgs args) {
-  auto response = CheckArgsExact(0, args);
-  if (!response.ok) {
-    return response;
-  }
-
-  std::ostringstream oss;
-  oss << options();
-  oss << " report_search_interval:" << report_search_interval_;
-  return Response::Ok(oss.str());
-}
-
-GtpPlayer::Response MiniguiPlayer::HandleLoadsgf(CmdArgs args) {
+GtpClient::Response MiniguiGtpClient::HandleLoadsgf(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
@@ -204,18 +163,19 @@ GtpPlayer::Response MiniguiPlayer::HandleLoadsgf(CmdArgs args) {
   if (!response.ok) {
     return response;
   }
+
   return ProcessSgf(trees);
 }
 
-GtpPlayer::Response MiniguiPlayer::HandlePlay(CmdArgs args) {
-  auto response = GtpPlayer::HandlePlay(args);
+GtpClient::Response MiniguiGtpClient::HandlePlay(CmdArgs args) {
+  auto response = GtpClient::HandlePlay(args);
   if (response.ok) {
-    ReportPosition(root());
+    ReportPosition(player_->root());
   }
   return response;
 }
 
-GtpPlayer::Response MiniguiPlayer::HandlePruneNodes(CmdArgs args) {
+GtpClient::Response MiniguiGtpClient::HandlePruneNodes(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
@@ -226,12 +186,14 @@ GtpPlayer::Response MiniguiPlayer::HandlePruneNodes(CmdArgs args) {
     return Response::Error("couldn't parse ", args[0], " as an integer");
   }
 
-  mutable_options()->prune_orphaned_nodes = x != 0;
+  auto options = player_->options();
+  options.prune_orphaned_nodes = x != 0;
+  player_->SetOptions(options);
 
   return Response::Ok();
 }
 
-GtpPlayer::Response MiniguiPlayer::HandleReportSearchInterval(CmdArgs args) {
+GtpClient::Response MiniguiGtpClient::HandleReportSearchInterval(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
@@ -246,14 +208,14 @@ GtpPlayer::Response MiniguiPlayer::HandleReportSearchInterval(CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response MiniguiPlayer::HandleSelectPosition(CmdArgs args) {
+GtpClient::Response MiniguiGtpClient::HandleSelectPosition(CmdArgs args) {
   auto response = CheckArgsExact(1, args);
   if (!response.ok) {
     return response;
   }
 
   if (args[0] == "root") {
-    ResetRoot();
+    player_->ResetRoot();
     return Response::Ok();
   }
 
@@ -272,15 +234,17 @@ GtpPlayer::Response MiniguiPlayer::HandleSelectPosition(CmdArgs args) {
   std::reverse(moves.begin(), moves.end());
 
   // Rewind to the start & play the sequence of moves.
-  ResetRoot();
+  player_->ResetRoot();
   for (const auto& move : moves) {
-    MG_CHECK(PlayMove(move));
+    MG_CHECK(player_->PlayMove(move));
   }
+
+  RefreshPendingWinRateEvals();
 
   return Response::Ok();
 }
 
-GtpPlayer::Response MiniguiPlayer::HandleWinrateEvals(CmdArgs args) {
+GtpClient::Response MiniguiGtpClient::HandleWinrateEvals(CmdArgs args) {
   int num_reads;
   if (!absl::SimpleAtoi(args[1], &num_reads) || num_reads < 0) {
     return Response::Error("invalid num_reads");
@@ -290,7 +254,7 @@ GtpPlayer::Response MiniguiPlayer::HandleWinrateEvals(CmdArgs args) {
   return Response::Ok();
 }
 
-GtpPlayer::Response MiniguiPlayer::ProcessSgf(
+GtpClient::Response MiniguiGtpClient::ProcessSgf(
     const std::vector<std::unique_ptr<sgf::Node>>& trees) {
   // Clear the board before replaying sgf.
   NewGame();
@@ -299,11 +263,11 @@ GtpPlayer::Response MiniguiPlayer::ProcessSgf(
   // inference on the positions in batches.
   std::function<Response(const sgf::Node&)> traverse =
       [&](const sgf::Node& node) {
-        if (node.move.color != root()->position.to_play()) {
+        if (node.move.color != player_->root()->position.to_play()) {
           // The move color is different than expected. Play a pass move to flip
           // the colors.
-          if (root()->move == Coord::kPass) {
-            auto expected = ColorToCode(root()->position.to_play());
+          if (player_->root()->move == Coord::kPass) {
+            auto expected = ColorToCode(player_->root()->position.to_play());
             auto actual = node.move.ToSgf();
             MG_LOG(ERROR) << "expected move by " << expected << ", got "
                           << actual
@@ -312,28 +276,28 @@ GtpPlayer::Response MiniguiPlayer::ProcessSgf(
             return Response::Error("cannot load file");
           }
           MG_LOG(WARNING) << "Inserting pass move";
-          MG_CHECK(PlayMove(Coord::kPass));
-          ReportPosition(root());
+          MG_CHECK(player_->PlayMove(Coord::kPass));
+          ReportPosition(player_->root());
         }
 
-        if (!PlayMove(node.move.c)) {
+        if (!player_->PlayMove(node.move.c)) {
           MG_LOG(ERROR) << "error playing " << node.move.ToSgf();
           return Response::Error("cannot load file");
         }
 
         if (!node.comment.empty()) {
-          auto* info = GetAuxInfo(root());
+          auto* info = GetAuxInfo(player_->root());
           info->comment = node.comment;
         }
 
-        ReportPosition(root());
+        ReportPosition(player_->root());
         for (const auto& child : node.children) {
           auto response = traverse(*child);
           if (!response.ok) {
             return response;
           }
         }
-        UndoMove();
+        player_->UndoMove();
         return Response::Ok();
       };
 
@@ -345,21 +309,21 @@ GtpPlayer::Response MiniguiPlayer::ProcessSgf(
   }
 
   // Play the main line.
-  ResetRoot();
+  player_->ResetRoot();
   if (!trees.empty()) {
     for (const auto& move : trees[0]->ExtractMainLine()) {
       // We already validated that all the moves could be played in traverse(),
       // so if PlayMove fails here, something has gone seriously awry.
-      MG_CHECK(PlayMove(move.c));
+      MG_CHECK(player_->PlayMove(move.c));
     }
-    ReportPosition(root());
+    ReportPosition(player_->root());
   }
 
   return Response::Ok();
 }
 
-void MiniguiPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf,
-                                       bool include_tree_stats) {
+void MiniguiGtpClient::ReportSearchStatus(MctsNode* root, MctsNode* leaf,
+                                          bool include_tree_stats) {
   auto sorted_child_info = root->CalculateRankedChildInfo();
 
   nlohmann::json j = {
@@ -437,7 +401,7 @@ void MiniguiPlayer::ReportSearchStatus(MctsNode* root, MctsNode* leaf,
   MG_LOG(INFO) << "mg-update:" << j.dump();
 }
 
-void MiniguiPlayer::ReportPosition(MctsNode* node) {
+void MiniguiGtpClient::ReportPosition(MctsNode* node) {
   const auto& position = node->position;
 
   std::ostringstream oss;
@@ -484,7 +448,7 @@ void MiniguiPlayer::ReportPosition(MctsNode* node) {
   MG_LOG(INFO) << "mg-position: " << j.dump();
 }
 
-MiniguiPlayer::AuxInfo* MiniguiPlayer::RegisterNode(MctsNode* node) {
+MiniguiGtpClient::AuxInfo* MiniguiGtpClient::GetAuxInfo(MctsNode* node) {
   auto it = node_to_info_.find(node);
   if (it != node_to_info_.end()) {
     return it->second.get();
@@ -498,25 +462,19 @@ MiniguiPlayer::AuxInfo* MiniguiPlayer::RegisterNode(MctsNode* node) {
   return raw_info;
 }
 
-MiniguiPlayer::AuxInfo* MiniguiPlayer::GetAuxInfo(MctsNode* node) const {
-  auto it = node_to_info_.find(node);
-  MG_CHECK(it != node_to_info_.end());
-  return it->second.get();
-}
-
-MiniguiPlayer::AuxInfo::AuxInfo(AuxInfo* parent, MctsNode* node)
+MiniguiGtpClient::AuxInfo::AuxInfo(AuxInfo* parent, MctsNode* node)
     : parent(parent), node(node), id(absl::StrFormat("%p", node)) {
   if (parent != nullptr) {
     parent->children.push_back(this);
   }
 }
 
-void MiniguiPlayer::RefreshPendingWinRateEvals() {
+void MiniguiGtpClient::RefreshPendingWinRateEvals() {
   to_eval_.clear();
 
   // Build a new list of nodes that require win rate evaluation.
   // First, traverse to the leaf node of the current position's main line.
-  auto* info = RegisterNode(root());
+  auto* info = GetAuxInfo(player_->root());
   while (!info->children.empty()) {
     info = info->children[0];
   }
@@ -538,6 +496,16 @@ void MiniguiPlayer::RefreshPendingWinRateEvals() {
     }
     return a->node->position.n() < b->node->position.n();
   });
+}
+
+void MiniguiGtpClient::TreeSearchCb(absl::Span<MctsPlayer::TreePath> paths) {
+  if (!paths.empty() && report_search_interval_ != absl::ZeroDuration()) {
+    auto now = absl::Now();
+    if (now - last_report_time_ > report_search_interval_) {
+      last_report_time_ = now;
+      ReportSearchStatus(paths.back().root, paths.back().leaf, false);
+    }
+  }
 }
 
 }  // namespace minigo
