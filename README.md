@@ -65,7 +65,6 @@ This project assumes you have the following:
 - Python 3.5+
 - [Docker](https://docs.docker.com/install/)
 - [Cloud SDK](https://cloud.google.com/sdk/downloads)
-- Bazel v0.11 or greater
 
 The [Hitchhiker's guide to
 python](http://docs.python-guide.org/en/latest/dev/virtualenvs/) has a good
@@ -75,6 +74,16 @@ point haven't been tested in environments that are not using virtualenv.
 ```shell
 pip3 install virtualenv
 pip3 install virtualenvwrapper
+```
+
+Install Bazel
+------------------
+
+```shell
+wget https://github.com/bazelbuild/bazel/releases/download/0.19.2/bazel-0.19.2-installer-linux-x86_64.sh
+chmod 755 bazel-0.19.2-installer-linux-x86_64.sh
+sudo ./bazel-0.19.2-installer-linux-x86_64.sh
+rm bazel-0.19.2-installer-linux-x86_64.sh
 ```
 
 Install TensorFlow
