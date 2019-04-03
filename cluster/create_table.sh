@@ -22,3 +22,4 @@ source ${SCRIPT_DIR}/utils.sh
 
 create_cbt_game_table
 create_cbt_eval_game_table
+create_cbt_model_table

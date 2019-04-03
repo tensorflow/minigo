@@ -40,3 +40,4 @@ unset CBT_INSTANCE
 unset CBT_ZONE
 unset CBT_TABLE
 unset CBT_EVAL_TABLE
+unset CBT_MODEL_TABLE

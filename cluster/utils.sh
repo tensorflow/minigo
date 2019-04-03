@@ -172,6 +172,23 @@ function create_cbt_eval_game_table() {
 }
 
 
+# Creates a Cloud Bigtable table for storing models.
+# Globals:
+#   PROJECT: The cloud project
+#   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
+#   CBT_MODEL_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
+function create_cbt_model_table() {
+  check_cbt_exists
+  if ! (create_cbt_table ${CBT_MODEL_TABLE} ); then
+    return 1
+  fi
+  if ! (create_cbt_family ${CBT_MODEL_TABLE} metadata ); then
+    return 1
+  fi
+}
+
+
+
 # Creates a cluster service account if it doesn't exist.
 # Globals:
 #   PROJECT: The cloud project
