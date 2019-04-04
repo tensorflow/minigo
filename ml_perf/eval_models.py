@@ -33,8 +33,8 @@ def load_train_times():
       line = line.strip()
       if line:
         timestamp, name = line.split(' ')
-        models.append((float(timestamp), 
-            'tf,' + os.path.join(fsdb.models_dir(), name + '.pb')))
+        path = 'tf,' + os.path.join(fsdb.models_dir(), name + '.pb')
+        models.append((float(timestamp), name, path))
   return models
 
 
@@ -42,12 +42,12 @@ def main(unused_argv):
   sgf_dir = os.path.join(fsdb.eval_dir(), 'target')
   target = 'tf,' + os.path.join(fsdb.models_dir(), 'target.pb')
   models = load_train_times()
-  for i, (timestamp, name) in enumerate(models):
-    winrate = wait(evaluate_model(name, target, sgf_dir, i + 1))
+  for i, (timestamp, name, path) in enumerate(models):
+    winrate = wait(evaluate_model(path, target, sgf_dir, i + 1))
     if winrate >= 0.50:
+      print('Model {} beat target after {}s'.format(name, timestamp))
       break
 
 
 if __name__ == '__main__':
   app.run(main)
-
