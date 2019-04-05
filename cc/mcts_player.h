@@ -129,8 +129,6 @@ class MctsPlayer {
 
   virtual void NewGame();
 
-  // If visitor is non-null, it is called on each batch of leaves visited during
-  // tree search.
   virtual Coord SuggestMove();
 
   // Plays the move at point c.
