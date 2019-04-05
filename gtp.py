@@ -45,6 +45,14 @@ def make_gtp_instance(load_file, cgos_mode=False, kgs_mode=False,
                       minigui_mode=False):
     """Takes a path to model files and set up a GTP engine instance."""
     n = DualNetwork(load_file)
+    # Here so we dont try load EdgeTPU python library unless we need to
+    if load_file.endswith(".tflite"):
+        from dual_net_edge_tpu import DualNetworkEdgeTpu
+        n = DualNetworkEdgeTpu(load_file)
+    else:
+        from dual_net import DualNetwork
+        n = DualNetwork(load_file)
+
     if cgos_mode:
         player = CGOSPlayer(network=n, seconds_per_move=5, timed_match=True,
                             two_player_mode=True)
