@@ -126,14 +126,20 @@ class GtpClient {
         std::bind(handler, static_cast<T*>(this), std::placeholders::_1);
   }
 
+  // Begin pondering again if requested.
+  void MaybeStartPondering();
+
   // If waiting for the opponent to play, consider thinking for a bit.
   // Returns true if we pondered.
   bool MaybePonder();
 
   virtual void Ponder();
 
-  // Begin pondering again if requested.
-  void MaybeStartPondering();
+  // Replay a loaded SGF game.
+  // Called by HandleLoadSgf after the SGF file has been loaded and parsed, and
+  // a new has been started.
+  virtual Response ReplaySgf(
+      const std::vector<std::unique_ptr<sgf::Node>>& trees);
 
   // Handles a GTP command specified by `line`.
   // Returns a (bool, string) pair containing whether the GtpPlayer should

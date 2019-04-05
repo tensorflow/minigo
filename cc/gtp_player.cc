@@ -161,6 +161,19 @@ void GtpClient::Ponder() {
   ponder_read_count_ += player_->root()->N() - n;
 }
 
+GtpClient::Response GtpClient::ReplaySgf(
+    const std::vector<std::unique_ptr<sgf::Node>>& trees) {
+  if (!trees.empty()) {
+    for (const auto& move : trees[0]->ExtractMainLine()) {
+      if (!player_->PlayMove(move.c)) {
+        MG_LOG(ERROR) << "couldn't play move " << move.c;
+        return Response::Error("cannot load file");
+      }
+    }
+  }
+  return Response::Ok();
+}
+
 GtpClient::Response GtpClient::HandleCmd(const std::string& line) {
   std::vector<absl::string_view> args =
       absl::StrSplit(line, absl::ByAnyChar(" \t\r\n"), absl::SkipWhitespace());
@@ -379,16 +392,7 @@ GtpClient::Response GtpClient::HandleLoadsgf(CmdArgs args) {
 
   NewGame();
 
-  if (!trees.empty()) {
-    for (const auto& move : trees[0]->ExtractMainLine()) {
-      if (!player_->PlayMove(move.c)) {
-        MG_LOG(ERROR) << "couldn't play move " << move.c;
-        return Response::Error("cannot load file");
-      }
-    }
-  }
-
-  return Response::Ok();
+  return ReplaySgf(trees);
 }
 
 GtpClient::Response GtpClient::HandleName(CmdArgs args) {

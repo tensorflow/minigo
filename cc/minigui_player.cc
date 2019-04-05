@@ -37,7 +37,6 @@ MiniguiGtpClient::MiniguiGtpClient(std::unique_ptr<MctsPlayer> player,
     : GtpClient(std::move(player), options) {
   RegisterCmd("echo", &MiniguiGtpClient::HandleEcho);
   RegisterCmd("genmove", &MiniguiGtpClient::HandleGenmove);
-  RegisterCmd("loadsgf", &MiniguiGtpClient::HandleLoadsgf);
   RegisterCmd("play", &MiniguiGtpClient::HandlePlay);
   RegisterCmd("prune_nodes", &MiniguiGtpClient::HandlePruneNodes);
   RegisterCmd("report_search_interval",
@@ -147,26 +146,6 @@ GtpClient::Response MiniguiGtpClient::HandleGenmove(CmdArgs args) {
   return response;
 }
 
-GtpClient::Response MiniguiGtpClient::HandleLoadsgf(CmdArgs args) {
-  auto response = CheckArgsExact(1, args);
-  if (!response.ok) {
-    return response;
-  }
-
-  std::string contents;
-  if (!file::ReadFile(std::string(args[0]), &contents)) {
-    return Response::Error("cannot load file");
-  }
-
-  std::vector<std::unique_ptr<sgf::Node>> trees;
-  response = ParseSgf(contents, &trees);
-  if (!response.ok) {
-    return response;
-  }
-
-  return ProcessSgf(trees);
-}
-
 GtpClient::Response MiniguiGtpClient::HandlePlay(CmdArgs args) {
   auto response = GtpClient::HandlePlay(args);
   if (response.ok) {
@@ -254,11 +233,8 @@ GtpClient::Response MiniguiGtpClient::HandleWinrateEvals(CmdArgs args) {
   return Response::Ok();
 }
 
-GtpClient::Response MiniguiGtpClient::ProcessSgf(
+GtpClient::Response MiniguiGtpClient::ReplaySgf(
     const std::vector<std::unique_ptr<sgf::Node>>& trees) {
-  // Clear the board before replaying sgf.
-  NewGame();
-
   // Traverse the SGF's game trees, loading them into the backend & running
   // inference on the positions in batches.
   std::function<Response(const sgf::Node&)> traverse =
