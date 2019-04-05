@@ -137,7 +137,7 @@ class GtpClient {
 
   // Replay a loaded SGF game.
   // Called by HandleLoadSgf after the SGF file has been loaded and parsed, and
-  // a new has been started.
+  // a new game has been started.
   virtual Response ReplaySgf(
       const std::vector<std::unique_ptr<sgf::Node>>& trees);
 
