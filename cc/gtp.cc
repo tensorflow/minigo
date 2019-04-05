@@ -19,9 +19,9 @@
 #include "cc/constants.h"
 #include "cc/dual_net/factory.h"
 #include "cc/file/path.h"
-#include "cc/gtp_player.h"
+#include "cc/gtp_client.h"
 #include "cc/init.h"
-#include "cc/minigui_player.h"
+#include "cc/minigui_gtp_client.h"
 #include "cc/zobrist.h"
 #include "gflags/gflags.h"
 

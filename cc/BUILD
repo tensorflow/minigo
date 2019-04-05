@@ -155,9 +155,9 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
-    name = "gtp_player",
-    srcs = ["gtp_player.cc"],
-    hdrs = ["gtp_player.h"],
+    name = "gtp_client",
+    srcs = ["gtp_client.cc"],
+    hdrs = ["gtp_client.h"],
     deps = [
         ":base",
         ":logging",
@@ -205,12 +205,12 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
-    name = "minigui_player",
-    srcs = ["minigui_player.cc"],
-    hdrs = ["minigui_player.h"],
+    name = "minigui_gtp_client",
+    srcs = ["minigui_gtp_client.cc"],
+    hdrs = ["minigui_gtp_client.h"],
     deps = [
         ":base",
-        ":gtp_player",
+        ":gtp_client",
         ":logging",
         ":mcts",
         ":sgf",
@@ -509,9 +509,9 @@ minigo_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
-        ":gtp_player",
+        ":gtp_client",
         ":init",
-        ":minigui_player",
+        ":minigui_gtp_client",
         ":zobrist",
         "//cc/dual_net:factory",
         "//cc/file",

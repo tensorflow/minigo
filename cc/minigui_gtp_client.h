@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_MINIGUI_PLAYER_H_
-#define CC_MINIGUI_PLAYER_H_
+#ifndef CC_MINIGUI_GTP_CLIENT_H_
+#define CC_MINIGUI_GTP_CLIENT_H_
 
 #include <deque>
 #include <map>
@@ -29,7 +29,7 @@
 #include "absl/types/span.h"
 #include "cc/color.h"
 #include "cc/dual_net/dual_net.h"
-#include "cc/gtp_player.h"
+#include "cc/gtp_client.h"
 #include "cc/thread_safe_queue.h"
 
 namespace minigo {
@@ -133,4 +133,4 @@ class MiniguiGtpClient : public GtpClient {
 
 }  // namespace minigo
 
-#endif  // CC_MINIGUI_PLAYER_H_
+#endif  // CC_MINIGUI_GTP_CLIENT_H_

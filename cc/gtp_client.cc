@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/gtp_player.h"
+#include "cc/gtp_client.h"
 
 #include <algorithm>
 #include <cmath>

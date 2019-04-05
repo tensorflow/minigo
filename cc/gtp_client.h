@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_GTP_PLAYER_H_
-#define CC_GTP_PLAYER_H_
+#ifndef CC_GTP_CLIENT_H_
+#define CC_GTP_CLIENT_H_
 
 #include <deque>
 #include <functional>
@@ -200,4 +200,4 @@ class GtpClient {
 
 }  // namespace minigo
 
-#endif  // CC_GTP_PLAYER_H_
+#endif  // CC_GTP_CLIENT_H_
