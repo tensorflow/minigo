@@ -72,7 +72,7 @@ class ThreadSafeQueue {
     return queue_.empty();
   }
 
-  // private:
+ private:
   bool has_elements() const EXCLUSIVE_LOCKS_REQUIRED(&m_) {
     return !queue_.empty();
   }

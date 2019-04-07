@@ -74,7 +74,7 @@ void ModelBatcher::RunMany(ModelBatcher* other_batcher,
 }
 
 size_t ModelBatcher::GetBatchSize() const {
-  return (num_active_clients_ + buffering_ - 1) / buffering_;
+  return std::max<size_t>(1, num_active_clients_ / buffering_);
 }
 
 void ModelBatcher::MaybeRunBatchesLocked() {

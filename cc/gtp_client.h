@@ -54,7 +54,11 @@ class GtpClient {
     bool courtesy_pass = false;
   };
 
-  GtpClient(std::unique_ptr<MctsPlayer> player, const Options& options);
+  GtpClient(std::unique_ptr<DualNetFactory> model_factory,
+            std::shared_ptr<InferenceCache> inference_cache,
+            const std::string& model_path, const Game::Options& game_options,
+            const MctsPlayer::Options& player_options,
+            const GtpClient::Options& client_options);
   virtual ~GtpClient();
 
   virtual void Run();
@@ -174,7 +178,10 @@ class GtpClient {
   Response ParseSgf(const std::string& sgf_str,
                     std::vector<std::unique_ptr<sgf::Node>>* trees);
 
+  std::unique_ptr<DualNetFactory> model_factory_;
+  std::shared_ptr<InferenceCache> inference_cache_;
   std::unique_ptr<MctsPlayer> player_;
+  std::unique_ptr<Game> game_;
 
   // There are two kinds of pondering supported:
   //   kReadLimited: pondering will run for a maximum number of reads.

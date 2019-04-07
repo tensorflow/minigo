@@ -73,16 +73,16 @@ LogStream::LogStream(const char* file, int line, LogLevel level)
       c = 'U';
       break;
   }
-  file = std::strrchr(file, '/');
-  if (file == nullptr) {
-    file = std::strrchr(file, '\\');
+  const auto* f = std::strrchr(file, '/');
+  if (f == nullptr) {
+    f = std::strrchr(file, '\\');
   }
-  if (file == nullptr) {
-    file = file;
+  if (f == nullptr) {
+    f = file;
   } else {
-    file += 1;
+    f += 1;
   }
-  *this << '[' << c << "] " << file << ':' << line << " : ";
+  *this << '[' << c << "] " << f << ':' << line << " : ";
 }
 
 LogStream::~LogStream() {

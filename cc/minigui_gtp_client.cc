@@ -20,6 +20,7 @@
 #include <sstream>
 #include <utility>
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -32,13 +33,17 @@
 
 namespace minigo {
 
-MiniguiGtpClient::MiniguiGtpClient(std::unique_ptr<MctsPlayer> player,
-                                   const Options& options)
-    : GtpClient(std::move(player), options) {
+MiniguiGtpClient::MiniguiGtpClient(
+    std::unique_ptr<DualNetFactory> model_factory,
+    std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
+    const std::string& model_path, const Game::Options& game_options,
+    const MctsPlayer::Options& player_options,
+    const GtpClient::Options& client_options)
+    : GtpClient(std::move(model_factory), inference_cache, model_path,
+                game_options, player_options, client_options) {
   RegisterCmd("echo", &MiniguiGtpClient::HandleEcho);
   RegisterCmd("genmove", &MiniguiGtpClient::HandleGenmove);
   RegisterCmd("play", &MiniguiGtpClient::HandlePlay);
-  RegisterCmd("prune_nodes", &MiniguiGtpClient::HandlePruneNodes);
   RegisterCmd("report_search_interval",
               &MiniguiGtpClient::HandleReportSearchInterval);
   RegisterCmd("select_position", &MiniguiGtpClient::HandleSelectPosition);
@@ -46,78 +51,34 @@ MiniguiGtpClient::MiniguiGtpClient(std::unique_ptr<MctsPlayer> player,
 
   player_->SetTreeSearchCallback(
       std::bind(&MiniguiGtpClient::TreeSearchCb, this, std::placeholders::_1));
+
+  variation_tree_ = absl::make_unique<VariationTree>();
+
+  int num_workers = 16;
+  int num_win_rate_evals = 8;
+  model_factory_ =
+      absl::make_unique<BatchingDualNetFactory>(std::move(model_factory_));
+  auto worker_options = player_options;
+  worker_options.virtual_losses = 1;
+  win_rate_evaluator_ = absl::make_unique<WinRateEvaluator>(
+      num_workers, num_win_rate_evals, model_factory_.get(), inference_cache,
+      model_path, game_options, worker_options);
 }
 
 MiniguiGtpClient::~MiniguiGtpClient() = default;
 
 void MiniguiGtpClient::NewGame() {
-  node_to_info_.clear();
-  id_to_info_.clear();
-  to_eval_.clear();
   GtpClient::NewGame();
-  ReportPosition(player_->root());
+  variation_tree_ = absl::make_unique<VariationTree>();
+  ReportRootPosition();
+  RefreshPendingWinRateEvals();
 }
 
 void MiniguiGtpClient::Ponder() {
-  // Decide whether to perform normal pondering or win rate evaluation.
-  if (to_eval_.empty()) {
-    // Nothing needs win rate evaluation.
-    do_winrate_eval_reads_ = false;
-  } else if (to_eval_[0]->num_eval_reads == 0) {
-    // While there are still nodes in the win rate eval queue that haven't had
-    // any reads, always perform win rate evaluation.
-    do_winrate_eval_reads_ = true;
-  } else {
-    // While all nodes have been evaluated at least once, alternate between
-    // performing win rate evaluation and normal pondering.
-    do_winrate_eval_reads_ = !do_winrate_eval_reads_;
-  }
-
-  if (!do_winrate_eval_reads_) {
+  if (win_rate_evaluator_->all_nodes_have_at_least_one_read()) {
     GtpClient::Ponder();
-    return;
   }
-
-  // Remember the number of reads at the root.
-  int n = player_->root()->N();
-
-  // First populate the batch with any nodes that require win rate evaluation.
-  std::vector<MctsPlayer::TreePath> paths;
-  for (int i = 0; i < player_->options().virtual_losses; ++i) {
-    if (to_eval_.empty()) {
-      break;
-    }
-    player_->SelectLeaves(to_eval_.front()->node, 1, &paths);
-    to_eval_.pop_front();
-  }
-
-  player_->ProcessLeaves(absl::MakeSpan(paths),
-                         player_->options().random_symmetry);
-
-  // Send updated visit and Q data for all the nodes we performed win rate
-  // evaluation on. This updates Minigui's win rate graph.
-  for (const auto& path : paths) {
-    auto* root = path.root;
-    nlohmann::json j = {
-        {"id", GetAuxInfo(root)->id},
-        {"n", root->N()},
-        {"q", root->Q()},
-    };
-    MG_LOG(INFO) << "mg-update:" << j.dump();
-  }
-
-  // Increment the ponder count by difference new and old reads.
-  ponder_read_count_ += player_->root()->N() - n;
-
-  // Increment the number of reads for all the nodes we performed win rate
-  // evaluation on, pushing nodes that require more reads onto the back of the
-  // queue.
-  for (const auto& path : paths) {
-    auto* info = GetAuxInfo(path.root);
-    if (++info->num_eval_reads < num_eval_reads_) {
-      to_eval_.push_back(info);
-    }
-  }
+  win_rate_evaluator_->EvalNodes();
 }
 
 GtpClient::Response MiniguiGtpClient::HandleCmd(const std::string& line) {
@@ -137,10 +98,11 @@ GtpClient::Response MiniguiGtpClient::HandleEcho(CmdArgs args) {
 }
 
 GtpClient::Response MiniguiGtpClient::HandleGenmove(CmdArgs args) {
-  ReportSearchStatus(player_->root(), nullptr, true);
+  ReportSearchStatus(nullptr, true);
   auto response = GtpClient::HandleGenmove(args);
   if (response.ok) {
-    ReportPosition(player_->root());
+    variation_tree_->PlayMove(player_->root()->move);
+    ReportRootPosition();
   }
   RefreshPendingWinRateEvals();
   return response;
@@ -149,27 +111,11 @@ GtpClient::Response MiniguiGtpClient::HandleGenmove(CmdArgs args) {
 GtpClient::Response MiniguiGtpClient::HandlePlay(CmdArgs args) {
   auto response = GtpClient::HandlePlay(args);
   if (response.ok) {
-    ReportPosition(player_->root());
+    variation_tree_->PlayMove(player_->root()->move);
+    ReportRootPosition();
   }
+  RefreshPendingWinRateEvals();
   return response;
-}
-
-GtpClient::Response MiniguiGtpClient::HandlePruneNodes(CmdArgs args) {
-  auto response = CheckArgsExact(1, args);
-  if (!response.ok) {
-    return response;
-  }
-
-  int x;
-  if (!absl::SimpleAtoi(args[0], &x)) {
-    return Response::Error("couldn't parse ", args[0], " as an integer");
-  }
-
-  auto options = player_->options();
-  options.prune_orphaned_nodes = x != 0;
-  player_->SetOptions(options);
-
-  return Response::Ok();
 }
 
 GtpClient::Response MiniguiGtpClient::HandleReportSearchInterval(CmdArgs args) {
@@ -193,29 +139,13 @@ GtpClient::Response MiniguiGtpClient::HandleSelectPosition(CmdArgs args) {
     return response;
   }
 
-  if (args[0] == "root") {
-    player_->ResetRoot();
-    return Response::Ok();
-  }
-
-  auto it = id_to_info_.find(args[0]);
-  if (it == id_to_info_.end()) {
+  if (!variation_tree_->SelectNode(std::string(args[0]))) {
     return Response::Error("unknown position id");
   }
-  auto* node = it->second->node;
 
-  // Build the sequence of moves the will end up at the requested position.
-  std::vector<Coord> moves;
-  while (node->parent != nullptr) {
-    moves.push_back(node->move);
-    node = node->parent;
-  }
-  std::reverse(moves.begin(), moves.end());
-
-  // Rewind to the start & play the sequence of moves.
-  player_->ResetRoot();
-  for (const auto& move : moves) {
-    MG_CHECK(player_->PlayMove(move));
+  player_->NewGame();
+  for (auto c : variation_tree_->current_node()->GetVariation()) {
+    MG_CHECK(player_->PlayMove(c));
   }
 
   RefreshPendingWinRateEvals();
@@ -228,7 +158,7 @@ GtpClient::Response MiniguiGtpClient::HandleWinrateEvals(CmdArgs args) {
   if (!absl::SimpleAtoi(args[1], &num_reads) || num_reads < 0) {
     return Response::Error("invalid num_reads");
   }
-  num_eval_reads_ = num_reads;
+  win_rate_evaluator_->SetNumEvalReads(num_reads);
   RefreshPendingWinRateEvals();
   return Response::Ok();
 }
@@ -253,20 +183,20 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
           }
           MG_LOG(WARNING) << "Inserting pass move";
           MG_CHECK(player_->PlayMove(Coord::kPass));
-          ReportPosition(player_->root());
+          variation_tree_->PlayMove(Coord::kPass);
+          ReportRootPosition();
         }
 
         if (!player_->PlayMove(node.move.c)) {
           MG_LOG(ERROR) << "error playing " << node.move.ToSgf();
           return Response::Error("cannot load file");
         }
-
+        variation_tree_->PlayMove(node.move.c);
         if (!node.comment.empty()) {
-          auto* info = GetAuxInfo(player_->root());
-          info->comment = node.comment;
+          variation_tree_->current_node()->comment = node.comment;
         }
+        ReportRootPosition();
 
-        ReportPosition(player_->root());
         for (const auto& child : node.children) {
           auto response = traverse(*child);
           if (!response.ok) {
@@ -274,6 +204,7 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
           }
         }
         player_->UndoMove();
+        variation_tree_->GoToParent();
         return Response::Ok();
       };
 
@@ -285,25 +216,29 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
   }
 
   // Play the main line.
-  player_->ResetRoot();
+  player_->NewGame();
+  variation_tree_->GoToStart();
   if (!trees.empty()) {
     for (const auto& move : trees[0]->ExtractMainLine()) {
       // We already validated that all the moves could be played in traverse(),
       // so if PlayMove fails here, something has gone seriously awry.
       MG_CHECK(player_->PlayMove(move.c));
+      variation_tree_->PlayMove(move.c);
     }
-    ReportPosition(player_->root());
+    RefreshPendingWinRateEvals();
+    ReportRootPosition();
   }
 
   return Response::Ok();
 }
 
-void MiniguiGtpClient::ReportSearchStatus(MctsNode* root, MctsNode* leaf,
+void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
                                           bool include_tree_stats) {
+  auto* root = player_->root();
   auto sorted_child_info = root->CalculateRankedChildInfo();
 
   nlohmann::json j = {
-      {"id", GetAuxInfo(root)->id},
+      {"id", variation_tree_->current_node()->id},
       {"n", root->N()},
       {"q", root->Q()},
   };
@@ -377,8 +312,9 @@ void MiniguiGtpClient::ReportSearchStatus(MctsNode* root, MctsNode* leaf,
   MG_LOG(INFO) << "mg-update:" << j.dump();
 }
 
-void MiniguiGtpClient::ReportPosition(MctsNode* node) {
-  const auto& position = node->position;
+void MiniguiGtpClient::ReportRootPosition() {
+  const auto* root = player_->root();
+  const auto& position = root->position;
 
   std::ostringstream oss;
   for (const auto& stone : position.stones()) {
@@ -393,94 +329,253 @@ void MiniguiGtpClient::ReportPosition(MctsNode* node) {
     oss << ch;
   }
 
-  auto* info = GetAuxInfo(node);
   nlohmann::json j = {
-      {"id", info->id},
+      {"id", variation_tree_->current_node()->id},
       {"toPlay", position.to_play() == Color::kBlack ? "B" : "W"},
       {"moveNum", position.n()},
       {"stones", oss.str()},
-      {"gameOver", node->game_over()},
+      {"gameOver", root->game_over()},
   };
 
-  const auto& captures = node->position.num_captures();
+  const auto& captures = position.num_captures();
   if (captures[0] != 0 || captures[1] != 0) {
     j["caps"].push_back(captures[0]);
     j["caps"].push_back(captures[1]);
   }
-  if (node->parent != nullptr) {
-    j["parentId"] = GetAuxInfo(node->parent)->id;
-    if (node->N() > 0) {
+  if (root->parent != nullptr) {
+    j["parentId"] = variation_tree_->current_node()->parent->id;
+    if (root->N() > 0) {
       // Only send Q if the node has been read at least once.
-      j["q"] = node->Q();
+      j["q"] = root->Q();
     }
   }
-  if (node->move != Coord::kInvalid) {
-    j["move"] = node->move.ToGtp();
+  if (root->move != Coord::kInvalid) {
+    j["move"] = root->move.ToGtp();
   }
-  if (!info->comment.empty()) {
-    j["comment"] = info->comment;
+  const auto& comment = variation_tree_->current_node()->comment;
+  if (!comment.empty()) {
+    j["comment"] = comment;
   }
 
   MG_LOG(INFO) << "mg-position: " << j.dump();
 }
 
-MiniguiGtpClient::AuxInfo* MiniguiGtpClient::GetAuxInfo(MctsNode* node) {
-  auto it = node_to_info_.find(node);
-  if (it != node_to_info_.end()) {
-    return it->second.get();
-  }
-
-  auto* parent = node->parent != nullptr ? GetAuxInfo(node->parent) : nullptr;
-  auto info = absl::make_unique<AuxInfo>(parent, node);
-  auto raw_info = info.get();
-  id_to_info_.emplace(info->id, raw_info);
-  node_to_info_.emplace(node, std::move(info));
-  return raw_info;
-}
-
-MiniguiGtpClient::AuxInfo::AuxInfo(AuxInfo* parent, MctsNode* node)
-    : parent(parent), node(node), id(absl::StrFormat("%p", node)) {
-  if (parent != nullptr) {
-    parent->children.push_back(this);
-  }
-}
-
 void MiniguiGtpClient::RefreshPendingWinRateEvals() {
-  to_eval_.clear();
-
   // Build a new list of nodes that require win rate evaluation.
   // First, traverse to the leaf node of the current position's main line.
-  auto* info = GetAuxInfo(player_->root());
-  while (!info->children.empty()) {
-    info = info->children[0];
+  auto* node = variation_tree_->current_node();
+  while (!node->children.empty()) {
+    node = node->children[0];
   }
 
-  // Walk back up the tree to the root, enqueing all nodes that have fewer than
-  // the num_eval_reads_ win rate evaluations.
-  while (info != nullptr) {
-    if (info->num_eval_reads < num_eval_reads_) {
-      to_eval_.push_back(info);
+  std::vector<VariationTree::Node*> variation;
+  while (node != nullptr) {
+    variation.push_back(node);
+    node = node->parent;
+  }
+  std::reverse(variation.begin(), variation.end());
+
+  win_rate_evaluator_->SetCurrentVariation(std::move(variation));
+}
+
+void MiniguiGtpClient::TreeSearchCb(const std::vector<MctsNode*>& leaves) {
+  if (!leaves.empty() && report_search_interval_ != absl::ZeroDuration()) {
+    auto now = absl::Now();
+    if (now - last_report_time_ > report_search_interval_) {
+      last_report_time_ = now;
+      ReportSearchStatus(leaves.back(), false);
     }
-    info = info->parent;
+  }
+}
+
+MiniguiGtpClient::VariationTree::Node::Node(Node* parent, Coord move)
+    : parent(parent),
+      move(move),
+      id(parent == nullptr ? "root" : absl::StrFormat("%p", this)),
+      n(parent != nullptr ? parent->n + 1 : 0) {}
+
+std::vector<Coord> MiniguiGtpClient::VariationTree::Node::GetVariation() const {
+  std::vector<Coord> variation;
+  for (auto* node = this; node->parent != nullptr; node = node->parent) {
+    variation.push_back(node->move);
+  }
+  std::reverse(variation.begin(), variation.end());
+  return variation;
+}
+
+MiniguiGtpClient::VariationTree::VariationTree() {
+  auto root = absl::make_unique<Node>(nullptr, Coord::kInvalid);
+  current_node_ = root.get();
+  id_map_.emplace(root->id, std::move(root));
+}
+
+void MiniguiGtpClient::VariationTree::PlayMove(Coord c) {
+  // Check if the current node already has a child with the given move.
+  for (auto* child : current_node_->children) {
+    if (child->move == c) {
+      current_node_ = child;
+      return;
+    }
+  }
+
+  // Create a new child.
+  auto child = absl::make_unique<Node>(current_node_, c);
+  current_node_->children.push_back(child.get());
+  current_node_ = current_node_->children.back();
+  id_map_.emplace(current_node_->id, std::move(child));
+}
+
+void MiniguiGtpClient::VariationTree::GoToParent() {
+  MG_CHECK(current_node_->parent != nullptr);
+  current_node_ = current_node_->parent;
+}
+
+void MiniguiGtpClient::VariationTree::GoToStart() {
+  while (current_node_->parent != nullptr) {
+    current_node_ = current_node_->parent;
+  }
+}
+
+bool MiniguiGtpClient::VariationTree::SelectNode(const std::string& id) {
+  auto it = id_map_.find(id);
+  if (it == id_map_.end()) {
+    return false;
+  }
+  current_node_ = it->second.get();
+  return true;
+}
+
+MiniguiGtpClient::WinRateEvaluator::WinRateEvaluator(
+    int num_workers, int num_eval_reads, DualNetFactory* model_factory,
+    std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
+    const std::string& model_path, const Game::Options& game_options,
+    const MctsPlayer::Options& player_options)
+    : num_eval_reads_(num_eval_reads) {
+  MG_CHECK(inference_cache != nullptr);
+
+  for (int i = 0; i < num_workers; ++i) {
+    auto game = absl::make_unique<Game>("b", "w", game_options);
+    auto player = absl::make_unique<MctsPlayer>(
+        model_factory->NewDualNet(model_path), inference_cache, game.get(),
+        player_options);
+    workers_.push_back(absl::make_unique<Worker>(
+        std::move(game), std::move(player), &eval_queue_));
+    workers_.back()->Start();
+  }
+}
+
+MiniguiGtpClient::WinRateEvaluator::~WinRateEvaluator() = default;
+
+void MiniguiGtpClient::WinRateEvaluator::SetNumEvalReads(int num_eval_reads) {
+  num_eval_reads_ = num_eval_reads;
+  UpdateNodesToEval();
+}
+
+void MiniguiGtpClient::WinRateEvaluator::SetCurrentVariation(
+    std::vector<VariationTree::Node*> nodes) {
+  variation_ = std::move(nodes);
+  UpdateNodesToEval();
+}
+
+void MiniguiGtpClient::WinRateEvaluator::EvalNodes() {
+  auto num_inferences = std::min(workers_.size(), to_eval_.size());
+  if (num_inferences == 0) {
+    return;
+  }
+
+  // Inform each worker how many inferences we want to run in parallel.
+  // This allows the batcher to know how many inferences to expect.
+  for (size_t i = 0; i < num_inferences; ++i) {
+    workers_[i]->Prepare();
+  }
+
+  // Run win rate evaluation in parallel.
+  for (size_t i = 0; i < num_inferences; ++i) {
+    workers_[i]->EvalAsync(to_eval_.front());
+    to_eval_.pop_front();
+  }
+
+  // Wait for the workers to finish.
+  for (size_t i = 0; i < num_inferences; ++i) {
+    auto* node = eval_queue_.Pop();
+    // auto* node = workers_[i]->Wait();
+    if (node->num_eval_reads < num_eval_reads_) {
+      to_eval_.push_back(node);
+    }
+  }
+}
+
+void MiniguiGtpClient::WinRateEvaluator::UpdateNodesToEval() {
+  to_eval_.clear();
+  for (auto* node : variation_) {
+    if (node->num_eval_reads < num_eval_reads_) {
+      to_eval_.push_back(node);
+    }
   }
 
   // Sort the nodes for eval by number of eval reads, breaking ties by the move
   // number.
-  std::sort(to_eval_.begin(), to_eval_.end(), [](AuxInfo* a, AuxInfo* b) {
-    if (a->num_eval_reads != b->num_eval_reads) {
-      return a->num_eval_reads < b->num_eval_reads;
-    }
-    return a->node->position.n() < b->node->position.n();
-  });
+  std::sort(to_eval_.begin(), to_eval_.end(),
+            [](VariationTree::Node* a, VariationTree::Node* b) {
+              if (a->num_eval_reads != b->num_eval_reads) {
+                return a->num_eval_reads < b->num_eval_reads;
+              }
+              return a->n < b->n;
+            });
 }
 
-void MiniguiGtpClient::TreeSearchCb(absl::Span<MctsPlayer::TreePath> paths) {
-  if (!paths.empty() && report_search_interval_ != absl::ZeroDuration()) {
-    auto now = absl::Now();
-    if (now - last_report_time_ > report_search_interval_) {
-      last_report_time_ = now;
-      ReportSearchStatus(paths.back().root, paths.back().leaf, false);
+MiniguiGtpClient::WinRateEvaluator::Worker::Worker(
+    std::unique_ptr<Game> game, std::unique_ptr<MctsPlayer> player,
+    ThreadSafeQueue<VariationTree::Node*>* eval_queue)
+    : game_(std::move(game)),
+      player_(std::move(player)),
+      eval_queue_(eval_queue) {}
+
+MiniguiGtpClient::WinRateEvaluator::Worker::~Worker() {
+  absl::MutexLock lock(&mutex_);
+  MG_CHECK(!pending_.has_value());
+  pending_ = nullptr;
+  Join();
+}
+
+void MiniguiGtpClient::WinRateEvaluator::Worker::Prepare() {
+  BatchingDualNetFactory::StartGame(player_->network(), player_->network());
+}
+
+void MiniguiGtpClient::WinRateEvaluator::Worker::EvalAsync(
+    VariationTree::Node* node) {
+  absl::MutexLock lock(&mutex_);
+  MG_CHECK(!pending_.has_value());
+  pending_ = node;
+}
+
+void MiniguiGtpClient::WinRateEvaluator::Worker::Run() {
+  for (;;) {
+    absl::MutexLock lock(&mutex_);
+    mutex_.Await(absl::Condition(
+        &pending_, &absl::optional<VariationTree::Node*>::has_value));
+    auto* node = *pending_;
+    pending_.reset();
+    if (node == nullptr) {
+      break;
     }
+
+    player_->NewGame();
+    for (auto c : node->GetVariation()) {
+      MG_CHECK(player_->PlayMove(c));
+    }
+    player_->TreeSearch();
+    BatchingDualNetFactory::EndGame(player_->network(), player_->network());
+
+    nlohmann::json j = {
+        {"id", node->id},
+        {"n", player_->root()->N()},
+        {"q", player_->root()->Q()},
+    };
+    MG_LOG(INFO) << "mg-update:" << j.dump();
+
+    node->num_eval_reads = player_->root()->N();
+    eval_queue_->Push(node);
   }
 }
 

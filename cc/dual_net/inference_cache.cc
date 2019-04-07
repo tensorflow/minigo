@@ -46,6 +46,8 @@ InferenceCache::Key::Key(Coord prev_move, const Position& position)
   }
 }
 
+InferenceCache::~InferenceCache() = default;
+
 size_t BasicInferenceCache::CalculateCapacity(size_t size_mb) {
   // Minimum load factory of an absl::node_hash_map at the time of writing,
   // taken from https://abseil.io/docs/cpp/guides/container.

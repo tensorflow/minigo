@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+
 #include "absl/memory/memory.h"
 #include "cc/algorithm.h"
 #include "cc/color.h"
@@ -70,8 +71,6 @@ class TestablePlayer : public MctsPlayer {
   using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;
   using MctsPlayer::ProcessLeaves;
-  using MctsPlayer::ResetRoot;
-  using MctsPlayer::TreePath;
   using MctsPlayer::TreeSearch;
   using MctsPlayer::UndoMove;
 
@@ -498,9 +497,8 @@ TEST_F(MctsPlayerTest, SymmetriesTest) {
   // Without playing a move, all features planes should be zero except the last
   // one (it's black's turn to play).
   auto* root = player.root();
-  TestablePlayer::TreePath path(root, root);
   root->AddVirtualLoss(root);
-  player.ProcessLeaves({&path, 1}, true);
+  player.ProcessLeaves(std::vector<MctsNode*>({root}), true);
   for (int i = 0; i < kN * kN; ++i) {
     ASSERT_EQ(0.0, root->child_P(i));
   }
@@ -523,9 +521,8 @@ TEST_F(MctsPlayerTest, SymmetriesTest) {
   // the symmetries.
   for (int i = 0; i < 100; ++i) {
     auto* leaf = nodes.back().get();
-    path.leaf = leaf;
     leaf->AddVirtualLoss(root);
-    player.ProcessLeaves({&path, 1}, true);
+    player.ProcessLeaves(std::vector<MctsNode*>({leaf}), true);
     ASSERT_EQ(0.0, leaf->child_P(Coord::FromGtp("pass")));
     for (const auto move : moves) {
       // Playing where stones exist is illegal and should have been marked as 0.
@@ -535,20 +532,6 @@ TEST_F(MctsPlayerTest, SymmetriesTest) {
       }
     }
   }
-}
-
-TEST_F(MctsPlayerTest, ResetRoot) {
-  auto player =
-      absl::make_unique<TestablePlayer>(game_.get(), MctsPlayer::Options());
-
-  auto* game_root = player->root();
-
-  auto c = Coord(12);
-  player->PlayMove(c);
-
-  EXPECT_EQ(c, player->root()->move);
-  player->ResetRoot();
-  EXPECT_EQ(game_root, player->root());
 }
 
 TEST_F(MctsPlayerTest, UndoMove) {

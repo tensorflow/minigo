@@ -77,6 +77,8 @@ class InferenceCache {
     zobrist::Hash stone_hash_;
   };
 
+  virtual ~InferenceCache();
+
   // Clears the cache.
   virtual void Clear() = 0;
 

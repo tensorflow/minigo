@@ -32,7 +32,7 @@ enum class Color {
 };
 
 inline Color OtherColor(Color color) {
-  MG_CHECK(color == Color::kWhite || color == Color::kBlack);
+  MG_DCHECK(color == Color::kWhite || color == Color::kBlack);
   return color == Color::kWhite ? Color::kBlack : Color::kWhite;
 }
 

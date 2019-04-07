@@ -44,7 +44,7 @@ class RandomDualNet : public DualNet {
 
 class RandomDualNetFactory : public DualNetFactory {
  public:
-  RandomDualNetFactory(uint64_t seed, float policy_stddev, float value_stddev);
+  explicit RandomDualNetFactory(uint64_t seed);
 
   // Model specifies the policy and value standard deviation as a
   // colon-separated string, e.g. "0.4:0.4".
@@ -53,8 +53,6 @@ class RandomDualNetFactory : public DualNetFactory {
  private:
   absl::Mutex mutex_;
   Random rnd_;
-  const float policy_stddev_;
-  const float value_stddev_;
 };
 
 }  // namespace minigo

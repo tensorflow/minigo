@@ -187,8 +187,8 @@ TfDualNet::TfDualNet(std::string graph_path, int device_count)
     if (device_count > 0) {
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
-    worker_threads_.emplace_back(functor, graph_def);
-    worker_threads_.emplace_back(functor, graph_def);
+    worker_threads_.emplace_back(std::move(functor), graph_def);
+    worker_threads_.emplace_back(std::move(functor), graph_def);
   }
 }
 

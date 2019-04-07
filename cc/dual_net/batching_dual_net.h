@@ -120,9 +120,9 @@ class BatchingDualNetFactory : public DualNetFactory {
  public:
   BatchingDualNetFactory(std::unique_ptr<DualNetFactory> factory_impl);
 
-  int GetBufferCount() const;
+  int GetBufferCount() const override;
 
-  std::unique_ptr<DualNet> NewDualNet(const std::string& model_path);
+  std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) override;
 
   static void StartGame(DualNet* black, DualNet* white);
   static void EndGame(DualNet* black, DualNet* white);

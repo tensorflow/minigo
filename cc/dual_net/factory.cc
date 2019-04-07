@@ -61,7 +61,8 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
     absl::string_view engine_desc) {
   MG_CHECK(!engine_desc.empty());
 
-  std::vector<std::string> parts = absl::StrSplit(engine_desc, absl::MaxSplits(':', 1));
+  std::vector<std::string> parts =
+      absl::StrSplit(engine_desc, absl::MaxSplits(':', 1));
   auto engine = parts[0];
   std::string arg_str;
   if (parts.size() == 2) {
@@ -75,9 +76,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
     MG_CHECK(!arg_str.empty());
     uint64_t seed = 0;
     MG_CHECK(absl::SimpleAtoi(arg_str, &seed));
-    // TODO(tommadams): expose policy_stddev & value_stddev as command line
-    // arguments.
-    return absl::make_unique<RandomDualNetFactory>(13 * seed, 0.4, 0.4);
+    return absl::make_unique<RandomDualNetFactory>(13 * seed);
   }
 
 #ifdef MG_ENABLE_TF_DUAL_NET

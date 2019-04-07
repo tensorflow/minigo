@@ -48,8 +48,6 @@ DEFINE_double(value_init_penalty, 0.0,
               "clamped to [-1, 1].\n"
               "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
               "This behaves similiarly to leela's FPU \"First Play Urgency\".");
-DEFINE_bool(tree_reuse, true,
-            "Enable reuse of shared subtrees between consecutive moves.");
 
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
@@ -68,9 +66,10 @@ DEFINE_double(decay_factor, 0.98,
 DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
               "inference engine.");
-DEFINE_int32(cache_size_mb, 0,
-             "Size of the inference cache in MB. A value of 0 (the default) "
-             "disables the cache.");
+DEFINE_int32(cache_size_mb, 1024,
+             "Size of the inference cache in MB. In tree reuse in GTP mode is "
+             "disabled, so cache_size_mb should be non-zero for reasonable "
+             "performance. Enabling minigui mode requires an inference cache.");
 
 namespace minigo {
 namespace {
@@ -84,7 +83,7 @@ void Gtp() {
   player_options.soft_pick = false;
   player_options.random_symmetry = true;
   player_options.value_init_penalty = FLAGS_value_init_penalty;
-  player_options.tree_reuse = FLAGS_tree_reuse;
+  player_options.tree_reuse = false;
   player_options.virtual_losses = FLAGS_virtual_losses;
   player_options.num_readouts = FLAGS_num_readouts;
   player_options.seconds_per_move = FLAGS_seconds_per_move;
@@ -99,26 +98,25 @@ void Gtp() {
 
   auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
   auto model_factory = NewDualNetFactory(model_desc.engine);
-  auto model = model_factory->NewDualNet(model_desc.model);
-  std::unique_ptr<BasicInferenceCache> cache;
+
+  std::shared_ptr<ThreadSafeInferenceCache> inference_cache;
   if (FLAGS_cache_size_mb > 0) {
     auto capacity = BasicInferenceCache::CalculateCapacity(FLAGS_cache_size_mb);
-    std::cerr << "Will cache up to " << capacity
-              << " inferences, using roughly " << FLAGS_cache_size_mb
-              << "MB.\n";
-    cache = absl::make_unique<BasicInferenceCache>(capacity);
+    MG_LOG(INFO) << "Will cache up to " << capacity
+                 << " inferences, using roughly " << FLAGS_cache_size_mb
+                 << "MB.\n";
+    inference_cache = std::make_shared<ThreadSafeInferenceCache>(capacity, 1);
   }
-
-  Game game(model->name(), model->name(), game_options);
-  auto player = absl::make_unique<MctsPlayer>(
-      std::move(model), std::move(cache), &game, player_options);
 
   std::unique_ptr<GtpClient> client;
   if (FLAGS_minigui) {
-    client =
-        absl::make_unique<MiniguiGtpClient>(std::move(player), client_options);
+    client = absl::make_unique<MiniguiGtpClient>(
+        std::move(model_factory), std::move(inference_cache), model_desc.model,
+        game_options, player_options, client_options);
   } else {
-    client = absl::make_unique<GtpClient>(std::move(player), client_options);
+    client = absl::make_unique<GtpClient>(
+        std::move(model_factory), std::move(inference_cache), model_desc.model,
+        game_options, player_options, client_options);
   }
   client->Run();
 }

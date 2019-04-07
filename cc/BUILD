@@ -214,8 +214,10 @@ minigo_cc_library(
         ":logging",
         ":mcts",
         ":sgf",
+        ":thread",
         ":thread_safe_queue",
         "//cc/dual_net",
+        "//cc/dual_net:batching_dual_net",
         "//cc/file",
         "@com_github_nlohmann_json//:json",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -252,7 +254,6 @@ minigo_cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -299,6 +300,15 @@ minigo_cc_library(
 minigo_cc_library(
     name = "symmetries",
     hdrs = ["symmetries.h"],
+    deps = [
+        ":logging",
+    ],
+)
+
+cc_library(
+    name = "thread",
+    srcs = ["thread.cc"],
+    hdrs = ["thread.h"],
     deps = [
         ":logging",
     ],

@@ -26,57 +26,172 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "cc/color.h"
+#include "cc/dual_net/batching_dual_net.h"
 #include "cc/dual_net/dual_net.h"
 #include "cc/gtp_client.h"
+#include "cc/thread.h"
 #include "cc/thread_safe_queue.h"
 
 namespace minigo {
 
 class MiniguiGtpClient : public GtpClient {
  public:
-  MiniguiGtpClient(std::unique_ptr<MctsPlayer> player, const Options& options);
+  MiniguiGtpClient(std::unique_ptr<DualNetFactory> model_factory,
+                   std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
+                   const std::string& model_path,
+                   const Game::Options& game_options,
+                   const MctsPlayer::Options& player_options,
+                   const GtpClient::Options& client_options);
   ~MiniguiGtpClient() override;
 
   void NewGame() override;
 
  private:
-  // We maintain some auxiliary data structures about nodes in the search tree
-  // that correspond to actual positions played.
-  struct AuxInfo {
-    AuxInfo(AuxInfo* parent, MctsNode* node);
+  // A tree that tracks all variations played during one game.
+  // This tree is persistent throughout a game, unlike the tree used for search.
+  // The VariationTree maintains a current_node, which is always updated so that
+  // it always corresponds to the MctsPlayer's root.
+  class VariationTree {
+   public:
+    struct Node {
+      Node(Node* parent, Coord move);
 
-    // Parent in the game tree.
-    // This is a shortcut for the following expression:
-    //   node->parent != nullptr ? GetAuxInfo(node->parent) : nullptr
-    AuxInfo* parent;
+      Node(const Node&) = delete;
+      Node& operator=(const Node&) = delete;
 
-    // Tree search node.
-    MctsNode* node;
+      Node(Node&&) = default;
+      Node& operator=(Node&&) = default;
 
-    // Unique ID.
-    std::string id;
+      // Returns the sequence of moves required to reach this node, starting
+      // from an empty board.
+      std::vector<Coord> GetVariation() const;
 
-    // Number of times we have performed tree search for win rate evaluation for
-    // this position. This is tracked separately from MctsNode.N to that every
-    // position requiring win rate evaluation is evaluated as a tree search
-    // root, regardless of what the "real" tree search is doing.
-    int num_eval_reads = 0;
+      Node* const parent;
+      const Coord move;
+      const std::string id;
+      const int n = 0;
 
-    // Children of this position. These are stored in order that the positions
-    // were played (MctsNode::children is unordered), so that the chain of
-    // descendants from this position formed by children[0] is the position's
-    // main line. Children at index 1 and later are variations from the main
-    // line.
-    std::vector<AuxInfo*> children;
+      // Number of times we have performed tree search for win rate evaluation
+      // for this position. This is tracked separately from MctsNode.N to that
+      // every position requiring win rate evaluation is evaluated as a tree
+      // search root, regardless of what the "real" tree search is doing.
+      int num_eval_reads = 0;
 
-    // Any SGF comments associated with this position.
-    std::string comment;
+      // Children of this position. These are stored in order that the positions
+      // were played (MctsNode::children is unordered), so that the chain of
+      // descendants from this position formed by children[0] is the position's
+      // main line. Children at index 1 and later are variations from the main
+      // line.
+      std::vector<Node*> children;
+
+      // Any SGF comments associated with this position.
+      std::string comment;
+    };
+
+    VariationTree();
+
+    // Plays the given move from the current position, updating current_node.
+    void PlayMove(Coord c);
+
+    // Update current_node to its parent.
+    void GoToParent();
+
+    // Rewind the current_node all the way back to the starting empty board
+    // state.
+    void GoToStart();
+
+    // Sets current_node to the node with the given id if it exists.
+    // Returns true if the node with a matching id was found.
+    bool SelectNode(const std::string& id);
+
+    // Returns the current node in the tree.
+    Node* current_node() { return current_node_; }
+
+   private:
+    Node* current_node_ = nullptr;
+    absl::flat_hash_map<std::string, std::unique_ptr<Node>> id_map_;
+  };
+
+  // The WinRateEvaluator handles performing win rate evaluation for positions
+  // that run in parellel with conventionaly pondering.
+  // For more accurate win rate evaluation, the WinRateEvaluator doesn't use
+  // virtual losses and runs inference on one leaf at a time. To improve
+  // efficiency, the WinRateEvaluator uses multiple MctsPlayers that all perform
+  // tree search in parallel, with each player performing win rate evaluation
+  // for a different position.
+  // It's a little depressing how much extra code had to be written to support
+  // background win rate evaluation, but there we are. Things would be a lot
+  // simpler if we had a nice fiber library.
+  class WinRateEvaluator {
+   public:
+    WinRateEvaluator(int num_workers, int num_eval_reads,
+                     DualNetFactory* model_factory,
+                     std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
+                     const std::string& model_path,
+                     const Game::Options& game_options,
+                     const MctsPlayer::Options& player_options);
+    ~WinRateEvaluator();
+
+    bool all_nodes_have_at_least_one_read() const {
+      return to_eval_.empty() || to_eval_[0]->num_eval_reads > 0;
+    }
+
+    void SetNumEvalReads(int num_eval_reads);
+    void SetCurrentVariation(std::vector<VariationTree::Node*> nodes);
+    void EvalNodes();
+
+    // private:
+    void UpdateNodesToEval();
+
+    class Worker : public Thread {
+     public:
+      Worker(std::unique_ptr<Game> game, std::unique_ptr<MctsPlayer> player,
+             ThreadSafeQueue<VariationTree::Node*>* eval_queue);
+      ~Worker();
+
+      // Prepare the worker for running evaluation.
+      // Prepare should be called on all workers that are about to perform eval
+      // before the Eval calls. This tells the inference batcher shared
+      // between workers how many inferences to expect.
+      void Prepare();
+
+      // Start running evaluation on the given Node.
+      // Each time Eval is called, the Worker resets the board and plays a
+      // game out to the given node, then performs tree search until a single
+      // inference is performed.
+      // Because the workers all share an inference cache, repeated Evals of
+      // the same node will result in an ever increasing number of nodes being
+      // expanded during the tree search, since cached hits don't count towards
+      // the number of inferences performed during the search.
+      // This does require that the inference cache is large enough to fit all
+      // the inferences performed during win rate evaluation for the current
+      // variation.
+      void EvalAsync(VariationTree::Node* node);
+
+     private:
+      void Run() override;
+
+      absl::Mutex mutex_;
+      absl::optional<VariationTree::Node*> pending_ GUARDED_BY(&mutex_);
+      std::unique_ptr<Game> game_;
+      std::unique_ptr<MctsPlayer> player_ GUARDED_BY(&mutex_);
+      std::vector<MctsNode*> leaves_;
+      ThreadSafeQueue<VariationTree::Node*>* eval_queue_;
+    };
+
+    int num_eval_reads_ = 8;
+    std::vector<std::unique_ptr<Worker>> workers_;
+    std::deque<VariationTree::Node*> to_eval_;
+    std::vector<VariationTree::Node*> variation_;
+    ThreadSafeQueue<VariationTree::Node*> eval_queue_;
   };
 
   void Ponder() override;
 
+  // GTP command handlers.
   Response HandleCmd(const std::string& line) override;
   Response HandleGenmove(CmdArgs args) override;
   Response HandlePlay(CmdArgs args) override;
@@ -84,51 +199,31 @@ class MiniguiGtpClient : public GtpClient {
       const std::vector<std::unique_ptr<sgf::Node>>& trees) override;
 
   Response HandleEcho(CmdArgs args);
-  Response HandlePruneNodes(CmdArgs args);
   Response HandleReportSearchInterval(CmdArgs args);
   Response HandleSelectPosition(CmdArgs args);
   Response HandleWinrateEvals(CmdArgs args);
 
-  // Writes the search data for the tree search being performed at the given
-  // root to stderr. If leaf is non-null, the search path from root to leaf
-  // is also written.
-  void ReportSearchStatus(MctsNode* root, MctsNode* leaf,
-                          bool include_tree_stats);
+  // Writes the search data for the tree search currently being performed to
+  // stderr. If leaf is non-null, the search path from root to leaf is also
+  // written.
+  void ReportSearchStatus(const MctsNode* leaf, bool include_tree_stats);
 
   // Writes the position data for the node to stderr as a JSON object.
-  void ReportPosition(MctsNode* node);
-
-  // Gets the AuxInfo for the given node.
-  // If AuxInfo doesn't yet exist, create it.
-  AuxInfo* GetAuxInfo(MctsNode* node);
+  void ReportRootPosition();
 
   // Clears the to_eval_ win rate evaluation queue and repopulates it.
   void RefreshPendingWinRateEvals();
 
-  void TreeSearchCb(absl::Span<MctsPlayer::TreePath> paths);
+  // Callback invoked during the main tree search (not any of the
+  // WinRateEvaluator's searches). Calls ReportSearchStatus if the time since
+  // the time it called ReportSearchStatus is greater than
+  // report_search_interval_.
+  void TreeSearchCb(const std::vector<MctsNode*>& leaves);
 
-  // Map from MctsNode to auxiliary info about that node used by the GtpPlayer.
-  absl::flat_hash_map<MctsNode*, std::unique_ptr<AuxInfo>> node_to_info_;
-
-  // Map from unique ID associated with every position played in a game or
-  // variation to the position's auxiliary info and MctsNode.
-  absl::flat_hash_map<std::string, AuxInfo*> id_to_info_;
-
-  // Queue of positions that require their win rate to be evaluated.
-  std::deque<AuxInfo*> to_eval_;
-
-  // Number of times to perform tree search for each position when evaluating
-  // its win rate.
-  int num_eval_reads_ = 6;
-
-  // Each call to Ponder alternates between performing background win-rate
-  // estimation reads (while there are still some remaining) and regular
-  // pondering.
-  bool do_winrate_eval_reads_ = true;
-
-  // Used to track when to print the current tree search status to stderr.
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;
+  std::unique_ptr<VariationTree> variation_tree_;
+  std::unique_ptr<WinRateEvaluator> win_rate_evaluator_;
 };
 
 }  // namespace minigo
