@@ -80,9 +80,6 @@ class MctsPlayer {
     // of time spent thinking as the game progresses.
     float decay_factor = 0.98;
 
-    // If true, print debug info to stderr.
-    bool verbose = true;
-
     // If true, children of the current root node are pruned when a move is
     // played. Under normal play, only the descendents of the move played ever
     // have a chance of being visited again during tree search. However, when
@@ -159,6 +156,7 @@ class MctsPlayer {
   const Options& options() const { return options_; }
   const std::string& name() const { return network_->name(); }
   DualNet* network() { return network_.get(); }
+  uint64_t seed() const { return rnd_.seed(); }
 
   void SetOptions(const Options& options) { options_ = options; }
 

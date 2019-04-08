@@ -72,7 +72,6 @@ void Puzzle() {
   player_options.virtual_losses = FLAGS_virtual_losses;
   player_options.random_seed = FLAGS_seed;
   player_options.num_readouts = FLAGS_num_readouts;
-  player_options.verbose = false;
 
   std::atomic<size_t> total_moves(0);
   std::atomic<size_t> correct_moves(0);

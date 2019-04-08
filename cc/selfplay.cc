@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdio.h>
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -268,7 +269,7 @@ class SelfPlayer {
   struct ThreadOptions {
     void Init(int thread_id, Random* rnd) {
       ParseOptionsFromFlags(&game_options, &player_options);
-      player_options.verbose = thread_id == 0;
+      verbose = thread_id == 0;
       // If an random seed was explicitly specified, make sure we use a
       // different seed for each thread.
       if (player_options.random_seed != 0) {
@@ -288,6 +289,7 @@ class SelfPlayer {
     std::string output_dir;
     std::string holdout_dir;
     std::string sgf_dir;
+    bool verbose = false;
   };
 
   void ThreadRun(int thread_id) {
@@ -335,28 +337,69 @@ class SelfPlayer {
         }
       }
 
+      if (thread_options.verbose) {
+        MG_LOG(INFO) << "MctsPlayer options: " << player->options();
+        MG_LOG(INFO) << "Game options: " << game->options();
+        MG_LOG(INFO) << "Random seed used: " << player->seed();
+      }
+
       // Play the game.
       auto start_time = absl::Now();
       {
         absl::MutexLock lock(&mutex_);
         BatchingDualNetFactory::StartGame(player->network(), player->network());
       }
+      int current_readouts;
+      absl::Time start;
       while (!game->game_over() && !player->root()->at_move_limit()) {
+        // Record some information using for printing tree search stats.
+        if (thread_options.verbose) {
+          current_readouts = player->root()->N();
+          start = absl::Now();
+        }
+
+        // Choose the move to play.
         auto move = player->SuggestMove();
-        if (player->options().verbose) {
-          const auto& position = player->root()->position;
-          MG_LOG(INFO) << player->root()->position.ToPrettyString(
-              use_ansi_colors);
+
+        // Log tree search stats.
+        if (thread_options.verbose) {
+          const auto* root = player->root();
+          const auto& position = root->position;
+
+          int num_readouts = root->N() - current_readouts;
+          auto elapsed = absl::Now() - start;
+          elapsed = elapsed * 100 / num_readouts;
+          MG_LOG(INFO) << "Milliseconds per 100 reads: "
+                       << absl::ToInt64Milliseconds(elapsed) << "ms"
+                       << " over " << num_readouts << " readouts (vlosses: "
+                       << player->options().virtual_losses << ")";
+          MG_LOG(INFO) << root->CalculateTreeStats().ToString();
+
+          MG_LOG(INFO) << root->position.ToPrettyString(use_ansi_colors);
           MG_LOG(INFO) << "Move: " << position.n()
                        << " Captures X: " << position.num_captures()[0]
                        << " O: " << position.num_captures()[1];
-          MG_LOG(INFO) << player->root()->Describe();
+          MG_LOG(INFO) << root->Describe();
         }
+
+        // Play the chosen move.
         MG_CHECK(player->PlayMove(move));
+
+        // Log information about the move played.
+        if (thread_options.verbose) {
+          MG_LOG(INFO) << absl::StreamFormat("%s Q: %0.5f", player->name(),
+                                             player->root()->Q());
+          MG_LOG(INFO) << "Played >>" << move;
+        }
       }
       {
         absl::MutexLock lock(&mutex_);
         BatchingDualNetFactory::EndGame(player->network(), player->network());
+      }
+
+      if (thread_options.verbose) {
+        MG_LOG(INFO) << "Inference history: "
+                     << player->GetModelsUsedForInference();
       }
 
       {

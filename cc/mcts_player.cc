@@ -82,27 +82,10 @@ MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network,
   // divide 2, multiply 2 guarentees that white and black do even number.
   temperature_cutoff_ = !options_.soft_pick ? -1 : (((kN * kN / 12) / 2) * 2);
   root_ = &game_root_;
-
-  if (options_.verbose) {
-    MG_LOG(INFO) << "MctsPlayer options: " << options_;
-    MG_LOG(INFO) << "Game options: " << game_->options();
-    // A time-based seed will be used when options_.random_seed == 0, so log
-    // that explicitly.
-    MG_LOG(INFO) << "Random seed used: " << rnd_.seed();
-  }
-
   InitializeGame({&bv_, &gv_, Color::kBlack});
 }
 
-MctsPlayer::~MctsPlayer() {
-  if (options_.verbose) {
-    MG_LOG(INFO) << "Inference history:";
-    for (const auto& info : inferences_) {
-      MG_LOG(INFO) << info.model << " [" << info.first_move << ", "
-                   << info.last_move << "]";
-    }
-  }
-}
+MctsPlayer::~MctsPlayer() = default;
 
 void MctsPlayer::InitializeGame(const Position& position) {
   root_stats_ = {};
@@ -167,17 +150,6 @@ Coord MctsPlayer::SuggestMove() {
       TreeSearch();
     }
   }
-  int num_readouts = root_->N() - current_readouts;
-  auto elapsed = absl::Now() - start;
-  elapsed = elapsed * 100 / num_readouts;
-  if (options_.verbose) {
-    MG_LOG(INFO) << "Milliseconds per 100 reads: "
-                 << absl::ToInt64Milliseconds(elapsed) << "ms"
-                 << " over " << num_readouts
-                 << " readouts (vlosses: " << options_.virtual_losses << ")";
-    MG_LOG(INFO) << root_->CalculateTreeStats().ToString();
-  }
-
   if (ShouldResign()) {
     return Coord::kResign;
   }
@@ -187,11 +159,7 @@ Coord MctsPlayer::SuggestMove() {
 
 Coord MctsPlayer::PickMove() {
   if (root_->position.n() >= temperature_cutoff_) {
-    Coord c = root_->GetMostVisitedMove();
-    if (options_.verbose) {
-      MG_LOG(INFO) << "Picked arg_max " << c;
-    }
-    return c;
+    return root_->GetMostVisitedMove();
   }
 
   // Select from the first kN * kN moves (instead of kNumMoves) to avoid
@@ -217,9 +185,6 @@ Coord MctsPlayer::PickMove() {
 
   float e = rnd_();
   Coord c = SearchSorted(cdf, e * cdf.back());
-  if (options_.verbose) {
-    MG_LOG(INFO) << "Picked rnd(" << e << ") " << c;
-  }
   MG_DCHECK(root_->child_N(c) != 0);
   return c;
 }
@@ -334,11 +299,6 @@ bool MctsPlayer::PlayMove(Coord c) {
   } else {
     root_->children.clear();
     root_ = root_->MaybeAddChild(c);
-  }
-
-  if (options_.verbose) {
-    MG_LOG(INFO) << absl::StreamFormat("%s Q: %0.5f", name(), root_->Q());
-    MG_LOG(INFO) << "Played >>" << c;
   }
 
   // Handle consecutive passing or termination by move limit.

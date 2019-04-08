@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdio.h>
+
 #include <cmath>
 #include <functional>
 #include <iostream>
@@ -217,11 +218,8 @@ class Evaluator {
     }
 
     const bool verbose = thread_id == 0;
-    player_options.verbose = false;
     auto black = absl::make_unique<MctsPlayer>(black_model->NewDualNet(),
                                                nullptr, &game, player_options);
-
-    player_options.verbose = false;
     auto white = absl::make_unique<MctsPlayer>(white_model->NewDualNet(),
                                                nullptr, &game, player_options);
 
