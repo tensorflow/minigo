@@ -59,6 +59,12 @@ class Coord {
 
   operator uint16_t() const { return value_; }
 
+  // Enable Coords to be used as keys in absl hashed containers.
+  template <typename H>
+  friend H AbslHashValue(H h, Coord c) {
+    return H::combine(std::move(h), c.value_);
+  }
+
  private:
   uint16_t value_;
 };
