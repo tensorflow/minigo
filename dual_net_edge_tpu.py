@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This file contains an implementation of dual_net.py for Google's EdgeTPU. It can only be used for inference and requires a specially quantized and compiled model file.
+"""This file contains an implementation of dual_net.py for Google's EdgeTPU.
+It can only be used for inference and requires a specially quantized and
+compiled model file.
 
 For more information see https://coral.withgoogle.com
 """
@@ -23,6 +25,7 @@ from edgetpu.basic.basic_engine import BasicEngine  # pylint: disable=import-err
 
 
 class DualNetworkEdgeTpu():
+    """DualNetwork implementation for Google's EdgeTPU."""
 
     def __init__(self, save_file):
         self.engine = BasicEngine(save_file)
@@ -44,10 +47,12 @@ class DualNetworkEdgeTpu():
                     output_tensors_sizes, expected_output_tensor_sizes))
 
     def run(self, position):
+        """Runs inference on a single position."""
         probs, values = self.run_many([position])
         return probs[0], values[0]
 
     def run_many(self, positions):
+        """Runs inference on a list of position."""
         processed = list(map(features_lib.extract_features, positions))
         probabilities = []
         values = []
