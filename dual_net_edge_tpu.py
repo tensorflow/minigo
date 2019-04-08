@@ -11,19 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This file contains an implementation of dual_net.py for Google's EdgeTPU. It can only be used for inference and requires a specially quantized and compiled model file.
 
-"""
-This file contains an implementation of dual_net.py for Google's EdgeTPU.
-It can only be used for inference and requires a specially quantized and
-compiled model file. For more information see https://coral.withgoogle.com
+For more information see https://coral.withgoogle.com
 """
 
 import numpy as np
 import features as features_lib
 import go
-from edgetpu.basic.basic_engine import BasicEngine
+from edgetpu.basic.basic_engine import BasicEngine  # pylint: disable=import-error
+
 
 class DualNetworkEdgeTpu():
+
     def __init__(self, save_file):
         self.engine = BasicEngine(save_file)
         self.board_size = go.N
@@ -33,14 +33,15 @@ class DualNetworkEdgeTpu():
         expected_input_shape = [1, self.board_size, self.board_size, 17]
         if not np.array_equal(input_tensor_shape, expected_input_shape):
             raise RuntimeError(
-                    'Invalid input tensor shape {}. Expected: {}'.format(
-                            input_tensor_shape, expected_input_shape))
+                'Invalid input tensor shape {}. Expected: {}'.format(
+                    input_tensor_shape, expected_input_shape))
         output_tensors_sizes = self.engine.get_all_output_tensors_sizes()
         expected_output_tensor_sizes = [self.output_policy_size, 1]
-        if not np.array_equal(output_tensors_sizes, expected_output_tensor_sizes):
+        if not np.array_equal(output_tensors_sizes,
+                              expected_output_tensor_sizes):
             raise RuntimeError(
-                    'Invalid output tensor sizes {}. Expected: {}'.format(
-                            output_tensors_sizes, expected_output_tensor_sizes))
+                'Invalid output tensor sizes {}. Expected: {}'.format(
+                    output_tensors_sizes, expected_output_tensor_sizes))
 
     def run(self, position):
         probs, values = self.run_many([position])
@@ -51,7 +52,8 @@ class DualNetworkEdgeTpu():
         probabilities = []
         values = []
         for state in processed:
-            assert state.shape == (self.board_size, self.board_size, 17), str(state.shape)
+            assert state.shape == (self.board_size, self.board_size,
+                                   17), str(state.shape)
             result = self.engine.RunInference(state.flatten())
             # If needed you can get the raw inference time from the result object.
             # inference_time = result[0] # ms
