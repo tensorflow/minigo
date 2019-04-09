@@ -10,6 +10,9 @@ pyvenv.cfg
 .DS_store
 logs/
 saved_models/
+ratings.db
+cbt_ratings.db
+.rsync_log
 
 # Vim temp files
 *.swp
