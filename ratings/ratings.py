@@ -295,11 +295,10 @@ def sync(root, force_all=False):
 def wins_subset(bucket):
     with sqlite3.connect('ratings.db') as db:
         data = db.execute(
-            "select model_winner, model_loser from wins "
-            "join models where "
-            "    models.bucket = ? AND "
-            "    model_winner = models.id",
-            (bucket,)).fetchall()
+            "SELECT model_winner, model_loser FROM wins WHERE"
+            "  (model_winner in (SELECT id FROM models where bucket = ?)) or "
+            "  (model_loser  in (SELECT id FROM models where bucket = ?)) ",
+            (bucket, bucket)).fetchall()
     return data
 
 
