@@ -51,8 +51,8 @@ fi
 
 # TODO(amj) Check that cc/main runs with perms to read a gs:// path directly
 echo Retrieiving Models
-gsutil cp ${MODEL_BLACK} .
-gsutil cp ${MODEL_WHITE} .
+gsutil cp "${MODEL_BLACK}" .
+gsutil cp "${MODEL_WHITE}" .
 
 BASENAME_BLACK=`basename $MODEL_BLACK`
 BASENAME_WHITE=`basename $MODEL_WHITE`

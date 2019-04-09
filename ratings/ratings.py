@@ -68,8 +68,6 @@ def model_num_for(model_id):
     except:
         print("No model found for id: {}".format(model_id))
         raise
-        return None
-
 
 def rowid_for(db, bucket, name):
     try:
@@ -110,10 +108,6 @@ def import_files(files, bucket=None):
 
             m_num_w = re.match(MODEL_REGEX, pw).group(1)
             m_num_b = re.match(MODEL_REGEX, pb).group(1)
-            # v10 and v9 have the same model and name for 588, so cross eval
-            # games played with this model should be ignored.
-            if m_num_w == '000588' or m_num_b == '000588':
-                continue
 
             try:
                 # create models or ignore.
@@ -219,7 +213,7 @@ def ingest_dirs(root, dirs):
     for d in dirs:
         if os.path.isdir(os.path.join(root, d)):
             fs = [os.path.join(root, d, f) for f in os.listdir(os.path.join(root, d))]
-            print("Importing from {}".format(d))
+            print("Importing({}) from {}/{}".format(len(fs), root,d))
             import_files(fs)
 
 
@@ -251,7 +245,7 @@ def suggest_pairs(top_n=10, per_n=3, ignore_before=300):
     bucket_ids.sort()
     data = [d for d in data if d[0] in bucket_ids and d[1] in bucket_ids]
 
-    ratings = [(model_num_for(k), v[0], v[1]) for k, v in compute_ratings(data).items()]
+    ratings = [(model_num_for(k),) + v for k, v in compute_ratings(data).items()]
     ratings.sort()
     ratings = ratings[ignore_before:]  # Filter off the first 100 models, which improve too fast.
 
@@ -282,7 +276,6 @@ def sync(root, force_all=False):
             cmd = ["gsutil", "-m", "rsync", "-r", os.path.join(fsdb.eval_dir(), d), os.path.join(root, d)]
             print(" ".join(cmd))
             subprocess.call(cmd)
-
         ingest_dirs(root, ds)
     else:
         cmd = ["gsutil", "-m", "rsync", "-r", fsdb.eval_dir(), root]
@@ -306,14 +299,16 @@ def main():
     root = os.path.abspath(os.path.join("sgf", fsdb.FLAGS.bucket_name, "sgf/eval"))
     if FLAGS.sync_ratings:
         sync(root)
+
     models = fsdb.get_models()
     data = wins_subset(fsdb.models_dir())
-    print(len(data))
+    print("win subset", len(data), "games")
     r = compute_ratings(data)
     for v, k in sorted([(v, k) for k, v in r.items()])[-20:][::-1]:
-        print(models[model_num_for(k)][1], v)
+        print("Top model({}) {}: {}".format(k, model_num_for(k), v))
+
     db = sqlite3.connect("ratings.db")
-    print(db.execute("select count(*) from wins").fetchone()[0], "games")
+    print("db has", db.execute("select count(*) from wins").fetchone()[0], "games")
     for m in models[-10:]:
         m_id = model_id(m[0])
         if m_id in r:

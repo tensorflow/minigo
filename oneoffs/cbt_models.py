@@ -17,6 +17,13 @@
 """Write Minigo model records to Bigtable.
 
 This is used to insert models data into cbt model table from gcs training dir.
+
+Usage:
+python3 oneoffs/cbt_models.py \
+    --cbt_project "$PROJECT" \
+    --cbt_instance "$CBT_INSTANCE" \
+    --cbt_table    "$CBT_MODEL_TABLE" \
+    --model_glob "gs://<path>/models/*.meta"
 """
 
 import sys

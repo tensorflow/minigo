@@ -29,16 +29,18 @@ CREATE TABLE IF NOT EXISTS models (
   black_wins integer,
   white_games integer,
   white_wins integer,
-  unique(bucket, model_name)
+
+  UNIQUE(bucket, model_name)
 );
 
 CREATE TABLE IF NOT EXISTS wins (
     game_id integer primary key,
     model_winner integer not null,
     model_loser integer not null,
-    foreign key(game_id) references games(game_id),
-    foreign key(model_winner) references models(id),
-    foreign key(model_loser) references models(id)
+
+    FOREIGN KEY(game_id) REFERENCES games(game_id) ON DELETE CASCADE,
+    FOREIGN KEY(model_winner) REFERENCES models(id) ON DELETE CASCADE,
+    FOREIGN KEY(model_loser) REFERENCES models(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS games (
@@ -52,13 +54,16 @@ CREATE TABLE IF NOT EXISTS games (
 
   black_won boolean,
   result text,
-  unique(filename),
-  FOREIGN KEY(b_id) REFERENCES models(id),
-  FOREIGN KEY(w_id) REFERENCES models(id)
+
+  UNIQUE(filename),
+  FOREIGN KEY(b_id) REFERENCES models(id) ON DELETE CASCADE,
+  FOREIGN KEY(w_id) REFERENCES models(id) ON DELETE CASCADE
 );
 
 
 CREATE INDEX IF NOT EXISTS model_name_bucket_index ON models (model_name, bucket);
 CREATE INDEX IF NOT EXISTS game_model_b_index ON games (b_id);
 CREATE INDEX IF NOT EXISTS game_model_w_index ON games (w_id);
-CREATE INDEX IF NOT EXISTS game_filename on games (filename);
+CREATE INDEX IF NOT EXISTS game_filename_index on games (filename);
+CREATE INDEX IF NOT EXISTS win_winner_index on wins (model_winner);
+CREATE INDEX IF NOT EXISTS win_loser_index on wins (model_loser);

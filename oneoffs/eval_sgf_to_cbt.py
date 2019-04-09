@@ -18,6 +18,13 @@
 
 This is used to backfill eval games from before they were written by
 cc-evaluator as part of https://github.com/tensorflow/minigo/pull/709
+
+Usage:
+python3 oneoffs/eval_sgf_to_cbt.py \
+    --cbt_project "$PROJECT" \
+    --cbt_instance "$CBT_INSTANCE" \
+    --cbt_table    "$CBT_EVAL_TABLE" \
+    --sgf_glob     "gs://<path>/eval/*/*.sgf"
 """
 
 import sys
@@ -37,7 +44,6 @@ from tensorflow import gfile
 
 import sgf_wrapper
 from bigtable_input import METADATA, TABLE_STATE
-
 
 
 flags.DEFINE_string(
@@ -89,7 +95,8 @@ def read_existing_paths(bt_table):
     rows = bt_table.read_rows(
         filter_=row_filters.ColumnRangeFilter(
             METADATA, SGF_FILENAME, SGF_FILENAME))
-    names = (row.cell_value(METADATA, SGF_FILENAME).decode() for row in rows)
+    reader = tqdm(rows, desc="eval_game", unit=" rows")
+    names = (row.cell_value(METADATA, SGF_FILENAME).decode() for row in reader)
     processed = [os.path.splitext(os.path.basename(r))[0] for r in names]
     return processed
 
@@ -103,7 +110,7 @@ def canonical_name(sgf_name):
 
     # Often eval is inside a folder with the run name.
     # include from folder before /eval/ if part of path.
-    with_folder = re.search(r'/([^/]*/eval/.*)', sgf_name)
+    with_folder = re.search(r'(?:^|/)([^/]*/eval/.*)', sgf_name)
     if with_folder:
         return with_folder.group(1)
 
