@@ -20,7 +20,7 @@ This is used to backfill eval games from before they were written by
 cc-evaluator as part of https://github.com/tensorflow/minigo/pull/709
 
 Usage:
-python3 oneoffs/eval_sgf_to_cbt.py \
+python3 oneoffs/cbt_eval_sgfs.py \
     --cbt_project "$PROJECT" \
     --cbt_instance "$CBT_INSTANCE" \
     --cbt_table    "$CBT_EVAL_TABLE" \
