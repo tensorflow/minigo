@@ -140,7 +140,6 @@ def main(argv):
     if FLAGS.max_trainings:
         trainings = trainings[:FLAGS.max_trainings]
 
-    # TODO:  have a --dry_run to review
     if FLAGS.dry_run:
         for t in trainings:
             print(t)
