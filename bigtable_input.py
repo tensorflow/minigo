@@ -619,10 +619,10 @@ def mix_by_decile(games, moves, deciles=9):
     #   fr_: fraction
     #    _r: resign (ordinary)
     #   _nr: no-resign
-    lesser = 10 - math.floor(deciles)
-    greater = 10 - lesser
+    ct_total = 10
+    lesser = ct_total - math.floor(deciles)
+    greater = ct_total - lesser
     ct_r, ct_nr = greater, lesser
-    ct_total = ct_r + ct_nr
     fr_r = ct_r / ct_total
     fr_nr = ct_nr / ct_total
     games_r = math.ceil(games * fr_r)
