@@ -46,8 +46,9 @@ flags.DEFINE_float('training_fresh', 0.05,
 flags.DEFINE_integer('batch_size', 1024,
                      'How many TFRecords to pull through tf.Session at a time')
 
-flags.DEFINE_string('output_prefix', 'gs://dtj-minigo-us-central1/tryit_',
+flags.DEFINE_string('output_prefix', None,
                     'Name of output file to receive TFRecords')
+flags.mark_flag_as_required('output_prefix')
 
 flags.DEFINE_integer('concurrency', 4,
                      'Number of parallel subprocesses')
