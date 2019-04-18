@@ -105,7 +105,11 @@ bool MctsPlayer::UndoMove() {
   game_->UndoMove();
   if (!options_.tree_reuse) {
     // Reset the root to a fresh node.
-    *root_ = MctsNode(root_->parent, root_->move);
+    if (root_->parent != nullptr) {
+      *root_ = MctsNode(root_->parent, root_->move);
+    } else {
+      *root_ = MctsNode(root_->stats, root_->position);
+    }
   }
   return true;
 }
