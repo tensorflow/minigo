@@ -30,8 +30,9 @@ $ python3 ratings/cbt_ratings.py  \
 import sys
 sys.path.insert(0, '.')
 
-import re
 import math
+import random
+import re
 import sqlite3
 from collections import defaultdict, Counter
 
@@ -207,7 +208,19 @@ def setup_models(models_table):
         return model_ids, model_runs
 
 
-def sync(eval_games_table, model_ids, model_runs):
+def sync():
+    # TODO(djk): table.exists() without admin=True, read_only=False.
+    models_table = (bigtable
+                    .Client(FLAGS.cbt_project, read_only=True)
+                    .instance(FLAGS.cbt_instance)
+                    .table("models"))
+
+    eval_games_table = (bigtable
+                        .Client(FLAGS.cbt_project, read_only=True)
+                        .instance(FLAGS.cbt_instance)
+                        .table("eval_games"))
+
+    model_ids, model_runs = setup_models(models_table)
     # TODO(sethtroisi): Potentially only update from a starting rows.
 
     status = Counter()
@@ -304,6 +317,53 @@ def sync(eval_games_table, model_ids, model_runs):
         print("{:<10}".format(count), s)
 
 
+def current_run(model_ids):
+    """Return the largest number run.
+
+    If you want something different, feel free to extend with fsdb or something.
+    """
+    all_runs = set(run for run, name in model_ids)
+
+    # TODO fix before submit
+    return max(all_runs)
+
+    # Assumption of the run format.
+    assert all(re.match("v[0-9]+", run) for run in all_runs), all_runs
+
+    # "Current" is defined as largest numbered run.
+    max_num = max(int(r[1:] for r in all_runs))
+    return 'v' + str(max_num)
+
+
+def run_win_records(run=None):
+    """Return all win records between two models both in run
+
+    If run is None, models must be in different runs.
+    """
+
+    with sqlite3.connect('cbt_ratings.db') as db:
+        if run:
+            data = db.execute(
+                """
+                SELECT model_winner, model_loser FROM wins
+                JOIN models m1, models m2 WHERE
+                    m1.bucket = ? AND m1.id = model_winner AND
+                    m2.bucket = ? AND m2.id = model_loser
+                """,
+                (run, run))
+        else:
+            # run=None is for cross eval, don't allow games from same run
+            data = db.execute("""
+                SELECT model_winner, model_loser FROM wins
+                JOIN models m1, models m2 WHERE
+                    m1.id = model_winner AND
+                    m2.id = model_loser AND
+                    m1.bucket != m2.bucket
+                """)
+
+    return data.fetchall()
+
+
 def compute_ratings(model_ids, data=None):
     """ Calculate ratings from win records
 
@@ -364,56 +424,68 @@ def top_n(n=10):
     with sqlite3.connect('cbt_ratings.db') as db:
         model_ids, _ = read_models(db)
 
-    data = wins_subset()
+    data = run_win_records()
     ratings = compute_ratings(model_ids, data)
     top_models = sorted(ratings.items(), key=lambda k: k[::-1])
     return top_models[-n:][::-1]
 
 
-def wins_subset(run=None):
-    with sqlite3.connect('cbt_ratings.db') as db:
-        if run:
-            data = db.execute(
-                """
-                select model_winner, model_loser from wins
-                join models m1 join models m2 where
-                    m1.bucket = ? AND m1.id = model_winner
-                    m2.bucket = ? AND m2.id = model_loser
-                """,
-                (run, run))
-        else:
-            # run=None is for cross eval, don't allow games from same run
-            data = db.execute("""
-                select model_winner, model_loser from wins
-                join models m1 join models m2 where
-                    m1.id = model_winner AND
-                    m2.id = model_loser AND
-                    m1.bucket != m2.bucket
-                """)
+def suggest_pairs(top_n=10, per_n=3, ignore_before=300):
+    """ Find the maximally interesting pairs of models to match up
+    First, sort the ratings by uncertainty.
+    Then, take the ten highest models with the highest uncertainty
+    For each of them, call them `m1`
+    Sort all the models by their distance from m1's rating and take the 20
+    nearest rated models. ('candidate_m2s')
+    Choose `per_n` random pairings, (m1, m2), from this list
 
-    return data.fetchall()
+    `top_n` will pair the top n models by uncertainty.
+    `per_n` will give each of the top_n models this many opponents
+    `ignore_before` is the model number to `filter` off, i.e., the early models.
+    Returns a list of *model numbers*, not model ids.
+    """
+
+    with sqlite3.connect('cbt_ratings.db') as db:
+        model_ids, model_runs = read_models(db)
+
+    run = current_run(model_ids)
+    data = run_win_records(run)
+
+    ratings = compute_ratings(model_ids, data)
+    ratings = [(name,) + rating for (run, name), rating in ratings.items()]
+    ratings.sort()
+
+    # Filter off the first X models, which improve quickly but are chaotic.
+    ratings = ratings[ignore_before:]
+
+    # Sort by rating variance
+    ratings.sort(key=lambda r: r[2], reverse=True)
+
+    pairs = []
+    for m1 in ratings[:top_n]:
+        print("Pairing {}, sigma {:.1f} (Rating {:.1f})".format(
+            m1[0], m1[2], m1[1]))
+
+        def rating_diff(m2):
+            """Rating difference between two models"""
+            return abs(m1[1] - m2[1])
+
+        candidate_m2s = sorted(ratings, key=rating_diff)[1:20]
+        for m2 in random.sample(candidate_m2s, per_n):
+            pairs.append((m1[0], m2[0]))
+            print("    {}, rating delta {:.1f}".format(m2[0], rating_diff(m2)))
+
+    return pairs
 
 
 def main():
     if FLAGS.sync_ratings:
-        # TODO(djk): table.exists() without admin=True, read_only=False.
-        models_table = (bigtable
-                        .Client(FLAGS.cbt_project, read_only=True)
-                        .instance(FLAGS.cbt_instance)
-                        .table("models"))
+        sync()
 
-        eval_games_table = (bigtable
-                            .Client(FLAGS.cbt_project, read_only=True)
-                            .instance(FLAGS.cbt_instance)
-                            .table("eval_games"))
+    with sqlite3.connect('cbt_ratings.db') as db:
+        model_ids, model_runs = read_models(db)
 
-        model_ids, model_runs = setup_models(models_table)
-        sync(eval_games_table, model_ids, model_runs)
-    else:
-        with sqlite3.connect('cbt_ratings.db') as db:
-            model_ids, model_runs = read_models(db)
-
-    data = wins_subset()
+    data = run_win_records()
 
     print("DB has", len(data), "games")
     if not data:
@@ -438,6 +510,11 @@ def main():
             print("{:>30}:  {:.2f} ({:.3f})".format(name, rating, sigma))
         else:
             print("{:>30}:  not found".format(name))
+
+    random.seed(5)
+    # Suggest some pairs
+    print()
+    suggest_pairs(5, 2)
 
 
 if __name__ == '__main__':
