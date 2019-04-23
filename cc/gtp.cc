@@ -67,7 +67,7 @@ DEFINE_string(model, "",
               "Path to a minigo model. The format of the model depends on the "
               "inference engine.");
 DEFINE_int32(cache_size_mb, 1024,
-             "Size of the inference cache in MB. In tree reuse in GTP mode is "
+             "Size of the inference cache in MB. Tree reuse in GTP mode is "
              "disabled, so cache_size_mb should be non-zero for reasonable "
              "performance. Enabling minigui mode requires an inference cache.");
 
@@ -106,6 +106,9 @@ void Gtp() {
                  << " inferences, using roughly " << FLAGS_cache_size_mb
                  << "MB.\n";
     inference_cache = std::make_shared<ThreadSafeInferenceCache>(capacity, 1);
+  } else {
+    MG_LOG(WARNING) << "cache_size_mb == 0 results in poor performance in GTP "
+                       "mode because tree reuse is disabled.";
   }
 
   std::unique_ptr<GtpClient> client;
