@@ -50,9 +50,11 @@ function train() {
   echo "Training on ${#train_chunks[@]} chunks in ${num_steps} steps"
   echo "Writing to $work_dir"
 
-  echo gsutil cp "${BASH_SOURCE[0]}" "$work_dir/"
+  # Copy this training script to GCS so we have a record of the exact settings
+  # used.
+  gsutil cp "${BASH_SOURCE[0]}" "$work_dir/"
 
-  echo python3 train.py \
+  python3 train.py \
     --trunk_layers=$trunk_layers \
     --conv_width=$filter_width \
     --fc_width=$filter_width \
