@@ -97,8 +97,7 @@ pip3 install -r requirements.txt
 Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
 - GPU: `pip3 install "tensorflow-gpu>=1.13,<1.14"`.
-  - *Note*: You must install [CUDA
-    9.0](https://developer.nvidia.com/cuda-90-download-archive). for Tensorflow
+  - *Note*: You must install [CUDA 9.0](https://developer.nvidia.com/cuda-90-download-archive). for Tensorflow
     1.5+.
 - CPU: `pip3 install "tensorflow>=1.13,<1.14"`.
 
@@ -276,10 +275,10 @@ it gets picked up by selfplay workers.
 
 Configuration for things like "where do debug SGFs get written", "where does
 training data get written", "where do the latest models get published" are
-managed by the helper scripts in the rl_loop directory. Those helper scripts
+managed by the helper scripts in the rl\_loop directory. Those helper scripts
 execute the same commands as demonstrated below. Configuration for things like
 "what size network is being used?" or "how many readouts during selfplay" can
-be passed in as flags. The mask_flags.py utility helps ensure all parts of the
+be passed in as flags. The mask\_flags.py utility helps ensure all parts of the
 pipeline are using the same network configuration.
 
 All local paths in the examples can be replaced with `gs://` GCS paths, and the
@@ -390,6 +389,107 @@ python3 validate.py \
 The validate.py will glob all the .tfrecord.zz files under the
 directories given as positional arguments and compute the validation error
 for the positions from those files.
+
+
+Retraining a model
+======================
+
+The training data for most of Minigo's models up to v13 is publicly available in
+the `minigo-pub` Cloud storage bucket, e.g.:
+
+```shell
+gsutil ls gs://minigo-pub/v13-19x19/data/golden_chunks/
+```
+
+For models v14 and onwards, we started using Cloud BigTable and are still
+working on making that data public.
+
+Here's how to retrain your own model from this source data using a Cloud TPU:
+
+```shell
+# I wrote these notes using our existing TPU-enabled project, so they're missing
+# a few preliminary steps, like setting up a Cloud account, creating a project,
+# etc. New users will also need to enable Cloud TPU on their project using the
+# TPUs panel.
+
+###############################################################################
+
+# Note that you will be billed for any storage you use and also while you have
+# VMs running. Remember to shut down your VMs when you're not using them!
+
+# To use a Cloud TPU on GCE, you need to create a special TPU-enabled VM using
+# the `ctpu` tool. First, set up some environment variables:
+#   GCE_PROJECT=<your project name>
+#   GCE_VM_NAME=<your VM's name>
+#   GCE_ZONE<the zone in which you want to bring uo your VM, e.g. us-central1-f>
+
+# In this example, we will use the following values:
+GCE_PROJECT=example-project
+GCE_VM_NAME=minigo-etpu-test
+GCE_ZONE=us-central1-f
+
+# Create the Cloud TPU enabled VM.
+ctpu up \
+  --project="${GCE_PROJECT}" \
+  --zone="${GCE_ZONE}" \
+  --name="${GCE_VM_NAME}" \
+  --tf-version=1.13
+
+# This will take a few minutes and you should see output similar to the
+# following:
+#   ctpu will use the following configuration values:
+#         Name:                 minigo-etpu-test
+#         Zone:                 us-central1-f
+#         GCP Project:          example-project
+#         TensorFlow Version:   1.13
+#  OK to create your Cloud TPU resources with the above configuration? [Yn]: y
+#  2019/04/09 10:50:04 Creating GCE VM minigo-etpu-test (this may take a minute)...
+#  2019/04/09 10:50:04 Creating TPU minigo-etpu-test (this may take a few minutes)...
+#  2019/04/09 10:50:11 GCE operation still running...
+#  2019/04/09 10:50:12 TPU operation still running...
+
+# Once the Cloud TPU is created, `ctpu` will have SSHed you into the machine.
+
+# Remember to set the same environment variables on your VM.
+GCE_PROJECT=example-project
+GCE_VM_NAME=minigo-etpu-test
+GCE_ZONE=us-central1-f
+
+# Clone the Minigo Github repository:
+git clone https://github.com/tensorflow/minigo
+cd minigo
+
+# Install virtualenv.
+pip3 install virtualenv virtualenvwrapper
+
+# Create a virtual environment
+virtualenv -p /usr/bin/python3 --system-site-packages "${HOME}/.venvs/minigo"
+
+# Activate the virtual environment.
+source "${HOME}/.venvs/minigo/bin/activate"
+
+# Install Minigo dependencies (TensorFlow for Cloud TPU is already installed as
+# part of the VM image).
+pip install -r requirements.txt
+
+# When training on a Cloud TPU, the training work directory must be on Google Cloud Storage.
+# You'll need to choose your own globally unique bucket name.
+# The bucket location should be close to your VM.
+GCS_BUCKET_NAME=minigo_test_bucket
+GCE_BUCKET_LOCATION=us-central1
+gsutil mb -p "${GCE_PROJECT}" -l "${GCE_BUCKET_LOCATION}" "gs://${GCS_BUCKET_NAME}"
+
+# Run the training script and note the location of the training work_dir
+# it reports, e.g.
+#    Writing to gs://minigo_test_bucket/train/2019-04-25-18
+./oneoffs/train.sh "${GCS_BUCKET_NAME}"
+
+# Launch tensorboard, pointing it at the work_dir reported by the train.sh script.
+tensorboard --logdir=gs://minigo_test_bucket/train/2019-04-25-18
+
+# After a few minutes, TensorBoard should start updating.
+# Interesting graphs to look at are value_cost_normalized, policy_cost and policy_entropy.
+```
 
 Running Minigo on a Kubernetes Cluster
 ==============================
