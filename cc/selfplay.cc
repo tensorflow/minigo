@@ -349,7 +349,7 @@ class SelfPlayer {
         absl::MutexLock lock(&mutex_);
         BatchingDualNetFactory::StartGame(player->network(), player->network());
       }
-      int current_readouts;
+      int current_readouts = 0;
       absl::Time start;
       while (!game->game_over() && !player->root()->at_move_limit()) {
         // Record some information using for printing tree search stats.

@@ -309,15 +309,14 @@ GtpClient::Response GtpClient::HandleFinalScore(CmdArgs args) {
   if (!response.ok) {
     return response;
   }
-  if (!player_->game()->game_over()) {
+  if (!game_->game_over()) {
     // Game isn't over yet, calculate the current score using Tromp-Taylor
     // scoring.
-    return Response::Ok(
-        Game::FormatScore(player_->root()->position.CalculateScore(
-            player_->game()->options().komi)));
+    return Response::Ok(Game::FormatScore(
+        player_->root()->position.CalculateScore(game_->options().komi)));
   } else {
     // Game is over, we have the result available.
-    return Response::Ok(player_->game()->result_string());
+    return Response::Ok(game_->result_string());
   }
 }
 
@@ -367,7 +366,7 @@ GtpClient::Response GtpClient::HandleKomi(CmdArgs args) {
   }
 
   double x;
-  if (!absl::SimpleAtod(args[0], &x) || x != player_->game()->options().komi) {
+  if (!absl::SimpleAtod(args[0], &x) || x != game_->options().komi) {
     return Response::Error("unacceptable komi");
   }
 

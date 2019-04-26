@@ -95,13 +95,6 @@ class MctsPlayer {
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 
-  struct History {
-    std::array<float, kNumMoves> search_pi;
-    Coord c = Coord::kPass;
-    std::string comment;
-    const MctsNode* node = nullptr;
-  };
-
   // Callback invoked on each batch of leaves expanded during tree search.
   using TreeSearchCallback = std::function<void(const std::vector<MctsNode*>&)>;
 
@@ -142,8 +135,6 @@ class MctsPlayer {
   // no longer calls SelectLeaves directly.
   MctsNode* root() { return root_; }
   const MctsNode* root() const { return root_; }
-
-  Game* game() { return game_; }
 
   const Options& options() const { return options_; }
   const std::string& name() const { return network_->name(); }
