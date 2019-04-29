@@ -43,6 +43,9 @@ flags.DEFINE_integer('training_moves', 2**21,
 flags.DEFINE_float('training_fresh', 0.05,
                    'Fraction of fresh games in each new training window')
 
+flags.DEFINE_integer('training_thin', 4,
+                     'Factor by which to thin out training sets (keep 1:N)')
+
 flags.DEFINE_integer('batch_size', 1024,
                      'How many TFRecords to pull through tf.Session at a time')
 
@@ -62,10 +65,17 @@ FLAGS = flags.FLAGS
 def training_series(cursor_r, cursor_c, mix, increment_fraction=0.05):
     """Given two end-cursors and a mix of games, produce a series of bounds.
     """
-    while (cursor_r - mix.games_r) >= 0 and (cursor_c - mix.games_c) >= 0:
-        yield (cursor_r - mix.games_r), cursor_r, (cursor_c - mix.games_c), cursor_c
-        cursor_r -= math.ceil(mix.games_r * increment_fraction)
-        cursor_c -= math.ceil(mix.games_c * increment_fraction)
+    stride_r = math.ceil(mix.games_r * increment_fraction)
+    intervals = math.ceil(cursor_r / stride_r)
+    # Now determine which increment will divide cursor_c into the same
+    # number of intervals
+    stride_c = math.ceil(cursor_c / intervals)
+    print('stride_c was {}, now {}'.format(mix.games_c * increment_fraction, stride_c))
+    print('stride_r: {}  stride_c: {}'.format(stride_r, stride_c))
+    for b_r, b_c in zip(range(0, cursor_r, stride_r), range(0, cursor_c, stride_c)):
+        last_r, last_c = b_r + stride_r, b_c + stride_c
+        yield (b_r, last_r, b_c, last_c)
+    yield last_r, cursor_r, last_c, cursor_c
 
 
 def _export_training_set(args):
@@ -112,6 +122,7 @@ def main(argv):
     total_games = FLAGS.training_games
     total_moves = FLAGS.training_moves
     fresh = FLAGS.training_fresh
+    thin = FLAGS.training_thin
     batch_size = FLAGS.batch_size
     output_prefix = FLAGS.output_prefix
 
@@ -123,14 +134,15 @@ def main(argv):
     gq_c = bigtable_input.GameQueue(spec.project, spec.instance, spec.table + '-nr')
 
     mix = bigtable_input.mix_by_decile(total_games, total_moves, 9)
+    bounds = list(training_series(gq_r.latest_game_number,
+                                  gq_c.latest_game_number,
+                                  mix,
+                                  fresh))
     trainings = [(spec, start_r, start_c,
                   mix, batch_size,
                   '{}{:0>10}_{:0>10}.tfrecord.zz'.format(output_prefix, start_r, start_c))
                  for start_r, finish_r, start_c, finish_c
-                 in reversed(list(training_series(gq_r.latest_game_number,
-                                                  gq_c.latest_game_number,
-                                                  mix,
-                                                  fresh)))]
+                 in bounds]
 
     if FLAGS.starting_game:
         game = FLAGS.starting_game
@@ -140,6 +152,8 @@ def main(argv):
 
     if FLAGS.max_trainings:
         trainings = trainings[:FLAGS.max_trainings]
+
+    trainings = trainings[::thin]
 
     if FLAGS.dry_run:
         for t in trainings:
