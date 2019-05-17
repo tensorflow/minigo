@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+# You can pass a parameter as the start URL
 killall chromium
 export DISPLAY=:0
 export GDK_BACKEND=x11
-chromium --incognito http://localhost:5001/kiosk.html &
+chromium --incognito $1 &
 CHROMIUM_PID=$!
 sleep 5
 xte -x :0 "key F11"
