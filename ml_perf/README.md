@@ -31,15 +31,18 @@ commands. This may vary on a different operating system or graphics card.
     pip3 install -r requirements.txt
 
     # Install Python Tensorflow for GPU
-    # (alternatively use "tensorflow>=1.11,<1.12" for CPU Tensorflow)
-    pip3 install "tensorflow-gpu>=1.11,<1.12"
+    # (alternatively use "tensorflow>=1.13.1" for CPU Tensorflow)
+    pip3 install "tensorflow-gpu>=1.13.1"
 
     # Install bazel
-    wget https://github.com/bazelbuild/bazel/releases/download/0.17.1/bazel-0.17.1-installer-linux-x86_64.sh
-    chmod +x bazel-0.17.1-installer-linux-x86_64.sh
-    ./bazel-0.17.1-installer-linux-x86_64.sh
+    wget https://github.com/bazelbuild/bazel/releases/download/0.19.2/bazel-0.19.2-installer-linux-x86_64.sh
+    chmod +x bazel-0.19.2-installer-linux-x86_64.sh
+    sudo ./bazel-0.19.2-installer-linux-x86_64.sh
+    rm bazel-0.19.2-installer-linux-x86_64.sh
 
     # Compile TensorFlow C++ libraries
+    sudo sh -c "echo /usr/local/cuda/lib64 > /etc/ld.so.conf.d/cuda.conf"
+    sudo ldconfig
     ./cc/configure_tensorflow.sh
 
     # Compile and run C++ self-play and evaluation binaries

@@ -11,7 +11,17 @@ build system (see [README.md](../README.md) for installation instructions).
 Minigo++ depends on the TensorFlow C++ libraries, but we have not yet set up
 Bazel WORKSPACE and BUILD rules to automatically download and configure
 TensorFlow so (for now at least) you must perform a manual step to build the
-library.  This depends on `zip`, so be sure that package is installed first:
+library.  This depends on `zip`, so be sure that package is installed first.
+
+If you want to run on GPU, you will have to tell Bazel where to find your CUDA
+install (note that recent versions of Bazel ignore `LD_LIBRARY_PATH`):
+
+```shell
+sudo sh -c "echo /usr/local/cuda/lib64 > /etc/ld.so.conf.d/cuda.conf"
+sudo ldconfig
+```
+
+Now, you're ready to compile TensorFlow from source:
 
 ```shell
 sudo apt-get install zip

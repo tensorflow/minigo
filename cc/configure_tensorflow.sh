@@ -15,7 +15,7 @@ rm -rf ${dst_dir}/*
 mkdir -p ${dst_dir}
 
 # TODO(tommadams): we should probably switch to Clang at some point.
-commit_tag="v1.13.0-rc2"
+commit_tag="v1.13.1"
 
 echo "Cloning tensorflow to ${tmp_dir}"
 git clone https://github.com/tensorflow/tensorflow "${tmp_dir}"
@@ -46,7 +46,6 @@ TF_CUDA_CLANG=${TF_CUDA_CLANG:-0} \
 TF_NEED_TENSORRT=${TF_NEED_TENSORRT:-0} \
 TF_NEED_MPI=${TF_NEED_MPI:-0} \
 TF_SET_ANDROID_WORKSPACE=${TF_SET_ANDROID_WORKSPACE:-0} \
-TF_NCCL_VERSION=${TF_NCCL_VERSION:-1.3} \
 ./configure
 
 echo "Building tensorflow package"
