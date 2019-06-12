@@ -585,6 +585,24 @@ minigo_cc_binary(
     ],
 )
 
+cc_binary(
+    name = "sample_records",
+    srcs = ["sample_records.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base",
+        ":init",
+        ":logging",
+        ":random",
+        ":tensorflow",
+        ":thread",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+    ],
+)
+
 minigo_cc_binary(
     name = "simple_example",
     srcs = ["simple_example.cc"],
