@@ -14,14 +14,18 @@
 
 #include "cc/random.h"
 
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
-
 namespace minigo {
 
 namespace {
 uint64_t ChooseSeed(uint64_t seed) {
-  return seed != 0 ? seed : absl::ToUnixMicros(absl::Now());
+  if (seed == 0) {
+    std::random_device rd;
+    seed = rd();
+    if (sizeof(std::random_device::result_type) < 8) {
+      seed = (seed << 32) | rd();
+    }
+  }
+  return seed;
 }
 }  // namespace
 

@@ -276,7 +276,6 @@ minigo_cc_library(
     srcs = ["random.cc"],
     hdrs = ["random.h"],
     deps = [
-        "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
     ],
 )
