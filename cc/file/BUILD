@@ -22,8 +22,8 @@ cc_library(
     deps = [
         ":path",
         "//cc:logging",
-        "//cc:tensorflow",
         "//cc/platform",
+        "//cc/tensorflow",
         "@com_google_absl//absl/strings",
     ],
 )

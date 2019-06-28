@@ -25,7 +25,8 @@ cbt_ratings.db
 staging/
 
 bazel-*
-cc/tensorflow/
+cc/tensorflow/include
+cc/tensorflow/lib
 
 minigui/static/*.js.map
 
