@@ -223,7 +223,7 @@ First, run a frozen graph through Toco, the TensorFlow optimizing compiler:
 
 ```
 BATCH_SIZE=8
-./cc/tensorflow/toco \
+./cc/tensorflow/bin/toco \
   --input_file=saved_models/000256-opossum.pb \
   --input_format=TENSORFLOW_GRAPHDEF \
   --output_format=TFLITE \
