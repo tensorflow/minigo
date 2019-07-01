@@ -13,64 +13,6 @@ load(
     "minigo_cc_test_9_only",
 )
 
-### cc_library(
-###     name = "tensorflow_dynamic",
-###     srcs = [
-###         "tensorflow/libtensorflow_framework.so",
-###     ] + select({
-###         "//cc/config:enable_tpu": ["tensorflow/libgrpc_runtime.so"],
-###         "//conditions:default": ["tensorflow/libtensorflow_cc.so"],
-###     }),
-###     hdrs = glob(
-###         ["tensorflow/**/*"],
-###         exclude = [
-###             "**/*.a",
-###             "**/*.so",
-###             "tensorflow/flatbuffers/**",
-###             "tensorflow/tensorflow/lite/**",
-###         ],
-###     ),
-###     includes = [
-###         "tensorflow",
-###         "tensorflow/external/nsync/public",
-###     ],
-###     tags = ["manual"],
-### )
-###
-### # TODO(tommadams): Set this up for windows compilation.
-### cc_library(
-###     name = "tensorflow_static",
-###     srcs = [],
-###     hdrs = [],
-###     tags = ["manual"],
-### )
-###
-### cc_library(
-###     name = "tensorflow",
-###     tags = ["manual"],
-###     deps = select({
-###         "@bazel_tools//src/conditions:windows": ["tensorflow_static"],
-###         "//conditions:default": ["tensorflow_dynamic"],
-###     }),
-### )
-###
-### cc_library(
-###     name = "tf_lite",
-###     srcs = [
-###         "tensorflow/libtensorflow_lite.a",
-###     ],
-###     hdrs = glob(
-###         [
-###             "tensorflow/flatbuffers/*.h",
-###             "tensorflow/tensorflow/lite/**",
-###         ],
-###         exclude = ["**/*.so"],
-###     ),
-###     includes = ["tensorflow"],
-###     linkopts = ["-ldl"],
-###     tags = ["manual"],
-### )
-
 cc_library(
     name = "cuda",
     tags = ["manual"],

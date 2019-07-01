@@ -29,3 +29,10 @@ http_archive(
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_workspace")
 
 tf_workspace()
+
+load("//cc:cuda_configure.bzl", "cuda_configure")
+load("//cc:tensorrt_configure.bzl", "tensorrt_configure")
+
+cuda_configure(name = "local_config_cuda")
+
+tensorrt_configure(name = "local_config_tensorrt")
