@@ -19,3 +19,4 @@ rsync -a --copy-links ${src_dir}/org_tensorflow/tensorflow/*.so ${dst_dir}/lib/
 rsync -a --copy-links --exclude "*.so" ${src_dir}/org_tensorflow/ ${dst_dir}/include/
 rsync -a --copy-links ${src_dir}/eigen_archive/ ${dst_dir}/include/third_party/eigen3/
 rsync -a --copy-links ${src_dir}/protobuf_archive/src/ ${dst_dir}/include/
+rsync -a --copy-links ${src_dir}/org_tensorflow/tensorflow/lite/toco/toco ${dst_dir}/bin/

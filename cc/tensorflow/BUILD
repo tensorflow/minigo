@@ -31,15 +31,19 @@ cc_library(
 # The following targets are used by cc/configure_tensorflow.sh to build the
 # files required by the cc_library targets above.
 
+# Compiling TensorFlow is handled by the :build rule's dependencies.
+# The copy_outputs.sh script just copies the generated libraries and headers
+# into the correct location under //cc/tensorflow/.
 sh_binary(
     name = "build",
-    srcs = ["build.sh"],
+    srcs = ["copy_outputs.sh"],
     data = [
         ":libgrpc_runtime.so",
         ":libtensorflow_lite.so",
         ":tensorflow_hdrs",
         "@org_tensorflow//tensorflow:libtensorflow_cc.so",
         "@org_tensorflow//tensorflow:libtensorflow_framework.so",
+        "@org_tensorflow//tensorflow/lite/toco",
         "@org_tensorflow//third_party/eigen3:eigen_third_party_header_files",
     ],
     visibility = ["//visibility:public"],
