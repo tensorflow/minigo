@@ -12,9 +12,9 @@ cc_library(
     includes = [
         "include",
         "include/tensorflow/external/nsync/public",
+        "include/third_party/eigen3/",
     ],
     linkopts = ["-lm"],
-    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
@@ -22,8 +22,8 @@ cc_library(
     name = "tf_lite",
     srcs = ["lib/libtensorflow_lite.so"],
     hdrs = glob(["include/tensorflow/lite/**"]),
+    includes = ["include"],
     linkopts = ["-ldl"],
-    tags = ["manual"],
     visibility = ["//visibility:public"],
     deps = ["@flatbuffers//:runtime_cc"],
 )
@@ -70,5 +70,6 @@ transitive_hdrs(
         ":libtensorflow_lite.so",
         "@eigen_archive//:eigen",
         "@org_tensorflow//tensorflow:libtensorflow.so",
+        "@protobuf_archive//:protobuf_headers",
     ],
 )

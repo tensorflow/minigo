@@ -593,8 +593,8 @@ cc_binary(
         ":init",
         ":logging",
         ":random",
-        ":tensorflow",
         ":thread",
+        "//cc/tensorflow",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -643,20 +643,10 @@ minigo_cc_binary(
     srcs = ["tpu_test.cc"],
     tags = ["manual"],
     deps = [
-        ":tensorflow",
+        "//cc/tensorflow",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-    ],
-)
-
-minigo_cc_binary(
-    name = "position_benchmark",
-    srcs = ["position_benchmark.cc"],
-    deps = [
-        ":base",
-        ":position",
-        "@com_google_benchmark//:benchmark",
     ],
 )
