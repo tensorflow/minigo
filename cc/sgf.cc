@@ -210,6 +210,7 @@ bool GetTreeImpl(const Ast::Tree& tree,
                  std::vector<std::unique_ptr<Node>>* dst) {
   const auto* src = &tree;
   const Ast::Property* prop;
+  const Ast::Property* stones;
 
   // Extract all the nodes out of this tree.
   for (const auto& node : src->nodes) {
@@ -219,6 +220,43 @@ bool GetTreeImpl(const Ast::Tree& tree,
       move.color = Color::kBlack;
     } else if ((prop = node.FindProperty("W")) != nullptr) {
       move.color = Color::kWhite;
+    } else if ((prop = node.FindProperty("HA")) != nullptr) {
+      int handicap;
+      bool valid_handicap = absl::SimpleAtoi(prop->values[0], &handicap);
+      if (!valid_handicap) {
+        MG_LOG(ERROR) << "Invalid handicap property: " << prop->values[0];
+        break;
+      }
+
+      if ((handicap <= 1) || (handicap > 9)) {
+        MG_LOG(ERROR) << "Invalid handicap value:" << handicap;
+        return false;
+      }
+      stones = node.FindProperty("AB");
+      if (stones == nullptr) {
+        MG_LOG(ERROR) << "Handicap stones not specified.";
+        return false;
+      }
+
+      for (const auto& h_location : stones->values) {
+        Move m;
+        m.color = Color::kBlack;
+        m.c = Coord::FromSgf(h_location, true);
+        if (m.c == Coord::kInvalid) {
+          MG_LOG(ERROR) << "Can't parse node " << node.ToString() << ": \""
+                        << h_location << "\" isn't a valid SGF coord for a handicap stone";
+          return false;
+        }
+        dst->push_back(absl::make_unique<Node>(m, ""));
+        dst = &(dst->back()->children);
+        if (h_location != stones->values.back()) {
+          m.color = Color::kWhite;
+          m.c = Coord::kPass;
+          dst->push_back(absl::make_unique<Node>(m, ""));
+          dst = &(dst->back()->children);
+        }
+      }
+      continue;
     } else {
       continue;
     }

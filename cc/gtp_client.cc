@@ -179,11 +179,14 @@ void GtpClient::Ponder() {
 
 GtpClient::Response GtpClient::ReplaySgf(
     const std::vector<std::unique_ptr<sgf::Node>>& trees) {
+
   if (!trees.empty()) {
+    // the SGF parser takes care of transforming an sgf into moves that the
+    // engine is able to understand, so all we do here is just play them in.
     for (const auto& move : trees[0]->ExtractMainLine()) {
       if (!player_->PlayMove(move.c)) {
-        MG_LOG(ERROR) << "couldn't play move " << move.c;
-        return Response::Error("cannot load file");
+        MG_LOG(ERROR) << "Couldn't play move " << move.c;
+        return Response::Error("Cannot load file");
       }
     }
   }
