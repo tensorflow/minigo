@@ -1,4 +1,4 @@
-define(["require", "exports", "./position", "./base", "./util"], function (require, exports, position_1, base_1, util_1) {
+define(["require", "exports", "./base", "./util"], function (require, exports, base_1, util_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     const STAR_POINTS = {
@@ -382,11 +382,23 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
     class Annotations extends Layer {
         constructor() {
             super(...arguments);
-            this.annotations = new Map();
+            this.annotations = [];
+            this._showDivergence = false;
+        }
+        get showDivergence() {
+            return this._showDivergence;
+        }
+        set showDivergence(x) {
+            if (x == this._showDivergence) {
+                return;
+            }
+            this._showDivergence = x;
+            this.update(new Set(["annotations"]));
+            this.board.draw();
         }
         clear() {
-            if (this.annotations.size > 0) {
-                this.annotations.clear();
+            if (this.annotations.length > 0) {
+                this.annotations = [];
                 this.board.draw();
             }
         }
@@ -395,38 +407,29 @@ define(["require", "exports", "./position", "./base", "./util"], function (requi
                 return false;
             }
             let position = this.board.position;
-            this.annotations.clear();
-            for (let annotation of position.annotations) {
-                let byShape = this.annotations.get(annotation.shape);
-                if (byShape === undefined) {
-                    byShape = [];
-                    this.annotations.set(annotation.shape, byShape);
-                }
-                byShape.push(annotation);
-            }
+            this.annotations = position.annotations;
             return true;
         }
         draw() {
-            if (this.annotations.size == 0) {
+            if (this.annotations.length == 0) {
                 return;
             }
             let sr = this.board.stoneRadius;
-            let pr = util_1.pixelRatio();
             let ctx = this.board.ctx;
-            ctx.lineCap = 'round';
-            this.annotations.forEach((annotations, shape) => {
-                switch (shape) {
-                    case position_1.Annotation.Shape.Dot:
-                        for (let annotation of annotations) {
-                            let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
-                            ctx.fillStyle = annotation.colors[0];
-                            ctx.beginPath();
-                            ctx.arc(c.x + 0.5, c.y + 0.5, 0.16 * sr, 0, 2 * Math.PI);
-                            ctx.fill();
-                        }
-                        break;
+            let textHeight = Math.floor(0.8 * sr);
+            ctx.font = `${textHeight}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (let annotation of this.annotations) {
+                ctx.fillStyle = annotation.colors[0];
+                let c = this.boardToCanvas(annotation.p.row, annotation.p.col);
+                if (annotation.label == "●") {
+                    ctx.fillText(annotation.label, c.x, c.y);
                 }
-            });
+                else if (this.showDivergence) {
+                    ctx.fillText(annotation.label, c.x, c.y);
+                }
+            }
         }
     }
     exports.Annotations = Annotations;

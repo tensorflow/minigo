@@ -7,11 +7,12 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.gtp = gtp;
             this._highlightedNextMove = null;
             this.searchLyr = new lyr.Search();
+            this.annoLyr = new lyr.Annotations();
             this.addLayers([
                 new lyr.Label(),
                 new lyr.BoardStones(),
                 this.searchLyr,
-                new lyr.Annotations()
+                this.annoLyr
             ]);
             this.enabled = true;
         }
@@ -82,6 +83,7 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             this.variationTree = new variation_tree_1.VariationTree('tree');
             this.log = new log_1.Log('log', 'console');
             this.showSearch = true;
+            this.showDiverge = false;
             this.showConsole = false;
             this.moveElem = util_1.getElement('move');
             this.commentElem = util_1.getElement('comment');
@@ -183,6 +185,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
                         break;
                     case 'End':
                         this.goForward(Infinity);
+                        break;
+                    case 'v':
+                        this.toggleNumberVariations();
                         break;
                 }
             });
@@ -360,6 +365,9 @@ define(["require", "exports", "./app", "./base", "./board", "./layer", "./log", 
             else {
                 this.searchElem.innerText = 'Show search';
             }
+        }
+        toggleNumberVariations() {
+            this.board.annoLyr.showDivergence = !this.board.annoLyr.showDivergence;
         }
         uploadTmpFile(contents) {
             return fetch('write_tmp_file', {

@@ -47,16 +47,20 @@ class ExploreBoard extends ClickableBoard {
   }
 
   private searchLyr: lyr.Search;
+  public annoLyr: lyr.Annotations;
+
 
   constructor(parentElemId: string, position: Position, private gtp: Socket) {
     super(parentElemId, position, []);
 
     this.searchLyr = new lyr.Search();
+    this.annoLyr = new lyr.Annotations();
+
     this.addLayers([
         new lyr.Label(),
         new lyr.BoardStones(),
         this.searchLyr,
-        new lyr.Annotations()]);
+        this.annoLyr]);
     this.enabled = true;
   }
 
@@ -118,6 +122,7 @@ class ExploreApp extends App {
   private variationTree = new VariationTree('tree');
   private log = new Log('log', 'console');
   private showSearch = true;
+  private showDiverge = false;
   private showConsole = false;
   private moveElem = getElement('move');
   private commentElem = getElement('comment');
@@ -245,6 +250,9 @@ class ExploreApp extends App {
           break;
         case 'End':
           this.goForward(Infinity);
+          break;
+        case 'v':
+          this.toggleNumberVariations();
           break;
       }
     });
@@ -456,6 +464,10 @@ class ExploreApp extends App {
     } else {
       this.searchElem.innerText = 'Show search';
     }
+  }
+
+  private toggleNumberVariations() {
+    this.board.annoLyr.showDivergence = !this.board.annoLyr.showDivergence;
   }
 
   private uploadTmpFile(contents: string) {

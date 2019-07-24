@@ -310,3 +310,16 @@ stdout: = D4
    - *fails*: If the id doesn't correspond to a position played in the game or
      one of its variations.
    - *comments*: Required only for Minigui's study mode.
+
+
+### Hacking
+
+
+e.g. in study.ts, change the last line to something like
+
+```
+(window as any)['app'] = new ExploreApp();
+```
+
+This will put the application in a global variable named "app"; you need to cast
+the window object to the "any" type to silence the TS compiler.

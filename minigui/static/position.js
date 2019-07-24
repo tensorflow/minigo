@@ -1,14 +1,6 @@
 define(["require", "exports", "./base", "./util"], function (require, exports, base_1, util) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    var Annotation;
-    (function (Annotation) {
-        let Shape;
-        (function (Shape) {
-            Shape[Shape["Dot"] = 0] = "Dot";
-        })(Shape = Annotation.Shape || (Annotation.Shape = {}));
-    })(Annotation || (Annotation = {}));
-    exports.Annotation = Annotation;
     class Position {
         constructor(j) {
             this.parent = null;
@@ -62,7 +54,7 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             if (base_1.moveIsPoint(this.lastMove)) {
                 this.annotations.push({
                     p: this.lastMove,
-                    shape: Annotation.Shape.Dot,
+                    label: "●",
                     colors: ['#ef6c02'],
                 });
             }
@@ -81,6 +73,33 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             }
             p.isMainLine = this.isMainLine && this.children.length == 0;
             p.parent = this;
+            if (!p.isMainLine) {
+                let result = [];
+                let node;
+                for (node = p; node && !node.isMainLine; node = node.parent) {
+                    if (node.lastMove == null) {
+                        break;
+                    }
+                    result.push(node.lastMove);
+                }
+                result.reverse();
+                let playedCount = new Uint16Array(base_1.N * base_1.N);
+                for (let i = 0; i < result.length - 1; ++i) {
+                    let move = result[i];
+                    if (base_1.moveIsPoint(move)) {
+                        let idx = move.row * base_1.N + move.col;
+                        let count = ++playedCount[idx];
+                        if (count != 1) {
+                            continue;
+                        }
+                        p.annotations.push({
+                            p: move,
+                            label: (i + 1).toString(),
+                            colors: ['#999999'],
+                        });
+                    }
+                }
+            }
             this.children.push(p);
         }
         getChild(move) {

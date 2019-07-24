@@ -214,7 +214,7 @@ define(["require", "exports", "./base", "./layer", "./util", "./view"], function
         drawImpl() {
             super.drawImpl();
             let p = this.enabled ? this.p : null;
-            this.ctx.canvas.style.cursor = p ? 'pointer' : null;
+            this.ctx.canvas.style.cursor = p ? 'pointer' : '';
             if (p) {
                 this.drawStones([p], this.position.toPlay, 0.6);
             }

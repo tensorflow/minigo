@@ -15,15 +15,9 @@
 import {Color, Move, N, Nullable, Point, moveIsPoint, movesEqual, otherColor, stonesEqual, toGtp} from './base'
 import * as util from './util'
 
-namespace Annotation {
-  export enum Shape {
-    Dot,
-  }
-}
-
 interface Annotation {
   p: Point;
-  shape: Annotation.Shape;
+  label: string;
   colors: string[];
 }
 
@@ -100,10 +94,10 @@ class Position {
     if (moveIsPoint(this.lastMove)) {
       this.annotations.push({
         p: this.lastMove,
-        shape: Annotation.Shape.Dot,
+        label: "●",
         colors: ['#ef6c02'],
       });
-    }
+    } 
   }
 
   addChild(p: Position) {
@@ -125,6 +119,34 @@ class Position {
     // Create a new child.
     p.isMainLine = this.isMainLine && this.children.length == 0;
     p.parent = this;
+
+    // If it is not on the main line, prepare the move number annotations.
+    if (! p.isMainLine) {
+      let result: Move[] = [];
+      let node: Nullable<Position>
+      for (node = p; node && !node.isMainLine; node = node.parent) {
+        if (node.lastMove == null) { break; }
+        result.push(node.lastMove);
+      }
+      result.reverse();
+      let playedCount = new Uint16Array(N * N);
+      for (let i=0; i < result.length - 1; ++i) {
+        let move = result[i];
+
+        if (moveIsPoint(move)) {
+          let idx = move.row * N + move.col;
+          let count = ++playedCount[idx];
+          if (count != 1) {
+            continue;
+          }
+          p.annotations.push({
+            p: move, // 'p' here for 'point'.
+            label: (i+1).toString(),
+            colors: ['#999999'],
+          });
+        }
+      }
+    }
     this.children.push(p);
   }
 
