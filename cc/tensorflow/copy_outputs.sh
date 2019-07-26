@@ -12,7 +12,10 @@ dst_dir=$1
 
 echo "Copying from \"${src_dir}\" to \"${dst_dir}\""
 
-rm -rfd ${dst_dir}/*/
+for sub_dir in lib include bin; do
+  rm -rfd "${dst_dir}/${sub_dir}"
+  mkdir -p "${dst_dir}/${sub_dir}"
+done
 
 rsync -a --copy-links ${src_dir}/__main__/cc/tensorflow/*.so ${dst_dir}/lib/
 rsync -a --copy-links ${src_dir}/org_tensorflow/tensorflow/*.so ${dst_dir}/lib/

@@ -8,6 +8,15 @@ _DEFAULT_CUDNN_VERSION=7
 # Run the TensorFlow configuration script, setting reasonable values for most
 # of the options.
 echo "Configuring tensorflow"
+
+# //cc/tensorflow:build needs to know whether the user wants TensorRT support,
+# so it can build extra libraries.
+read -p "Enable TensorRT support? [y/N]: " yn
+case $yn in
+    [Yy]* ) export TF_NEED_TENSORRT=1;;
+    * ) export TF_NEED_TENSORRT=0;;
+esac
+
 CC_OPT_FLAGS="${CC_OPT_FLAGS:--march=native}" \
 CUDA_TOOLKIT_PATH=${CUDA_TOOLKIT_PATH:-/usr/local/cuda} \
 CUDNN_INSTALL_PATH=${CUDNN_INSTALL_PATH:-/usr/local/cuda} \
@@ -25,7 +34,6 @@ TF_NEED_VERBS=${TF_NEED_VERBS:-0} \
 TF_NEED_OPENCL_SYCL=${TF_NEED_OPENCL_SYCL:-0} \
 TF_CUDA_CLANG=${TF_CUDA_CLANG:-0} \
 TF_NEED_ROCM=${TF_NEED_ROCM:-0} \
-TF_NEED_TENSORRT=${TF_NEED_TENSORRT:-0} \
 TF_NEED_MPI=${TF_NEED_MPI:-0} \
 TF_SET_ANDROID_WORKSPACE=${TF_SET_ANDROID_WORKSPACE:-0} \
 bazel --bazelrc=/dev/null run @org_tensorflow//:configure
@@ -44,4 +52,5 @@ bazel run -c opt \
   --copt=-Wno-ignored-attributes \
   --copt=-Wno-maybe-uninitialized \
   --copt=-Wno-sign-compare \
+  --define=need_trt="$TF_NEED_TENSORRT" \
   //cc/tensorflow:build -- ${workspace}/cc/tensorflow
