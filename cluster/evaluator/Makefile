@@ -19,6 +19,7 @@ py-push: py-image
 cc-image:
 		mkdir -p staging/cc
 		cp ../../WORKSPACE staging/
+		cp ../../.bazelrc staging/
 		cp ../../mask_flags.py staging/
 		cp evaluator_cc_wrapper.sh staging/
 		cp -r -p ../../cc/ staging/

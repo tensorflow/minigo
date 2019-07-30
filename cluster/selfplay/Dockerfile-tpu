@@ -2,7 +2,7 @@ ARG PROJECT
 FROM gcr.io/$PROJECT/cc-base:latest
 
 # Tensorflow is needed for gfile
-RUN pip3 install tensorflow>=1.11
+RUN pip3 install tensorflow==1.13.1
 WORKDIR /app
 
 ARG RUNMODE

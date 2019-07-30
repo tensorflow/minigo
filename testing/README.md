@@ -24,7 +24,7 @@ And then run the tests.
 
 ```shell
 docker run --rm gcr.io/minigo-testing/minigo-prow-harness-v2:latest \
-  --repo=github.com/tensorflow/minigo --job=tf-minigo-presubmit --scenario=execute -- ./test.sh
+  --repo=github.com/tensorflow/minigo --job=tf-minigo-presubmit --scenario=execute -- ./github.com/tensorflow/minigo/test.sh
 ```
 
 ## Components

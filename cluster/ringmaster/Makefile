@@ -2,6 +2,7 @@
 gtp:
 		mkdir -p staging/cc
 		cp ../../WORKSPACE staging/
+		cp ../../.bazelrc staging/
 		cp -r -p ../../cc/ staging/
 		cp p100-lz-tuning staging/
 		rm -rfd staging/cc/tensorflow
@@ -10,6 +11,7 @@ gtp:
 ring:
 		mkdir -p staging/cc
 		cp ../../WORKSPACE staging/
+		cp ../../.bazelrc staging/
 		cp -r -p ../../cc/ staging/
 		cp p100-lz-tuning staging/
 		cp ringmaster_wrapper.sh staging/

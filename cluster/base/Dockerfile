@@ -1,4 +1,4 @@
-FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu16.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -38,7 +38,7 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     apt-get update -y && apt-get install google-cloud-sdk -y
 
-ENV BAZEL_VERSION 0.15.2
+ENV BAZEL_VERSION 0.19.2
 
 WORKDIR /
 RUN mkdir /bazel && \
@@ -62,6 +62,10 @@ ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
 WORKDIR /app
 
 # For the slow stuff, copy just the needed scripts so we don't break the docker cache
+COPY staging/WORKSPACE WORKSPACE
+COPY staging/.bazelrc .bazelrc
+COPY staging/cc/tensorflow/BUILD cc/tensorflow/BUILD
+COPY staging/cc/tensorflow/copy_outputs.sh cc/tensorflow/copy_outputs.sh
 COPY staging/cc/configure_tensorflow.sh cc/configure_tensorflow.sh
 ENV CC_OPT_FLAGS -march=ivybridge
 ADD staging/requirements.txt /app/requirements.txt
@@ -70,4 +74,5 @@ RUN pip3 install --upgrade pip setuptools
 #TODO: just install what we need (keras?) so changes to requirements.txt don't trigger TF rebuilds
 RUN pip3 install -r /app/requirements.txt
 
+ENV TF_NEED_TENSORRT 0
 RUN cc/configure_tensorflow.sh

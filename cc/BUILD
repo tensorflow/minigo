@@ -13,30 +13,6 @@ load(
     "minigo_cc_test_9_only",
 )
 
-cc_library(
-    name = "cuda",
-    tags = ["manual"],
-    deps = select({
-        "//cc/config:enable_gpu": [
-            "@local_config_cuda//:cuda_headers",
-            "@local_config_cuda//:cudart",
-        ],
-        "//conditions:default": [],
-    }),
-)
-
-cc_library(
-    name = "tensorrt",
-    tags = ["manual"],
-    deps = [
-        "@local_config_cuda//:cuda_headers",
-        "@local_config_cuda//:cudart",
-        "@local_config_tensorrt//:nv_infer",
-        "@local_config_tensorrt//:nvparsers",
-        "@local_config_tensorrt//:tensorrt_headers",
-    ],
-)
-
 minigo_cc_library(
     name = "base",
     srcs = [

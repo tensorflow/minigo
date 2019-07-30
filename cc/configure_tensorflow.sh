@@ -11,11 +11,13 @@ echo "Configuring tensorflow"
 
 # //cc/tensorflow:build needs to know whether the user wants TensorRT support,
 # so it can build extra libraries.
-read -p "Enable TensorRT support? [y/N]: " yn
-case $yn in
-    [Yy]* ) export TF_NEED_TENSORRT=1;;
-    * ) export TF_NEED_TENSORRT=0;;
-esac
+if [ -z "${TF_NEED_TENSORRT}" ]; then
+  read -p "Enable TensorRT support? [y/N]: " yn
+  case $yn in
+      [Yy]* ) export TF_NEED_TENSORRT=1;;
+      * ) export TF_NEED_TENSORRT=0;;
+  esac
+fi
 
 CC_OPT_FLAGS="${CC_OPT_FLAGS:--march=native}" \
 CUDA_TOOLKIT_PATH=${CUDA_TOOLKIT_PATH:-/usr/local/cuda} \

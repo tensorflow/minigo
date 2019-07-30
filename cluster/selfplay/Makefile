@@ -7,6 +7,7 @@
 define staging =
 	mkdir -p staging
 	cp ../../WORKSPACE staging/
+	cp ../../.bazelrc staging/
 	cp -r -p ../../rl_loop/ staging/
 	cp -r -p ../../cc/ staging/
 	rm -rfd staging/cc/tensorflow

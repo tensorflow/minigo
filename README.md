@@ -80,10 +80,10 @@ Install Bazel
 ------------------
 
 ```shell
-wget https://github.com/bazelbuild/bazel/releases/download/0.19.2/bazel-0.19.2-installer-linux-x86_64.sh
-chmod 755 bazel-0.19.2-installer-linux-x86_64.sh
-sudo ./bazel-0.19.2-installer-linux-x86_64.sh
-rm bazel-0.19.2-installer-linux-x86_64.sh
+BAZEL_VERSION=0.19.2
+wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+chmod 755 bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+sudo ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 ```
 
 Install TensorFlow
