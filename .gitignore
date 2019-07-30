@@ -28,8 +28,8 @@ bazel-*
 cc/tensorflow/bin
 cc/tensorflow/include
 cc/tensorflow/lib
-# tensorflow.bazelrc
-# tf_configure.bazelrc
+tensorflow.bazelrc
+tf_configure.bazelrc
 
 minigui/static/*.js.map
 
