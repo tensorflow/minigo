@@ -54,6 +54,8 @@ class LogStream {
 void ABSL_ATTRIBUTE_NOINLINE CheckFail(const char* cond, const char* file,
                                        int line);
 
+// CheckFailStream is used by the MG_CHECK macro to log a FATAL error when a
+// condition fails.
 class CheckFailStream {
  public:
   CheckFailStream(const char* cond, const char* file, int line);
@@ -70,6 +72,26 @@ class CheckFailStream {
   LogStream impl_;
 };
 
+// CheckNoOpStream is used in non-debug builds (i.e. when NDEBUG defined) that
+// allows the compiler to completely optimize away MG_DCHECK macros.
+class CheckNoOpStream {
+ public:
+  template <typename T>
+  CheckNoOpStream& operator<<(const T& t) {
+    return *this;
+  }
+  operator bool() { return true; }
+};
+
+// CheckStreamVoidify is used in the MG_CHECK macro to convert the result of
+// CheckFailStream logging to void. The & operator is used because it has a
+// precedence lower than << but higher than ?:
+class CheckStreamVoidify {
+ public:
+  void operator&(const CheckFailStream&) {}
+  void operator&(const CheckNoOpStream&) {}
+};
+
 }  // namespace internal
 }  // namespace minigo
 
@@ -80,15 +102,18 @@ class CheckFailStream {
 // MG_CHECK(cond) and MG_DCHECK(cond) halt the program, printing the current
 // the given condition `cond` is not true. MG_CHECK is always enabled, MG_DCHECK
 // is only enabled for debug builds (i.e. when NDEBUG is not defined).
-#define MG_CHECK(cond) \
-  (cond)               \
-      ? false          \
-      : true & ::minigo::internal::CheckFailStream(#cond, __FILE__, __LINE__)
+// Both result expressions of the ?: ternary operator evaluate to void, which
+// silences "statement has no effect" compiler warnings.
+#define MG_CHECK(cond)                                \
+  (cond) ? (void)0                                    \
+         : ::minigo::internal::CheckStreamVoidify() & \
+               ::minigo::internal::CheckFailStream(#cond, __FILE__, __LINE__)
 
 #ifndef NDEBUG
-#define MG_DCHECK MG_CHECK
+#define MG_DCHECK(cond) MG_CHECK(cond)
 #else
-#define MG_DCHECK(cond) MG_CHECK(true)
+#define MG_DCHECK(cond) \
+  while (false && (cond)) ::minigo::internal::CheckNoOpStream()
 #endif
 
 #endif  // CC_LOGGING_H_
