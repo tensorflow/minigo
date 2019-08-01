@@ -22,4 +22,4 @@
 
 # Copy prebuilt TensorFlow from image.
 rsync -ah /app/cc/tensorflow/ ./cc/tensorflow/
-
+cp /app/*.bazelrc ./
