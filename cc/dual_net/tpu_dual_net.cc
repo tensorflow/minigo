@@ -28,9 +28,9 @@
 #include "cc/logging.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
-#include "tensorflow/core/platform/protobuf.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/platform/protobuf.h"
 
 using tensorflow::DT_FLOAT;
 using tensorflow::Env;
@@ -164,8 +164,7 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
 
 TpuDualNet::TpuDualNet(const std::string& tpu_name,
                        const std::string& graph_path)
-    : DualNet(std::string(file::Stem(graph_path))),
-      graph_path_(graph_path) {
+    : DualNet(std::string(file::Stem(graph_path))), graph_path_(graph_path) {
   // Make sure tpu_name looks like a valid name.
   MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
 
@@ -239,8 +238,8 @@ TpuDualNetFactory::TpuDualNetFactory(std::string tpu_name)
     : tpu_name_(std::move(tpu_name)) {
   // Create a session containing ops for initializing & shutting down a TPU.
   GraphDef graph_def;
-  ::tensorflow::protobuf::TextFormat::ParseFromString(
-      kTpuOpsGraphDef, &graph_def);
+  ::tensorflow::protobuf::TextFormat::ParseFromString(kTpuOpsGraphDef,
+                                                      &graph_def);
   main_session_ = CreateSession(graph_def, tpu_name_);
 
   MG_LOG(INFO) << "Initializing TPU " << tpu_name_;

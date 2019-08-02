@@ -179,7 +179,6 @@ void GtpClient::Ponder() {
 
 GtpClient::Response GtpClient::ReplaySgf(
     const std::vector<std::unique_ptr<sgf::Node>>& trees) {
-
   if (!trees.empty()) {
     // the SGF parser takes care of transforming an sgf into moves that the
     // engine is able to understand, so all we do here is just play them in.

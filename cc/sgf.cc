@@ -244,7 +244,8 @@ bool GetTreeImpl(const Ast::Tree& tree,
         m.c = Coord::FromSgf(h_location, true);
         if (m.c == Coord::kInvalid) {
           MG_LOG(ERROR) << "Can't parse node " << node.ToString() << ": \""
-                        << h_location << "\" isn't a valid SGF coord for a handicap stone";
+                        << h_location
+                        << "\" isn't a valid SGF coord for a handicap stone";
           return false;
         }
         dst->push_back(absl::make_unique<Node>(m, ""));

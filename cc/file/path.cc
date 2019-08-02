@@ -26,7 +26,7 @@ const char kSepStr[2] = "\\";
 #else
 const char kSepChar = '/';
 const char kSepStr[2] = "/";
-#endif // _WIN32
+#endif  // _WIN32
 
 namespace internal {
 

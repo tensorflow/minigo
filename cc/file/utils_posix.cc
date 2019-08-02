@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/file/utils.h"
-
 #include <dirent.h>
 #include <sys/stat.h>
+
 #include <cstdio>
 #include <string>
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "cc/file/path.h"
+#include "cc/file/utils.h"
 #include "cc/logging.h"
 
 namespace minigo {

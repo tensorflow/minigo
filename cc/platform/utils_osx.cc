@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/platform/utils.h"
-
 #include <sys/sysctl.h>
+
 #include <cstring>
 
 #include "cc/logging.h"
+#include "cc/platform/utils.h"
 
 namespace minigo {
 

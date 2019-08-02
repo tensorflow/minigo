@@ -20,7 +20,7 @@
 # NOTE! If this file changes/moves, please change
 # https://github.com/kubernetes/test-infra/blob/master/config/jobs/tensorflow/minigo/minigo.yaml
 
-src_glob=($(bazel info workspace)/cc/{.,dual_net,file}/*.{cc,h})
+src_glob=($(bazel info workspace)/cc/**/*.{cc,h})
 diff -u <(cat ${src_glob[@]}) <(clang-format -style=file ${src_glob[@]})
 if [ $? -ne 0 ]; then
   echo >&2 "---------------------------------------------"

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/tf_utils.h"
-
 #include "cc/logging.h"
+#include "cc/tf_utils.h"
 
 namespace minigo {
 namespace tf_utils {

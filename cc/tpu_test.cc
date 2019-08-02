@@ -132,16 +132,15 @@ class Model {
     for (int replica = 1; replica < kNumReplicas; ++replica) {
       for (int i = 0; i < kNumMoves; ++i) {
         if (policy[0][i] != policy[replica][i]) {
-          Log() << absl::StreamFormat("policy[0][%d] == %f\n",
-                                      i, policy[0][i]);
-          Log() << absl::StreamFormat("policy[%d][%d] == %f\n",
-                                      replica, i, policy[replica][i]);
+          Log() << absl::StreamFormat("policy[0][%d] == %f\n", i, policy[0][i]);
+          Log() << absl::StreamFormat("policy[%d][%d] == %f\n", replica, i,
+                                      policy[replica][i]);
           LOG(FATAL) << ":(";
         }
         if (value[0] != value[replica]) {
           Log() << absl::StreamFormat("value[0] == %f\n", value[0]);
-          Log() << absl::StreamFormat("value[%d] == %f\n",
-                                      replica, value[replica]);
+          Log() << absl::StreamFormat("value[%d] == %f\n", replica,
+                                      value[replica]);
           LOG(FATAL) << ":(";
         }
       }
@@ -159,9 +158,7 @@ class Model {
   }
 
  private:
-  std::ostream& Log() {
-    return std::cerr << "(" << path_ << ") ";
-  }
+  std::ostream& Log() { return std::cerr << "(" << path_ << ") "; }
 
   std::string path_;
   std::unique_ptr<Session> session_;

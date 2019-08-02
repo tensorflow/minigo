@@ -14,8 +14,8 @@
 
 #include "cc/random.h"
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <functional>
 
 #include "gtest/gtest.h"

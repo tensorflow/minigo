@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cc/dual_net/dual_net.h"
+
 #include <array>
 #include <deque>
 #include <map>
 #include <vector>
 
-#include "cc/dual_net/dual_net.h"
 #include "cc/position.h"
 #include "cc/random.h"
 #include "cc/symmetries.h"
