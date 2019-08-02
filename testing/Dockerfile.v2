@@ -25,6 +25,7 @@ ENV IMAGE=${IMAGE_ARG}
 RUN apt-get update && apt-get install -y \
     rsync \
     git \
+    clang-format \
     wget && \
     apt-get clean
 

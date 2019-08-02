@@ -22,7 +22,6 @@ all: build
 buildv2:
 	mkdir -p staging/tensorflow
 	cp ../requirements.txt staging/requirements.txt
-	cp -r ../cc/tensorflow/ staging/
 	docker build --build-arg PROJECT=$(PROJECT) -f Dockerfile.v2 -t $(IMG_V2):$(TAG) .
 	docker tag $(IMG_V2):$(TAG) $(IMG_V2):latest
 	rm -rf staging/
