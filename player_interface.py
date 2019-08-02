@@ -27,7 +27,6 @@ class PlayerInterface(ABC):
         Returns:
           A go.Position instance.
         """
-        pass
 
     @abstractmethod
     def get_result_string(self):
@@ -36,7 +35,6 @@ class PlayerInterface(ABC):
         Returns:
           The result as a string, e.g. B+R, W+1.5.
         """
-        pass
 
     @abstractmethod
     def initialize_game(self, position=None):
@@ -46,7 +44,6 @@ class PlayerInterface(ABC):
           position: the board position to copy for the initial game state. If
                     None, an empty board state is used for the initial position.
         """
-        pass
 
     @abstractmethod
     def suggest_move(self, position):
@@ -58,7 +55,6 @@ class PlayerInterface(ABC):
         Returns:
           The players's best guess as the best move to play.
         """
-        pass
 
     @abstractmethod
     def play_move(self, c):
@@ -71,7 +67,6 @@ class PlayerInterface(ABC):
           True if the move was successfully played.
           False if the requested move is illegal.
         """
-        pass
 
     @abstractmethod
     def should_resign(self):
@@ -81,7 +76,6 @@ class PlayerInterface(ABC):
           True if the player thinks the current player is doing so badly they
           had better just give up.
         """
-        pass
 
     @abstractmethod
     def to_sgf(self, use_comments=True):
@@ -93,7 +87,6 @@ class PlayerInterface(ABC):
         Returns:
           A formatted SGF string
         """
-        pass
 
     @abstractmethod
     def set_result(self, winner, was_resign):
@@ -103,7 +96,6 @@ class PlayerInterface(ABC):
           winner: +1 for a black win, -1 a white win.
           was_resign: True if the win was by resignation.
         """
-        pass
 
 
 class MCTSPlayerInterface(PlayerInterface):
@@ -116,7 +108,6 @@ class MCTSPlayerInterface(PlayerInterface):
         Returns:
           The current MCTSNode root of the search tree.
         """
-        pass
 
     @abstractmethod
     def tree_search(self, parallel_readouts=None):
@@ -133,7 +124,6 @@ class MCTSPlayerInterface(PlayerInterface):
         Returns:
           A list of the newly expanded leaves.
         """
-        pass
 
     @abstractmethod
     def get_num_readouts(self):
@@ -142,7 +132,6 @@ class MCTSPlayerInterface(PlayerInterface):
         Returns:
           The number of readouts.
         """
-        pass
 
     @abstractmethod
     def set_num_readouts(self, readouts):
@@ -151,4 +140,3 @@ class MCTSPlayerInterface(PlayerInterface):
         Args:
           readouts: the number of readouts.
         """
-        pass
