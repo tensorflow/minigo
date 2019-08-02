@@ -140,25 +140,25 @@ TEST(DualNetTest, TestStoneFeaturesWithCapture) {
 // Checks that the different backends produce the same result.
 TEST(DualNetTest, TestBackendsEqual) {
   struct Test {
-    Test(std::unique_ptr<DualNetFactory> factory, std::string extension)
-        : factory(std::move(factory)), extension(std::move(extension)) {}
+    Test(std::unique_ptr<DualNetFactory> factory, std::string basename)
+        : factory(std::move(factory)), basename(std::move(basename)) {}
     std::unique_ptr<DualNetFactory> factory;
-    std::string extension;
+    std::string basename;
   };
 
   std::map<std::string, Test> tests;
 
 #if MG_ENABLE_TF_DUAL_NET
   tests.emplace("TfDualNet",
-                Test(absl::make_unique<TfDualNetFactory>(), ".pb"));
+                Test(absl::make_unique<TfDualNetFactory>(), "test_model.pb"));
 #endif
 #if MG_ENABLE_LITE_DUAL_NET
-  tests.emplace("LiteDualNet",
-                Test(absl::make_unique<LiteDualNetFactory>(), ".tflite"));
+  tests.emplace("LiteDualNet", Test(absl::make_unique<LiteDualNetFactory>(),
+                                    "test_model.tflite"));
 #endif
 #if MG_ENABLE_TRT_DUAL_NET
-  tests.emplace("TrtDualNet",
-                Test(absl::make_unique<TrtDualNetFactory>(), ".uff"));
+  tests.emplace("TrtDualNet", Test(absl::make_unique<TrtDualNetFactory>(1),
+                                   "test_model.trt.pb"));
 #endif
 
   DualNet::BoardFeatures nhwc_features;
@@ -184,8 +184,8 @@ TEST(DualNetTest, TestBackendsEqual) {
     auto& test = kv.second;
     MG_LOG(INFO) << "Running " << name;
 
-    auto dual_net = test.factory->NewDualNet(
-        absl::StrCat("cc/dual_net/test_model", test.extension));
+    auto dual_net =
+        test.factory->NewDualNet(absl::StrCat("cc/dual_net/", test.basename));
 
     auto* features = dual_net->GetInputLayout() == DualNet::InputLayout::kNHWC
                          ? &nhwc_features

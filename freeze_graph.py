@@ -26,7 +26,7 @@ flags.DEFINE_boolean(
     'use_trt', False, 'True to write a GraphDef that uses the TRT runtime')
 flags.DEFINE_integer('trt_max_batch_size', None,
                      'Maximum TRT batch size')
-flags.DEFINE_string('trt_precision', "fp32",
+flags.DEFINE_string('trt_precision', 'fp32',
                     'Precision for TRT runtime: fp16, fp32 or int8')
 flags.register_multi_flags_validator(
     ['use_trt', 'trt_max_batch_size'],
