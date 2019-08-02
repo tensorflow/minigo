@@ -24,6 +24,8 @@
 #include "cc/symmetries.h"
 #include "cc/test_utils.h"
 #include "gtest/gtest.h"
+#include "tensorflow/core/framework/op.h"
+#include "tensorflow/core/framework/op_def_builder.h"
 
 #if MG_ENABLE_TF_DUAL_NET
 #include "cc/dual_net/tf_dual_net.h"
@@ -156,9 +158,15 @@ TEST(DualNetTest, TestBackendsEqual) {
   tests.emplace("LiteDualNet", Test(absl::make_unique<LiteDualNetFactory>(),
                                     "test_model.tflite"));
 #endif
+
 #if MG_ENABLE_TRT_DUAL_NET
-  tests.emplace("TrtDualNet", Test(absl::make_unique<TrtDualNetFactory>(1),
-                                   "test_model.trt.pb"));
+  // Only run TRT test if TensorFlow has been compiled with TRT support.
+  const auto* op_registry = tensorflow::OpRegistry::Global();
+  const tensorflow::OpRegistrationData* op_def_data;
+  if (op_registry->LookUp("TRTEngineOp", &op_def_data).ok()) {
+    tests.emplace("TrtDualNet", Test(absl::make_unique<TrtDualNetFactory>(1),
+                                     "test_model.trt.pb"));
+  }
 #endif
 
   DualNet::BoardFeatures nhwc_features;

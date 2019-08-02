@@ -223,6 +223,7 @@ minigo_cc_test(
     deps = [
         ":batching_dual_net",
         ":dual_net",
+        "//cc/tensorflow",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
