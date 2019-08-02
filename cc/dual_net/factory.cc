@@ -102,8 +102,12 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
 
 #ifdef MG_ENABLE_TRT_DUAL_NET
   if (engine == "trt") {
-    MG_CHECK(arg_str.empty());
-    return absl::make_unique<TrtDualNetFactory>();
+    MG_CHECK(!arg_str.empty())
+        << "Please specify a fixed batch size for the TRT inference engine, "
+           "e.g. --model=trt:8,${MODEL_PATH}";
+    int batch_size;
+    MG_CHECK(absl::SimpleAtoi(arg_str, &batch_size));
+    return absl::make_unique<TrtDualNetFactory>(batch_size);
   }
 #endif  // MG_ENABLE_TRT_DUAL_NET
 

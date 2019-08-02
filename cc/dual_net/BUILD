@@ -26,7 +26,10 @@ minigo_cc_library(
 )
 
 factory_engine_copts = select({
-    "//cc/config:enable_tf": ["-DMG_ENABLE_TF_DUAL_NET"],
+    "//cc/config:enable_tf": [
+        "-DMG_ENABLE_TF_DUAL_NET",
+        "-DMG_ENABLE_TRT_DUAL_NET",
+    ],
     "//conditions:default": [],
 }) + select({
     "//cc/config:enable_lite": ["-DMG_ENABLE_LITE_DUAL_NET"],
@@ -37,7 +40,10 @@ factory_engine_copts = select({
 })
 
 factory_engine_deps = select({
-    "//cc/config:enable_tf": [":tf_dual_net"],
+    "//cc/config:enable_tf": [
+        ":tf_dual_net",
+        ":trt_dual_net",
+    ],
     "//conditions:default": [],
 }) + select({
     "//cc/config:enable_lite": [":lite_dual_net"],
@@ -179,28 +185,21 @@ minigo_cc_library(
     ],
 )
 
-# TODO(tommadams) : trt_dual_net is disabled temporarily. TensorRT can be used
-# as an inference engine by using trt.create_inference_graph prior to freezing
-# the graph to a GraphDef proto, and running the model using tf_dual_net.
-# Once this PR lands, I'll port the TensorRT inference code that
-# NVIDIA submitted for MLPerf 0.6:
-#   https://github.com/mlperf/training_results_v0.6/blob/master/NVIDIA/benchmarks/minigo/implementations/tensorflow/minigo/cc/dual_net/
-# minigo_cc_library(
-#     name = "trt_dual_net",
-#     srcs = ["trt_dual_net.cc"],
-#     hdrs = ["trt_dual_net.h"],
-#     tags = ["manual"],
-#     deps = [
-#         ":dual_net",
-#         "//cc:base",
-#         "//cc:logging",
-#         "//cc/file:path",
-#         "//cc/tensorflow",
-#         "@com_google_absl//absl/memory",
-#         "@com_google_absl//absl/strings",
-#         "@com_google_absl//absl/synchronization",
-#     ],
-# )
+minigo_cc_library(
+    name = "trt_dual_net",
+    srcs = ["trt_dual_net.cc"],
+    hdrs = ["trt_dual_net.h"],
+    tags = ["manual"],
+    deps = [
+        ":dual_net",
+        "//cc:base",
+        "//cc:logging",
+        "//cc/file:path",
+        "//cc/tensorflow",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
 
 minigo_cc_library(
     name = "batching_dual_net",

@@ -14,286 +14,122 @@
 
 #include "cc/dual_net/trt_dual_net.h"
 
-#include <bitset>
-#include <thread>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 #include "absl/memory/memory.h"
-#include "absl/strings/str_cat.h"
-#include "absl/synchronization/notification.h"
 #include "cc/constants.h"
 #include "cc/file/path.h"
 #include "cc/logging.h"
-#include "cc/thread_safe_queue.h"
-#include "cuda/include/cuda_runtime_api.h"
-#include "tensorrt/include/NvInfer.h"
-#include "tensorrt/include/NvUffParser.h"
+#include "tensorflow/core/framework/graph.pb.h"
+#include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/lib/core/errors.h"
+#include "tensorflow/core/lib/core/status.h"
+#include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/public/session.h"
+
+using tensorflow::DT_FLOAT;
+using tensorflow::Env;
+using tensorflow::GraphDef;
+using tensorflow::NewSession;
+using tensorflow::ReadBinaryProto;
+using tensorflow::Session;
+using tensorflow::SessionOptions;
+using tensorflow::Tensor;
+using tensorflow::TensorShape;
 
 namespace minigo {
-
 namespace {
 
-bool DeviceHasNativeReducedPrecision(int device) {
-  cudaDeviceProp props;
-  MG_CHECK(cudaGetDeviceProperties(&props, device) == cudaSuccess);
-  if (props.major > 6) {
-    return true;
-  }
-  if (props.major == 6) {
-    return props.minor != 1;
-  }
-  if (props.major == 5) {
-    return props.minor >= 3;
-  }
-  return false;
-}
-
 class TrtDualNet : public DualNet {
-  class TrtLogger : public nvinfer1::ILogger {
-   public:
-    void log(nvinfer1::ILogger::Severity severity, const char* msg) override {
-      switch (severity) {
-        case Severity::kINTERNAL_ERROR:
-          MG_LOG(ERROR) << "TensorRT internal error: " << msg;
-          break;
-        case Severity::kERROR:
-          MG_LOG(ERROR) << "TensorRT error: " << msg;
-          break;
-        case Severity::kWARNING:
-          MG_LOG(WARNING) << "TensorRT warning: " << msg;
-          break;
-        default:
-          break;
-      }
-    }
-  };
-
-  class TrtWorker {
-   public:
-    TrtWorker(nvinfer1::ICudaEngine* engine, size_t batch_size)
-        : batch_size_(batch_size) {
-      context_ = engine->createExecutionContext();
-      MG_CHECK(context_);
-
-      void* host_ptr;
-      size_t input_size = batch_size * kN * kN * DualNet::kNumStoneFeatures;
-      MG_CHECK(cudaHostAlloc(&host_ptr, input_size * sizeof(float),
-                             cudaHostAllocWriteCombined) == cudaSuccess);
-      pos_tensor_ = static_cast<float*>(host_ptr);
-      size_t output_size = batch_size * (kNumMoves + 1);
-      MG_CHECK(cudaHostAlloc(&host_ptr, output_size * sizeof(float),
-                             cudaHostAllocDefault) == cudaSuccess);
-      value_output_ = static_cast<float*>(host_ptr);
-      policy_output_ = value_output_ + batch_size;
-    }
-
-    ~TrtWorker() {
-      cudaFreeHost(value_output_);
-      cudaFreeHost(pos_tensor_);
-
-      context_->destroy();
-    }
-
-    void RunMany(std::vector<const BoardFeatures*> features,
-                 std::vector<Output*> outputs) {
-      size_t num_features = features.size();
-
-      auto* feature_data = pos_tensor_;
-      // Copy the features into the input tensor.
-      for (const auto* feature : features) {
-        feature_data =
-            std::copy_n(feature->data(), kNumBoardFeatures, feature_data);
-      }
-
-      // Run the model.
-      void* buffers[] = {pos_tensor_, policy_output_, value_output_};
-      MG_CHECK(context_->execute(batch_size_, buffers));
-
-      // Copy the policy and value out of the output tensors.
-      for (size_t i = 0; i < num_features; ++i) {
-        memcpy(outputs[i]->policy.data(), policy_output_ + i * kNumMoves,
-               sizeof(outputs[i]->policy));
-        outputs[i]->value = value_output_[i];
-      }
-    }
-
-   private:
-    nvinfer1::IExecutionContext* context_;
-
-    float* pos_tensor_;
-    float* policy_output_;
-    float* value_output_;
-    const size_t batch_size_;
-  };
-
-  struct InferenceData {
-    std::vector<const DualNet::BoardFeatures*> features;
-    std::vector<DualNet::Output*> outputs;
-    absl::Notification* notification;
-  };
-
  public:
-  TrtDualNet(std::string graph_path, int device_count)
-      : DualNet(std::string(file::Stem(graph_path))),
-        graph_path_(graph_path),
-        runtime_(nvinfer1::createInferRuntime(logger_)),
-        parser_(nvuffparser::createUffParser()),
-        batch_capacity_(0),
-        device_count_(device_count) {
-    MG_CHECK(runtime_);
-    MG_CHECK(parser_);
-
-    // Note: TensorRT ignores the input order argument and always assumes NCHW.
-    MG_CHECK(parser_->registerInput(
-        "pos_tensor", nvinfer1::DimsCHW(DualNet::kNumStoneFeatures, kN, kN),
-        nvuffparser::UffInputOrder::kNCHW));
-
-    MG_CHECK(parser_->registerOutput("policy_output"));
-    MG_CHECK(parser_->registerOutput("value_output"));
-
-    cudaSetDevice(0);
-    builder_ = nvinfer1::createInferBuilder(logger_);
-    MG_CHECK(builder_);
-    network_ = builder_->createNetwork();
-    MG_CHECK(network_);
-
-    MG_CHECK(parser_->parse(graph_path.c_str(), *network_,
-                            nvinfer1::DataType::kFLOAT))
-        << ". File path: '" << graph_path << "'";
-
-    // TODO(csigg): Use builder->platformHasFastFp16() instead.
-    bool enable_fp16_mode = true;
-    for (int device_id = 0; device_id < device_count_; ++device_id) {
-      enable_fp16_mode &= DeviceHasNativeReducedPrecision(device_id);
-    }
-    // If all GPUs support fast fp16 math, enable it.
-    builder_->setFp16Mode(enable_fp16_mode);
-    builder_->setMaxWorkspaceSize(1ull << 30);  // One gigabyte.
-  }
-
-  void Reserve(size_t capacity) override {
-    MG_CHECK(capacity > 0);
-    if (capacity <= batch_capacity_) {
-      return;
-    }
-    batch_capacity_ = capacity;
-
-    running_ = false;
-    for (auto& thread : worker_threads_) {
-      thread.join();
-    }
-    worker_threads_.clear();
-    running_ = true;
-
-    builder_->setMaxBatchSize(batch_capacity_);
-
-    auto* engine = [&] {
-      // Building TensorRT engines is not thread-safe.
-      static absl::Mutex mutex;
-      absl::MutexLock lock(&mutex);
-      return builder_->buildCudaEngine(*network_);
-    }();
-    MG_CHECK(engine);
-
-    using Pair = std::pair<int, nvinfer1::ICudaEngine*>;
-    std::vector<Pair> pairs = {Pair(0, engine)};
-
-    auto* blob = engine->serialize();
-    MG_CHECK(blob);
-
-    for (int device_id = 1; device_id < device_count_; ++device_id) {
-      cudaSetDevice(device_id);
-      // TODO(csigg): it would be faster to deserialize engines in parallel.
-      pairs.push_back(
-          Pair(device_id, runtime_->deserializeCudaEngine(
-                              blob->data(), blob->size(), nullptr)));
-    }
-
-    auto functor = [this](const Pair& pair) {
-      pthread_setname_np(pthread_self(), "TrtWorker");
-      cudaSetDevice(pair.first);
-      TrtWorker worker(pair.second, batch_capacity_);
-      while (running_) {
-        InferenceData inference;
-        if (inference_queue_.PopWithTimeout(&inference, absl::Seconds(1))) {
-          worker.RunMany(std::move(inference.features),
-                         std::move(inference.outputs));
-          inference.notification->Notify();
-        }
-      }
-    };
-
-    for (auto& pair : pairs) {
-      MG_CHECK(pair.second) << "Failed to deserialize TensorRT engine.";
-      engines_.push_back(pair.second);
-      worker_threads_.emplace_back(functor, pair);
-      worker_threads_.emplace_back(functor, pair);
-    }
-    blob->destroy();
-  }
-
-  ~TrtDualNet() override {
-    running_ = false;
-    for (auto& thread : worker_threads_) {
-      thread.join();
-    }
-    for (auto* engine : engines_) {
-      engine->destroy();
-    }
-    network_->destroy();
-    builder_->destroy();
-    parser_->destroy();
-    runtime_->destroy();
-  }
+  TrtDualNet(std::string graph_path, size_t batch_size);
+  ~TrtDualNet() override;
 
   void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, std::string* model) {
-    MG_DCHECK(features.size() == outputs.size());
-    Reserve(features.size());
-
-    absl::Notification notification;
-    inference_queue_.Push(
-        {std::move(features), std::move(outputs), &notification});
-    notification.WaitForNotification();
-
-    if (model != nullptr) {
-      *model = graph_path_;
-    }
-  }
-
-  InputLayout GetInputLayout() const override {
-    // TensorRT requires the input to be in NCHW layout.
-    return InputLayout::kNCHW;
-  }
+               std::vector<Output*> outputs, std::string* model) override;
 
  private:
-  std::string graph_path_;
-
-  TrtLogger logger_;
-  nvinfer1::IRuntime* runtime_;
-  nvuffparser::IUffParser* parser_;
-  nvinfer1::IBuilder* builder_;
-  nvinfer1::INetworkDefinition* network_;
-  std::vector<nvinfer1::ICudaEngine*> engines_;
-
-  ThreadSafeQueue<InferenceData> inference_queue_;
-  std::vector<std::thread> worker_threads_;
-  std::atomic<bool> running_;
-  size_t batch_capacity_;
-  int device_count_;
+  const std::string graph_path_;
+  const size_t batch_size_;
+  std::unique_ptr<Session> session_;
+  std::vector<std::pair<std::string, Tensor>> inputs_;
+  std::vector<std::string> output_names_;
+  std::vector<Tensor> outputs_;
 };
 
-}  // namespace
+TrtDualNet::TrtDualNet(std::string graph_path, size_t batch_size)
+    : DualNet(std::string(file::Stem(graph_path))),
+      graph_path_(graph_path),
+      batch_size_(batch_size) {
+  GraphDef graph_def;
 
-TrtDualNetFactory::TrtDualNetFactory() : device_count_(0) {
-  MG_CHECK(cudaGetDeviceCount(&device_count_) == cudaSuccess);
-  MG_CHECK(device_count_ > 0) << "No CUDA devices found.";
+  auto* env = Env::Default();
+  TF_CHECK_OK(ReadBinaryProto(env, graph_path, &graph_def));
+
+  SessionOptions options;
+  options.config.mutable_gpu_options()->set_allow_growth(true);
+  session_.reset(NewSession(options));
+  TF_CHECK_OK(session_->Create(graph_def));
+
+  output_names_.emplace_back("policy_output");
+  output_names_.emplace_back("value_output");
+
+  inputs_.emplace_back(
+      "pos_tensor", Tensor(DT_FLOAT, TensorShape({static_cast<int>(batch_size_),
+                                                  kN, kN, kNumStoneFeatures})));
 }
 
-int TrtDualNetFactory::GetBufferCount() const { return device_count_ * 2; }
+TrtDualNet::~TrtDualNet() {
+  if (session_ != nullptr) {
+    TF_CHECK_OK(session_->Close());
+  }
+}
+
+void TrtDualNet::RunMany(std::vector<const BoardFeatures*> features,
+                         std::vector<Output*> outputs, std::string* model) {
+  MG_CHECK(features.size() <= batch_size_);
+
+  auto* feature_data = inputs_[0].second.flat<float>().data();
+  for (const auto* feature : features) {
+    feature_data = std::copy(feature->begin(), feature->end(), feature_data);
+  }
+
+  // Input should already be ready here
+  // Run the model.
+  TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
+
+  // Copy the policy and value out of the output tensors.
+  // TODO(tommadams): figure out if there's a way to avoid this copy by having
+  // the client code read the contents of the output tensors directly. This is
+  // complicated by multi-threading & batching.
+  const auto& policy_tensor = outputs_[0].flat<float>();
+  const auto& value_tensor = outputs_[1].flat<float>();
+
+  for (size_t i = 0; i < features.size(); ++i) {
+    memcpy(outputs[i]->policy.data(), policy_tensor.data() + i * kNumMoves,
+           sizeof(outputs[i]->policy));
+    outputs[i]->value = value_tensor.data()[i];
+  }
+
+  if (model != nullptr) {
+    *model = graph_path_;
+  }
+}
+}  // namespace
+
+TrtDualNetFactory::TrtDualNetFactory(size_t batch_size)
+    : batch_size_(batch_size) {}
+
+int TrtDualNetFactory::GetBufferCount() const {
+  // TODO(tommamdams): support multiple GPUs.
+  return 1;
+}
 
 std::unique_ptr<DualNet> TrtDualNetFactory::NewDualNet(
     const std::string& model) {
-  return absl::make_unique<TrtDualNet>(model, device_count_);
+  return absl::make_unique<TrtDualNet>(model, batch_size_);
 }
 
 }  // namespace minigo

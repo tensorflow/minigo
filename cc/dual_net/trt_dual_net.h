@@ -7,14 +7,14 @@ namespace minigo {
 
 class TrtDualNetFactory : public DualNetFactory {
  public:
-  TrtDualNetFactory();
+  explicit TrtDualNetFactory(size_t batch_size);
 
   int GetBufferCount() const override;
 
   std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
 
  private:
-  int device_count_;
+  const size_t batch_size_;
 };
 
 }  // namespace minigo

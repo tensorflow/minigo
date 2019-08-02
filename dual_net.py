@@ -27,6 +27,7 @@ import numpy as np
 import random
 
 import tensorflow as tf
+import tensorflow.contrib.tensorrt as trt
 from tensorflow.contrib import summary
 from tensorflow.contrib.tpu.python.tpu import tpu_config
 from tensorflow.contrib.tpu.python.tpu import tpu_estimator
@@ -139,7 +140,7 @@ flags.DEFINE_integer(
 flags.DEFINE_bool(
     'use_swish', False,
     help=('Use Swish activation function inplace of ReLu. '
-         'https://arxiv.org/pdf/1710.05941.pdf'))
+          'https://arxiv.org/pdf/1710.05941.pdf'))
 
 
 # TODO(seth): Verify if this is still required.
@@ -300,7 +301,7 @@ def model_fn(features, labels, mode, params):
 
         value_cost_normalized = value_cost / params['value_cost_weight']
 
-        with tf.variable_scope("metrics"):
+        with tf.variable_scope('metrics'):
             metric_ops = {
                 'policy_cost': tf.metrics.mean(policy_cost),
                 'value_cost': tf.metrics.mean(value_cost),
@@ -333,7 +334,7 @@ def model_fn(features, labels, mode, params):
                 summary.scalar(metric_name, metric_op[1], step=eval_step)
 
         # Reset metrics occasionally so that they are mean of recent batches.
-        reset_op = tf.variables_initializer(tf.local_variables("metrics"))
+        reset_op = tf.variables_initializer(tf.local_variables('metrics'))
         cond_reset_op = tf.cond(
             tf.equal(eval_step % params['summary_steps'], tf.to_int64(1)),
             lambda: reset_op,
@@ -402,23 +403,22 @@ def model_inference_fn(features, training, params):
         tf.layers.conv2d,
         filters=params['conv_width'],
         kernel_size=3,
-        padding="same",
-        data_format="channels_last",
+        padding='same',
+        data_format='channels_last',
         use_bias=False)
 
     mg_global_avgpool2d = functools.partial(
         tf.layers.average_pooling2d,
         pool_size=go.N,
         strides=1,
-        padding="valid",
-        data_format="channels_last")
+        padding='valid',
+        data_format='channels_last')
 
     def mg_activation(inputs):
         if FLAGS.use_swish:
             return tf.nn.swish(inputs)
 
         return tf.nn.relu(inputs)
-
 
     def residual_inner(inputs):
         conv_layer1 = mg_batchn(mg_conv2d(inputs))
@@ -473,7 +473,8 @@ def model_inference_fn(features, training, params):
     # Policy head
     policy_conv = mg_conv2d(
         shared_output, filters=params['policy_conv_width'], kernel_size=1)
-    policy_conv = mg_activation(mg_batchn(policy_conv, center=False, scale=False))
+    policy_conv = mg_activation(
+        mg_batchn(policy_conv, center=False, scale=False))
     logits = tf.layers.dense(
         tf.reshape(
             policy_conv, [-1, params['policy_conv_width'] * go.N * go.N]),
@@ -484,7 +485,8 @@ def model_inference_fn(features, training, params):
     # Value head
     value_conv = mg_conv2d(
         shared_output, filters=params['value_conv_width'], kernel_size=1)
-    value_conv = mg_activation(mg_batchn(value_conv, center=False, scale=False))
+    value_conv = mg_activation(
+        mg_batchn(value_conv, center=False, scale=False))
 
     value_fc_hidden = mg_activation(tf.layers.dense(
         tf.reshape(value_conv, [-1, params['value_conv_width'] * go.N * go.N]),
@@ -513,8 +515,8 @@ def tpu_model_inference_fn(features):
     def custom_getter(getter, name, *args, **kwargs):
         with tf.control_dependencies(None):
             return tf.guarantee_const(
-                getter(name, *args, **kwargs), name=name + "/GuaranteeConst")
-    with tf.variable_scope("", custom_getter=custom_getter):
+                getter(name, *args, **kwargs), name=name + '/GuaranteeConst')
+    with tf.variable_scope('', custom_getter=custom_getter):
         # TODO(tommadams): remove the tf.control_dependencies context manager
         # when a fixed version of TensorFlow is released.
         t = int(time.time())
@@ -615,16 +617,30 @@ def export_model(model_path):
     for filename in all_checkpoint_files:
         suffix = filename.partition(latest_checkpoint)[2]
         destination_path = model_path + suffix
-        print("Copying {} to {}".format(filename, destination_path))
+        print('Copying {} to {}'.format(filename, destination_path))
         tf.gfile.Copy(filename, destination_path)
 
 
-def freeze_graph(model_path):
+def freeze_graph(model_path, use_trt=False, trt_max_batch_size=8,
+                 trt_precision='fp32'):
+    output_names = ['policy_output', 'value_output']
+
     n = DualNetwork(model_path)
     out_graph = tf.graph_util.convert_variables_to_constants(
-        n.sess, n.sess.graph.as_graph_def(), ["policy_output", "value_output"])
-    with tf.gfile.GFile(model_path + '.pb', 'wb') as f:
-        f.write(out_graph.SerializeToString())
+        n.sess, n.sess.graph.as_graph_def(), output_names)
+
+    if use_trt:
+        out_graph = trt.create_inference_graph(
+            input_graph_def=out_graph,
+            outputs=output_names,
+            max_batch_size=trt_max_batch_size,
+            max_workspace_size_bytes=1 << 29,
+            precision_mode=trt_precision)
+        with tf.gfile.GFile(model_path + '.trt.pb', 'wb') as f:
+            f.write(out_graph.SerializeToString())
+    else:
+        with tf.gfile.GFile(model_path + '.pb', 'wb') as f:
+            f.write(out_graph.SerializeToString())
 
 
 def freeze_graph_tpu(model_path):
