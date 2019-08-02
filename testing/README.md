@@ -12,20 +12,54 @@ Some UIs to check out:
 Testgrid (Test Results Dashboard): https://k8s-testgrid.appspot.com/sig-big-data
 Prow (Test-runner dashboard): https://prow.k8s.io/?repo=tensorflow%2Fminigo
 
-## Local testing
+## Updating continuous integration tests
 
-To test out changes to the docker image, first build the test-harness image:
-
-```shell
-make buildv2
-```
-
-And then run the tests.
+Build and push the test-harness image:
 
 ```shell
-docker run --rm gcr.io/minigo-testing/minigo-prow-harness-v2:latest \
-  --repo=github.com/tensorflow/minigo --job=tf-minigo-presubmit --scenario=execute -- ./github.com/tensorflow/minigo/test.sh
+cd testing/
+PROJECT=tensor-go VERSION_TAG=latest make pushv2
 ```
+
+The test image may need to be rebuilt occasionally if installed libraries or
+tools need updating (e.g. `clang-format`, `tensorflow`).
+
+## Test a pull request locally
+
+You can test a PR sent to github locally using the following steps. This
+enables you to poke around if something's failing.
+
+```shell
+export PATH=$HOME/go/bin:$PATH
+cd $HOME  # Or somewhere else outside the minigo repo
+git clone git@github.com:kubernetes/test-infra.git
+cd test-infra/config
+./pj-on-kind.sh pull-tf-minigo-cc
+```
+
+Then enter the pull request number when prompted.
+
+To interactively debug the `pj-on-kind` test, edit
+`config/jobs/tensorflow/minigo/minigo.yaml` in the `test-infra` repository
+and change the command run by `pull-tf-minigo-cc` to run `sleep 10000000`
+instead of `./cc/test.sh`.
+
+Find the name of the pod name:
+
+```shell
+export KUBECONFIG="$(kind get kubeconfig-path --name="mkpod")"
+kubectl get pods --all-namespaces
+```
+
+The pod name will be a long hex string, something like
+`fc19639a-b497-11e9-95be-ecb1d74c871e`.
+
+You can now attach to the running pod using:
+
+```shell
+kubectl exec -it --namespace default $POD_NAME bash
+```
+
 
 ## Components
 
