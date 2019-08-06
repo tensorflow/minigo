@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html>
+  <head>
+    <title>Opening Frequency Report</title>
+    <script type="text/javascript" src="wgo/wgo.min.js"></script>
+    <script type="text/javascript" src="wgo/wgo.player.min.js"></script>
+    <link type="text/css" href="wgo/wgo.player.css" rel="stylesheet" />
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/vuetify@1.0.18/dist/vuetify.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://unpkg.com/vuetify@1.0.18/dist/vuetify.min.css" crossorigin="anonymous"/>
+    <link rel="stylesheet" href='https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons' crossorigin="anonymous"/> 
+
+  </head>
+  <body>
+    <main class="container">
+    <v-app >
+      <v-content>
+        <v-container grid-list-small text-xs-left>
+          <v-layout row>
+            <v-flex s12>
+              <h1> Minigo Opening Analysis </h1>
+{% raw %}
+              <v-btn-toggle v-model=run mandatory>
+                <v-btn v-for="(value, run) in run_times" :value=run v-on:click="this.run=run;drawChart();">
+                  {{ run }}
+                </v-btn>
+              </v-btn-toggle>
+{% endraw %}
+            </v-flex>
+          </v-layout>
+
+          <v-layout v-for="opening in top10" row>
+            <v-flex xs4 lg3>
+              <v-card>
+                  <v-card-text>
+                      <div ref="playerNodes"
+                        style="max-height:300px"
+                        ></div>
+                  </v-card-text>
+              </v-card>
+            </v-flex>
+            <v-flex xs6 lg8>
+                <div class="chart w-100" ref="chartNodes" style="height: 100%;min-height:300px"></div>
+            </v-flex>
+          </v-layout>
+        </v-container>
+      </v-content>
+    </v-app>
+
+    </main>
+
+  </body>
+  <script>
+      var app = new Vue({
+          el: 'main',
+          data: {
+              top10: {{giant_blob}},
+              run: 'v17',
+              run_times: { v17: [1549908000.0, 1551196800.0],
+                           v16: [1547794800.0, 1549850400.0],
+              }
+          },
+          mounted() {
+              google.charts.load('current', {'packages':['corechart']});
+              google.charts.setOnLoadCallback(this.drawChart);
+          },
+          methods: {
+              drawChart() {
+                  console.log("Drawing.  run:", this.run);
+                  this.$refs.playerNodes.forEach((node, index) => {
+                    var player = new WGo.BasicPlayer(node, {
+                        sgf: "(;SZ[19];" + this.top10[index].sequence + ")",
+                        layout: "minimal",
+                        board: {section: {bottom: 9, left: 9, top:0, right: 0}},
+                        move: 999,
+                    });
+
+                  });
+                  this.$refs.chartNodes.forEach((node, index) => {
+                      var data = new google.visualization.DataTable();
+                      data.addColumn('number', 'Timestamp'); // Implicit domain label col.
+                      data.addColumn('number', 'Frequency'); // Implicit series 1 data col.
+                      data.addRows(this.top10[index].chart);
+
+                      var options = {
+                          title: `Seen total ${this.top10[index].count} times`,
+                          hAxis: {title: 'Timestamp of training',
+                                  viewWindow: {min: this.run_times[this.run][0], max: this.run_times[this.run][1] }},
+                          vAxis: {title: 'Frequency', logScale: true},
+                          legend: { position : 'none'},
+                          theme: 'material',
+                          pointSize: 3,
+                      }
+
+                      var chart = new google.visualization.ScatterChart(node);
+
+                      chart.draw(data, options);
+                  });
+              },
+          }
+      })
+  </script>
+</html>
+<!DOCTYPE HTML>
