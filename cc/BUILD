@@ -358,6 +358,19 @@ minigo_cc_test_9_only(
 )
 
 minigo_cc_test(
+    name = "pass_alive_test",
+    size = "small",
+    srcs = ["pass_alive_test.cc"],
+    deps = [
+        ":base",
+        ":position",
+        ":test_utils",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+minigo_cc_test(
     name = "random_test",
     size = "small",
     srcs = ["random_test.cc"],

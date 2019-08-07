@@ -53,8 +53,11 @@ std::string CleanBoardString(absl::string_view str) {
 }
 
 TestablePosition::TestablePosition(absl::string_view board_str, Color to_play)
+    : TestablePosition(ParseBoard(board_str), to_play) {}
+
+TestablePosition::TestablePosition(const std::array<Color, kN * kN>& stones,
+                                   Color to_play)
     : Position(&board_visitor, &group_visitor, to_play) {
-  auto stones = ParseBoard(board_str);
   for (int i = 0; i < kN * kN; ++i) {
     if (stones[i] != Color::kEmpty) {
       AddStoneToBoard(i, stones[i]);

@@ -172,6 +172,21 @@ class Position {
   // negative.
   float CalculateScore(float komi);
 
+  // Calculates all pass-alive region that are enclosed by groups of `color`
+  // stones.
+  // Elements in the returned array are set to `color` if they belong to a
+  // pass-alive region, or `Color::kEmpty` otherwise. Only intersections inside
+  // the enclosed region are set to `color`, intersections that are part of an
+  // enclosing group are set to `Color::kEmpty`.
+  // Concretely, given the following position:
+  //   X . X . O X .
+  //   X X X X X X .
+  //   . . . . . . .
+  // The returned array will be set to:
+  //   . X . X X . .
+  //   . . . . . . .
+  std::array<Color, kN * kN> CalculatePassAliveRegions(Color color) const;
+
   // Returns true if playing this move is legal.
   // Does not check positional superko.
   // legal_move(c) can be used to check for positional superko.

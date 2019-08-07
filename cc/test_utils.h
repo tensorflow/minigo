@@ -32,6 +32,8 @@ namespace minigo {
 class TestablePosition : public Position {
  public:
   TestablePosition(absl::string_view board_str, Color to_play = Color::kBlack);
+  TestablePosition(const std::array<Color, kN * kN>& stones,
+                   Color to_play = Color::kBlack);
 
   using Position::PlayMove;
 
