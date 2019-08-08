@@ -78,6 +78,11 @@ void Game::AddMove(Color color, Coord c, const Position::Stones& stones,
   move->stones = stones;
 }
 
+void Game::MarkLastMoveAsTrainable() {
+  auto* move = moves_.back().get();
+  move->trainable = true;
+}
+
 void Game::UndoMove() {
   MG_CHECK(!moves_.empty());
   moves_.pop_back();

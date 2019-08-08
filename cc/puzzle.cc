@@ -118,7 +118,7 @@ void Puzzle() {
 
         // Check if we predict the move that was played.
         auto expected_move = moves[move_to_predict].c;
-        auto actual_move = player->SuggestMove();
+        auto actual_move = player->SuggestMove(player_options.num_readouts);
         if (actual_move == expected_move) {
           ++correct_moves;
         }

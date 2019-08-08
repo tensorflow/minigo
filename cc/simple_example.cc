@@ -61,7 +61,7 @@ void SimpleExample() {
 
   // Play the game.
   while (!game.game_over() && !player.root()->at_move_limit()) {
-    auto move = player.SuggestMove();
+    auto move = player.SuggestMove(player_options.num_readouts);
 
     const auto& position = player.root()->position;
     std::cout << player.root()->position.ToPrettyString(use_ansi_colors)

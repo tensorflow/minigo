@@ -277,7 +277,7 @@ GtpClient::Response GtpClient::HandleBenchmark(CmdArgs args) {
   }
 
   player_->SetOptions(temp_options);
-  player_->SuggestMove();
+  player_->SuggestMove(temp_options.num_readouts);
   player_->SetOptions(saved_options);
 
   return Response::Ok();
@@ -337,7 +337,7 @@ GtpClient::Response GtpClient::HandleGenmove(CmdArgs args) {
   if (options_.courtesy_pass && player_->root()->move == Coord::kPass) {
     c = Coord::kPass;
   } else {
-    c = player_->SuggestMove();
+    c = player_->SuggestMove(player_->options().num_readouts);
   }
   MG_LOG(INFO) << player_->root()->Describe();
   MG_CHECK(player_->PlayMove(c));

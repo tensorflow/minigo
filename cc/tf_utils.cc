@@ -105,7 +105,9 @@ std::vector<tensorflow::Example> MakeExamples(const Game& game) {
     const auto* move = game.moves()[i].get();
     game.GetStoneHistory(i, DualNet::kMoveHistory, &recent_positions);
     DualNet::SetFeatures(recent_positions, move->color, &features);
-    examples.push_back(MakeTfExample(features, move->search_pi, game.result()));
+    if (move->trainable) {
+      examples.push_back(MakeTfExample(features, move->search_pi, game.result()));
+    }
   }
   return examples;
 }

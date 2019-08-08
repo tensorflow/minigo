@@ -31,7 +31,7 @@
             </v-flex>
           </v-layout>
 
-          <v-layout v-for="opening in top10" row>
+          <v-layout v-for="opening in top10" row :key="opening.sequence">
             <v-flex xs4 lg3>
               <v-card>
                   <v-card-text>
