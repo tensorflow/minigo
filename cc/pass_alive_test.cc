@@ -83,10 +83,7 @@ class PassAliveTest : public ::testing::Test {
   void RunTests(absl::Span<const TestCase> tests) {
     for (const auto& test : tests) {
       MG_LOG(INFO) << "board state:\n" << test.board.ToPrettyString();
-      MG_LOG(INFO) << "Calculating black pass-alive regions";
       auto black = test.board.CalculatePassAliveRegions(Color::kBlack);
-
-      MG_LOG(INFO) << "Calculating white pass-alive regions";
       auto white = test.board.CalculatePassAliveRegions(Color::kWhite);
 
       // Initialize the result to the input board state.
