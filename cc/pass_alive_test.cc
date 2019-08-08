@@ -720,6 +720,129 @@ TEST_F(PassAliveTest, 19x19) {
           X O O X O X X X X X O O X X O O X O O
           X X O O O X X X O X O . O X X O X X X
           X O O . O X . X O O O O O X . X . . .)"},
+
+      {// board state
+       R"(. X . X . X . X . X . X . X . X X O .
+          X . X . X . X . X . X . X . X . X O O
+          . X . X . X . X . X . X . X . X . O .
+          X . X . X . X . X . X . X . X . O . O
+          . X . X . X . X . X . X . X . O . O .
+          X . X . X . X . X . X . X . O . O . O
+          . X . X . X . X . X . X . O . O . O .
+          X . X . X . X . X . X . O . O . O . O
+          . X . X . X . X . X . O . O . O . O .
+          X . X . X . X . X . O . O . O . O . O
+          . X . X . X . X . O . O . O . O . O .
+          X . X . X . X . O . O . O . O . O . O
+          . X . X . X . O . O . O . O . O . O .
+          X . X . X . O . O . O . O . O . O . O
+          . X . X . O . O . O . O . O . O . O .
+          X . X . O . O . O . O . O . O . O . O
+          . X . O . O . O . O . O . O . O . O .
+          X X O . O . O . O . O . O . O . O . O
+          . X O O . O . O . O . O . O . O . O .)",
+       // expected result
+       R"(X X X X X X X X X X X X X X X X X O O
+          X X X X X X X X X X X X X X X X X O O
+          X X X X X X X X X X X X X X X X . O O
+          X X X X X X X X X X X X X X X . O O O
+          X X X X X X X X X X X X X X . O O O O
+          X X X X X X X X X X X X X . O O O O O
+          X X X X X X X X X X X X . O O O O O O
+          X X X X X X X X X X X . O O O O O O O
+          X X X X X X X X X X . O O O O O O O O
+          X X X X X X X X X . O O O O O O O O O
+          X X X X X X X X . O O O O O O O O O O
+          X X X X X X X . O O O O O O O O O O O
+          X X X X X X . O O O O O O O O O O O O
+          X X X X X . O O O O O O O O O O O O O
+          X X X X . O O O O O O O O O O O O O O
+          X X X . O O O O O O O O O O O O O O O
+          X X . O O O O O O O O O O O O O O O O
+          X X O O O O O O O O O O O O O O O O O
+          X X O O O O O O O O O O O O O O O O O)"},
+
+      {// board state
+       R"(X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X
+          . X . X . X . X . X . X . X . X . X .
+          X . X . X . X . X . X . X . X . X . X)",
+       // expected result
+       R"(X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X
+          X X X X X X X X X X X X X X X X X X X)"},
+
+      {// board state
+       R"(X O . O . O X O . O . O X O . O . O X
+          . X O X O X . X O X O X . X O X O X .
+          X O X . X O X O X . X O X O X . X O X
+          O . O X O . O . O X O . O . O X O . O
+          X O X . X O X O X . X O X O X . X O X
+          . X O X O X . X O X O X . X O X O X .
+          X O . O . O X O . O . O X O . O . O X
+          . X O X O X . X O X O X . X O X O X .
+          X O X . X O X O X . X O X O X . X O X
+          O . O X O . O . O X O . O . O X O . O
+          X O X . X O X O X . X O X O X . X O X
+          . X O X O X . X O X O X . X O X O X .
+          X O . O . O X O . O . O X O . O . O X
+          . X O X O X . X O X O X . X O X O X .
+          X O X . X O X O X . X O X O X . X O X
+          O . O X O . O . O X O . O . O X O . O
+          X O X . X O X O X . X O X O X . X O X
+          . X O X O X . X O X O X . X O X O X .
+          X O . O . O X O . O . O X O . O . O X)",
+       // expected result
+       R"(X O . O . O X O . O . O X O . O . O X
+          . X O X O X . X O X O X . X O X O X .
+          X O X . X O X O X . X O X O X . X O X
+          O . O X O . O . O X O . O . O X O . O
+          X O X . X O X O X . X O X O X . X O X
+          . X O X O X . X O X O X . X O X O X .
+          X O . O . O X O . O . O X O . O . O X
+          . X O X O X . X O X O X . X O X O X .
+          X O X . X O X O X . X O X O X . X O X
+          O . O X O . O . O X O . O . O X O . O
+          X O X . X O X O X . X O X O X . X O X
+          . X O X O X . X O X O X . X O X O X .
+          X O . O . O X O . O . O X O . O . O X
+          . X O X O X . X O X O X . X O X O X .
+          X O X . X O X O X . X O X O X . X O X
+          O . O X O . O . O X O . O . O X O . O
+          X O X . X O X O X . X O X O X . X O X
+          . X O X O X . X O X O X . X O X O X .
+          X O . O . O X O . O . O X O . O . O X)"},
   };
 
   RunTests(tests);

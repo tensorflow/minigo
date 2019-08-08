@@ -101,6 +101,21 @@ class inline_vector {
     --size_;
   }
 
+  void resize(int size) {
+    MG_CHECK(size >= 0);
+    MG_CHECK(size <= Capacity);
+    size_ = size;
+  }
+
+  void resize(int size, const T& t) {
+    MG_CHECK(size >= 0);
+    MG_CHECK(size <= Capacity);
+    for (int i = size_; i < size; ++i) {
+      data()[i] = t;
+    }
+    size_ = size;
+  }
+
  private:
   int size_ = 0;
   uint8_t MG_ALIGN(alignof(T)) storage_[Capacity * sizeof(T)];

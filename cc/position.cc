@@ -530,7 +530,7 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
   //      region_groups[region->groups_begin + i]
   //  - vital group j is stored at:
   //      region_groups[region->groups_begin + region->num_enclosing_groups + j]
-  inline_vector<uint16_t, 2 * kMaxNumGroups> region_groups;
+  inline_vector<uint16_t, 4 * kMaxNumGroups> region_groups;
 
   // For each point c on the board:
   //  - if the point is in an enclosed region (i.e. empty or other_color), then
@@ -572,14 +572,17 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
         }
       }
 
-      // Sort all liberties and remove duplicates.
       if (g.num_liberties > 1) {
+        // Sort all liberties and remove duplicates.
         auto* liberties_begin = &liberties[g.liberties_begin];
         auto* liberties_end = liberties_begin + g.num_liberties;
         std::sort(liberties_begin, liberties_end);
         auto unique_end = std::unique(liberties_begin, liberties_end);
         g.num_liberties =
             static_cast<uint16_t>(std::distance(liberties_begin, unique_end));
+
+        // Release the duplicate liberties we just removed back to the pool.
+        liberties.resize(g.liberties_begin + g.num_liberties);
       }
     }
   }
