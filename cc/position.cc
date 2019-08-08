@@ -469,27 +469,39 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
   constexpr auto kMaxNumGroups = kN * kN;  // A safe over-estimate
 
   struct BensonGroup {
-    explicit BensonGroup(size_t liberties_begin, Coord first_stone)
+    explicit BensonGroup(int liberties_begin, Coord first_stone)
         : liberties_begin(static_cast<uint16_t>(liberties_begin)),
           first_stone(first_stone) {}
+    // Indexes into liberty_storage.
     uint16_t liberties_begin;
     uint16_t num_liberties = 0;
+
     uint16_t num_vital_regions = 0;
-    Coord first_stone;
+    Coord first_stone;  // TODO(tommadams): remove
     bool is_pass_alive = false;
   };
 
   struct BensonRegion {
-    Coord first_stone = Coord::kInvalid;
-    std::set<Coord> empty_points;
-    std::set<Coord> other_color_points;
+    BensonRegion(int empty_points_begin, Coord first_stone)
+        : empty_points_begin(static_cast<uint16_t>(empty_points_begin)),
+          first_stone(first_stone) {}
+    // Indexes into region_storage.
+    uint16_t empty_points_begin;
+    uint16_t num_empty_points = 0;
+
     std::set<BensonGroup*> vital_for;
     std::set<BensonGroup*> enclosing_groups;
+
+    Coord first_stone;  // TODO(tommadams): remove
     bool is_pass_alive = false;
   };
 
-  // Fixed capactiy storage for things.
+  // Fixed capacity storage for liberties of all groups.
   inline_vector<Coord, kMaxNumGroups * 4> liberty_storage;
+
+  // Fixed capacity storage for coordinates in regions.
+  inline_vector<Coord, kN * kN> region_storage;
+
   inline_vector<BensonGroup, kMaxNumGroups> group_storage;
 
   inline_vector<BensonGroup*, kMaxNumGroups> candidate_groups;
@@ -510,95 +522,94 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
   // next initialization step.
   std::array<BensonGroup*, kN * kN> groups;
 
-  // Initialization step.
-  {
-    // First step, initialize the groups.
+  // First step, initialize the groups.
+  board_visitor_->Begin();
+  for (int row = 0; row < kN; ++row) {
+    for (int col = 0; col < kN; ++col) {
+      Coord c(row, col);
+      if (stones_[c].color() != color || !board_visitor_->Visit(c)) {
+        continue;
+      }
 
-    board_visitor_->Begin();
-    for (int row = 0; row < kN; ++row) {
-      for (int col = 0; col < kN; ++col) {
-        Coord c(row, col);
-        if (stones_[c].color() != color || !board_visitor_->Visit(c)) {
-          continue;
-        }
+      group_storage.emplace_back(liberty_storage.size(), c);
+      auto* g = &group_storage.back();
+      candidate_groups.push_back(g);
+      while (!board_visitor_->Done()) {
+        c = board_visitor_->Next();
+        groups[c] = g;
 
-        group_storage.emplace_back(liberty_storage.size(), c);
-        auto* g = &group_storage.back();
-        candidate_groups.push_back(g);
-        while (!board_visitor_->Done()) {
-          c = board_visitor_->Next();
-          groups[c] = g;
-
-          for (auto nc : kNeighborCoords[c]) {
-            auto ns = stones_[nc];
-            if (ns.empty()) {
-              liberty_storage.push_back(nc);
-              g->num_liberties += 1;
-            } else if (ns.color() == color) {
-              board_visitor_->Visit(nc);
-            }
+        for (auto nc : kNeighborCoords[c]) {
+          auto ns = stones_[nc];
+          if (ns.empty()) {
+            liberty_storage.push_back(nc);
+            g->num_liberties += 1;
+          } else if (ns.color() == color) {
+            board_visitor_->Visit(nc);
           }
         }
+      }
 
-        // Sort all liberty coordinates and remove duplicates.
-        if (g->num_liberties > 1) {
-          auto* begin = &liberty_storage[g->liberties_begin];
-          auto* end = begin + g->num_liberties;
-          std::sort(begin, end);
-          auto unique_end = std::unique(begin, end);
-          g->num_liberties =
-              static_cast<uint16_t>(std::distance(begin, unique_end));
-        }
+      // Sort all liberties and remove duplicates.
+      if (g->num_liberties > 1) {
+        auto* begin = &liberty_storage[g->liberties_begin];
+        auto* end = begin + g->num_liberties;
+        std::sort(begin, end);
+        auto unique_end = std::unique(begin, end);
+        g->num_liberties =
+            static_cast<uint16_t>(std::distance(begin, unique_end));
       }
     }
+  }
 
-    // Build the set of all regions.
-    board_visitor_->Begin();
-    for (int row = 0; row < kN; ++row) {
-      for (int col = 0; col < kN; ++col) {
-        Coord c(row, col);
-        MG_LOG(INFO) << "r " << c.ToGtp();
-        if (stones_[c].color() == color || !board_visitor_->Visit(c)) {
-          continue;
-        }
-
-        auto r = absl::make_unique<BensonRegion>();
-        r->first_stone = c;
-        while (!board_visitor_->Done()) {
-          c = board_visitor_->Next();
-
-          regions[c] = r.get();
-          if (stones_[c].empty()) {
-            r->empty_points.insert(c);
-          } else {
-            r->other_color_points.insert(c);
-          }
-
-          for (auto nc : kNeighborCoords[c]) {
-            auto ns = stones_[nc];
-            if (ns.color() != color) {
-              board_visitor_->Visit(nc);
-            } else {
-              r->enclosing_groups.insert(groups[nc]);
-            }
-          }
-        }
-
-        // Find the vital groups for this region.
-        for (auto* g : r->enclosing_groups) {
-          const auto* liberties_begin = &liberty_storage[g->liberties_begin];
-          const auto* liberties_end = liberties_begin + g->num_liberties;
-          bool is_vital =
-              std::includes(liberties_begin, liberties_end,
-                            r->empty_points.begin(), r->empty_points.end());
-          if (is_vital) {
-            r->vital_for.insert(g);
-            g->num_vital_regions += 1;
-          }
-        }
-
-        region_pool.push_back(std::move(r));
+  // Build the set of all regions.
+  board_visitor_->Begin();
+  for (int row = 0; row < kN; ++row) {
+    for (int col = 0; col < kN; ++col) {
+      Coord c(row, col);
+      if (stones_[c].color() == color || !board_visitor_->Visit(c)) {
+        continue;
       }
+
+      auto r = absl::make_unique<BensonRegion>(region_storage.size(), c);
+      while (!board_visitor_->Done()) {
+        c = board_visitor_->Next();
+
+        regions[c] = r.get();
+        if (stones_[c].empty()) {
+          region_storage.push_back(c);
+          r->num_empty_points += 1;
+        }
+
+        for (auto nc : kNeighborCoords[c]) {
+          auto ns = stones_[nc];
+          if (ns.color() != color) {
+            board_visitor_->Visit(nc);
+          } else {
+            r->enclosing_groups.insert(groups[nc]);
+          }
+        }
+      }
+
+      // Sort empty points.
+      auto* empty_points_begin = &region_storage[r->empty_points_begin];
+      auto* empty_points_end = empty_points_begin + r->num_empty_points;
+      std::sort(empty_points_begin, empty_points_end);
+
+      // Find the vital groups for this region.
+      for (auto* g : r->enclosing_groups) {
+        const auto* liberties_begin = &liberty_storage[g->liberties_begin];
+        const auto* liberties_end = liberties_begin + g->num_liberties;
+        const auto* empty_points_begin = &region_storage[r->empty_points_begin];
+        const auto* empty_points_end = empty_points_begin + r->num_empty_points;
+        bool is_vital = std::includes(liberties_begin, liberties_end,
+                                      empty_points_begin, empty_points_end);
+        if (is_vital) {
+          r->vital_for.insert(g);
+          g->num_vital_regions += 1;
+        }
+      }
+
+      region_pool.push_back(std::move(r));
     }
   }
 
@@ -651,7 +662,8 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
         if (r == nullptr) {
           continue;
         }
-        for (auto e : r->empty_points) {
+        for (uint32_t i = 0; i < r->num_empty_points; ++i) {
+          auto e = region_storage[r->empty_points_begin + i];
           regions[e] = nullptr;
         }
         for (auto& vg : r->vital_for) {
@@ -671,6 +683,8 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
   // pass-alive, and all but zero or one empty points must be adjacent to a
   // neighboring group.
   for (auto& r : region_pool) {
+    // All regions must have at least one empty point, otherwise they'd be dead.
+    MG_CHECK(r->num_empty_points != 0);
     if (r->enclosing_groups.empty()) {
       // Skip regions that have no enclosing group (the empty board).
       // Because we consider regions that have one empty point that isn't
@@ -695,7 +709,8 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
     // completely.
     if (r->is_pass_alive) {
       int num_interior_points = 0;
-      for (auto c : r->empty_points) {
+      for (uint32_t i = 0; i < r->num_empty_points; ++i) {
+        auto c = region_storage[r->empty_points_begin + i];
         bool is_interior = true;
         for (auto nc : kNeighborCoords[c]) {
           if (stones_[nc].color() == color) {
@@ -716,15 +731,21 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
   for (size_t i = 0; i < result.size(); ++i) {
     result[i] = Color::kEmpty;
   }
+  board_visitor_->Begin();
   for (auto& r : region_pool) {
     if (!r->is_pass_alive) {
       continue;
     }
-    for (auto c : r->empty_points) {
+    auto c = region_storage[r->empty_points_begin];
+    MG_CHECK(board_visitor_->Visit(c));
+    while (!board_visitor_->Done()) {
+      c = board_visitor_->Next();
       result[c] = color;
-    }
-    for (auto c : r->other_color_points) {
-      result[c] = color;
+      for (auto nc : kNeighborCoords[c]) {
+        if (stones_[nc].color() != color) {
+          board_visitor_->Visit(nc);
+        }
+      }
     }
   }
 
