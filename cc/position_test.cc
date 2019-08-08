@@ -416,6 +416,22 @@ TEST(PositionTest, TestScoring) {
    ......OOO)");
     EXPECT_EQ(2.5, board.CalculateScore(6.5));
   }
+
+  {
+    // The bottom right corner is a black pass-alive territory and so should
+    // count as 12 points for black.
+    auto board = TestablePosition(R"(
+   .........
+   .........
+   .........
+   .......XX
+   ..O....XO
+   .......X.
+   .......XX
+   .......X.
+   .......XX)");
+    EXPECT_EQ(4.5, board.CalculateScore(6.5));
+  }
 }
 
 // Plays through an example game and verifies that the outcome is as expected.

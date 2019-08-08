@@ -83,25 +83,16 @@ class PassAliveTest : public ::testing::Test {
   void RunTests(absl::Span<const TestCase> tests) {
     for (const auto& test : tests) {
       // MG_LOG(INFO) << "board state:\n" << test.board.ToPrettyString();
-      auto black = test.board.CalculatePassAliveRegions(Color::kBlack);
-      auto white = test.board.CalculatePassAliveRegions(Color::kWhite);
+      auto regions = test.board.CalculatePassAliveRegions();
 
-      // Initialize the result to the input board state.
+      // Overlay the pass-alive regions onto the initial position to get the
+      // resulting territory ownership.
       std::array<Color, kN * kN> actual;
       for (size_t i = 0; i < kN * kN; ++i) {
-        actual[i] = test.board.stones()[i].color();
-      }
-
-      // Merge both pass-alive regions into the result.
-      for (size_t i = 0; i < kN * kN; ++i) {
-        MG_CHECK(black[i] == Color::kEmpty || white[i] == Color::kEmpty)
-            << Coord(i).ToGtp()
-            << " was marked as belonging to both black & white pass-alive "
-               "regions";
-        if (black[i] != Color::kEmpty) {
-          actual[i] = Color::kBlack;
-        } else if (white[i] != Color::kEmpty) {
-          actual[i] = Color::kWhite;
+        if (regions[i] != Color::kEmpty) {
+          actual[i] = regions[i];
+        } else {
+          actual[i] = test.board.stones()[i].color();
         }
       }
 

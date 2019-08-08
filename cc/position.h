@@ -174,18 +174,21 @@ class Position {
 
   // Calculates all pass-alive region that are enclosed by groups of `color`
   // stones.
-  // Elements in the returned array are set to `color` if they belong to a
-  // pass-alive region, or `Color::kEmpty` otherwise. Only intersections inside
-  // the enclosed region are set to `color`, intersections that are part of an
-  // enclosing group are set to `Color::kEmpty`.
-  // Concretely, given the following position:
+  // Elements in the returned array are set to `Color::kBlack` or
+  // `Color::kWhite` if they belong to a pass-alive region or `Color::kEmpty`
+  // otherwise. Only intersections inside the enclosed region are set,
+  // intersections that are part of an enclosing group are set to
+  // `Color::kEmpty`. Concretely, given the following position:
   //   X . X . O X .
   //   X X X X X X .
   //   . . . . . . .
   // The returned array will be set to:
   //   . X . X X . .
   //   . . . . . . .
-  std::array<Color, kN * kN> CalculatePassAliveRegions(Color color) const;
+  std::array<Color, kN * kN> CalculatePassAliveRegions() const;
+
+  // Returns true if the whole board is pass-alive.
+  bool CalculateWholeBoardPassAlive() const;
 
   // Returns true if playing this move is legal.
   // Does not check positional superko.
@@ -221,6 +224,12 @@ class Position {
 
   // The following methods are protected to enable direct testing by unit tests.
  protected:
+  // Sets the pass alive regions for the given color in result.
+  // The caller is responsible for initializing all elements in `result` to
+  // `Color::kEmpty` before calling.
+  void CalculatePassAliveRegionsForColor(
+      Color color, std::array<Color, kN * kN>* result) const;
+
   // Returns the Group of the stone at the given coordinate. Used for testing.
   Group GroupAt(Coord c) const {
     auto s = stones_[c];

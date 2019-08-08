@@ -369,6 +369,14 @@ class SelfPlayer {
       int current_readouts = 0;
       absl::Time search_start_time;
       while (!game->game_over() && !player->root()->at_move_limit()) {
+        if (player->root()->position.CalculateWholeBoardPassAlive()) {
+          // Play two pass moves to end the game.
+          // We don't mark these moves as trainable.
+          MG_CHECK(player->PlayMove(Coord::kPass));
+          MG_CHECK(player->PlayMove(Coord::kPass));
+          break;
+        }
+
         // Record some information using for printing tree search stats.
         if (thread_options.verbose) {
           current_readouts = player->root()->N();

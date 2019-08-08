@@ -106,7 +106,8 @@ std::vector<tensorflow::Example> MakeExamples(const Game& game) {
     game.GetStoneHistory(i, DualNet::kMoveHistory, &recent_positions);
     DualNet::SetFeatures(recent_positions, move->color, &features);
     if (move->trainable) {
-      examples.push_back(MakeTfExample(features, move->search_pi, game.result()));
+      examples.push_back(
+          MakeTfExample(features, move->search_pi, game.result()));
     }
   }
   return examples;

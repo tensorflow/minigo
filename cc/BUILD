@@ -496,6 +496,23 @@ minigo_cc_binary(
 )
 
 minigo_cc_binary(
+    name = "replay_games",
+    srcs = ["replay_games.cc"],
+    deps = [
+        ":base",
+        ":init",
+        ":logging",
+        ":position",
+        ":sgf",
+        ":thread",
+        ":thread_safe_queue",
+        "//cc/file",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/memory",
+    ],
+)
+
+minigo_cc_binary(
     name = "selfplay",
     srcs = ["selfplay.cc"],
     visibility = ["//visibility:public"],

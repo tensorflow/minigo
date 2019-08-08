@@ -32,7 +32,8 @@ class Thread {
 
 class LambdaThread : public Thread {
  public:
-  explicit LambdaThread(std::function<void()> closure);
+  template <typename T>
+  explicit LambdaThread(T closure) : closure_(std::move(closure)) {}
 
  private:
   void Run() override;

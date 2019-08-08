@@ -367,27 +367,34 @@ bool Position::HasNeighboringGroup(Coord c, GroupId group_id) const {
 }
 
 float Position::CalculateScore(float komi) {
-  int score = 0;
-
   static_assert(static_cast<int>(Color::kEmpty) == 0, "Color::kEmpty != 0");
   static_assert(static_cast<int>(Color::kBlack) == 1, "Color::kBlack != 1");
   static_assert(static_cast<int>(Color::kWhite) == 2, "Color::kWhite != 2");
 
-  auto score_empty_area = [this](Coord c) {
+  auto territories = CalculatePassAliveRegions();
+  for (int i = 0; i < kN * kN; ++i) {
+    if (territories[i] == Color::kEmpty) {
+      territories[i] = stones_[i].color();
+    }
+  }
+
+  int score = 0;
+  auto* bv = board_visitor_;
+  auto score_empty_area = [bv, &territories](Coord c) {
     int num_visited = 0;
     int found_bits = 0;
     do {
-      c = board_visitor_->Next();
+      c = bv->Next();
       ++num_visited;
       for (auto nc : kNeighborCoords[c]) {
-        Color color = stones_[nc].color();
+        auto color = territories[nc];
         if (color == Color::kEmpty) {
-          board_visitor_->Visit(nc);
+          bv->Visit(nc);
         } else {
           found_bits |= static_cast<int>(color);
         }
       }
-    } while (!board_visitor_->Done());
+    } while (!bv->Done());
 
     if (found_bits == 1) {
       return num_visited;
@@ -398,30 +405,34 @@ float Position::CalculateScore(float komi) {
     }
   };
 
-  group_visitor_->Begin();
-  board_visitor_->Begin();
+  bv->Begin();
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
       Coord c(row, col);
-      Stone s = stones_[c];
-      if (s.empty()) {
-        if (board_visitor_->Visit(c)) {
-          // First time visiting this empty coord.
+      auto color = territories[c];
+      if (color == Color::kEmpty) {
+        if (bv->Visit(c)) {
           score += score_empty_area(c);
         }
-      } else if (group_visitor_->Visit(s.group_id())) {
-        // First time visiting this group of stones.
-        auto size = groups_[s.group_id()].size;
-        if (s.color() == Color::kBlack) {
-          score += size;
-        } else {
-          score -= size;
-        }
+      } else if (color == Color::kBlack) {
+        score += 1;
+      } else {
+        score -= 1;
       }
     }
   }
 
   return static_cast<float>(score) - komi;
+}
+
+std::array<Color, kN * kN> Position::CalculatePassAliveRegions() const {
+  std::array<Color, kN * kN> result;
+  for (auto& x : result) {
+    x = Color::kEmpty;
+  }
+  CalculatePassAliveRegionsForColor(Color::kBlack, &result);
+  CalculatePassAliveRegionsForColor(Color::kWhite, &result);
+  return result;
 }
 
 // A _region_ is a connected set of intersections regardless of color.
@@ -458,8 +469,8 @@ float Position::CalculateScore(float komi) {
 // be captured by the opponent even if that player always passes on their turn.
 // More details:
 //   https://senseis.xmp.net/?BensonsDefinitionOfUnconditionalLife
-std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
-    Color color) const {
+void Position::CalculatePassAliveRegionsForColor(
+    Color color, std::array<Color, kN * kN>* result) const {
   constexpr auto kMaxNumRegions = (kN * kN + 1) / 2 + 1;
   constexpr auto kMaxNumGroups = kN * kN;  // A safe over-estimate
 
@@ -720,12 +731,6 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
   // all its enclosing groups must be pass-alive, and all but zero or one empty
   // points must be adjacent to a neighboring group.
 
-  // Initialize the result array to empty.
-  std::array<Color, kN * kN> result;
-  for (auto& x : result) {
-    x = Color::kEmpty;
-  }
-
   board_visitor_->Begin();
   for (auto& r : regions) {
     // All regions must have at least one empty point, otherwise they'd be dead.
@@ -775,7 +780,7 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
       board_visitor_->Visit(c);
       while (!board_visitor_->Done()) {
         c = board_visitor_->Next();
-        result[c] = color;
+        (*result)[c] = color;
         for (auto nc : kNeighborCoords[c]) {
           if (stones_[nc].color() != color) {
             board_visitor_->Visit(nc);
@@ -784,8 +789,16 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions(
       }
     }
   }
+}
 
-  return result;
+bool Position::CalculateWholeBoardPassAlive() const {
+  auto territories = CalculatePassAliveRegions();
+  for (int i = 0; i < kN * kN; ++i) {
+    if (territories[i] == Color::kEmpty && stones_[i].empty()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void Position::UpdateLegalMoves(ZobristHistory* zobrist_history) {

@@ -29,9 +29,6 @@ void Thread::Join() {
   impl_.join();
 }
 
-LambdaThread::LambdaThread(std::function<void()> closure)
-    : closure_(std::move(closure)) {}
-
 void LambdaThread::Run() { closure_(); }
 
 }  // namespace minigo
