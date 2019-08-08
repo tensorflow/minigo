@@ -82,7 +82,7 @@ class PassAliveTest : public ::testing::Test {
 
   void RunTests(absl::Span<const TestCase> tests) {
     for (const auto& test : tests) {
-      MG_LOG(INFO) << "board state:\n" << test.board.ToPrettyString();
+      // MG_LOG(INFO) << "board state:\n" << test.board.ToPrettyString();
       auto black = test.board.CalculatePassAliveRegions(Color::kBlack);
       auto white = test.board.CalculatePassAliveRegions(Color::kWhite);
 
@@ -110,8 +110,8 @@ class PassAliveTest : public ::testing::Test {
           << ToPrettyString(test.expected) << "\n\nactual:\n"
           << ToPrettyString(actual) << "\n";
 
-      MG_LOG(INFO) << "expected:\n" << ToPrettyString(test.expected);
-      MG_LOG(INFO) << "actual:\n" << ToPrettyString(actual);
+      // MG_LOG(INFO) << "expected:\n" << ToPrettyString(test.expected);
+      // MG_LOG(INFO) << "actual:\n" << ToPrettyString(actual);
     }
   }
 };
