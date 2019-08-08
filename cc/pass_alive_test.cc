@@ -126,428 +126,428 @@ TEST_F(PassAliveTest, 9x9) {
 
   TestCase tests[] = {
       {// board state
-       R"(.X.XO....
-          XXXXO....
-          OOOOO....
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........)",
+       R"(. X . X O . . . .
+          X X X X O . . . .
+          O O O O O . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(XXXXO....
-          XXXXO....
-          OOOOO....
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........)"},
+       R"(X X X X O . . . .
+          X X X X O . . . .
+          O O O O O . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(....O.O..
-          ....OOO..
-          ......OOO
-          ......O..
-          ......OOO
-          ......OXX
-          ......OX.
-          ......OXX
-          ......OX.)",
+       R"(. . . . O . O . .
+          . . . . O O O . .
+          . . . . . . O O O
+          . . . . . . O . .
+          . . . . . . O O O
+          . . . . . . O X X
+          . . . . . . O X .
+          . . . . . . O X X
+          . . . . . . O X .)",
        // expected result
-       R"(....OOOOO
-          ....OOOOO
-          ......OOO
-          ......OOO
-          ......OOO
-          ......OXX
-          ......OXX
-          ......OXX
-          ......OXX)"},
+       R"(. . . . O O O O O
+          . . . . O O O O O
+          . . . . . . O O O
+          . . . . . . O O O
+          . . . . . . O O O
+          . . . . . . O X X
+          . . . . . . O X X
+          . . . . . . O X X
+          . . . . . . O X X)"},
 
       {// board state
-       R"(...X.....
-          XXXX.....
-          .X.X.....
-          XXXX.....
-          .........
-          .........
-          .........
-          .........
-          .........)",
+       R"(. . . X . . . . .
+          X X X X . . . . .
+          . X . X . . . . .
+          X X X X . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(XXXX.....
-          XXXX.....
-          XXXX.....
-          XXXX.....
-          .........
-          .........
-          .........
-          .........
-          .........)"},
+       R"(X X X X . . . . .
+          X X X X . . . . .
+          X X X X . . . . .
+          X X X X . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// Top-left region is not pass-alive because it has two empty points that
        // aren't adjacent to the enclosing chain.
        // board state
-       R"(...X.....
-          ...X.....
-          XXXX.....
-          .X.X.....
-          XXXX.....
-          .........
-          .........
-          .........
-          .........)",
+       R"(. . . X . . . . .
+          . . . X . . . . .
+          X X X X . . . . .
+          . X . X . . . . .
+          X X X X . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(...X.....
-          ...X.....
-          XXXX.....
-          XXXX.....
-          XXXX.....
-          .........
-          .........
-          .........
-          .........)"},
+       R"(. . . X . . . . .
+          . . . X . . . . .
+          X X X X . . . . .
+          X X X X . . . . .
+          X X X X . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// Top-left region is pass-alive because only one empty point is not
        // adjacent to the enclosing chain.
        // board state
-       R"(O..X.....
-          ...X.....
-          XXXX.....
-          .X.X.....
-          XXXX.....
-          .........
-          .........
-          .........
-          .........)",
+       R"(O . . X . . . . .
+          . . . X . . . . .
+          X X X X . . . . .
+          . X . X . . . . .
+          X X X X . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(XXXX.....
-          XXXX.....
-          XXXX.....
-          XXXX.....
-          XXXX.....
-          .........
-          .........
-          .........
-          .........)"},
+       R"(X X X X . . . . .
+          X X X X . . . . .
+          X X X X . . . . .
+          X X X X . . . . .
+          X X X X . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          OOOOO....
-          O.O.O....)",
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          O O O O O . . . .
+          O . O . O . . . .)",
        // expected result
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          OOOOO....
-          OOOOO....)"},
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          O O O O O . . . .
+          O O O O O . . . .)"},
 
       {// board state
-       R"(.........
-          ..XXXXXX.
-          ..X..X.X.
-          ..XXXXXX.
-          .........
-          .........
-          .........
-          .........
-          .........)",
+       R"(. . . . . . . . .
+          . . X X X X X X .
+          . . X . . X . X .
+          . . X X X X X X .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          ..XXXXXX.
-          ..XXXXXX.
-          ..XXXXXX.
-          .........
-          .........
-          .........
-          .........
-          .........)"},
+       R"(. . . . . . . . .
+          . . X X X X X X .
+          . . X X X X X X .
+          . . X X X X X X .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .OOOOOOO.
-          .O.OXXXO.
-          .OOOXXXO.
-          .OX.XXXO.
-          .OXXXXOO.
-          .OOOOOO..
-          .........
-          .........)",
+       R"(. . . . . . . . .
+          . O O O O O O O .
+          . O . O X X X O .
+          . O O O X X X O .
+          . O X . X X X O .
+          . O X X X X O O .
+          . O O O O O O . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          .OOOOOOO.
-          .OOOOOOO.
-          .OOOOOOO.
-          .OOOOOOO.
-          .OOOOOOO.
-          .OOOOOO..
-          .........
-          .........)"},
+       R"(. . . . . . . . .
+          . O O O O O O O .
+          . O O O O O O O .
+          . O O O O O O O .
+          . O O O O O O O .
+          . O O O O O O O .
+          . O O O O O O . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          OOOOO....
-          .O.XOO...
-          O.O.XO...)",
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          O O O O O . . . .
+          . O . X O O . . .
+          O . O . X O . . .)",
        // expected result
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          OOOOO....
-          OOOOOO...
-          OOOOOO...)"},
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          O O O O O . . . .
+          O O O O O O . . .
+          O O O O O O . . .)"},
 
       {// board state
-       R"(OXX.X.X.O
-          OX.XOXXXX
-          OXXOOOOOO
-          OOOO.....
-          .........
-          .........
-          .........
-          .........
-          .........)",
+       R"(O X X . X . X . O
+          O X . X O X X X X
+          O X X O O O O O O
+          O O O O . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(OXXXXXXXX
-          OXXXOXXXX
-          OXXOOOOOO
-          OOOO.....
-          .........
-          .........
-          .........
-          .........)"},
+       R"(O X X X X X X X X
+          O X X X O X X X X
+          O X X O O O O O O
+          O O O O . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(..O.O.XX.
-          .OOOO.X.X
-          OO.....XX
-          .........
-          .........
-          X......OO
-          .XX...O.O
-          X.X..OO.O
-          .X.X.O.O.)",
+       R"(. . O . O . X X .
+          . O O O O . X . X
+          O O . . . . . X X
+          . . . . . . . . .
+          . . . . . . . . .
+          X . . . . . . O O
+          . X X . . . O . O
+          X . X . . O O . O
+          . X . X . O . O .)",
        // expected result
-       R"(..O.O.XXX
-          .OOOO.XXX
-          OO.....XX
-          .........
-          .........
-          X......OO
-          .XX...OOO
-          X.X..OOOO
-          .X.X.OOOO)"},
+       R"(. . O . O . X X X
+          . O O O O . X X X
+          O O . . . . . X X
+          . . . . . . . . .
+          . . . . . . . . .
+          X . . . . . . O O
+          . X X . . . O O O
+          X . X . . O O O O
+          . X . X . O O O O)"},
 
       {// board state
-       R"(.OOOOOOO.
-          OOX..XX.O
-          O...XOX.O
-          O...X.X.O
-          OXXX.XX.O
-          OXO.X...O
-          OX.XX.XXO
-          O.XX..OOO
-          .OOOOOOX.)",
+       R"(. O O O O O O O .
+          O O X . . X X . O
+          O . . . X O X . O
+          O . . . X . X . O
+          O X X X . X X . O
+          O X O . X . . . O
+          O X . X X . X X O
+          O . X X . . O O O
+          . O O O O O O X .)",
        // expected result
-       R"(OOOOOOOOO
-          OOX..XX.O
-          O...XXX.O
-          O...XXX.O
-          OXXXXXX.O
-          OXXXX...O
-          OXXXX.XXO
-          O.XX..OOO
-          OOOOOOOOO)"},
+       R"(O O O O O O O O O
+          O O X . . X X . O
+          O . . . X X X . O
+          O . . . X X X . O
+          O X X X X X X . O
+          O X X X X . . . O
+          O X X X X . X X O
+          O . X X . . O O O
+          O O O O O O O O O)"},
 
       {// board state
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........)",
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........)"},
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .........
-          ...XX....
-          ..X..X...
-          ..X..X...
-          ...XX....
-          .........
-          .........
-          .........)",
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . X X . . . .
+          . . X . . X . . .
+          . . X . . X . . .
+          . . . X X . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          .........
-          ...XX....
-          ..X..X...
-          ..X..X...
-          ...XX....
-          .........
-          .........
-          .........)"},
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . X X . . . .
+          . . X . . X . . .
+          . . X . . X . . .
+          . . . X X . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .........
-          .XXXX....
-          .X..X....
-          .X..XXX..
-          .XXXX.X..
-          ....XXX..
-          .........
-          .........)",
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . X X X X . . . .
+          . X . . X . . . .
+          . X . . X X X . .
+          . X X X X . X . .
+          . . . . X X X . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          .........
-          .XXXX....
-          .XXXX....
-          .XXXXXX..
-          .XXXXXX..
-          ....XXX..
-          .........
-          .........)"},
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . X X X X . . . .
+          . X X X X . . . .
+          . X X X X X X . .
+          . X X X X X X . .
+          . . . . X X X . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .XXXXX...
-          .X...X...
-          .X...X...
-          .X...XXX.
-          .XXXXX.X.
-          .....XXX.
-          .........
-          .........)",
+       R"(. . . . . . . . .
+          . X X X X X . . .
+          . X . . . X . . .
+          . X . . . X . . .
+          . X . . . X X X .
+          . X X X X X . X .
+          . . . . . X X X .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          .XXXXX...
-          .X...X...
-          .X...X...
-          .X...XXX.
-          .XXXXX.X.
-          .....XXX.
-          .........
-          .........)"},
+       R"(. . . . . . . . .
+          . X X X X X . . .
+          . X . . . X . . .
+          . X . . . X . . .
+          . X . . . X X X .
+          . X X X X X . X .
+          . . . . . X X X .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .........
-          ....X....
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........)",
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . X . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          .........
-          ....X....
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........)"},
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . X . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          ....O....
-          .........)",
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . O . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.........
-          .........
-          .........
-          .........
-          .........
-          .........
-          .........
-          ....O....
-          .........)"},
+       R"(. . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . . . . . .
+          . . . . O . . . .
+          . . . . . . . . .)"},
 
       {// board state
-       R"(O........
-           ....OOOO.
-           .OOOOXXO.
-           .OXXX.XO.
-           .OX..XXO.
-           .OXXXOOO.
-           .OOOOO...
-           .........
-           .........)",
+       R"(O . . . . . . . .
+            . . . . O O O O.
+            . O O O O X X O.
+            . O X X X . X O.
+            . O X . . X X O.
+            . O X X X O O O.
+            . O O O O O . ..
+            . . . . . . . ..
+            . . . . . . . ..)",
        // expected result
-       R"(O........
-          ....OOOO.
-          .OOOOXXO.
-          .OXXX.XO.
-          .OX..XXO.
-          .OXXXOOO.
-          .OOOOO...
-          .........
-          .........)"},
+       R"(O . . . . . . . .
+          . . . . O O O O .
+          . O O O O X X O .
+          . O X X X . X O .
+          . O X . . X X O .
+          . O X X X O O O .
+          . O O O O O . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
 
       {// Seki
        // board state
-       R"(.OX.XO...
-          OOOXXO...
-          .OXXOO...
-          OXXXO....
-          XX.XO....
-          OOXXO....
-          .OOOO....
-          .........
-          .........)",
+       R"(. O X . X O . . .
+          O O O X X O . . .
+          . O X X O O . . .
+          O X X X O . . . .
+          X X . X O . . . .
+          O O X X O . . . .
+          . O O O O . . . .
+          . . . . . . . . .
+          . . . . . . . . .)",
        // expected result
-       R"(.OX.XO...
-          OOOXXO...
-          .OXXOO...
-          OXXXO....
-          XX.XO....
-          OOXXO....
-          .OOOO....
-          .........
-          .........)"},
+       R"(. O X . X O . . .
+          O O O X X O . . .
+          . O X X O O . . .
+          O X X X O . . . .
+          X X . X O . . . .
+          O O X X O . . . .
+          . O O O O . . . .
+          . . . . . . . . .
+          . . . . . . . . .)"},
   };
 
   RunTests(tests);
@@ -560,169 +560,169 @@ TEST_F(PassAliveTest, 19x19) {
 
   TestCase tests[] = {
       {// board state
-       R"(X.X....OO.......X.X
-          .XX....O.OOO....XX.
-          .X.....OO..O.....XO
-          XX.OO....OOO.....XX
-          ...O.OOO...........
-          ...OO.XO...........
-          .....OOO...........
-          ...................
-          .XXX...............
-          .X.X...............
-          .X.X............OOO
-          X.X.............O.O
-          .XX..............O.
-          XX................O
-          .................O.
-          OO...............OO
-          .O.....OO........O.
-          .OOOO.O.O........OO
-          O..O.O.OO.......O..)",
+       R"(X . X . . . . O O . . . . . . . X . X
+          . X X . . . . O . O O O . . . . X X .
+          . X . . . . . O O . . O . . . . . X O
+          X X . O O . . . . O O O . . . . . X X
+          . . . O . O O O . . . . . . . . . . .
+          . . . O O . X O . . . . . . . . . . .
+          . . . . . O O O . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . X X X . . . . . . . . . . . . . . .
+          . X . X . . . . . . . . . . . . . . .
+          . X . X . . . . . . . . . . . . O O O
+          X . X . . . . . . . . . . . . . O . O
+          . X X . . . . . . . . . . . . . . O .
+          X X . . . . . . . . . . . . . . . . O
+          . . . . . . . . . . . . . . . . . O .
+          O O . . . . . . . . . . . . . . . O O
+          . O . . . . . O O . . . . . . . . O .
+          . O O O O . O . O . . . . . . . . O O
+          O . . O . O . O O . . . . . . . O . .)",
        // expected result
-       R"(X.X....OO.......XXX
-          .XX....O.OOO... XXX
-          .X.....OO..O.....XX
-          XX.OO....OOO.....XX
-          ...OOOOO...........
-          ...OOOOO...........
-          .....OOO...........
-          ...................
-          .XXX...............
-          .XXX...............
-          .XXX............OOO
-          XXX.............OOO
-          XXX..............OO
-          XX................O
-          .................OO
-          OO...............OO
-          .O.....OO........OO
-          .OOOO.O.O........OO
-          O..O.O.OO.......O..)"},
+       R"(X . X . . . . O O . . . . . . . X X X
+          . X X . . . . O . O O O . . . . X X X
+          . X . . . . . O O . . O . . . . . X X
+          X X . O O . . . . O O O . . . . . X X
+          . . . O O O O O . . . . . . . . . . .
+          . . . O O O O O . . . . . . . . . . .
+          . . . . . O O O . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . X X X . . . . . . . . . . . . . . .
+          . X X X . . . . . . . . . . . . . . .
+          . X X X . . . . . . . . . . . . O O O
+          X X X . . . . . . . . . . . . . O O O
+          X X X . . . . . . . . . . . . . . O O
+          X X . . . . . . . . . . . . . . . . O
+          . . . . . . . . . . . . . . . . . O O
+          O O . . . . . . . . . . . . . . . O O
+          . O . . . . . O O . . . . . . . . O O
+          . O O O O . O . O . . . . . . . . O O
+          O . . O . O . O O . . . . . . . O . .)"},
 
       {// board state
-       R"(.X.X.XXXX.XXXX.X.X.
-          X.XXXX..X.X..XXXX.X
-          XX.X..X.X.X.X..X.X.
-          X.X.XX.XX.XX.XX.X.X
-          .X.XX.XX...XX.XX.X.
-          .X.X...........X.X.
-          X.X.............X.X
-          .X...............X.
-          ...................
-          XXX.....XXXXX......
-          ..X.....X...X.XXXXX
-          OXXXX...X..XX.X....
-          O.X.X...X.O.XXX....
-          ..XXX...X...X.X....
-          XXX.....XXXXXXXXXXX
-          ..............O....
-          OOOOO....OOOOO.OOOO
-          .O..OO...O...OOO...
-          O.O.XO...O.O.O.O.OO)",
+       R"(. X . X . X X X X . X X X X . X . X .
+          X . X X X X . . X . X . . X X X X . X
+          X X . X . . X . X . X . X . . X . X .
+          X . X . X X . X X . X X . X X . X . X
+          . X . X X . X X . . . X X . X X . X .
+          . X . X . . . . . . . . . . . X . X .
+          X . X . . . . . . . . . . . . . X . X
+          . X . . . . . . . . . . . . . . . X .
+          . . . . . . . . . . . . . . . . . . .
+          X X X . . . . . X X X X X . . . . . .
+          . . X . . . . . X . . . X . X X X X X
+          O X X X X . . . X . . X X . X . . . .
+          O . X . X . . . X . O . X X X . . . .
+          . . X X X . . . X . . . X . X . . . .
+          X X X . . . . . X X X X X X X X X X X
+          . . . . . . . . . . . . . . O . . . .
+          O O O O O . . . . O O O O O . O O O O
+          . O . . O O . . . O . . . O O O . . .
+          O . O . X O . . . O . O . O . O . O O)",
        // expected result
-       R"(XXXXXXXXX.XXXX.X.X.
-          XXXXXX..X.X..XXXX.X
-          XX.X..X.X.X.X..X.X.
-          X.X.XX.XX.XX.XX.X.X
-          .X.XX.XX...XX.XX.X.
-          .X.X...........X.X.
-          X.X.............X.X
-          .X...............X.
-          ...................
-          XXX.....XXXXX......
-          XXX.....XXXXX.XXXXX
-          XXXXX...XXXXX.X....
-          XXXXX...XXXXXXX....
-          XXXXX...XXXXXXX....
-          XXX.....XXXXXXXXXXX
-          ..............O....
-          OOOOO....OOOOO.OOOO
-          .O..OO...O...OOO...
-          O.O.XO...O.O.O.O.OO)"},
+       R"(X X X X X X X X X . X X X X . X . X .
+          X X X X X X . . X . X . . X X X X . X
+          X X . X . . X . X . X . X . . X . X .
+          X . X . X X . X X . X X . X X . X . X
+          . X . X X . X X . . . X X . X X . X .
+          . X . X . . . . . . . . . . . X . X .
+          X . X . . . . . . . . . . . . . X . X
+          . X . . . . . . . . . . . . . . . X .
+          . . . . . . . . . . . . . . . . . . .
+          X X X . . . . . X X X X X . . . . . .
+          X X X . . . . . X X X X X . X X X X X
+          X X X X X . . . X X X X X . X . . . .
+          X X X X X . . . X X X X X X X . . . .
+          X X X X X . . . X X X X X X X . . . .
+          X X X . . . . . X X X X X X X X X X X
+          . . . . . . . . . . . . . . O . . . .
+          O O O O O . . . . O O O O O . O O O O
+          . O . . O O . . . O . . . O O O . . .
+          O . O . X O . . . O . O . O . O . O O)"},
 
       {// board state
-       R"(.X.X.XXXX.XXXX.X.X.
-          X.XXXX..X.X..XXXX.X
-          XX.X..X.X.X.X..X.X.
-          X.X.XX.XX.XX.XX.X.X
-          .X.XX.XX...XX.XX.X.
-          .X.X...........X.X.
-          X.X.............X.X
-          .X...............X.
-          ...................
-          XXX.....XXXXX......
-          ..X.....X...X.XXXXX
-          OXXXX...X..XX.X....
-          ..X.X...X...XXX....
-          ..XXX...X...X.X....
-          XXX.....XXXXXXXXXXX
-          ..............O....
-          OOOOO....OOOOO.OOOO
-          .O..OO...O...OOO...
-          O.O..O...O.O.O.O.OO)",
+       R"(. X . X . X X X X . X X X X . X . X .
+          X . X X X X . . X . X . . X X X X . X
+          X X . X . . X . X . X . X . . X . X .
+          X . X . X X . X X . X X . X X . X . X
+          . X . X X . X X . . . X X . X X . X .
+          . X . X . . . . . . . . . . . X . X .
+          X . X . . . . . . . . . . . . . X . X
+          . X . . . . . . . . . . . . . . . X .
+          . . . . . . . . . . . . . . . . . . .
+          X X X . . . . . X X X X X . . . . . .
+          . . X . . . . . X . . . X . X X X X X
+          O X X X X . . . X . . X X . X . . . .
+          . . X . X . . . X . . . X X X . . . .
+          . . X X X . . . X . . . X . X . . . .
+          X X X . . . . . X X X X X X X X X X X
+          . . . . . . . . . . . . . . O . . . .
+          O O O O O . . . . O O O O O . O O O O
+          . O . . O O . . . O . . . O O O . . .
+          O . O . . O . . . O . O . O . O . O O)",
        // expected result
-       R"(XXXXXXXXX.XXXX.X.X.
-          XXXXXX..X.X..XXXX.X
-          XX.X..X.X.X.X..X.X.
-          X.X.XX.XX.XX.XX.X.X
-          .X.XX.XX...XX.XX.X.
-          .X.X...........X.X.
-          X.X.............X.X
-          .X...............X.
-          ...................
-          XXX.....XXXXX......
-          ..X.....X...X.XXXXX
-          OXXXX...X..XX.X....
-          ..X.X...X...XXX....
-          ..XXX...X...X.X....
-          XXX.....XXXXXXXXXXX
-          ..............O....
-          OOOOO....OOOOO.OOOO
-          .O..OO...O...OOO...
-          O.O..O...O.O.O.O.OO)"},
+       R"(X X X X X X X X X . X X X X . X . X .
+          X X X X X X . . X . X . . X X X X . X
+          X X . X . . X . X . X . X . . X . X .
+          X . X . X X . X X . X X . X X . X . X
+          . X . X X . X X . . . X X . X X . X .
+          . X . X . . . . . . . . . . . X . X .
+          X . X . . . . . . . . . . . . . X . X
+          . X . . . . . . . . . . . . . . . X .
+          . . . . . . . . . . . . . . . . . . .
+          X X X . . . . . X X X X X . . . . . .
+          . . X . . . . . X . . . X . X X X X X
+          O X X X X . . . X . . X X . X . . . .
+          . . X . X . . . X . . . X X X . . . .
+          . . X X X . . . X . . . X . X . . . .
+          X X X . . . . . X X X X X X X X X X X
+          . . . . . . . . . . . . . . O . . . .
+          O O O O O . . . . O O O O O . O O O O
+          . O . . O O . . . O . . . O O O . . .
+          O . O . . O . . . O . O . O . O . O O)"},
 
       {// Whole board seki
        // board state
-       R"(O.XXXOOOO.O.XOOO.O.
-          .OOXXXXOOOXXXXO.OXX
-          XOXX.XOOOOOOOXOOOOX
-          XXOOXXOXXOXXOXOXXXX
-          XXOOOOXXXX.XOXX.XOX
-          .XXO.XXXOOXXOXOXXOO
-          OXOOOOOOOXXOOOOOXXO
-          OOXXXOX.OOXXO.OOXOO
-          OOXXXOOOOXX.XOOXOOX
-          O.OXXOXOXXXXXOOX..X
-          OOOXXXXXOXOXXOXXXXX
-          XOX.XXOOOOOOXXOOOOO
-          XXXXXOOOOX.OOXO..XO
-          XXOOXOOXXXOOXOOXXXX
-          XOO.XOOOXXOOXXXOOOO
-          XXOXXOXOOX.OOX.OXO.
-          XOOXOXXXXXOOXXOOXOO
-          XXOOOXXXOXO.OXXOXXX
-          XOO.OX.XOOOOOX.X...)",
+       R"(O . X X X O O O O . O . X O O O . O .
+          . O O X X X X O O O X X X X O . O X X
+          X O X X . X O O O O O O O X O O O O X
+          X X O O X X O X X O X X O X O X X X X
+          X X O O O O X X X X . X O X X . X O X
+          . X X O . X X X O O X X O X O X X O O
+          O X O O O O O O O X X O O O O O X X O
+          O O X X X O X . O O X X O . O O X O O
+          O O X X X O O O O X X . X O O X O O X
+          O . O X X O X O X X X X X O O X . . X
+          O O O X X X X X O X O X X O X X X X X
+          X O X . X X O O O O O O X X O O O O O
+          X X X X X O O O O X . O O X O . . X O
+          X X O O X O O X X X O O X O O X X X X
+          X O O . X O O O X X O O X X X O O O O
+          X X O X X O X O O X . O O X . O X O .
+          X O O X O X X X X X O O X X O O X O O
+          X X O O O X X X O X O . O X X O X X X
+          X O O . O X . X O O O O O X . X . . .)",
        // expected result
-       R"(O.XXXOOOO.O.XOOO.O.
-          .OOXXXXOOOXXXXO.OXX
-          XOXX.XOOOOOOOXOOOOX
-          XXOOXXOXXOXXOXOXXXX
-          XXOOOOXXXX.XOXX.XOX
-          .XXO.XXXOOXXOXOXXOO
-          OXOOOOOOOXXOOOOOXXO
-          OOXXXOX.OOXXO.OOXOO
-          OOXXXOOOOXX.XOOXOOX
-          O.OXXOXOXXXXXOOX..X
-          OOOXXXXXOXOXXOXXXXX
-          XOX.XXOOOOOOXXOOOOO
-          XXXXXOOOOX.OOXO..XO
-          XXOOXOOXXXOOXOOXXXX
-          XOO.XOOOXXOOXXXOOOO
-          XXOXXOXOOX.OOX.OXO.
-          XOOXOXXXXXOOXXOOXOO
-          XXOOOXXXOXO.OXXOXXX
-          XOO.OX.XOOOOOX.X...)"},
+       R"(O . X X X O O O O . O . X O O O . O .
+          . O O X X X X O O O X X X X O . O X X
+          X O X X . X O O O O O O O X O O O O X
+          X X O O X X O X X O X X O X O X X X X
+          X X O O O O X X X X . X O X X . X O X
+          . X X O . X X X O O X X O X O X X O O
+          O X O O O O O O O X X O O O O O X X O
+          O O X X X O X . O O X X O . O O X O O
+          O O X X X O O O O X X . X O O X O O X
+          O . O X X O X O X X X X X O O X . . X
+          O O O X X X X X O X O X X O X X X X X
+          X O X . X X O O O O O O X X O O O O O
+          X X X X X O O O O X . O O X O . . X O
+          X X O O X O O X X X O O X O O X X X X
+          X O O . X O O O X X O O X X X O O O O
+          X X O X X O X O O X . O O X . O X O .
+          X O O X O X X X X X O O X X O O X O O
+          X X O O O X X X O X O . O X X O X X X
+          X O O . O X . X O O O O O X . X . . .)"},
   };
 
   RunTests(tests);

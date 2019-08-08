@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "cc/constants.h"
 #include "cc/logging.h"
@@ -35,6 +36,7 @@ std::vector<std::string> SplitBoardString(absl::string_view str) {
     if (stripped.empty()) {
       continue;
     }
+    stripped = absl::StrReplaceAll(stripped, {{" ", ""}});
     MG_CHECK(stripped.size() <= kN);
     stripped.resize(kN, '.');
     lines.push_back(std::move(stripped));
