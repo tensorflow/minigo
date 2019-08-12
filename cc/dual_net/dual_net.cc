@@ -64,11 +64,10 @@ void DualNet::SetFeatures(absl::Span<const Position::Stones* const> history,
   }
 }
 
-DualNet::~DualNet() = default;
+void DualNet::RunMany(absl::Span<const Position*> position_history,
+                      std::vector<Output*> outputs, std::string* model_name) {}
 
-DualNet::InputLayout DualNet::GetInputLayout() const {
-  return InputLayout::kNHWC;
-}
+DualNet::~DualNet() = default;
 
 void DualNet::Reserve(size_t) {}
 

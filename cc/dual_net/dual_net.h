@@ -22,6 +22,7 @@
 
 #include "absl/types/span.h"
 #include "cc/constants.h"
+#include "cc/model/model.h"
 #include "cc/position.h"
 
 namespace minigo {
@@ -33,7 +34,7 @@ namespace minigo {
 // 1s if black is to play, or 0s if white is to play. The planes are
 // concatenated together to give input features:
 //   [X_t, Y_t, X_t-1, Y_t-1, ..., X_t-7, Y_t-7, C].
-class DualNet {
+class DualNet : public Model {
  public:
   // Size of move history in the stone features.
   static constexpr int kMoveHistory = 8;
@@ -52,10 +53,7 @@ class DualNet {
   using StoneFeatures = std::array<float, kNumStoneFeatures>;
   using BoardFeatures = std::array<float, kNumBoardFeatures>;
 
-  enum class InputLayout {
-    kNHWC,
-    kNCHW,
-  };
+  using Output = Model::Output;
 
   // Generates the board features from the history of recent moves, where
   // history[0] is the current board position, and history[i] is the board
@@ -66,28 +64,24 @@ class DualNet {
   static void SetFeatures(absl::Span<const Position::Stones* const> history,
                           Color to_play, BoardFeatures* features);
 
-  struct Output {
-    std::array<float, kNumMoves> policy;
-    float value;
-  };
-
   explicit DualNet(std::string name) : name_(std::move(name)) {}
   virtual ~DualNet();
 
   const std::string& name() const { return name_; }
 
-  // Runs inference on a batch of input features.
-  // TODO(tommadams): rename model -> model_name.
-  virtual void RunMany(std::vector<const BoardFeatures*> features,
-                       std::vector<Output*> outputs, std::string* model) = 0;
+  void RunMany(absl::Span<const Position*> position_history,
+               std::vector<Output*> outputs, std::string* model_name) override;
 
   // Potentially prepares the DualNet to avoid expensive operations during
   // RunMany() calls with up to 'capacity' features.
   virtual void Reserve(size_t capacity);
 
-  virtual InputLayout GetInputLayout() const;
-
  private:
+  // Runs inference on a batch of input features.
+  // TODO(tommadams): rename model -> model_name.
+  virtual void RunMany(std::vector<const BoardFeatures*> features,
+                       std::vector<Output*> outputs,
+                       std::string* model_name) = 0;
   const std::string name_;
 };
 

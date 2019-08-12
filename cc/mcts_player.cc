@@ -391,16 +391,8 @@ void MctsPlayer::ProcessLeaves(const std::vector<MctsNode*>& leaves,
     leaf->GetMoveHistory(DualNet::kMoveHistory, &recent_positions_);
     DualNet::SetFeatures(recent_positions_, leaf->position.to_play(),
                          &raw_features);
-    if (network_->GetInputLayout() == DualNet::InputLayout::kNCHW) {
-      using OutIter =
-          symmetry::NchwOutputIterator<kN, DualNet::kNumStoneFeatures, float>;
-      symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
-          symmetries_used_[i], raw_features.data(),
-          OutIter(features_[i].data()));
-    } else {
-      symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
-          symmetries_used_[i], raw_features.data(), features_[i].data());
-    }
+    symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
+        symmetries_used_[i], raw_features.data(), features_[i].data());
   }
 
   std::vector<const DualNet::BoardFeatures*> feature_ptrs;

@@ -391,31 +391,6 @@ TEST(SymmetriesTest, Inverses) {
   }
 }
 
-TEST(SymmetriesTest, NchwOutput) {
-  for (int i = 0; i < kNumSymmetries; ++i) {
-    // clang-format off
-    std::array<float, 48> original = {{
-        11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
-        51,  52,  53,   61,  62,  63,   71,  72,  73,   81,  82,  83,
-        91,  92,  93,  101, 102, 103,  111, 112, 113,  121, 122, 123,
-        131, 132, 133,  141, 142, 143,  151, 152, 153,  161, 162, 163,
-    }};
-    // clang-format on
-
-    Symmetry sym = static_cast<Symmetry>(i);
-    std::array<float, 48> nhwc_output, nchw_output;
-    ApplySymmetry<4, 3>(sym, original.data(), nhwc_output.data());
-    using OutIter = NchwOutputIterator<4, 3, float>;
-    ApplySymmetry<4, 3>(sym, original.data(), OutIter(nchw_output.data()));
-
-    for (int c = 0; c < 3; ++c) {
-      for (int j = 0; j < 16; ++j) {
-        EXPECT_EQ(nchw_output[c * 16 + j], nhwc_output[j * 3 + c]);
-      }
-    }
-  }
-}
-
 }  // namespace
 }  // namespace symmetry
 }  // namespace minigo

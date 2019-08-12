@@ -47,10 +47,6 @@ void ModelBatcher::EndGame() {
   MaybeRunBatchesLocked();
 }
 
-DualNet::InputLayout ModelBatcher::GetInputLayout() const {
-  return model_impl_->GetInputLayout();
-}
-
 void ModelBatcher::RunMany(ModelBatcher* other_batcher,
                            std::vector<const DualNet::BoardFeatures*> features,
                            std::vector<DualNet::Output*> outputs,
@@ -196,10 +192,6 @@ void BatchingDualNet::RunMany(std::vector<const BoardFeatures*> features,
                               std::string* model) {
   batcher_->RunMany(other_batcher_.get(), std::move(features),
                     std::move(outputs), model);
-}
-
-DualNet::InputLayout BatchingDualNet::GetInputLayout() const {
-  return batcher_->GetInputLayout();
 }
 
 void BatchingDualNet::StartGame() { batcher_->StartGame(); }

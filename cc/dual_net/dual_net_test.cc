@@ -169,13 +169,8 @@ TEST(DualNetTest, TestBackendsEqual) {
   }
 #endif
 
-  DualNet::BoardFeatures nhwc_features;
-  Random().Uniform(0.0f, 1.0f, absl::MakeSpan(nhwc_features));
-  DualNet::BoardFeatures nchw_features;
-  using OutIter =
-      symmetry::NchwOutputIterator<kN, DualNet::kNumStoneFeatures, float>;
-  std::copy(nhwc_features.begin(), nhwc_features.end(),
-            OutIter(nchw_features.data()));
+  DualNet::BoardFeatures features;
+  Random().Uniform(0.0f, 1.0f, absl::MakeSpan(features));
 
   DualNet::Output ref_output;
   std::string ref_name;
@@ -195,11 +190,8 @@ TEST(DualNetTest, TestBackendsEqual) {
     auto dual_net =
         test.factory->NewDualNet(absl::StrCat("cc/dual_net/", test.basename));
 
-    auto* features = dual_net->GetInputLayout() == DualNet::InputLayout::kNHWC
-                         ? &nhwc_features
-                         : &nchw_features;
     DualNet::Output output;
-    dual_net->RunMany({features}, {&output}, nullptr);
+    dual_net->RunMany({&features}, {&output}, nullptr);
 
     if (ref_name.empty()) {
       ref_output = output;

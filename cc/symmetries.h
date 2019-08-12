@@ -205,34 +205,6 @@ inline void ApplySymmetry(Symmetry sym, SrcIt src, DstIt dst) {
   }
 }
 
-template <int N, int num_channels, typename T>
-class NchwOutputIterator {
- public:
-  using difference_type = std::ptrdiff_t;
-  using value_type = T;
-  using reference = T&;
-  using pointer = T*;
-  using iterator_category = std::output_iterator_tag;
-
-  NchwOutputIterator(T* features) : ptr_(features), offset_(0) {}
-
-  NchwOutputIterator& operator++() {
-    offset_ += N * N;
-    if (offset_ >= N * N * num_channels) {
-      offset_ -= N * N * num_channels - 1;
-    }
-    return *this;
-  }
-
-  reference operator*() const { return ptr_[offset_]; }
-
-  bool operator!=(const T* ptr) { return ptr != ptr_ + offset_; }
-
- private:
-  T* ptr_;
-  size_t offset_;
-};
-
 }  // namespace symmetry
 }  // namespace minigo
 

@@ -67,7 +67,6 @@ class ModelBatcher {
 
   void StartGame() LOCKS_EXCLUDED(&mutex_);
   void EndGame() LOCKS_EXCLUDED(&mutex_);
-  DualNet::InputLayout GetInputLayout() const;
   void RunMany(ModelBatcher* other_batcher,
                std::vector<const DualNet::BoardFeatures*> features,
                std::vector<DualNet::Output*> outputs, std::string* model_name);
@@ -111,7 +110,6 @@ class BatchingDualNet : public DualNet {
 
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, std::string* model) override;
-  InputLayout GetInputLayout() const override;
   void StartGame();
   void EndGame();
   void SetOther(BatchingDualNet* other);

@@ -21,6 +21,7 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:position",
+        "//cc/model",
         "@com_google_absl//absl/types:span",
     ],
 )
