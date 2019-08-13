@@ -45,9 +45,6 @@ using tensorflow::TensorShape;
 namespace minigo {
 
 namespace {
-// Use double buffering: one running the current set of batches, the other
-// filling up the next set of batches.
-constexpr int kBufferCount = 2;
 
 // A GraphDef containing the ops required to initialize and shutdown a TPU.
 // This proto was generated from the script oneoffs/generate_tpu_graph_def.py.
@@ -148,7 +145,7 @@ void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
 
 void TpuDualNet::Worker::Reserve(size_t capacity) {
   MG_CHECK(capacity > 0);
-  if (capacity <= batch_capacity_) {
+  if (capacity <= batch_capacity_ && capacity > 3 * batch_capacity_ / 4) {
     return;
   }
 
@@ -162,9 +159,10 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
   batch_capacity_ = capacity;
 }
 
-TpuDualNet::TpuDualNet(const std::string& tpu_name,
+TpuDualNet::TpuDualNet(int buffer_count, const std::string& tpu_name,
                        const std::string& graph_path)
-    : DualNet(std::string(file::Stem(graph_path))), graph_path_(graph_path) {
+    : DualNet(std::string(file::Stem(graph_path))), graph_path_(graph_path),
+	buffer_count_(buffer_count) {
   // Make sure tpu_name looks like a valid name.
   MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
 
@@ -198,7 +196,7 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
                << graph_path;
   MG_CHECK(num_replicas > 0);
 
-  for (int i = 0; i < kBufferCount; ++i) {
+  for (int i = 0; i < buffer_count_; ++i) {
     workers_.Push(absl::make_unique<TpuDualNet::Worker>(graph_def, tpu_name,
                                                         num_replicas));
   }
@@ -209,7 +207,7 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
   // so explicitly run inference once during construction.
   MG_LOG(INFO) << "Running warm-up inferences";
   std::vector<std::thread> threads;
-  for (int i = 0; i < kBufferCount; ++i) {
+  for (int i = 0; i < buffer_count_; ++i) {
     threads.emplace_back([this]() {
       BoardFeatures features;
       Output output;
@@ -234,8 +232,8 @@ void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
   }
 }
 
-TpuDualNetFactory::TpuDualNetFactory(std::string tpu_name)
-    : tpu_name_(std::move(tpu_name)) {
+TpuDualNetFactory::TpuDualNetFactory(int buffer_count, std::string tpu_name)
+    : tpu_name_(std::move(tpu_name)), buffer_count_(buffer_count) {
   // Create a session containing ops for initializing & shutting down a TPU.
   GraphDef graph_def;
   ::tensorflow::protobuf::TextFormat::ParseFromString(kTpuOpsGraphDef,
@@ -254,11 +252,11 @@ TpuDualNetFactory::~TpuDualNetFactory() {
   TF_CHECK_OK(main_session_->Close());
 }
 
-int TpuDualNetFactory::GetBufferCount() const { return kBufferCount; }
+int TpuDualNetFactory::GetBufferCount() const { return buffer_count_; }
 
 std::unique_ptr<DualNet> TpuDualNetFactory::NewDualNet(
     const std::string& model) {
-  return absl::make_unique<TpuDualNet>(tpu_name_, model);
+  return absl::make_unique<TpuDualNet>(buffer_count_, tpu_name_, model);
 }
 
 }  // namespace minigo
