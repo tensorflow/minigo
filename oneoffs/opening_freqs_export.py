@@ -21,8 +21,10 @@ SGF viewer showing the most popular joseki for a given hour.  Currently orphaned
 
 import os
 import sqlite3
+import functools
 import json
 import datetime as dt
+import collections
 from hashlib import sha256
 from jinja2 import Template
 
@@ -37,6 +39,7 @@ flags.DEFINE_string("in_dir", None, "sgfs here are parsed.")
 flags.DEFINE_string("db_path", 'joseki.db', "Path to josekidb")
 flags.DEFINE_string("template", 'joseki.html', "Path to template to render")
 flags.DEFINE_string("out_file", 'openings.html', "Where to write the report")
+flags.DEFINE_integer("top_n", 100, "Number of top openings to use per run")
 
 
 def sha(sequence):
@@ -167,7 +170,7 @@ def create_hourly_reports(hour_directory):
     cur = db.execute('''
                      select seq, sum(count) from joseki_counts where hour = ? group by seq order by 2 desc limit 300;
                      ''', (hr,))
-    sequences = [row for row in cur.fetchall()]
+    sequences = list(cur.fetchall())
 
     dias = [make_wgo_diagram(seq, c) for (seq, c) in sequences]
     with open(os.path.join(FLAGS.in_dir, '{}-out.html'.format(hr)), 'w') as out:
@@ -190,44 +193,103 @@ HTML_SHELL = """
 """
 
 
-def create_top_report():
+def get_runs(db):
+    return [r[0] for r in db.execute('''
+               select distinct(run) from joseki_counts;'''
+                                     ).fetchall()]
+
+def top_seqs_by_run(db, topN=300):
+    runs = get_runs(db)
+    top_seqs_by_run = {}
+    for r in runs:
+        cur = db.execute('''
+                         select seq, sum(count) from joseki_counts
+                         where run = ?
+                         group by seq order by 2 desc limit ?;
+                         ''', (r, topN))
+        sequences = list(cur.fetchall())
+        sequences = collapse_common_prefix(sequences)
+        print("Pruned to ", len(sequences))
+        sequences.sort(key=lambda s: s[1], reverse=True)
+        top_seqs_by_run[r] = sequences
+    return top_seqs_by_run
+
+
+def run_time_ranges(db):
+    ts = lambda hr: int(dt.datetime.strptime(hr, "%Y-%m-%d-%H").timestamp())
+    runs = {r[0]: (ts(r[1]), ts(r[2])) for r in db.execute('''
+        select run, min(hour), max(hour) from joseki_counts group by 1;
+        ''').fetchall()}
+    return runs
+
+
+def build_run_time_transformers(ranges, buckets=250):
+    """ Build a dict of functions to transform from a timestamp into a relative
+    offset.  E.g.
+    input: {'v17': (1234567890, 1235567879) ... }
+    output: {'v17': lambda t: (t - min) * (1/max) ... }
+    """
+
+    funcs = {}
+    def f(t, min_, max_):
+        #return "%0.2f" % ((t-min_) * (1/(max_-min_)))
+        key = (t-min_) * (1/(max_-min_))
+        return "%0.3f" % (int(buckets*key) / (buckets / 100.0))
+
+    for run, range_ in ranges.items():
+        funcs[run] = functools.partial(f, min_=range_[0], max_=range_[1])
+
+    return funcs
+
+
+def create_top_report(top_n=100):
     """
     Creates an html page showing the most common sequences in the database, and
     charting their popularity over time.
     """
+    db = sqlite3.connect(FLAGS.db_path)
     ts = lambda hr: int(dt.datetime.strptime(hr, "%Y-%m-%d-%H").timestamp())
     print('querying')
-    db = sqlite3.connect(FLAGS.db_path)
-    cur = db.execute('''
-                     select seq, sum(count) from joseki_counts group by seq order by 2 desc limit 300;
-                     ''')
-    sequences = [row for row in cur.fetchall()]
+    ranges = run_time_ranges(db)
+    interps = build_run_time_transformers(ranges)
+    seqs_by_run = top_seqs_by_run(db, top_n)
+    runs = sorted(seqs_by_run.keys())
 
-    sequences = collapse_common_prefix(sequences)
-    sequences.sort(key=lambda s: s[1], reverse=True)
-    print("Pruned to ", len(sequences))
+    cols = []
+    cols.append({'id': 'time', 'label': '% of Training', 'type': 'number'})
+    for run in runs:
+        cols.append({'id': run + 'count', 'label': run + ' times seen', 'type': 'number'})
 
-    data = []
-    for seq, count in sequences[:30]:
-        print(seq, count)
-        cur = db.execute('''
-                         SELECT hour, count from joseki_counts where seq = ?;
-                         ''', (seq,))
+    for run in runs:
+        data = []
+        sequences = seqs_by_run[run]
+        for seq, count in sequences:
+            print(run, seq, count)
+            rows = collections.defaultdict(lambda: [0 for i in range(len(runs))])
 
-        dat = cur.fetchall()
-        dat = [(ts(d[0]), d[1]) for d in dat]
-        obj = {"count": count, "chart": dat, "sequence": seq}
-        data.append(obj)
+            for idx, r in enumerate(runs):
+                cur = db.execute('''
+                                 SELECT hour, count from joseki_counts where seq = ? and run = ?;
+                                 ''', (seq, r))
 
-    print('saving')
-    tmpl = Template(open('oneoffs/joseki.html').read())
-    with open(FLAGS.out_file, 'w') as out:
-        out.write(tmpl.render(giant_blob=json.dumps(data)))
+                for hr, ct in cur.fetchall():
+                    key = interps[r](ts(hr))
+                    rows[key][idx] = ct
+
+            row_data = [ {'c': [ {'v': key} ] + [{'v': v if v else None} for v in value ] }
+                        for key,value in rows.items()]
+            obj = {'run': run, "count": count, 'cols': cols, "rows": row_data, "sequence": seq}
+            data.append(obj)
+
+        print('saving')
+        tmpl = Template(open('oneoffs/joseki.html').read())
+        with open(run + FLAGS.out_file, 'w') as out:
+            out.write(tmpl.render(giant_blob=json.dumps(data), run=run, time_ranges=json.dumps(ranges)))
 
 
 def main(_):
     """ Entrypoint for absl.app """
-    create_top_report()
+    create_top_report(FLAGS.top_n)
 
 if __name__ == '__main__':
     app.run(main)

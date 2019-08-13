@@ -20,18 +20,11 @@
         <v-container grid-list-small text-xs-left>
           <v-layout row>
             <v-flex s12>
-              <h1> Minigo Opening Analysis </h1>
-{% raw %}
-              <v-btn-toggle v-model=run mandatory>
-                <v-btn v-for="(value, run) in run_times" :value=run v-on:click="this.run=run;drawChart();">
-                  {{ run }}
-                </v-btn>
-              </v-btn-toggle>
-{% endraw %}
+              <h1> Minigo Opening Analysis for {{run}} </h1>
             </v-flex>
           </v-layout>
 
-          <v-layout v-for="opening in top10" row :key="opening.sequence">
+          <v-layout v-for="opening in topSeq" row :key="opening.sequence + opening.run">
             <v-flex xs4 lg3>
               <v-card>
                   <v-card-text>
@@ -56,11 +49,9 @@
       var app = new Vue({
           el: 'main',
           data: {
-              top10: {{giant_blob}},
+              topSeq: {{giant_blob}},
               run: 'v17',
-              run_times: { v17: [1549908000.0, 1551196800.0],
-                           v16: [1547794800.0, 1549850400.0],
-              }
+              run_times: {{time_ranges}},
           },
           mounted() {
               google.charts.load('current', {'packages':['corechart']});
@@ -68,10 +59,9 @@
           },
           methods: {
               drawChart() {
-                  console.log("Drawing.  run:", this.run);
                   this.$refs.playerNodes.forEach((node, index) => {
                     var player = new WGo.BasicPlayer(node, {
-                        sgf: "(;SZ[19];" + this.top10[index].sequence + ")",
+                        sgf: "(;SZ[19];" + this.topSeq[index].sequence + ")",
                         layout: "minimal",
                         board: {section: {bottom: 9, left: 9, top:0, right: 0}},
                         move: 999,
@@ -79,17 +69,17 @@
 
                   });
                   this.$refs.chartNodes.forEach((node, index) => {
-                      var data = new google.visualization.DataTable();
-                      data.addColumn('number', 'Timestamp'); // Implicit domain label col.
-                      data.addColumn('number', 'Frequency'); // Implicit series 1 data col.
-                      data.addRows(this.top10[index].chart);
+                      var data = new google.visualization.DataTable({
+                          cols: this.topSeq[index].cols,
+                          rows: this.topSeq[index].rows},
+                      0.6);
 
                       var options = {
-                          title: `Seen total ${this.top10[index].count} times`,
-                          hAxis: {title: 'Timestamp of training',
-                                  viewWindow: {min: this.run_times[this.run][0], max: this.run_times[this.run][1] }},
+                          title: `Seen total ${this.topSeq[index].count} times`,
+                          hAxis: {title: '% of training',
+                                  viewWindow: {min: 0, max: 100}},
                           vAxis: {title: 'Frequency', logScale: true},
-                          legend: { position : 'none'},
+                          legend: { position : 'bottom'},
                           theme: 'material',
                           pointSize: 3,
                       }
