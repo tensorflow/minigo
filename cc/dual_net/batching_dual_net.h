@@ -24,9 +24,16 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
+#include "absl/time/time.h"
 #include "cc/dual_net/dual_net.h"
 
 namespace minigo {
+
+struct BatchingDualNetStats {
+  size_t num_inferences = 0;
+  absl::Duration run_batch_time;
+  absl::Duration run_many_time;
+};
 
 namespace internal {
 
@@ -58,6 +65,7 @@ class ModelBatcher {
   void RunMany(ModelBatcher* other_batcher,
                std::vector<const DualNet::BoardFeatures*> features,
                std::vector<DualNet::Output*> outputs, std::string* model_name);
+  BatchingDualNetStats FlushStats() LOCKS_EXCLUDED(&mutex_);
 
  private:
   size_t GetBatchSize() const EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
@@ -67,8 +75,9 @@ class ModelBatcher {
 
   absl::Mutex mutex_;
   std::unique_ptr<DualNet> model_impl_;
-  const size_t buffering_;
+  const size_t buffer_count_;
   std::queue<InferenceRequest> queue_ GUARDED_BY(&mutex_);
+  BatchingDualNetStats stats_ GUARDED_BY(&mutex_);
 
   // Number of clients of this batcher that are playing in a two player game
   // and are currently waiting for the other player to play a move. These
@@ -126,6 +135,8 @@ class BatchingDualNetFactory : public DualNetFactory {
 
   static void StartGame(DualNet* black, DualNet* white);
   static void EndGame(DualNet* black, DualNet* white);
+
+  std::vector<std::pair<std::string, BatchingDualNetStats>> FlushStats();
 
  private:
   absl::Mutex mutex_;

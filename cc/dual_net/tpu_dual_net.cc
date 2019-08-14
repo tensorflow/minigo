@@ -161,8 +161,9 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
 
 TpuDualNet::TpuDualNet(int buffer_count, const std::string& tpu_name,
                        const std::string& graph_path)
-    : DualNet(std::string(file::Stem(graph_path))), graph_path_(graph_path),
-	buffer_count_(buffer_count) {
+    : DualNet(std::string(file::Stem(graph_path))),
+      graph_path_(graph_path),
+      buffer_count_(buffer_count) {
   // Make sure tpu_name looks like a valid name.
   MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
 

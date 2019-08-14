@@ -14,15 +14,22 @@ Prow (Test-runner dashboard): https://prow.k8s.io/?repo=tensorflow%2Fminigo
 
 ## Updating continuous integration tests
 
-Build and push the test-harness image:
+You will need to update the `cc-base` Docker image if you modify the certain
+files in the repo (e.g. `WORKSPACE`, `.bazelrc`, `cc/tensorflow/*`) because they
+will break the Docker cache before the slow `./cc/configure_tensorflow.sh` step.
 
 ```shell
-cd testing/
-PROJECT=tensor-go VERSION_TAG=latest make pushv2
+(cd cluster/base && PROJECT=tensor-go VERSION_TAG=latest make base-push)
 ```
 
+See the list of `COPY` files in `cluster/base/Dockerfile` for the complete list.
+
 The test image may need to be rebuilt occasionally if installed libraries or
-tools need updating (e.g. `clang-format`, `tensorflow`).
+tools need updating (e.g. `clang-format`, `tensorflow`):
+
+```shell
+(cd testing/ && PROJECT=tensor-go VERSION_TAG=latest make pushv2)
+```
 
 ## Test a pull request locally
 

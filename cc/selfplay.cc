@@ -100,9 +100,9 @@ DEFINE_double(fastplay_frequency, 0.0,
               "'fastplay_readouts' should also be set.");
 
 DEFINE_int32(fastplay_readouts, 20,
-              "The number of readouts to perform on a 'low readout' move, "
-              "aka 'playout cap oscillation'.\nIf this is set, "
-              "'fastplay_frequency' should be nonzero.");
+             "The number of readouts to perform on a 'low readout' move, "
+             "aka 'playout cap oscillation'.\nIf this is set, "
+             "'fastplay_frequency' should be nonzero.");
 
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
@@ -217,7 +217,7 @@ class SelfPlayer {
       : engine_(std::move(desc.engine)), model_(std::move(desc.model)) {}
 
   void Run() {
-    auto start_time = absl::Now();
+    auto player_start_time = absl::Now();
 
     // Figure out how many games we should play.
     MG_CHECK(FLAGS_parallel_games >= 1);
@@ -265,7 +265,8 @@ class SelfPlayer {
     }
 
     MG_LOG(INFO) << "Played " << num_games << " games, total time "
-                 << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
+                 << absl::ToDoubleSeconds(absl::Now() - player_start_time)
+                 << " sec.";
 
     {
       absl::MutexLock lock(&mutex_);
@@ -356,23 +357,25 @@ class SelfPlayer {
       }
 
       // Play the game.
-      auto start_time = absl::Now();
+      auto game_start_time = absl::Now();
       {
         absl::MutexLock lock(&mutex_);
         BatchingDualNetFactory::StartGame(player->network(), player->network());
       }
       int current_readouts = 0;
-      absl::Time start;
+      absl::Time search_start_time;
       while (!game->game_over() && !player->root()->at_move_limit()) {
         // Record some information using for printing tree search stats.
         if (thread_options.verbose) {
           current_readouts = player->root()->N();
-          start = absl::Now();
+          search_start_time = absl::Now();
         }
 
-        bool fastplay = (rnd_() < thread_options.player_options.fastplay_frequency);
-        int readouts = (fastplay ? thread_options.player_options.fastplay_readouts :
-                                    thread_options.player_options.num_readouts);
+        bool fastplay =
+            (rnd_() < thread_options.player_options.fastplay_frequency);
+        int readouts =
+            (fastplay ? thread_options.player_options.fastplay_readouts
+                      : thread_options.player_options.num_readouts);
 
         // Choose the move to play, optionally adding noise.
         auto move = player->SuggestMove(readouts, !fastplay);
@@ -383,12 +386,29 @@ class SelfPlayer {
           const auto& position = root->position;
 
           int num_readouts = root->N() - current_readouts;
-          auto elapsed = absl::Now() - start;
+          auto elapsed = absl::Now() - search_start_time;
           elapsed = elapsed * 100 / num_readouts;
-          MG_LOG(INFO) << "Milliseconds per 100 reads: "
-                       << absl::ToInt64Milliseconds(elapsed) << "ms"
-                       << " over " << num_readouts << " readouts (vlosses: "
-                       << player->options().virtual_losses << ")";
+
+          auto all_stats = batcher_->FlushStats();
+          MG_CHECK(all_stats.size() == 1);
+          const auto& stats = all_stats[0].second;
+          MG_LOG(INFO) << absl::Now()
+                       << "  num_inferences: " << stats.num_inferences
+                       << "  run_batch_total: "
+                       << absl::ToInt64Milliseconds(stats.run_batch_time)
+                       << "ms  run_many_total: "
+                       << absl::ToInt64Milliseconds(stats.run_many_time)
+                       << "ms  run_batch_per_inf: "
+                       << absl::ToInt64Microseconds(stats.run_batch_time /
+                                                    stats.num_inferences)
+                       << "us  run_many_per_inf: "
+                       << absl::ToInt64Microseconds(stats.run_many_time /
+                                                    stats.num_inferences)
+                       << "us";
+          // MG_LOG(INFO) << "Milliseconds per 100 reads: "
+          //              << absl::ToInt64Milliseconds(elapsed) << "ms"
+          //              << " over " << num_readouts << " readouts (vlosses: "
+          //              << player->options().virtual_losses << ")";
           MG_LOG(INFO) << root->CalculateTreeStats().ToString();
 
           if (!fastplay) {
@@ -428,7 +448,7 @@ class SelfPlayer {
         // Log the end game info with the shared mutex held to prevent the
         // outputs from multiple threads being interleaved.
         absl::MutexLock lock(&mutex_);
-        LogEndGameInfo(*game, absl::Now() - start_time);
+        LogEndGameInfo(*game, absl::Now() - game_start_time);
         win_stats_.Update(*game);
       }
 

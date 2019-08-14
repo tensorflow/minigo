@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "absl/memory/memory.h"
+#include "absl/time/clock.h"
 #include "cc/logging.h"
 
 namespace minigo {
@@ -24,8 +25,8 @@ namespace minigo {
 namespace internal {
 
 ModelBatcher::ModelBatcher(std::unique_ptr<DualNet> model_impl,
-                           size_t buffering)
-    : model_impl_(std::move(model_impl)), buffering_(buffering) {}
+                           size_t buffer_count)
+    : model_impl_(std::move(model_impl)), buffer_count_(buffer_count) {}
 
 ModelBatcher::~ModelBatcher() {
   MG_LOG(INFO) << "Ran " << num_batches_ << " batches with an average size of "
@@ -73,8 +74,16 @@ void ModelBatcher::RunMany(ModelBatcher* other_batcher,
   notification.WaitForNotification();
 }
 
+BatchingDualNetStats ModelBatcher::FlushStats() {
+  mutex_.Lock();
+  auto result = stats_;
+  stats_ = {};
+  mutex_.Unlock();
+  return result;
+}
+
 size_t ModelBatcher::GetBatchSize() const {
-  return std::max<size_t>(1, num_active_clients_ / buffering_);
+  return std::max<size_t>(1, num_active_clients_ / buffer_count_);
 }
 
 void ModelBatcher::MaybeRunBatchesLocked() {
@@ -109,6 +118,8 @@ void ModelBatcher::MaybeRunBatchesLocked() {
 }
 
 void ModelBatcher::RunBatch() {
+  auto run_batch_start_time = absl::Now();
+
   auto batch_size = GetBatchSize();
 
   std::vector<const DualNet::BoardFeatures*> features;
@@ -133,13 +144,17 @@ void ModelBatcher::RunBatch() {
 
   num_batches_ += 1;
   num_inferences_ += features.size();
+  auto num_inferences_in_batch = features.size();
 
   // Unlock the mutex while running inference. This allows more inferences
   // to be enqueued while inference is running.
   mutex_.Unlock();
 
   std::string model_name;
+  auto run_many_start_time = absl::Now();
+
   model_impl_->RunMany(std::move(features), std::move(outputs), &model_name);
+  auto run_many_time = absl::Now() - run_many_start_time;
 
   for (auto& inference : inferences) {
     if (inference.model_name != nullptr) {
@@ -159,6 +174,10 @@ void ModelBatcher::RunBatch() {
 
   // Lock the mutex again.
   mutex_.Lock();
+
+  stats_.run_batch_time += (absl::Now() - run_batch_start_time) / buffer_count_;
+  stats_.run_many_time += (run_many_time) / buffer_count_;
+  stats_.num_inferences += num_inferences_in_batch;
 }
 
 }  // namespace internal
@@ -264,6 +283,16 @@ void BatchingDualNetFactory::EndGame(DualNet* black, DualNet* white) {
   if (b != w) {
     w->EndGame();
   }
+}
+
+std::vector<std::pair<std::string, BatchingDualNetStats>>
+BatchingDualNetFactory::FlushStats() {
+  absl::MutexLock lock(&mutex_);
+  std::vector<std::pair<std::string, BatchingDualNetStats>> result;
+  for (const auto& kv : batchers_) {
+    result.emplace_back(kv.first, kv.second->FlushStats());
+  }
+  return result;
 }
 
 }  // namespace minigo
