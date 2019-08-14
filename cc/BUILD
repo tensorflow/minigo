@@ -129,6 +129,7 @@ minigo_cc_library(
     deps = [
         ":base",
         ":gtp_client",
+        ":json",
         ":logging",
         ":mcts",
         ":sgf",
@@ -137,12 +138,19 @@ minigo_cc_library(
         "//cc/dual_net",
         "//cc/dual_net:batching_dual_net",
         "//cc/file",
-        "@com_github_nlohmann_json//:json",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "json",
+    hdrs = [
+        "json.h",
+        "@com_github_nlohmann_json_single_header//file",
     ],
 )
 

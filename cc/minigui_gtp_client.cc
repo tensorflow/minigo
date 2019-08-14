@@ -27,9 +27,9 @@
 #include "absl/time/clock.h"
 #include "cc/constants.h"
 #include "cc/file/utils.h"
+#include "cc/json.h"
 #include "cc/logging.h"
 #include "cc/sgf.h"
-#include "nlohmann/json.hpp"
 
 namespace minigo {
 

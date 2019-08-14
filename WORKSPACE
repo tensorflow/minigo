@@ -12,19 +12,19 @@ http_archive(
     ],
 )
 
+# This should also be kept up to date with the version used by Tensorflow.
+http_file(
+    name = "com_github_nlohmann_json_single_header",
+    urls = [
+        "https://github.com/nlohmann/json/releases/download/v3.4.0/json.hpp",
+    ],
+)
+
 http_archive(
     name = "org_tensorflow",
     sha256 = "902a6d90bb69549fe241377210aa459773459820da1333b67dcfdef37836f25f",
     strip_prefix = "tensorflow-1.13.1",
     urls = ["https://github.com/tensorflow/tensorflow/archive/v1.13.1.zip"],
-)
-
-http_archive(
-    name = "com_github_nlohmann_json",
-    build_file = "//cc:json.BUILD",
-    sha256 = "2ef2fe6f1a615ad97beb39f91ef5e319d776f6ba0af91570003276e6ffb1c47c",
-    strip_prefix = "json-3.2.0",
-    urls = ["https://github.com/nlohmann/json/archive/v3.2.0.zip"],
 )
 
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_workspace")
