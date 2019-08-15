@@ -31,6 +31,7 @@
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/protobuf.h"
+#include "wtf/macros.h"
 
 using tensorflow::DT_FLOAT;
 using tensorflow::Env;
@@ -128,7 +129,10 @@ void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
   }
 
   // Run the model.
-  TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
+  {
+    WTF_SCOPE0("TpuWorker::Run");
+    TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
+  }
 
   // Copy the policy and value out of the output tensors.
   for (size_t i = 0; i < num_features; ++i) {

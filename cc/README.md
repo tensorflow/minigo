@@ -174,6 +174,20 @@ bazel build cc:selfplay \
   --copt=-O1
 ```
 
+## Profiling
+
+Minigo uses the C++ bindings for
+[https://google.github.io/tracing-framework/](Web Tracing Framework) to profile
+the code. To enable, compile with
+`bazel build --copt=-DWTF_ENABLE cc:selfplay` followed by the rest of your build
+arguments. Without `WTF_ENABLE` defined, all the profiling code should be
+optimized away by the compiler.
+
+By default, the `cc:selfplay` binary writes to the trace to
+`/tmp/minigo.wtf-trace` but this path can be overridden using the `--wtf_trace`
+flag.
+
+
 ## Inference engines
 
 C++ Minigo currently supports multiple separate engines for performing

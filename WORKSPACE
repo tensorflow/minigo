@@ -27,6 +27,14 @@ http_archive(
     urls = ["https://github.com/tensorflow/tensorflow/archive/v1.13.1.zip"],
 )
 
+http_archive(
+    name = "wtf",
+    build_file = "//cc:wtf.BUILD",
+    sha256 = "e9434641b5923df85d1fe0082030ce2ac8aad9d95676682aa072ad88421a2bc1",
+    strip_prefix = "tracing-framework-495ced98de99a5895e484b2e09771edb42d3c7ab",
+    urls = ["https://github.com/google/tracing-framework/archive/495ced98de99a5895e484b2e09771edb42d3c7ab.zip"],
+)
+
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_workspace")
 
 tf_workspace()

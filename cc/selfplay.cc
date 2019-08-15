@@ -47,6 +47,7 @@
 #include "cc/tf_utils.h"
 #include "cc/zobrist.h"
 #include "gflags/gflags.h"
+#include "wtf/macros.h"
 
 // Game options flags.
 DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
@@ -144,6 +145,8 @@ DEFINE_string(sgf_dir, "",
               "SGF directory for selfplay and puzzles. If empty in selfplay "
               "mode, no SGF is written.");
 DEFINE_string(bigtable_tag, "", "Used in Bigtable metadata");
+DEFINE_string(wtf_trace, "/tmp/minigo.wtf-trace",
+              "Output path for WTF traces.");
 
 namespace minigo {
 namespace {
@@ -306,6 +309,7 @@ class SelfPlayer {
   };
 
   void ThreadRun(int thread_id) {
+    WTF_THREAD_ENABLE("SelfPlay");
     // Only print the board using ANSI colors if stderr is sent to the
     // terminal.
     const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
@@ -378,10 +382,15 @@ class SelfPlayer {
                       : thread_options.player_options.num_readouts);
 
         // Choose the move to play, optionally adding noise.
-        auto move = player->SuggestMove(readouts, !fastplay);
+        Coord move = Coord::kInvalid;
+        {
+          WTF_SCOPE0("SuggestMove");
+          move = player->SuggestMove(readouts, !fastplay);
+        }
 
         // Log tree search stats.
         if (thread_options.verbose) {
+          WTF_SCOPE0("Logging");
           const auto* root = player->root();
           const auto& position = root->position;
 
@@ -392,23 +401,20 @@ class SelfPlayer {
           auto all_stats = batcher_->FlushStats();
           MG_CHECK(all_stats.size() == 1);
           const auto& stats = all_stats[0].second;
-          MG_LOG(INFO) << absl::Now()
-                       << "  num_inferences: " << stats.num_inferences
-                       << "  run_batch_total: "
-                       << absl::ToInt64Milliseconds(stats.run_batch_time)
-                       << "ms  run_many_total: "
-                       << absl::ToInt64Milliseconds(stats.run_many_time)
-                       << "ms  run_batch_per_inf: "
-                       << absl::ToInt64Microseconds(stats.run_batch_time /
-                                                    stats.num_inferences)
-                       << "us  run_many_per_inf: "
-                       << absl::ToInt64Microseconds(stats.run_many_time /
-                                                    stats.num_inferences)
-                       << "us";
-          // MG_LOG(INFO) << "Milliseconds per 100 reads: "
-          //              << absl::ToInt64Milliseconds(elapsed) << "ms"
-          //              << " over " << num_readouts << " readouts (vlosses: "
-          //              << player->options().virtual_losses << ")";
+          MG_LOG(INFO)
+              << absl::FormatTime("%Y-%m-%d %H:%M:%E3S", absl::Now(),
+                                  absl::LocalTimeZone())
+              << absl::StreamFormat(
+                     "  num_inferences: %d  buffer_count: %d  run_batch_total: "
+                     "%.3fms  run_many_total : %.3fms  run_batch_per_inf: "
+                     "%.3fms  run_many_per_inf: %.3fms",
+                     stats.num_inferences, stats.buffer_count,
+                     absl::ToDoubleMilliseconds(stats.run_batch_time),
+                     absl::ToDoubleMilliseconds(stats.run_many_time),
+                     absl::ToDoubleMilliseconds(stats.run_batch_time /
+                                                stats.num_inferences),
+                     absl::ToDoubleMilliseconds(stats.run_many_time /
+                                                stats.num_inferences));
           MG_LOG(INFO) << root->CalculateTreeStats().ToString();
 
           if (!fastplay) {
@@ -421,7 +427,10 @@ class SelfPlayer {
         }
 
         // Play the chosen move.
-        MG_CHECK(player->PlayMove(move));
+        {
+          WTF_SCOPE0("PlayMove");
+          MG_CHECK(player->PlayMove(move));
+        }
 
         if (!fastplay) {
           (*game).MarkLastMoveAsTrainable();
@@ -558,7 +567,17 @@ class SelfPlayer {
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
   minigo::zobrist::Init(FLAGS_seed * 614944751);
-  minigo::SelfPlayer player(minigo::ParseModelDescriptor(FLAGS_model));
-  player.Run();
+
+  WTF_THREAD_ENABLE("Main");
+  {
+    WTF_SCOPE0("Selfplay");
+    minigo::SelfPlayer player(minigo::ParseModelDescriptor(FLAGS_model));
+    player.Run();
+  }
+
+#ifdef WTF_ENABLE
+  MG_CHECK(wtf::Runtime::GetInstance()->SaveToFile(FLAGS_wtf_trace));
+#endif
+
   return 0;
 }

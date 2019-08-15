@@ -148,6 +148,7 @@ minigo_cc_library(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
+        "@wtf",
     ],
 )
 
@@ -182,6 +183,7 @@ minigo_cc_library(
         "//cc/tensorflow",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@wtf",
     ],
 )
 
@@ -214,6 +216,7 @@ minigo_cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
+        "@wtf",
     ],
 )
 

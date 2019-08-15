@@ -33,6 +33,7 @@
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/public/session.h"
+#include "wtf/macros.h"
 
 #if MINIGO_ENABLE_GPU
 #include "tensorflow/core/common_runtime/gpu/gpu_init.h"
@@ -56,7 +57,7 @@ namespace {
 class TfDualNet : public DualNet {
   class TfWorker {
    public:
-    TfWorker(const GraphDef& graph_def) : batch_capacity_(0) {
+    explicit TfWorker(const GraphDef& graph_def) : batch_capacity_(0) {
       SessionOptions options;
       options.config.mutable_gpu_options()->set_allow_growth(true);
       session_.reset(NewSession(options));
@@ -85,7 +86,10 @@ class TfDualNet : public DualNet {
       }
 
       // Run the model.
-      TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
+      {
+        WTF_SCOPE0("TfWorker::Run");
+        TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
+      }
 
       // Copy the policy and value out of the output tensors.
       const auto& policy_tensor = outputs_[0].flat<float>();
@@ -168,6 +172,7 @@ TfDualNet::TfDualNet(std::string graph_path, int device_count)
   }
 
   auto functor = [this](const GraphDef& graph_def) {
+    WTF_THREAD_ENABLE("TfWorker");
     TfWorker worker(graph_def);
     while (running_) {
       InferenceData inference;

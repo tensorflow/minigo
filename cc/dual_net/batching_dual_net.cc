@@ -19,6 +19,7 @@
 #include "absl/memory/memory.h"
 #include "absl/time/clock.h"
 #include "cc/logging.h"
+#include "wtf/macros.h"
 
 namespace minigo {
 
@@ -26,7 +27,9 @@ namespace internal {
 
 ModelBatcher::ModelBatcher(std::unique_ptr<DualNet> model_impl,
                            size_t buffer_count)
-    : model_impl_(std::move(model_impl)), buffer_count_(buffer_count) {}
+    : model_impl_(std::move(model_impl)),
+      buffer_count_(buffer_count),
+      stats_(buffer_count) {}
 
 ModelBatcher::~ModelBatcher() {
   MG_LOG(INFO) << "Ran " << num_batches_ << " batches with an average size of "
@@ -52,6 +55,7 @@ void ModelBatcher::RunMany(ModelBatcher* other_batcher,
                            std::vector<const DualNet::BoardFeatures*> features,
                            std::vector<DualNet::Output*> outputs,
                            std::string* model_name) {
+  WTF_SCOPE0("ModelBatcher::RunMany");
   MG_CHECK(features.size() == outputs.size());
 
   absl::Notification notification;
@@ -77,7 +81,7 @@ void ModelBatcher::RunMany(ModelBatcher* other_batcher,
 BatchingDualNetStats ModelBatcher::FlushStats() {
   mutex_.Lock();
   auto result = stats_;
-  stats_ = {};
+  stats_ = BatchingDualNetStats(buffer_count_);
   mutex_.Unlock();
   return result;
 }
@@ -118,6 +122,7 @@ void ModelBatcher::MaybeRunBatchesLocked() {
 }
 
 void ModelBatcher::RunBatch() {
+  WTF_SCOPE0("ModelBatcher::RunBatch");
   auto run_batch_start_time = absl::Now();
 
   auto batch_size = GetBatchSize();

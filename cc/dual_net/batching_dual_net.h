@@ -30,7 +30,10 @@
 namespace minigo {
 
 struct BatchingDualNetStats {
+  explicit BatchingDualNetStats(size_t buffer_count)
+      : buffer_count(buffer_count) {}
   size_t num_inferences = 0;
+  size_t buffer_count = 0;
   absl::Duration run_batch_time;
   absl::Duration run_many_time;
 };
