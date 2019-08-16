@@ -27,6 +27,15 @@ constexpr int kN = MINIGO_BOARD_SIZE;
 // kN * kN possible points on the board, plus pass.
 constexpr int kNumMoves = kN * kN + 1;
 
+// Safe lower bound of the number of moves to reach whole-board pass-alive
+// state. We use this number to skip calculating whether the whole board is
+// pass-alive for the early part of the game:
+//   133 for 19x19, 27 for 9x9
+// The best positions we've found for these are:
+//   141 for 19x19, 40 for 9x9
+// but there may be more optimal sequences of moves.
+constexpr int kMinPassAliveMoves = kN * (kN + 2 / 3);
+
 // 722 moves for 19x19, 162 for 9x9.
 constexpr int kMaxSearchDepth = static_cast<int>(kN * kN * 2);
 

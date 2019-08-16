@@ -536,6 +536,27 @@ TEST_F(PassAliveTest, 9x9) {
           . O O O O . . . .
           . . . . . . . . .
           . . . . . . . . .)"},
+
+      {// board state
+       R"(. . . . X O . . .
+          X X X X X O O O O
+          . X . . X O . O .
+          . X . . X O . O .
+          . X . . X O . O .
+          . X . . X O . O .
+          . X . . X O . O .
+          . X . . X O . O .
+          . X . . X O . O .)",
+       // expected result
+       R"(X X X X X O O O O
+          X X X X X O O O O
+          X X X X X O O O O
+          X X X X X O O O O
+          X X X X X O O O O
+          X X X X X O O O O
+          X X X X X O O O O
+          X X X X X O O O O
+          X X X X X O O O O)"},
   };
 
   RunTests(tests);
@@ -834,6 +855,47 @@ TEST_F(PassAliveTest, 19x19) {
           X O X . X O X O X . X O X O X . X O X
           . X O X O X . X O X O X . X O X O X .
           X O . O . O X O . O . O X O . O . O X)"},
+
+      {// board state
+       R"(. . . . . . . . . . X O . . O . . O .
+          X X X X X X X X . . X O . . O . . O .
+          . X . . X . . X . . X O . . O . . O .
+          . X . . X . . X . . X O . . O . . O .
+          . X . . X . . X . . X O . . O . . O .
+          . X . . X . . X . . X O . . O . . O .
+          . X . . X . . X . . X O . . O . . O .
+          . X . . X . . X . . X O . . O . . O .
+          . X . . X . . X . . X O . . O . . O .
+          . X . . X . . X X X X O . . O . . O .
+          . X . . X . . X O O O O . . O . . O .
+          . X . . X . . X O . . O . . O . . O .
+          . X . . X . . X O . . O . . O . . O .
+          . X . . X . . X O . . O . . O . . O .
+          . X . . X . . X O . . O . . O . . O .
+          . X . . X . . X O . . O . . O . . O .
+          . X . . X . . X O . . O . . O . . O .
+          . X . . X . . X O . . O O O O O O O O
+          . X . . X . . X O . . . . . . . . . .)",
+       // expected result
+       R"(X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X X X X O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O
+          X X X X X X X X O O O O O O O O O O O)"},
   };
 
   RunTests(tests);

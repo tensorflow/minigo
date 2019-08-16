@@ -115,6 +115,7 @@ void Run() {
   int num_whole_board_pass_alive_games = 0;
   int game_length_sum = 0;
   int whole_board_pass_alive_sum = 0;
+  int min_whole_board_pass_alive = kN * kN * 2;
   for (size_t i = 0; i < basenames.size(); ++i) {
     auto info = game_info_queue.Pop();
     switch (info.game_over_reason) {
@@ -130,6 +131,9 @@ void Run() {
         num_whole_board_pass_alive_games += 1;
         game_length_sum += info.game_length;
         whole_board_pass_alive_sum += info.whole_board_pass_alive_move;
+        if (info.whole_board_pass_alive_move < min_whole_board_pass_alive) {
+          min_whole_board_pass_alive = info.whole_board_pass_alive_move;
+        }
         break;
     }
   }
@@ -149,6 +153,8 @@ void Run() {
   MG_LOG(INFO) << "mean length of whole-board pass-alive games: "
                << float(game_length_sum) /
                       float(num_whole_board_pass_alive_games);
+  MG_LOG(INFO) << "min whole-board pass-alive move number: "
+               << min_whole_board_pass_alive;
 }
 
 }  // namespace
