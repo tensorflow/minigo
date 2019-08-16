@@ -57,7 +57,10 @@ class ModelBatcher {
     absl::Notification* notification;
   };
 
-  ModelBatcher(std::unique_ptr<DualNet> model_impl, size_t buffering);
+  // model_impl: the model that will evaluate the batched inferences.
+  // buffer_count: the model's ideal number of in-flight inference requests, as
+  //               returned by the model factory's GetBufferCount() method.
+  ModelBatcher(std::unique_ptr<DualNet> model_impl, size_t buffer_count);
   ~ModelBatcher();
 
   const std::string& name() const { return model_impl_->name(); }
