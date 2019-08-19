@@ -34,7 +34,7 @@ constexpr int kNumMoves = kN * kN + 1;
 // The best positions we've found for these are:
 //   141 for 19x19, 40 for 9x9
 // but there may be more optimal sequences of moves.
-constexpr int kMinPassAliveMoves = kN * (kN + 2 / 3);
+constexpr int kMinPassAliveMoves = kN * ((kN + 2) / 3);
 
 // 722 moves for 19x19, 162 for 9x9.
 constexpr int kMaxSearchDepth = static_cast<int>(kN * kN * 2);
