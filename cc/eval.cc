@@ -229,9 +229,14 @@ class Evaluator {
     while (!game.game_over() && !curr_player->root()->at_move_limit()) {
       if (curr_player->root()->position.n() >= kMinPassAliveMoves &&
           curr_player->root()->position.CalculateWholeBoardPassAlive()) {
-        // Play two pass moves to end the game.
+        // Play pass moves to end the game.
         MG_CHECK(curr_player->PlayMove(Coord::kPass));
         MG_CHECK(next_player->PlayMove(Coord::kPass));
+        MG_CHECK(curr_player->PlayMove(Coord::kPass));
+        // We don't PlayMove(kPass) a fourth time because the game is over after
+        // the third call so we can't play any more moves.
+        // TODO(tommadams): seriously, we need to call PlayMove on the Game
+        // object not the Players.
         break;
       }
 
