@@ -15,6 +15,8 @@
 #ifndef CC_DUAL_NET_BATCHING_DUAL_NET_H_
 #define CC_DUAL_NET_BATCHING_DUAL_NET_H_
 
+// TODO(tommadams): rename file to batching_model.h
+
 #include <atomic>
 #include <memory>
 #include <queue>
@@ -25,12 +27,12 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 #include "absl/time/time.h"
-#include "cc/dual_net/dual_net.h"
+#include "cc/model/model.h"
 
 namespace minigo {
 
-struct BatchingDualNetStats {
-  explicit BatchingDualNetStats(size_t buffer_count)
+struct BatchingModelStats {
+  explicit BatchingModelStats(size_t buffer_count)
       : buffer_count(buffer_count) {}
   size_t num_inferences = 0;
   size_t buffer_count = 0;
@@ -41,7 +43,7 @@ struct BatchingDualNetStats {
 namespace internal {
 
 // The ModelBatcher is responsible for batching up inference requests from
-// from multiple BatchingDualNet clients into larger (and therefore more
+// from multiple BatchingModel clients into larger (and therefore more
 // efficient) inferences.
 // Each ModelBatcher instance is responsible for batching inference requests
 // for a single model.
@@ -51,16 +53,14 @@ class ModelBatcher {
   // individual inferences because of virtual losses.
   struct InferenceRequest {
     ModelBatcher* other_batcher;
-    std::vector<const DualNet::BoardFeatures*> features;
-    std::vector<DualNet::Output*> outputs;
+    const std::vector<const Model::Input*>* inputs;
+    std::vector<Model::Output*>* outputs;
     std::string* model_name;
     absl::Notification* notification;
   };
 
   // model_impl: the model that will evaluate the batched inferences.
-  // buffer_count: the model's ideal number of in-flight inference requests, as
-  //               returned by the model factory's GetBufferCount() method.
-  ModelBatcher(std::unique_ptr<DualNet> model_impl, size_t buffer_count);
+  explicit ModelBatcher(std::unique_ptr<Model> model_impl);
   ~ModelBatcher();
 
   const std::string& name() const { return model_impl_->name(); }
@@ -68,9 +68,9 @@ class ModelBatcher {
   void StartGame() LOCKS_EXCLUDED(&mutex_);
   void EndGame() LOCKS_EXCLUDED(&mutex_);
   void RunMany(ModelBatcher* other_batcher,
-               std::vector<const DualNet::BoardFeatures*> features,
-               std::vector<DualNet::Output*> outputs, std::string* model_name);
-  BatchingDualNetStats FlushStats() LOCKS_EXCLUDED(&mutex_);
+               const std::vector<const Model::Input*>& inputs,
+               std::vector<Model::Output*>* outputs, std::string* model_name);
+  BatchingModelStats FlushStats() LOCKS_EXCLUDED(&mutex_);
 
  private:
   size_t GetBatchSize() const EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
@@ -79,10 +79,9 @@ class ModelBatcher {
   void RunBatch() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
 
   absl::Mutex mutex_;
-  std::unique_ptr<DualNet> model_impl_;
-  const size_t buffer_count_;
+  std::unique_ptr<Model> model_impl_;
   std::queue<InferenceRequest> queue_ GUARDED_BY(&mutex_);
-  BatchingDualNetStats stats_ GUARDED_BY(&mutex_);
+  BatchingModelStats stats_ GUARDED_BY(&mutex_);
 
   // Number of clients of this batcher that are playing in a two player game
   // and are currently waiting for the other player to play a move. These
@@ -100,19 +99,20 @@ class ModelBatcher {
 
 }  // namespace internal
 
-// The BatchingDualNet is a thin client for a ModelBatcher, which does all
+// The BatchingModel is a thin client for a ModelBatcher, which does all
 // the real work. The only tricky thing here is that in two player games,
-// BatchingDualNet keeps track of who the other player is so that its
+// BatchingModel keeps track of who the other player is so that its
 // ModelBatcher knows whose turn it is.
-class BatchingDualNet : public DualNet {
+class BatchingModel : public Model {
  public:
-  explicit BatchingDualNet(std::shared_ptr<internal::ModelBatcher> batcher);
+  explicit BatchingModel(std::shared_ptr<internal::ModelBatcher> batcher);
 
-  void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, std::string* model) override;
+  void RunMany(const std::vector<const Input*>& inputs,
+               std::vector<Output*>* outputs, std::string* model_name) override;
+
   void StartGame();
   void EndGame();
-  void SetOther(BatchingDualNet* other);
+  void SetOther(BatchingModel* other);
 
  private:
   friend class internal::ModelBatcher;
@@ -121,30 +121,33 @@ class BatchingDualNet : public DualNet {
   std::shared_ptr<internal::ModelBatcher> batcher_;
 
   // In a two player game where StartGame was called with different
-  // BatchingDualNet instances, other_batcher_ points to the ModelBatcher
+  // BatchingModel instances, other_batcher_ points to the ModelBatcher
   // used by the other player in the game. It's possible that batcher_ ==
   // other_batcher_ if both players are using the same model.
   std::shared_ptr<internal::ModelBatcher> other_batcher_ = nullptr;
 };
 
-// BatchingDualNetFactory managers the per-model ModelBatchers and creates
-// their BatchingDualNet clients.
-class BatchingDualNetFactory : public DualNetFactory {
+// BatchingModelFactory managers the per-model ModelBatchers and creates
+// their BatchingModel clients.
+// TODO(tommadams): Don't derive BatchingModelFactory from ModelFactory, that
+// way NewModel can return a unique_ptr<BatchingModel> and we can pass
+// BatchingModel pointers to StartGame and EndGame. That way we can get rid of
+// the dynamic_casts in those methods and have a compile-time guarantee that the
+// models are of the correct type.
+class BatchingModelFactory : public ModelFactory {
  public:
-  BatchingDualNetFactory(std::unique_ptr<DualNetFactory> factory_impl);
+  BatchingModelFactory(std::unique_ptr<ModelFactory> factory_impl);
 
-  int GetBufferCount() const override;
+  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 
-  std::unique_ptr<DualNet> NewDualNet(const std::string& model_path) override;
+  static void StartGame(Model* black, Model* white);
+  static void EndGame(Model* black, Model* white);
 
-  static void StartGame(DualNet* black, DualNet* white);
-  static void EndGame(DualNet* black, DualNet* white);
-
-  std::vector<std::pair<std::string, BatchingDualNetStats>> FlushStats();
+  std::vector<std::pair<std::string, BatchingModelStats>> FlushStats();
 
  private:
   absl::Mutex mutex_;
-  std::unique_ptr<DualNetFactory> factory_impl_;
+  std::unique_ptr<ModelFactory> factory_impl_;
 
   // Map from model to BatchingService for that model.
   absl::flat_hash_map<std::string, std::shared_ptr<internal::ModelBatcher>>

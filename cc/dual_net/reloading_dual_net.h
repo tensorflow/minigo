@@ -28,53 +28,48 @@
 
 namespace minigo {
 
-class ReloadingDualNetUpdater;
+class ReloadingModelUpdater;
 
-// Lightweight wrapper around a real DualNet instance.
-// This class exists to enable ReloadingDualNetUpdater to update the wrapped
+// Lightweight wrapper around a real Model instance.
+// This class exists to enable ReloadingModelUpdater to update the wrapped
 // model when a newer one is found.
-class ReloadingDualNet : public DualNet {
+class ReloadingModel : public Model {
  public:
-  ReloadingDualNet(std::string name, ReloadingDualNetUpdater* updater,
-                   std::unique_ptr<DualNet> impl);
-  ~ReloadingDualNet() override;
+  ReloadingModel(std::string name, ReloadingModelUpdater* updater,
+                 std::unique_ptr<Model> impl);
+  ~ReloadingModel() override;
 
-  void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, std::string* model) override;
-
-  void Reserve(size_t capacity) override;
+  void RunMany(const std::vector<const Input*>& inputs,
+               std::vector<Output*>* outputs, std::string* model_name) override;
 
   // Replaces the wrapped implementation with a new one constructed from the
   // given factory & model.
-  // Called by ReloadingDualNetUpdater::Poll when it finds a new model.
-  void UpdateImpl(std::unique_ptr<DualNet> model_impl);
+  // Called by ReloadingModelUpdater::Poll when it finds a new model.
+  void UpdateImpl(std::unique_ptr<Model> model_impl);
 
  private:
-  ReloadingDualNetUpdater* updater_;
+  ReloadingModelUpdater* updater_;
   absl::Mutex mutex_;
-  std::unique_ptr<DualNet> model_impl_ GUARDED_BY(&mutex_);
+  std::unique_ptr<Model> model_impl_ GUARDED_BY(&mutex_);
 };
 
-// Constructs ReloadingDualNet instances.
-// Wraps another DualNetFactory that constructs the real DualNet instances that
-// ReloadingDualNet wraps.
-class ReloadingDualNetFactory : public DualNetFactory {
+// Constructs ReloadingModel instances.
+// Wraps another ModelFactory that constructs the real Model instances that
+// ReloadingModel wraps.
+class ReloadingModelFactory : public ModelFactory {
  public:
-  ReloadingDualNetFactory(std::unique_ptr<DualNetFactory> impl,
-                          absl::Duration poll_interval);
+  ReloadingModelFactory(std::unique_ptr<ModelFactory> impl,
+                        absl::Duration poll_interval);
 
-  ~ReloadingDualNetFactory() override;
+  ~ReloadingModelFactory() override;
 
-  int GetBufferCount() const override;
-
-  // Constructs a new DualNet instance from the latest model that matches
+  // Constructs a new Model instance from the latest model that matches
   // model_pattern.
   // The model_pattern is a file path that contains exactly one "%d" scanf
   // matcher in the basename part (not the dirname part), e.g.:
   //  "foo/bar/%d-shipname.tflite"
   //  "some/dir/model.ckpt-%d.pb"
-  std::unique_ptr<DualNet> NewDualNet(
-      const std::string& model_pattern) override;
+  std::unique_ptr<Model> NewModel(const std::string& model_pattern) override;
 
  private:
   void ThreadRun();
@@ -83,24 +78,23 @@ class ReloadingDualNetFactory : public DualNetFactory {
 
   // Map from model pattern to updater than scans for models that match that
   // pattern.
-  absl::flat_hash_map<std::string, std::unique_ptr<ReloadingDualNetUpdater>>
+  absl::flat_hash_map<std::string, std::unique_ptr<ReloadingModelUpdater>>
       updaters_ GUARDED_BY(&mutex_);
 
   std::atomic<bool> running_;
-  std::unique_ptr<DualNetFactory> factory_impl_;
+  std::unique_ptr<ModelFactory> factory_impl_;
   const absl::Duration poll_interval_;
   std::thread thread_;
 };
 
-class ReloadingDualNetUpdater {
+class ReloadingModelUpdater {
  public:
   // Blocks until at least one matching model path is found.
-  ReloadingDualNetUpdater(const std::string& pattern,
-                          DualNetFactory* factory_impl);
+  ReloadingModelUpdater(const std::string& pattern, ModelFactory* factory_impl);
 
   // Scans directory_ for a new model that matches basename_pattern_.
-  // If a new model is found, all registered ReloadingDualNets are updated
-  // using DualNet instances created from the updater's factory_.
+  // If a new model is found, all registered ReloadingModels are updated
+  // using Model instances created from the updater's factory_.
   // Returns true if a new model was found.
   bool Poll();
 
@@ -108,11 +102,11 @@ class ReloadingDualNetUpdater {
   // There isn't a matching RegisterModel method because updater registers
   // models when it creates them.
   // Called by the model's destructor.
-  void UnregisterModel(ReloadingDualNet* model);
+  void UnregisterModel(ReloadingModel* model);
 
-  // Returns a new ReloadingDualNet instance that wraps a new DualNet instance
+  // Returns a new ReloadingModel instance that wraps a new Model instance
   // created by the factory_.
-  std::unique_ptr<ReloadingDualNet> NewReloadingDualNet();
+  std::unique_ptr<ReloadingModel> NewReloadingModel();
 
   // Exposed for testing.
   static bool ParseModelPathPattern(const std::string& pattern,
@@ -133,9 +127,9 @@ class ReloadingDualNetUpdater {
   std::string basename_and_length_pattern_;
 
   mutable absl::Mutex mutex_;
-  DualNetFactory* factory_impl_ GUARDED_BY(&mutex_);
+  ModelFactory* factory_impl_ GUARDED_BY(&mutex_);
   std::string latest_model_path_ GUARDED_BY(&mutex_);
-  absl::flat_hash_set<ReloadingDualNet*> models_ GUARDED_BY(&mutex_);
+  absl::flat_hash_set<ReloadingModel*> models_ GUARDED_BY(&mutex_);
 };
 
 }  // namespace minigo

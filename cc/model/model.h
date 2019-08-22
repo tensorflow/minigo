@@ -18,23 +18,56 @@
 #include <string>
 #include <vector>
 
-#include "absl/types/span.h"
+#include "cc/color.h"
+#include "cc/constants.h"
+#include "cc/inline_vector.h"
 #include "cc/position.h"
 
 namespace minigo {
 
 class Model {
  public:
+  struct Input {
+    Color to_play;
+
+    // position_history[0] holds the current position and position_history[i]
+    // holds the position from i moves ago.
+    inline_vector<const Position::Stones*, kMaxPositionHistory>
+        position_history;
+  };
+
   struct Output {
     std::array<float, kNumMoves> policy;
     float value;
   };
 
+  // TODO(tommadams): is there some way to avoid having buffer_count in the base
+  // class? All subclasses except BufferedModel set this to 1.
+  Model(std::string name, int buffer_count);
   virtual ~Model();
 
-  virtual void RunMany(absl::Span<const Position*> position_history,
-                       std::vector<Output*> outputs,
+  const std::string& name() const { return name_; }
+
+  // Returns the ideal number of inference requests in flight for this model.
+  int buffer_count() const { return buffer_count_; }
+
+  virtual void RunMany(const std::vector<const Input*>& inputs,
+                       std::vector<Output*>* outputs,
                        std::string* model_name) = 0;
+
+ private:
+  const std::string name_;
+  const int buffer_count_;
+};
+
+// Factory that creates Model instances.
+// All implementations are required to be thread safe.
+class ModelFactory {
+ public:
+  virtual ~ModelFactory();
+
+  // Create a single model.
+  virtual std::unique_ptr<Model> NewModel(const std::string& descriptor) = 0;
 };
 
 }  // namespace minigo

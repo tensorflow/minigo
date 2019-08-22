@@ -21,8 +21,11 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:position",
+        "//cc:random",
+        "//cc:symmetries",
         "//cc/model",
         "@com_google_absl//absl/types:span",
+        "@wtf",
     ],
 )
 
@@ -43,7 +46,6 @@ factory_engine_copts = select({
 factory_engine_deps = select({
     "//cc/config:enable_tf": [
         ":tf_dual_net",
-        ":trt_dual_net",
     ],
     "//conditions:default": [],
 }) + select({
@@ -76,10 +78,11 @@ minigo_cc_library(
     srcs = ["fake_dual_net.cc"],
     hdrs = ["fake_dual_net.h"],
     deps = [
-        ":dual_net",
         "//cc:base",
         "//cc:logging",
+        "//cc/model",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -88,9 +91,9 @@ minigo_cc_library(
     srcs = ["inference_cache.cc"],
     hdrs = ["inference_cache.h"],
     deps = [
-        ":dual_net",
         "//cc:base",
         "//cc:logging",
+        "//cc/model",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
@@ -102,10 +105,10 @@ minigo_cc_library(
     srcs = ["random_dual_net.cc"],
     hdrs = ["random_dual_net.h"],
     deps = [
-        ":dual_net",
         "//cc:base",
         "//cc:logging",
         "//cc:random",
+        "//cc/model",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
     ],
@@ -143,8 +146,10 @@ minigo_cc_library(
         ":dual_net",
         "//cc:base",
         "//cc:logging",
+        "//cc:random",
         "//cc:thread_safe_queue",
         "//cc/file:path",
+        "//cc/model:buffered_model",
         "//cc/tensorflow",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -181,6 +186,7 @@ minigo_cc_library(
         "//cc:logging",
         "//cc:thread_safe_queue",
         "//cc/file:path",
+        "//cc/model:buffered_model",
         "//cc/tensorflow",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -189,29 +195,13 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
-    name = "trt_dual_net",
-    srcs = ["trt_dual_net.cc"],
-    hdrs = ["trt_dual_net.h"],
-    tags = ["manual"],
-    deps = [
-        ":dual_net",
-        "//cc:base",
-        "//cc:logging",
-        "//cc/file:path",
-        "//cc/tensorflow",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
-
-minigo_cc_library(
     name = "batching_dual_net",
     srcs = ["batching_dual_net.cc"],
     hdrs = ["batching_dual_net.h"],
     deps = [
-        ":dual_net",
         "//cc:base",
         "//cc:logging",
+        "//cc/model",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",

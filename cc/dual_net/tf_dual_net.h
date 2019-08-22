@@ -18,20 +18,24 @@
 #include <memory>
 #include <string>
 
+#include "absl/synchronization/mutex.h"
 #include "cc/dual_net/dual_net.h"
+#include "cc/random.h"
 
 namespace minigo {
 
-class TfDualNetFactory : public DualNetFactory {
+class TfDualNetFactory : public ModelFactory {
  public:
-  TfDualNetFactory();
+  explicit TfDualNetFactory(uint64_t random_seed);
 
-  int GetBufferCount() const override;
-
-  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 
  private:
+  // TODO(tommadams): switch Random to use pcg32, then we can replace this mutex
+  // with an std::atomic<uint32_t> sequence number instead.
+  absl::Mutex mutex_;
   int device_count_;
+  Random rnd_ GUARDED_BY(&mutex_);
 };
 
 }  // namespace minigo

@@ -20,7 +20,7 @@
 namespace minigo {
 
 FakeDualNet::FakeDualNet(absl::Span<const float> priors, float value)
-    : DualNet("fake"), value_(value) {
+    : Model("fake", 1), value_(value) {
   if (!priors.empty()) {
     MG_CHECK(priors.size() == kNumMoves);
     for (int i = 0; i < kNumMoves; ++i) {
@@ -33,9 +33,9 @@ FakeDualNet::FakeDualNet(absl::Span<const float> priors, float value)
   }
 }
 
-void FakeDualNet::RunMany(std::vector<const DualNet::BoardFeatures*> features,
-                          std::vector<Output*> outputs, std::string* model) {
-  for (auto* output : outputs) {
+void FakeDualNet::RunMany(const std::vector<const Input*>& inputs,
+                          std::vector<Output*>* outputs, std::string* model) {
+  for (auto* output : *outputs) {
     output->policy = priors_;
     output->value = value_;
   }
@@ -44,8 +44,8 @@ void FakeDualNet::RunMany(std::vector<const DualNet::BoardFeatures*> features,
   }
 }
 
-std::unique_ptr<DualNet> FakeDualNetFactory::NewDualNet(
-    const std::string& model) {
+std::unique_ptr<Model> FakeDualNetFactory::NewModel(
+    const std::string& descriptor) {
   return absl::make_unique<FakeDualNet>();
 }
 

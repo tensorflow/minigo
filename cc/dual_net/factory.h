@@ -20,7 +20,7 @@
 #include <string>
 
 #include "absl/strings/string_view.h"
-#include "cc/dual_net/dual_net.h"
+#include "cc/model/model.h"
 
 namespace minigo {
 
@@ -33,8 +33,8 @@ std::ostream& operator<<(std::ostream& os, const ModelDescriptor& desc);
 
 ModelDescriptor ParseModelDescriptor(absl::string_view descriptor);
 
-std::unique_ptr<DualNetFactory> NewDualNetFactory(
-    absl::string_view engine_desc);
+std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
+                                              uint64_t random_seed);
 
 }  // namespace minigo
 

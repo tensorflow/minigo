@@ -15,6 +15,8 @@
 #ifndef CC_DUAL_NET_INFERENCE_CACHE_H_
 #define CC_DUAL_NET_INFERENCE_CACHE_H_
 
+// TODO(tommadams): move this class nto //cc/model/
+
 #include <array>
 #include <memory>
 #include <ostream>
@@ -25,7 +27,7 @@
 #include "absl/synchronization/mutex.h"
 #include "cc/constants.h"
 #include "cc/coord.h"
-#include "cc/dual_net/dual_net.h"
+#include "cc/model/model.h"
 #include "cc/position.h"
 #include "cc/zobrist.h"
 
@@ -84,11 +86,11 @@ class InferenceCache {
 
   // Adds the (features, inference output) pair to the cache.
   // If the cache is full, the least-recently-used pair is evicted.
-  virtual void Add(Key key, const DualNet::Output& output) = 0;
+  virtual void Add(Key key, const Model::Output& output) = 0;
 
   // Looks up the inference output for the given features.
   // If found, the features are marked as most-recently-used.
-  virtual bool TryGet(Key key, DualNet::Output* output) = 0;
+  virtual bool TryGet(Key key, Model::Output* output) = 0;
 };
 
 // Not thread safe.
@@ -101,8 +103,8 @@ class BasicInferenceCache : public InferenceCache {
   explicit BasicInferenceCache(size_t capacity);
 
   void Clear() override;
-  void Add(Key key, const DualNet::Output& output) override;
-  bool TryGet(Key key, DualNet::Output* output) override;
+  void Add(Key key, const Model::Output& output) override;
+  bool TryGet(Key key, Model::Output* output) override;
 
  private:
   struct ListNode {
@@ -111,10 +113,9 @@ class BasicInferenceCache : public InferenceCache {
   };
 
   struct Element : public ListNode {
-    Element(Key key, const DualNet::Output& output)
-        : key(key), output(output) {}
+    Element(Key key, const Model::Output& output) : key(key), output(output) {}
     Key key;
-    DualNet::Output output;
+    Model::Output output;
   };
 
   // Removes the given element from the LRU list.
@@ -169,9 +170,9 @@ class ThreadSafeInferenceCache : public InferenceCache {
   // time where the cache is completely empty (unless num_shards == 1).
   void Clear() override;
 
-  void Add(Key key, const DualNet::Output& output) override;
+  void Add(Key key, const Model::Output& output) override;
 
-  bool TryGet(Key key, DualNet::Output* output) override;
+  bool TryGet(Key key, Model::Output* output) override;
 
  private:
   struct Shard {

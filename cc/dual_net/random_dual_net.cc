@@ -27,14 +27,15 @@ namespace minigo {
 
 RandomDualNet::RandomDualNet(std::string name, uint64_t seed,
                              float policy_stddev, float value_stddev)
-    : DualNet(std::move(name)),
+    : Model(std::move(name), 1),
       rnd_(seed),
       policy_stddev_(policy_stddev),
       value_stddev_(value_stddev) {}
 
-void RandomDualNet::RunMany(std::vector<const BoardFeatures*> features,
-                            std::vector<Output*> outputs, std::string* model) {
-  for (auto* output : outputs) {
+void RandomDualNet::RunMany(const std::vector<const Input*>& inputs,
+                            std::vector<Output*>* outputs,
+                            std::string* model_name) {
+  for (auto* output : *outputs) {
     rnd_.NormalDistribution(0.5, policy_stddev_, &output->policy);
     for (auto& p : output->policy) {
       p = std::exp(p);
@@ -51,16 +52,19 @@ void RandomDualNet::RunMany(std::vector<const BoardFeatures*> features,
       output->value = rnd_.NormalDistribution(0, value_stddev_);
     } while (output->value < -1 || output->value > 1);
   }
-  if (model != nullptr) {
-    *model = name();
+  if (model_name != nullptr) {
+    *model_name = name();
   }
 }
 
 RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : rnd_(seed) {}
 
-std::unique_ptr<DualNet> RandomDualNetFactory::NewDualNet(
-    const std::string& model) {
-  std::vector<absl::string_view> parts = absl::StrSplit(model, ':');
+std::unique_ptr<Model> RandomDualNetFactory::NewModel(
+    const std::string& descriptor) {
+  // TODO(tommadams): return a BufferedModel that wraps one RandomModel per
+  // CPU core.
+
+  std::vector<absl::string_view> parts = absl::StrSplit(descriptor, ':');
   MG_CHECK(parts.size() == 2);
 
   float policy_stddev, value_stddev;
@@ -70,10 +74,15 @@ std::unique_ptr<DualNet> RandomDualNetFactory::NewDualNet(
   uint64_t seed;
   {
     absl::MutexLock lock(&mutex_);
+    // TODO(tommadams): replace Random implementation with
+    // http://www.pcg-random.org, which supports multiple streams. That way,
+    // we can can initialize the RandomModel instances with the factory's seed
+    // and a unique stream, instead of randomly generating a new seed. A
+    // monotonically incrementing number is sufficient for the stream ID.
     seed = rnd_.UniformUint64();
   }
-  return absl::make_unique<RandomDualNet>(absl::StrCat("rnd:", model), seed,
-                                          policy_stddev, value_stddev);
+  return absl::make_unique<RandomDualNet>(absl::StrCat("rnd:", descriptor),
+                                          seed, policy_stddev, value_stddev);
 }
 
 }  // namespace minigo

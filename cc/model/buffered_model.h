@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,34 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_DUAL_NET_FAKE_DUAL_NET_H_
-#define CC_DUAL_NET_FAKE_DUAL_NET_H_
+#ifndef CC_MODEL_BUFFERED_MODEL_H_
+#define CC_MODEL_BUFFERED_MODEL_H_
 
-#include <array>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "absl/types/span.h"
 #include "cc/model/model.h"
+#include "cc/thread_safe_queue.h"
 
 namespace minigo {
 
-class FakeDualNet : public Model {
+class BufferedModel : public Model {
  public:
-  FakeDualNet() : FakeDualNet(absl::Span<const float>(), 0) {}
-  FakeDualNet(absl::Span<const float> priors, float value);
+  BufferedModel(std::string name, std::vector<std::unique_ptr<Model>> impls);
+
+  const std::string& name() const { return name_; }
 
   void RunMany(const std::vector<const Input*>& inputs,
                std::vector<Output*>* outputs, std::string* model_name) override;
 
  private:
-  std::array<float, kNumMoves> priors_;
-  float value_;
-};
-
-class FakeDualNetFactory : public ModelFactory {
- public:
-  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
+  ThreadSafeQueue<std::unique_ptr<Model>> impls_;
+  const std::string name_;
 };
 
 }  // namespace minigo
 
-#endif  // CC_DUAL_NET_FAKE_DUAL_NET_H_
+#endif  //  CC_MODEL_BUFFERED_MODEL_H_

@@ -35,10 +35,6 @@
 #include "cc/dual_net/tpu_dual_net.h"
 #endif  // MG_ENABLE_TPU_DUAL_NET
 
-#ifdef MG_ENABLE_TRT_DUAL_NET
-#include "cc/dual_net/trt_dual_net.h"
-#endif  // MG_ENABLE_TRT_DUAL_NET
-
 namespace minigo {
 
 std::ostream& operator<<(std::ostream& os, const ModelDescriptor& desc) {
@@ -57,8 +53,8 @@ ModelDescriptor ParseModelDescriptor(absl::string_view descriptor) {
   return result;
 }
 
-std::unique_ptr<DualNetFactory> NewDualNetFactory(
-    absl::string_view engine_desc) {
+std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
+                                              uint64_t random_seed) {
   MG_CHECK(!engine_desc.empty());
 
   std::vector<std::string> parts =
@@ -82,7 +78,7 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
 #ifdef MG_ENABLE_TF_DUAL_NET
   if (engine == "tf") {
     MG_CHECK(arg_str.empty());
-    return absl::make_unique<TfDualNetFactory>();
+    return absl::make_unique<TfDualNetFactory>(random_seed);
   }
 #endif  // MG_ENABLE_TF_DUAL_NET
 
@@ -95,24 +91,15 @@ std::unique_ptr<DualNetFactory> NewDualNetFactory(
 
 #ifdef MG_ENABLE_TPU_DUAL_NET
   if (engine == "tpu") {
-    std::vector<std::string> args = absl::StrSplit(arg_str, absl::MaxSplits(':', 1));
-    MG_CHECK(args.size() == 2) << "\""<< arg_str << "\"";
+    std::vector<std::string> args =
+        absl::StrSplit(arg_str, absl::MaxSplits(':', 1));
+    MG_CHECK(args.size() == 2) << "\"" << arg_str << "\"";
     int buffer_count = 0;
     MG_CHECK(absl::SimpleAtoi(args[0], &buffer_count)) << args[0];
-    return absl::make_unique<TpuDualNetFactory>(buffer_count, args[1]);
+    return absl::make_unique<TpuDualNetFactory>(buffer_count, args[1],
+                                                random_seed);
   }
 #endif  // MG_ENABLE_TPU_DUAL_NET
-
-#ifdef MG_ENABLE_TRT_DUAL_NET
-  if (engine == "trt") {
-    MG_CHECK(!arg_str.empty())
-        << "Please specify a fixed batch size for the TRT inference engine, "
-           "e.g. --model=trt:8,${MODEL_PATH}";
-    int batch_size;
-    MG_CHECK(absl::SimpleAtoi(arg_str, &batch_size));
-    return absl::make_unique<TrtDualNetFactory>(batch_size);
-  }
-#endif  // MG_ENABLE_TRT_DUAL_NET
 
   MG_LOG(FATAL) << "Unrecognized inference engine \"" << engine << "\"";
   return nullptr;

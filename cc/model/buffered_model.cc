@@ -12,16 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/model/model.h"
-
-#include <utility>
+#include "cc/model/buffered_model.h"
 
 namespace minigo {
 
-Model::Model(std::string name, int buffer_count)
-    : name_(std::move(name)), buffer_count_(buffer_count) {}
-Model::~Model() = default;
+BufferedModel::BufferedModel(std::string name,
+                             std::vector<std::unique_ptr<Model>> impls)
+    : Model(std::move(name), static_cast<int>(impls.size())) {
+  for (auto& x : impls) {
+    impls_.Push(std::move(x));
+  }
+}
 
-ModelFactory::~ModelFactory() = default;
+void BufferedModel::RunMany(const std::vector<const Input*>& inputs,
+                            std::vector<Output*>* outputs,
+                            std::string* model_name) {
+  auto impl = impls_.Pop();
+  impl->RunMany(inputs, outputs, model_name);
+  impls_.Push(std::move(impl));
+}
 
 }  // namespace minigo

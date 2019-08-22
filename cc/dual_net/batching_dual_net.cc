@@ -25,11 +25,8 @@ namespace minigo {
 
 namespace internal {
 
-ModelBatcher::ModelBatcher(std::unique_ptr<DualNet> model_impl,
-                           size_t buffer_count)
-    : model_impl_(std::move(model_impl)),
-      buffer_count_(buffer_count),
-      stats_(buffer_count) {}
+ModelBatcher::ModelBatcher(std::unique_ptr<Model> model_impl)
+    : model_impl_(std::move(model_impl)), stats_(model_impl_->buffer_count()) {}
 
 ModelBatcher::~ModelBatcher() {
   MG_LOG(INFO) << "Ran " << num_batches_ << " batches with an average size of "
@@ -48,18 +45,16 @@ void ModelBatcher::EndGame() {
 }
 
 void ModelBatcher::RunMany(ModelBatcher* other_batcher,
-                           std::vector<const DualNet::BoardFeatures*> features,
-                           std::vector<DualNet::Output*> outputs,
+                           const std::vector<const Model::Input*>& inputs,
+                           std::vector<Model::Output*>* outputs,
                            std::string* model_name) {
-  WTF_SCOPE0("ModelBatcher::RunMany");
-  MG_CHECK(features.size() == outputs.size());
+  WTF_SCOPE("ModelBatcher::RunMany", size_t)(inputs.size());
 
   absl::Notification notification;
 
   {
     absl::MutexLock lock(&mutex_);
-    queue_.push({other_batcher, std::move(features), std::move(outputs),
-                 model_name, &notification});
+    queue_.push({other_batcher, &inputs, outputs, model_name, &notification});
     if (other_batcher != nullptr) {
       other_batcher->num_waiting_ += 1;
     }
@@ -74,16 +69,16 @@ void ModelBatcher::RunMany(ModelBatcher* other_batcher,
   notification.WaitForNotification();
 }
 
-BatchingDualNetStats ModelBatcher::FlushStats() {
+BatchingModelStats ModelBatcher::FlushStats() {
   mutex_.Lock();
   auto result = stats_;
-  stats_ = BatchingDualNetStats(buffer_count_);
+  stats_ = BatchingModelStats(model_impl_->buffer_count());
   mutex_.Unlock();
   return result;
 }
 
 size_t ModelBatcher::GetBatchSize() const {
-  return std::max<size_t>(1, num_active_clients_ / buffer_count_);
+  return std::max<size_t>(1, num_active_clients_ / model_impl_->buffer_count());
 }
 
 void ModelBatcher::MaybeRunBatchesLocked() {
@@ -123,29 +118,27 @@ void ModelBatcher::RunBatch() {
 
   auto batch_size = GetBatchSize();
 
-  std::vector<const DualNet::BoardFeatures*> features;
-  std::vector<DualNet::Output*> outputs;
+  // TODO(tommadams): reserve GetBatchSize() * virtual_losses elements.
+  std::vector<const Model::Input*> inputs;
+  std::vector<Model::Output*> outputs;
   std::vector<InferenceRequest> inferences;
-  features.reserve(batch_size);
-  outputs.reserve(batch_size);
-  inferences.reserve(batch_size);
 
   while (!queue_.empty() && inferences.size() < batch_size) {
     auto& inference = queue_.front();
-    size_t num_features = inference.features.size();
+    size_t num_features = inference.inputs->size();
 
-    std::copy_n(inference.features.begin(), num_features,
-                std::back_inserter(features));
-    std::copy_n(inference.outputs.begin(), num_features,
+    std::copy_n(inference.inputs->begin(), num_features,
+                std::back_inserter(inputs));
+    std::copy_n(inference.outputs->begin(), num_features,
                 std::back_inserter(outputs));
-    inferences.push_back(std::move(inference));
+    inferences.push_back(inference);
 
     queue_.pop();
   }
 
   num_batches_ += 1;
-  num_inferences_ += features.size();
-  auto num_inferences_in_batch = features.size();
+  num_inferences_ += inputs.size();
+  auto num_inferences_in_batch = inputs.size();
 
   // Unlock the mutex while running inference. This allows more inferences
   // to be enqueued while inference is running.
@@ -154,7 +147,8 @@ void ModelBatcher::RunBatch() {
   std::string model_name;
   auto run_many_start_time = absl::Now();
 
-  model_impl_->RunMany(std::move(features), std::move(outputs), &model_name);
+  MG_CHECK(inputs.size() == outputs.size());
+  model_impl_->RunMany(inputs, &outputs, &model_name);
   auto run_many_time = absl::Now() - run_many_start_time;
 
   for (auto& inference : inferences) {
@@ -176,29 +170,27 @@ void ModelBatcher::RunBatch() {
   // Lock the mutex again.
   mutex_.Lock();
 
-  stats_.run_batch_time += (absl::Now() - run_batch_start_time) / buffer_count_;
-  stats_.run_many_time += (run_many_time) / buffer_count_;
+  stats_.run_batch_time +=
+      (absl::Now() - run_batch_start_time) / model_impl_->buffer_count();
+  stats_.run_many_time += (run_many_time) / model_impl_->buffer_count();
   stats_.num_inferences += num_inferences_in_batch;
 }
 
 }  // namespace internal
 
-BatchingDualNet::BatchingDualNet(
-    std::shared_ptr<internal::ModelBatcher> batcher)
-    : DualNet(batcher->name()), batcher_(std::move(batcher)) {}
+BatchingModel::BatchingModel(std::shared_ptr<internal::ModelBatcher> batcher)
+    : Model(batcher->name(), 1), batcher_(std::move(batcher)) {}
 
-void BatchingDualNet::RunMany(std::vector<const BoardFeatures*> features,
-                              std::vector<Output*> outputs,
-                              std::string* model) {
-  batcher_->RunMany(other_batcher_.get(), std::move(features),
-                    std::move(outputs), model);
+void BatchingModel::RunMany(const std::vector<const Model::Input*>& inputs,
+                            std::vector<Output*>* outputs, std::string* model) {
+  batcher_->RunMany(other_batcher_.get(), inputs, outputs, model);
 }
 
-void BatchingDualNet::StartGame() { batcher_->StartGame(); }
+void BatchingModel::StartGame() { batcher_->StartGame(); }
 
-void BatchingDualNet::EndGame() { batcher_->EndGame(); }
+void BatchingModel::EndGame() { batcher_->EndGame(); }
 
-void BatchingDualNet::SetOther(BatchingDualNet* other) {
+void BatchingModel::SetOther(BatchingModel* other) {
   if (other == nullptr) {
     MG_CHECK(other_batcher_ != nullptr);
     other_batcher_ = nullptr;
@@ -208,27 +200,23 @@ void BatchingDualNet::SetOther(BatchingDualNet* other) {
   }
 }
 
-BatchingDualNetFactory::BatchingDualNetFactory(
-    std::unique_ptr<DualNetFactory> factory_impl)
+BatchingModelFactory::BatchingModelFactory(
+    std::unique_ptr<ModelFactory> factory_impl)
     : factory_impl_(std::move(factory_impl)) {}
 
-int BatchingDualNetFactory::GetBufferCount() const {
-  return factory_impl_->GetBufferCount();
-}
-
-std::unique_ptr<DualNet> BatchingDualNetFactory::NewDualNet(
-    const std::string& model_path) {
+std::unique_ptr<Model> BatchingModelFactory::NewModel(
+    const std::string& descriptor) {
   absl::MutexLock lock(&mutex_);
 
   // Find or create a service for the requested model.
-  auto it = batchers_.find(model_path);
+  auto it = batchers_.find(descriptor);
   if (it == batchers_.end()) {
     auto batcher = std::make_shared<internal::ModelBatcher>(
-        factory_impl_->NewDualNet(model_path), GetBufferCount());
-    it = batchers_.emplace(model_path, std::move(batcher)).first;
+        factory_impl_->NewModel(descriptor));
+    it = batchers_.emplace(descriptor, std::move(batcher)).first;
   }
 
-  auto model = absl::make_unique<BatchingDualNet>(it->second);
+  auto model = absl::make_unique<BatchingModel>(it->second);
 
   // Take this opportunity to prune any services that have no clients.
   it = batchers_.begin();
@@ -245,11 +233,11 @@ std::unique_ptr<DualNet> BatchingDualNetFactory::NewDualNet(
   return model;
 }
 
-void BatchingDualNetFactory::StartGame(DualNet* black, DualNet* white) {
+void BatchingModelFactory::StartGame(Model* black, Model* white) {
   // TODO(tommadams): figure out if we can refactor the code somehow to take
-  // BatchingDualNet pointers and avoid these dynamic_casts.
-  auto* b = dynamic_cast<BatchingDualNet*>(black);
-  auto* w = dynamic_cast<BatchingDualNet*>(white);
+  // BatchingModel pointers and avoid these dynamic_casts.
+  auto* b = dynamic_cast<BatchingModel*>(black);
+  auto* w = dynamic_cast<BatchingModel*>(white);
   MG_CHECK(b != nullptr && w != nullptr);
 
   if (b != w) {
@@ -264,11 +252,11 @@ void BatchingDualNetFactory::StartGame(DualNet* black, DualNet* white) {
   }
 }
 
-void BatchingDualNetFactory::EndGame(DualNet* black, DualNet* white) {
+void BatchingModelFactory::EndGame(Model* black, Model* white) {
   // TODO(tommadams): figure out if we can refactor the code somehow to take
-  // BatchingDualNet pointers and avoid these dynamic_casts.
-  auto* b = dynamic_cast<BatchingDualNet*>(black);
-  auto* w = dynamic_cast<BatchingDualNet*>(white);
+  // BatchingModel pointers and avoid these dynamic_casts.
+  auto* b = dynamic_cast<BatchingModel*>(black);
+  auto* w = dynamic_cast<BatchingModel*>(white);
   MG_CHECK(b != nullptr && w != nullptr);
 
   if (b != w) {
@@ -282,10 +270,10 @@ void BatchingDualNetFactory::EndGame(DualNet* black, DualNet* white) {
   }
 }
 
-std::vector<std::pair<std::string, BatchingDualNetStats>>
-BatchingDualNetFactory::FlushStats() {
+std::vector<std::pair<std::string, BatchingModelStats>>
+BatchingModelFactory::FlushStats() {
   absl::MutexLock lock(&mutex_);
-  std::vector<std::pair<std::string, BatchingDualNetStats>> result;
+  std::vector<std::pair<std::string, BatchingModelStats>> result;
   for (const auto& kv : batchers_) {
     result.emplace_back(kv.first, kv.second->FlushStats());
   }

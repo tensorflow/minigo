@@ -78,7 +78,7 @@ void BasicInferenceCache::Clear() {
   map_.clear();
 }
 
-void BasicInferenceCache::Add(Key key, const DualNet::Output& output) {
+void BasicInferenceCache::Add(Key key, const Model::Output& output) {
   if (map_.size() == capacity_) {
     // Cache is full, remove an element.
     auto it = map_.find(static_cast<Element*>(list_.prev)->key);
@@ -98,7 +98,7 @@ void BasicInferenceCache::Add(Key key, const DualNet::Output& output) {
   PushFront(elem);
 }
 
-bool BasicInferenceCache::TryGet(Key key, DualNet::Output* output) {
+bool BasicInferenceCache::TryGet(Key key, Model::Output* output) {
   auto it = map_.find(key);
   if (it == map_.end()) {
     return false;
@@ -132,13 +132,13 @@ void ThreadSafeInferenceCache::Clear() {
   }
 }
 
-void ThreadSafeInferenceCache::Add(Key key, const DualNet::Output& output) {
+void ThreadSafeInferenceCache::Add(Key key, const Model::Output& output) {
   auto* shard = shards_[key.Shard(shards_.size())].get();
   absl::MutexLock lock(&shard->mutex);
   shard->cache.Add(key, output);
 }
 
-bool ThreadSafeInferenceCache::TryGet(Key key, DualNet::Output* output) {
+bool ThreadSafeInferenceCache::TryGet(Key key, Model::Output* output) {
   auto* shard = shards_[key.Shard(shards_.size())].get();
   absl::MutexLock lock(&shard->mutex);
   return shard->cache.TryGet(key, output);

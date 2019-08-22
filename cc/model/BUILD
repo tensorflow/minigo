@@ -17,7 +17,17 @@ minigo_cc_library(
     hdrs = ["model.h"],
     deps = [
         "//cc:base",
+        "//cc:inline_vector",
         "//cc:position",
-        "@com_google_absl//absl/types:span",
+    ],
+)
+
+minigo_cc_library(
+    name = "buffered_model",
+    srcs = ["buffered_model.cc"],
+    hdrs = ["buffered_model.h"],
+    deps = [
+        ":model",
+        "//cc:thread_safe_queue",
     ],
 )

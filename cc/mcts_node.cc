@@ -220,20 +220,6 @@ std::string MctsNode::MostVisitedPathString() const {
   return result;
 }
 
-void MctsNode::GetMoveHistory(
-    int num_moves, std::vector<const Position::Stones*>* history) const {
-  history->clear();
-  history->reserve(num_moves);
-  const auto* node = this;
-  for (int j = 0; j < num_moves; ++j) {
-    history->push_back(&node->position.stones());
-    node = node->parent;
-    if (node == nullptr) {
-      break;
-    }
-  }
-}
-
 void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise,
                            float mix) {
   // NOTE: our interpretation is to only add dirichlet noise to legal moves.

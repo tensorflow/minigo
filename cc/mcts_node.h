@@ -27,6 +27,7 @@
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
 #include "cc/constants.h"
+#include "cc/inline_vector.h"
 #include "cc/position.h"
 #include "cc/zobrist.h"
 
@@ -116,13 +117,6 @@ class MctsNode {
 
   // Sorts the child nodes by visit counts, breaking ties by child action score.
   std::array<ChildInfo, kNumMoves> CalculateRankedChildInfo() const;
-
-  // Returns up to the last num_moves of moves that lead up to this node,
-  // including the node itself.
-  // After GetMoveHistory returns, history[0] is this MctsNode and history[i] is
-  // the MctsNode from i moves ago.
-  void GetMoveHistory(int num_moves,
-                      std::vector<const Position::Stones*>* history) const;
 
   // Mix noise into the node's priors:
   //   P_i = (1 - mix) * P_i + mix * noise_i

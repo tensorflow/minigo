@@ -88,6 +88,14 @@ class Random {
   std::mt19937 impl_;
 };
 
+// Returns a random number 64bit from std::random_device.
+// On many platforms, this requires reading from a hardware source of
+// non-determinism that can block if its entropy source is exhausted.
+uint64_t DeviceRandomUint64();
+
+// Same as DeviceRandomUint64 but doesn't return 0.
+uint64_t DeviceRandomUint64NonZero();
+
 }  // namespace minigo
 
 #endif  // CC_RANDOM_H_

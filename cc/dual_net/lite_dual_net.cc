@@ -37,12 +37,11 @@ class LiteDualNet : public DualNet {
  public:
   explicit LiteDualNet(std::string graph_path);
 
-  void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, std::string* model) override;
-
-  void Reserve(size_t capacity) override;
+  void RunManyImpl(std::string* model) override;
 
  private:
+  void Reserve(size_t capacity);
+
   template <typename T>
   void RunMany(std::vector<const BoardFeatures*> features,
                std::vector<Output*> outputs, T* feature_data,

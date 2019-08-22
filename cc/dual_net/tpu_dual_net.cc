@@ -26,6 +26,7 @@
 #include "cc/constants.h"
 #include "cc/file/path.h"
 #include "cc/logging.h"
+#include "cc/model/buffered_model.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -84,6 +85,9 @@ library {
 
 std::unique_ptr<Session> CreateSession(const GraphDef& graph_def,
                                        const std::string& tpu_name) {
+  // Make sure tpu_name looks like a valid name.
+  MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
+
   SessionOptions options;
   options.target = tpu_name;
   options.config.set_allow_soft_placement(true);
@@ -95,26 +99,40 @@ std::unique_ptr<Session> CreateSession(const GraphDef& graph_def,
 
 }  // namespace
 
-TpuDualNet::Worker::Worker(const tensorflow::GraphDef& graph_def,
-                           const std::string& tpu_name, int num_replicas)
-    : num_replicas_(num_replicas), batch_capacity_(0) {
+TpuDualNet::TpuDualNet(const std::string& tpu_name,
+                       const std::string& graph_path,
+                       const tensorflow::GraphDef& graph_def, int num_replicas,
+                       uint64_t random_seed)
+    : DualNet(std::string(file::Stem(graph_path)), random_seed),
+      num_replicas_(num_replicas) {
   session_ = CreateSession(graph_def, tpu_name);
   for (int i = 0; i < num_replicas_; ++i) {
     output_names_.push_back(absl::StrCat("policy_output_", i));
     output_names_.push_back(absl::StrCat("value_output_", i));
   }
+
+  // Run warm-up inferences on all sessions.
+  // Tensorflow lazily initializes the first time Session::Run is called,
+  // which can take hundreds of milliseconds. This interfers with time control,
+  // so explicitly run inference once during construction.
+  MG_LOG(INFO) << "Running warm-up inferences";
+  Position::Stones stones;
+  Input input;
+  input.to_play = Color::kBlack;
+  input.position_history.push_back(&stones);
+  Output output;
+  std::vector<const Input*> inputs = {&input};
+  std::vector<Output*> outputs = {&output};
+  RunMany(inputs, &outputs, nullptr);
 }
 
-TpuDualNet::Worker::~Worker() {
+TpuDualNet::~TpuDualNet() {
   MG_LOG(INFO) << "Closing worker session";
   TF_CHECK_OK(session_->Close());
 }
 
-void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
-                                 std::vector<Output*> outputs) {
-  MG_CHECK(features.size() == outputs.size());
-
-  size_t num_features = features.size();
+void TpuDualNet::RunManyImpl(std::string* model_name) {
+  size_t num_features = features_.size();
   size_t batch_size = (num_features + num_replicas_ - 1) / num_replicas_;
   Reserve(batch_size);
 
@@ -124,13 +142,13 @@ void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
     size_t end = std::min(num_features, (replica + 1) * batch_size);
     auto* data = inputs_[replica].second.flat<float>().data();
     for (size_t i = begin; i < end; ++i) {
-      data = std::copy(features[i]->begin(), features[i]->end(), data);
+      data = std::copy(features_[i].begin(), features_[i].end(), data);
     }
   }
 
   // Run the model.
   {
-    WTF_SCOPE0("TpuWorker::Run");
+    WTF_SCOPE("Session::Run", size_t)(batch_capacity_);
     TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
   }
 
@@ -141,13 +159,17 @@ void TpuDualNet::Worker::RunMany(std::vector<const BoardFeatures*> features,
 
     const auto& policy_tensor = outputs_[replica * 2].flat<float>();
     const auto& value_tensor = outputs_[replica * 2 + 1].flat<float>();
-    memcpy(outputs[i]->policy.data(), policy_tensor.data() + j * kNumMoves,
-           sizeof(outputs[i]->policy));
-    outputs[i]->value = value_tensor.data()[j];
+    memcpy(raw_outputs_[i].policy.data(), policy_tensor.data() + j * kNumMoves,
+           sizeof(raw_outputs_[i].policy));
+    raw_outputs_[i].value = value_tensor.data()[j];
+  }
+
+  if (model_name != nullptr) {
+    *model_name = graph_path_;
   }
 }
 
-void TpuDualNet::Worker::Reserve(size_t capacity) {
+void TpuDualNet::Reserve(size_t capacity) {
   MG_CHECK(capacity > 0);
   if (capacity <= batch_capacity_ && capacity > 3 * batch_capacity_ / 4) {
     return;
@@ -163,17 +185,36 @@ void TpuDualNet::Worker::Reserve(size_t capacity) {
   batch_capacity_ = capacity;
 }
 
-TpuDualNet::TpuDualNet(int buffer_count, const std::string& tpu_name,
-                       const std::string& graph_path)
-    : DualNet(std::string(file::Stem(graph_path))),
-      graph_path_(graph_path),
-      buffer_count_(buffer_count) {
-  // Make sure tpu_name looks like a valid name.
-  MG_CHECK(absl::StartsWith(tpu_name, "grpc://"));
-
-  auto* env = Env::Default();
+TpuDualNetFactory::TpuDualNetFactory(int buffer_count, std::string tpu_name,
+                                     uint64_t random_seed)
+    : tpu_name_(std::move(tpu_name)),
+      buffer_count_(buffer_count),
+      rnd_(random_seed) {
+  // Create a session containing ops for initializing & shutting down a TPU.
   GraphDef graph_def;
-  TF_CHECK_OK(ReadBinaryProto(env, graph_path_, &graph_def));
+  ::tensorflow::protobuf::TextFormat::ParseFromString(kTpuOpsGraphDef,
+                                                      &graph_def);
+  main_session_ = CreateSession(graph_def, tpu_name_);
+
+  MG_LOG(INFO) << "Initializing TPU " << tpu_name_;
+  TF_CHECK_OK(main_session_->Run({}, {}, {"ConfigureDistributedTPU"}, nullptr));
+}
+
+TpuDualNetFactory::~TpuDualNetFactory() {
+  MG_LOG(INFO) << "Shutting down TPU " << tpu_name_;
+  TF_CHECK_OK(main_session_->Run({}, {}, {"ShutdownDistributedTPU"}, nullptr));
+
+  MG_LOG(INFO) << "Closing main session";
+  TF_CHECK_OK(main_session_->Close());
+}
+
+std::unique_ptr<Model> TpuDualNetFactory::NewModel(
+    const std::string& descriptor) {
+  absl::MutexLock lock(&mutex_);
+
+  GraphDef graph_def;
+  auto* env = Env::Default();
+  TF_CHECK_OK(ReadBinaryProto(env, descriptor, &graph_def));
 
   // Check that we're actually loading a TPU model.
   bool found_tpu_op = false;
@@ -198,70 +239,16 @@ TpuDualNet::TpuDualNet(int buffer_count, const std::string& tpu_name,
     }
   }
   MG_LOG(INFO) << "Found " << num_replicas << " model replicas in graph "
-               << graph_path;
+               << descriptor;
   MG_CHECK(num_replicas > 0);
 
+  std::vector<std::unique_ptr<Model>> models;
   for (int i = 0; i < buffer_count_; ++i) {
-    workers_.Push(absl::make_unique<TpuDualNet::Worker>(graph_def, tpu_name,
-                                                        num_replicas));
+    models.push_back(absl::make_unique<TpuDualNet>(
+        tpu_name_, descriptor, graph_def, num_replicas, rnd_.UniformUint64()));
   }
 
-  // Run warm-up inferences on all sessions.
-  // Tensorflow lazily initializes the first time Session::Run is called,
-  // which can take hundreds of milliseconds. This interfers with time control,
-  // so explicitly run inference once during construction.
-  MG_LOG(INFO) << "Running warm-up inferences";
-  std::vector<std::thread> threads;
-  for (int i = 0; i < buffer_count_; ++i) {
-    threads.emplace_back([this]() {
-      BoardFeatures features;
-      Output output;
-      RunMany({&features}, {&output}, nullptr);
-    });
-  }
-  for (auto& t : threads) {
-    t.join();
-  }
-}
-
-TpuDualNet::~TpuDualNet() = default;
-
-void TpuDualNet::RunMany(std::vector<const BoardFeatures*> features,
-                         std::vector<Output*> outputs, std::string* model) {
-  auto worker = workers_.Pop();
-  worker->RunMany(features, outputs);
-  workers_.Push(std::move(worker));
-
-  if (model != nullptr) {
-    *model = graph_path_;
-  }
-}
-
-TpuDualNetFactory::TpuDualNetFactory(int buffer_count, std::string tpu_name)
-    : tpu_name_(std::move(tpu_name)), buffer_count_(buffer_count) {
-  // Create a session containing ops for initializing & shutting down a TPU.
-  GraphDef graph_def;
-  ::tensorflow::protobuf::TextFormat::ParseFromString(kTpuOpsGraphDef,
-                                                      &graph_def);
-  main_session_ = CreateSession(graph_def, tpu_name_);
-
-  MG_LOG(INFO) << "Initializing TPU " << tpu_name_;
-  TF_CHECK_OK(main_session_->Run({}, {}, {"ConfigureDistributedTPU"}, nullptr));
-}
-
-TpuDualNetFactory::~TpuDualNetFactory() {
-  MG_LOG(INFO) << "Shutting down TPU " << tpu_name_;
-  TF_CHECK_OK(main_session_->Run({}, {}, {"ShutdownDistributedTPU"}, nullptr));
-
-  MG_LOG(INFO) << "Closing main session";
-  TF_CHECK_OK(main_session_->Close());
-}
-
-int TpuDualNetFactory::GetBufferCount() const { return buffer_count_; }
-
-std::unique_ptr<DualNet> TpuDualNetFactory::NewDualNet(
-    const std::string& model) {
-  return absl::make_unique<TpuDualNet>(buffer_count_, tpu_name_, model);
+  return absl::make_unique<BufferedModel>(descriptor, std::move(models));
 }
 
 }  // namespace minigo

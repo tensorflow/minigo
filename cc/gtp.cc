@@ -81,7 +81,6 @@ void Gtp() {
   MctsPlayer::Options player_options;
   player_options.inject_noise = false;
   player_options.soft_pick = false;
-  player_options.random_symmetry = true;
   player_options.value_init_penalty = FLAGS_value_init_penalty;
   player_options.tree_reuse = false;
   player_options.virtual_losses = FLAGS_virtual_losses;
@@ -97,7 +96,8 @@ void Gtp() {
   MG_LOG(INFO) << game_options << " " << player_options;
 
   auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
-  auto model_factory = NewDualNetFactory(model_desc.engine);
+  auto model_factory =
+      NewDualNetFactory(model_desc.engine, DeviceRandomUint64NonZero());
 
   std::shared_ptr<ThreadSafeInferenceCache> inference_cache;
   if (FLAGS_cache_size_mb > 0) {

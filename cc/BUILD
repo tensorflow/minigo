@@ -167,6 +167,7 @@ minigo_cc_library(
     deps = [
         ":base",
         ":game",
+        ":inline_vector",
         ":logging",
         ":position",
         ":random",

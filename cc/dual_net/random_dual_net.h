@@ -15,15 +15,17 @@
 #ifndef CC_DUAL_NET_RANDOM_DUAL_NET_H_
 #define CC_DUAL_NET_RANDOM_DUAL_NET_H_
 
+// TODO(tommadams): rename file to random_model.h
+
 #include <array>
 
 #include "absl/synchronization/mutex.h"
-#include "cc/dual_net/dual_net.h"
+#include "cc/model/model.h"
 #include "cc/random.h"
 
 namespace minigo {
 
-class RandomDualNet : public DualNet {
+class RandomDualNet : public Model {
  public:
   RandomDualNet(std::string name, uint64_t seed, float policy_stddev,
                 float value_stddev);
@@ -33,8 +35,8 @@ class RandomDualNet : public DualNet {
   // Output value is a normal distribution with a mean of 0 and a standard
   // deviation of value_stddev. The output value is repeatedly sampled from the
   // normal distribution until a value is found in the range [-1, 1].
-  void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, std::string* model) override;
+  void RunMany(const std::vector<const Input*>& inputs,
+               std::vector<Output*>* outputs, std::string* model_name) override;
 
  private:
   Random rnd_;
@@ -42,13 +44,13 @@ class RandomDualNet : public DualNet {
   const float value_stddev_;
 };
 
-class RandomDualNetFactory : public DualNetFactory {
+class RandomDualNetFactory : public ModelFactory {
  public:
   explicit RandomDualNetFactory(uint64_t seed);
 
-  // Model specifies the policy and value standard deviation as a
+  // The descriptor specifies the policy and value standard deviation as a
   // colon-separated string, e.g. "0.4:0.4".
-  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 
  private:
   absl::Mutex mutex_;

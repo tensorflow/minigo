@@ -26,13 +26,12 @@
 #include "absl/time/time.h"
 #include "cc/algorithm.h"
 #include "cc/constants.h"
-#include "cc/dual_net/dual_net.h"
 #include "cc/dual_net/inference_cache.h"
 #include "cc/game.h"
 #include "cc/mcts_node.h"
+#include "cc/model/model.h"
 #include "cc/position.h"
 #include "cc/random.h"
-#include "cc/symmetries.h"
 
 namespace minigo {
 
@@ -47,7 +46,6 @@ class MctsPlayer {
     float noise_mix = 0.25;
     bool inject_noise = true;
     bool soft_pick = true;
-    bool random_symmetry = true;
 
     // See mcts_node.cc for details.
     // Default (0.0) is init-to-parent.
@@ -118,7 +116,7 @@ class MctsPlayer {
   // If position is non-null, the player will be initilized with that board
   // state. Otherwise, the player is initialized with an empty board with black
   // to play.
-  MctsPlayer(std::unique_ptr<DualNet> network,
+  MctsPlayer(std::unique_ptr<Model> model,
              std::shared_ptr<InferenceCache> inference_cache, Game* game,
              const Options& options);
 
@@ -128,7 +126,7 @@ class MctsPlayer {
 
   virtual void NewGame();
 
-  virtual Coord SuggestMove(int new_readouts, bool inject_noise=false);
+  virtual Coord SuggestMove(int new_readouts, bool inject_noise = false);
 
   // Plays the move at point c.
   // If game is non-null, adds a new move to the game's move history and sets
@@ -154,8 +152,8 @@ class MctsPlayer {
   const MctsNode* root() const { return root_; }
 
   const Options& options() const { return options_; }
-  const std::string& name() const { return network_->name(); }
-  DualNet* network() { return network_.get(); }
+  const std::string& name() const { return model_->name(); }
+  Model* model() { return model_.get(); }
   uint64_t seed() const { return rnd_.seed(); }
 
   void SetOptions(const Options& options) { options_ = options; }
@@ -168,8 +166,7 @@ class MctsPlayer {
                     std::vector<MctsNode*>* leaves);
 
   // Run inference for the given leaf nodes & incorportate the inference output.
-  void ProcessLeaves(const std::vector<MctsNode*>& leaves,
-                     bool random_symmetry);
+  void ProcessLeaves(const std::vector<MctsNode*>& leaves);
 
   // Protected methods that get exposed for testing.
  protected:
@@ -198,9 +195,11 @@ class MctsPlayer {
     int last_move = 0;
   };
 
+  void GetModelInput(const MctsNode* node, Model::Input* input) const;
+
   void UpdateGame(Coord c);
 
-  std::unique_ptr<DualNet> network_;
+  std::unique_ptr<Model> model_;
   int temperature_cutoff_;
 
   MctsNode::EdgeStats root_stats_;
@@ -217,7 +216,7 @@ class MctsPlayer {
 
   Options options_;
 
-  // The name of the model used for inferences. In the case of ReloadingDualNet,
+  // The name of the model used for inferences. In the case of ReloadingModel,
   // this is different from the model's name: the model name is the pattern used
   // to match each generation of model, while the inference model name is the
   // path to the actual serialized model file.
@@ -229,9 +228,10 @@ class MctsPlayer {
 
   // Vectors reused when running TreeSearch.
   std::vector<MctsNode*> tree_search_leaves_;
-  std::vector<DualNet::BoardFeatures> features_;
-  std::vector<DualNet::Output> outputs_;
-  std::vector<symmetry::Symmetry> symmetries_used_;
+  std::vector<Model::Input> inputs_;
+  std::vector<Model::Output> outputs_;
+  std::vector<const Model::Input*> input_ptrs_;
+  std::vector<Model::Output*> output_ptrs_;
   std::vector<const Position::Stones*> recent_positions_;
 
   TreeSearchCallback tree_search_cb_ = nullptr;

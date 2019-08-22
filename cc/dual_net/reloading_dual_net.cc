@@ -24,9 +24,9 @@
 
 namespace minigo {
 
-// ReloadingDualNetUpdater methods follow.
+// ReloadingModelUpdater methods follow.
 
-bool ReloadingDualNetUpdater::ParseModelPathPattern(
+bool ReloadingModelUpdater::ParseModelPathPattern(
     const std::string& pattern, std::string* directory,
     std::string* basename_pattern) {
   auto pair = file::SplitPath(pattern);
@@ -55,9 +55,9 @@ bool ReloadingDualNetUpdater::ParseModelPathPattern(
   return true;
 }
 
-bool ReloadingDualNetUpdater::MatchBasename(const std::string& basename,
-                                            const std::string& pattern,
-                                            int* generation) {
+bool ReloadingModelUpdater::MatchBasename(const std::string& basename,
+                                          const std::string& pattern,
+                                          int* generation) {
   int gen = 0;
   int n = 0;
   if (sscanf(basename.c_str(), pattern.c_str(), &gen, &n) != 1 ||
@@ -68,8 +68,8 @@ bool ReloadingDualNetUpdater::MatchBasename(const std::string& basename,
   return true;
 }
 
-ReloadingDualNetUpdater::ReloadingDualNetUpdater(const std::string& pattern,
-                                                 DualNetFactory* factory_impl)
+ReloadingModelUpdater::ReloadingModelUpdater(const std::string& pattern,
+                                             ModelFactory* factory_impl)
     : factory_impl_(factory_impl) {
   MG_CHECK(ParseModelPathPattern(pattern, &directory_, &basename_pattern_));
 
@@ -87,7 +87,7 @@ ReloadingDualNetUpdater::ReloadingDualNetUpdater(const std::string& pattern,
   }
 }
 
-bool ReloadingDualNetUpdater::Poll() {
+bool ReloadingModelUpdater::Poll() {
   // List all the files in the given directory.
   std::vector<std::string> basenames;
   if (!file::ListDir(directory_, &basenames)) {
@@ -123,95 +123,84 @@ bool ReloadingDualNetUpdater::Poll() {
       return false;
     }
 
-    // Create new model instances for all registered ReloadingDualNets.
+    // Create new model instances for all registered ReloadingModels.
     latest_model_path_ = std::move(path);
     MG_LOG(INFO) << "Loading new model \"" << latest_model_path_ << "\"";
     for (auto* model : models_) {
-      model->UpdateImpl(factory_impl_->NewDualNet(latest_model_path_));
+      model->UpdateImpl(factory_impl_->NewModel(latest_model_path_));
     }
   }
   return true;
 }
 
-void ReloadingDualNetUpdater::UnregisterModel(ReloadingDualNet* model) {
+void ReloadingModelUpdater::UnregisterModel(ReloadingModel* model) {
   absl::MutexLock lock(&mutex_);
   MG_CHECK(models_.erase(model) != 0);
 }
 
-std::unique_ptr<ReloadingDualNet>
-ReloadingDualNetUpdater::NewReloadingDualNet() {
+std::unique_ptr<ReloadingModel> ReloadingModelUpdater::NewReloadingModel() {
   absl::MutexLock lock(&mutex_);
   // Create the real model.
-  auto model_impl = factory_impl_->NewDualNet(latest_model_path_);
+  auto model_impl = factory_impl_->NewModel(latest_model_path_);
 
   // Wrap the model.
-  auto model = absl::make_unique<ReloadingDualNet>(basename_pattern_, this,
-                                                   std::move(model_impl));
+  auto model = absl::make_unique<ReloadingModel>(basename_pattern_, this,
+                                                 std::move(model_impl));
 
   // Register the wrapped model.
   MG_CHECK(models_.emplace(model.get()).second);
   return model;
 }
 
-// ReloadingDualNet methods follow.
+// ReloadingModel methods follow.
 
-ReloadingDualNet::ReloadingDualNet(std::string name,
-                                   ReloadingDualNetUpdater* updater,
-                                   std::unique_ptr<DualNet> impl)
-    : DualNet(std::move(name)),
+ReloadingModel::ReloadingModel(std::string name, ReloadingModelUpdater* updater,
+                               std::unique_ptr<Model> impl)
+    : Model(std::move(name), impl->buffer_count()),
       updater_(updater),
       model_impl_(std::move(impl)) {}
 
-ReloadingDualNet::~ReloadingDualNet() { updater_->UnregisterModel(this); }
+ReloadingModel::~ReloadingModel() { updater_->UnregisterModel(this); }
 
-void ReloadingDualNet::RunMany(std::vector<const BoardFeatures*> features,
-                               std::vector<Output*> outputs,
-                               std::string* model) {
+void ReloadingModel::RunMany(const std::vector<const Input*>& inputs,
+                             std::vector<Output*>* outputs,
+                             std::string* model_name) {
   absl::MutexLock lock(&mutex_);
-  model_impl_->RunMany(std::move(features), std::move(outputs), model);
+  model_impl_->RunMany(inputs, outputs, model_name);
 }
 
-void ReloadingDualNet::Reserve(size_t capacity) {
-  absl::MutexLock lock(&mutex_);
-  model_impl_->Reserve(capacity);
-}
-
-void ReloadingDualNet::UpdateImpl(std::unique_ptr<DualNet> model_impl) {
+void ReloadingModel::UpdateImpl(std::unique_ptr<Model> model_impl) {
   absl::MutexLock lock(&mutex_);
   model_impl_ = std::move(model_impl);
 }
 
-// ReloadingDualNetFactory methods follow.
+// ReloadingModelFactory methods follow.
 
-ReloadingDualNetFactory::ReloadingDualNetFactory(
-    std::unique_ptr<DualNetFactory> impl, absl::Duration poll_interval)
+ReloadingModelFactory::ReloadingModelFactory(std::unique_ptr<ModelFactory> impl,
+                                             absl::Duration poll_interval)
     : factory_impl_(std::move(impl)), poll_interval_(poll_interval) {
   running_ = true;
-  thread_ = std::thread(&ReloadingDualNetFactory::ThreadRun, this);
+  thread_ = std::thread(&ReloadingModelFactory::ThreadRun, this);
 }
 
-ReloadingDualNetFactory::~ReloadingDualNetFactory() {
+ReloadingModelFactory::~ReloadingModelFactory() {
   running_ = false;
   thread_.join();
 }
 
-int ReloadingDualNetFactory::GetBufferCount() const {
-  return factory_impl_->GetBufferCount();
-}
-
-std::unique_ptr<DualNet> ReloadingDualNetFactory::NewDualNet(
+std::unique_ptr<Model> ReloadingModelFactory::NewModel(
     const std::string& model_pattern) {
   absl::MutexLock lock(&mutex_);
   auto it = updaters_.find(model_pattern);
   if (it == updaters_.end()) {
-    auto updater = absl::make_unique<ReloadingDualNetUpdater>(
+    auto updater = absl::make_unique<ReloadingModelUpdater>(
         model_pattern, factory_impl_.get());
     it = updaters_.emplace(model_pattern, std::move(updater)).first;
   }
-  return it->second->NewReloadingDualNet();
+  return it->second->NewReloadingModel();
 }
 
-void ReloadingDualNetFactory::ThreadRun() {
+void ReloadingModelFactory::ThreadRun() {
   while (running_) {
     absl::SleepFor(poll_interval_);
     absl::MutexLock lock(&mutex_);

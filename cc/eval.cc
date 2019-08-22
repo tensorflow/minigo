@@ -88,11 +88,10 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
   game_options->ignore_repeated_moves = true;
   player_options->virtual_losses = FLAGS_virtual_losses;
-  player_options->random_seed = FLAGS_seed;
+  player_options->its = FLAGS_seed;
   player_options->num_readouts = FLAGS_num_readouts;
   player_options->inject_noise = false;
   player_options->soft_pick = false;
-  player_options->random_symmetry = true;
 }
 
 class Evaluator {
@@ -148,14 +147,16 @@ class Evaluator {
   Evaluator(ModelDescriptor desc_a, ModelDescriptor desc_b)
       : desc_a_(std::move(desc_a)), desc_b_(std::move(desc_b)) {
     // Create a batcher for the first model.
+    uint64_t factory_seed =
+        FLAGS_seed ? FLAGS_seed * 127 : DeviceRandomUint64NonZero();
     batchers_.push_back(absl::make_unique<BatchingDualNetFactory>(
-        NewDualNetFactory(desc_a_.engine)));
+        NewModelFactory(desc_a_.engine, DeviceRandomUint64NonZero())));
 
     // If the second model requires a different factory, create one & a second
     // batcher too.
     if (desc_b_.engine != desc_a_.engine) {
       batchers_.push_back(absl::make_unique<BatchingDualNetFactory>(
-          NewDualNetFactory(desc_b_.engine)));
+          NewModelFactory(desc_b_.engine, factory_seed * 769)));
     }
   }
 

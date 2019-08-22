@@ -47,6 +47,10 @@ constexpr float kDirichletAlpha = 0.03f * 361 / (kN * kN);
 static constexpr float kUct_base = 19652;
 static constexpr float kUct_init = 1.25;
 
+// Maximum number of moves we look back in history when preparing input for an
+// inference.
+static constexpr int kMaxPositionHistory = 8;
+
 }  // namespace minigo
 
 #endif  //  CC_CONSTANTS_H_

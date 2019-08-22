@@ -32,7 +32,6 @@ namespace minigo {
 std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
   os << " inject_noise:" << options.inject_noise
      << " soft_pick:" << options.soft_pick
-     << " random_symmetry:" << options.random_symmetry
      << " value_init_penalty:" << options.value_init_penalty
      << " policy_softmax_temp:" << options.policy_softmax_temp
      << " virtual_losses:" << options.virtual_losses
@@ -71,10 +70,10 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
          std::pow(decay_factor, std::max(player_move_num - core_moves, 0));
 }
 
-MctsPlayer::MctsPlayer(std::unique_ptr<DualNet> network,
+MctsPlayer::MctsPlayer(std::unique_ptr<Model> model,
                        std::shared_ptr<InferenceCache> inference_cache,
                        Game* game, const Options& options)
-    : network_(std::move(network)),
+    : model_(std::move(model)),
       game_root_(&root_stats_, {&bv_, &gv_, Color::kBlack}),
       game_(game),
       rnd_(options.random_seed),
@@ -126,7 +125,7 @@ Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise) {
   if (!root_->HasFlag(MctsNode::Flag::kExpanded)) {
     tree_search_leaves_.clear();
     SelectLeaves(root_, 1, &tree_search_leaves_);
-    ProcessLeaves(tree_search_leaves_, options_.random_symmetry);
+    ProcessLeaves(tree_search_leaves_);
   }
 
   if (inject_noise) {
@@ -192,15 +191,31 @@ Coord MctsPlayer::PickMove() {
   return c;
 }
 
+void MctsPlayer::GetModelInput(const MctsNode* node,
+                               Model::Input* input) const {
+  input->to_play = node->position.to_play();
+  input->position_history.clear();
+  // TODO(tommadams): add a method to the model that returns the position
+  // history size.
+  int n = kMaxPositionHistory;
+  for (int j = 0; j < n; ++j) {
+    input->position_history.push_back(&node->position.stones());
+    node = node->parent;
+    if (node == nullptr) {
+      break;
+    }
+  }
+}
+
 void MctsPlayer::TreeSearch() {
   tree_search_leaves_.clear();
   SelectLeaves(root_, options_.virtual_losses, &tree_search_leaves_);
-  ProcessLeaves(tree_search_leaves_, options_.random_symmetry);
+  ProcessLeaves(tree_search_leaves_);
 }
 
 void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
                               std::vector<MctsNode*>* leaves) {
-  DualNet::Output cached_output;
+  Model::Output cached_output;
 
   int max_cache_misses = num_leaves * 2;
   int num_selected = 0;
@@ -362,55 +377,30 @@ void MctsPlayer::UpdateGame(Coord c) {
                  std::move(comment), root_->Q(), search_pi, std::move(models));
 }
 
-void MctsPlayer::ProcessLeaves(const std::vector<MctsNode*>& leaves,
-                               bool random_symmetry) {
+void MctsPlayer::ProcessLeaves(const std::vector<MctsNode*>& leaves) {
   if (leaves.empty()) {
     return;
   }
 
-  // Select symmetry operations to apply.
-  symmetries_used_.resize(0);
-  if (random_symmetry) {
-    symmetries_used_.reserve(leaves.size());
-    for (size_t i = 0; i < leaves.size(); ++i) {
-      symmetries_used_.push_back(static_cast<symmetry::Symmetry>(
-          rnd_.UniformInt(0, symmetry::kNumSymmetries - 1)));
-    }
-  } else {
-    symmetries_used_.resize(leaves.size(), symmetry::kIdentity);
-  }
-
-  // Build input features for each leaf, applying random symmetries if
-  // requested.
-  DualNet::BoardFeatures raw_features;
-  features_.resize(leaves.size());
-  for (size_t i = 0; i < leaves.size(); ++i) {
-    const auto* leaf = leaves[i];
-    MG_CHECK(leaf->num_virtual_losses_applied > 0)
-        << "Don't forget to add a virtual loss before calling ProcessLeaves";
-    leaf->GetMoveHistory(DualNet::kMoveHistory, &recent_positions_);
-    DualNet::SetFeatures(recent_positions_, leaf->position.to_play(),
-                         &raw_features);
-    symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
-        symmetries_used_[i], raw_features.data(), features_[i].data());
-  }
-
-  std::vector<const DualNet::BoardFeatures*> feature_ptrs;
-  feature_ptrs.reserve(features_.size());
-  for (const auto& feature : features_) {
-    feature_ptrs.push_back(&feature);
-  }
-
+  inputs_.resize(leaves.size());
   outputs_.resize(leaves.size());
-  std::vector<DualNet::Output*> output_ptrs;
-  output_ptrs.reserve(outputs_.size());
-  for (auto& output : outputs_) {
-    output_ptrs.push_back(&output);
+
+  for (size_t i = 0; i < leaves.size(); ++i) {
+    MG_CHECK(leaves[i]->num_virtual_losses_applied > 0);
+    GetModelInput(leaves[i], &inputs_[i]);
+  }
+
+  input_ptrs_.clear();
+  for (const auto& x : inputs_) {
+    input_ptrs_.push_back(&x);
+  }
+  output_ptrs_.clear();
+  for (auto& x : outputs_) {
+    output_ptrs_.push_back(&x);
   }
 
   // Run inference.
-  network_->RunMany(std::move(feature_ptrs), std::move(output_ptrs),
-                    &inference_model_);
+  model_->RunMany(input_ptrs_, &output_ptrs_, &inference_model_);
 
   // Record some information about the inference.
   if (!inference_model_.empty()) {
@@ -421,29 +411,19 @@ void MctsPlayer::ProcessLeaves(const std::vector<MctsNode*>& leaves,
     inferences_.back().total_count += leaves.size();
   }
 
-  // Incorporate the inference outputs back into tree search, undoing any
-  // previously applied random symmetries.
-  DualNet::Output normalized_output;
+  // Incorporate the inference outputs back into tree search.
   for (size_t i = 0; i < leaves.size(); ++i) {
     auto* leaf = leaves[i];
     const auto& output = outputs_[i];
 
-    // Undo the applied symmetry.
-    symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(symmetries_used_[i]),
-                                   output.policy.data(),
-                                   normalized_output.policy.data());
-    normalized_output.policy[Coord::kPass] = output.policy[Coord::kPass];
-    normalized_output.value = output.value;
-
     // Propagate the results back up the tree to the root.
-    leaf->IncorporateResults(options_.value_init_penalty,
-                             normalized_output.policy, normalized_output.value,
-                             root_);
+    leaf->IncorporateResults(options_.value_init_penalty, output.policy,
+                             output.value, root_);
 
     // Update the inference cache.
     if (inference_cache_ != nullptr) {
       InferenceCache::Key key(leaf->move, leaf->position);
-      inference_cache_->Add(key, normalized_output);
+      inference_cache_->Add(key, output);
     }
 
     leaf->RevertVirtualLoss(root_);
