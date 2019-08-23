@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/model/model.h"
@@ -61,7 +62,7 @@ class DualNet : public Model {
   static void SetFeatures(absl::Span<const Position::Stones* const> history,
                           Color to_play, BoardFeatures* features);
 
-  DualNet(std::string name, uint64_t random_seed);
+  DualNet(std::string name, bool random_symmetry, uint64_t random_seed);
   ~DualNet() override;
 
   void RunMany(const std::vector<const Input*>& inputs,
@@ -76,9 +77,33 @@ class DualNet : public Model {
   std::vector<symmetry::Symmetry> symmetries_used_;
   std::vector<BoardFeatures> features_;
   std::vector<Output> raw_outputs_;
+
+  const bool random_symmetry_;
+  Random rnd_;
+};
+
+class DualNetFactory : public ModelFactory {
+ public:
+  // random_symmetry: whether to enable random symmetry in models created by
+  //                  this factory.
+  // random_seed: seed for random symmetries (each model instance gets a
+  //              unique seed from this one). Pass 0 to use a randomly
+  //              generated seed, seeded from the platform's entropy source
+  //              (e.g. /dev/rand).
+  DualNetFactory(bool random_symmetry, uint64_t random_seed);
+
+  bool random_symmetry() const { return random_symmetry_; }
+
+ protected:
+  uint64_t GetModelSeed() LOCKS_EXCLUDED(&mutex_);
+
+ private:
   const bool random_symmetry_;
 
-  Random rnd_;
+  // TODO(tommadams): switch Random to use pcg32, then we can replace this mutex
+  // with an std::atomic<uint32_t> sequence number instead.
+  absl::Mutex mutex_;
+  Random rnd_ GUARDED_BY(&mutex_);
 };
 
 }  // namespace minigo

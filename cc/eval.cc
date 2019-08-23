@@ -39,6 +39,7 @@
 #include "cc/init.h"
 #include "cc/logging.h"
 #include "cc/mcts_player.h"
+#include "cc/model/model.h"
 #include "cc/random.h"
 #include "cc/tf_utils.h"
 #include "cc/zobrist.h"
@@ -88,25 +89,24 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
   game_options->ignore_repeated_moves = true;
   player_options->virtual_losses = FLAGS_virtual_losses;
-  player_options->its = FLAGS_seed;
   player_options->num_readouts = FLAGS_num_readouts;
   player_options->inject_noise = false;
   player_options->soft_pick = false;
 }
 
 class Evaluator {
-  class Model {
+  class EvaluatedModel {
    public:
-    Model(BatchingDualNetFactory* batcher, const std::string& path)
+    EvaluatedModel(BatchingModelFactory* batcher, const std::string& path)
         : batcher_(batcher), path_(path) {}
 
-    BatchingDualNetFactory* batcher() { return batcher_; }
+    BatchingModelFactory* batcher() { return batcher_; }
     std::string name() {
       absl::MutexLock lock(&mutex_);
       if (name_.empty()) {
         // The model's name is lazily initialized the first time we create a
         // instance. Make sure it's valid.
-        NewDualNetImpl();
+        NewModelImpl();
       }
       return name_;
     }
@@ -121,23 +121,22 @@ class Evaluator {
       win_stats_.Update(game);
     }
 
-    std::unique_ptr<DualNet> NewDualNet() {
+    std::unique_ptr<Model> NewModel() {
       absl::MutexLock lock(&mutex_);
-      return NewDualNetImpl();
+      return NewModelImpl();
     }
 
    private:
-    std::unique_ptr<DualNet> NewDualNetImpl()
-        EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
-      auto dual_net = batcher_->NewDualNet(path_);
+    std::unique_ptr<Model> NewModelImpl() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
+      auto model = batcher_->NewModel(path_);
       if (name_.empty()) {
-        name_ = dual_net->name();
+        name_ = model->name();
       }
-      return dual_net;
+      return model;
     }
 
     mutable absl::Mutex mutex_;
-    BatchingDualNetFactory* batcher_ GUARDED_BY(&mutex_);
+    BatchingModelFactory* batcher_ GUARDED_BY(&mutex_);
     const std::string path_;
     std::string name_ GUARDED_BY(&mutex_);
     WinStats win_stats_ GUARDED_BY(&mutex_);
@@ -147,26 +146,24 @@ class Evaluator {
   Evaluator(ModelDescriptor desc_a, ModelDescriptor desc_b)
       : desc_a_(std::move(desc_a)), desc_b_(std::move(desc_b)) {
     // Create a batcher for the first model.
-    uint64_t factory_seed =
-        FLAGS_seed ? FLAGS_seed * 127 : DeviceRandomUint64NonZero();
-    batchers_.push_back(absl::make_unique<BatchingDualNetFactory>(
-        NewModelFactory(desc_a_.engine, DeviceRandomUint64NonZero())));
+    batchers_.push_back(absl::make_unique<BatchingModelFactory>(
+        NewModelFactory(desc_a_.engine, true, FLAGS_seed * 492888653)));
 
     // If the second model requires a different factory, create one & a second
     // batcher too.
     if (desc_b_.engine != desc_a_.engine) {
-      batchers_.push_back(absl::make_unique<BatchingDualNetFactory>(
-          NewModelFactory(desc_b_.engine, factory_seed * 769)));
+      batchers_.push_back(absl::make_unique<BatchingModelFactory>(
+          NewModelFactory(desc_b_.engine, true, FLAGS_seed * 295220389)));
     }
   }
 
   void Run() {
     auto start_time = absl::Now();
 
-    Model model_a(batchers_.front().get(), desc_a_.model);
-    Model model_b(batchers_.back().get(), desc_b_.model);
+    EvaluatedModel model_a(batchers_.front().get(), desc_a_.model);
+    EvaluatedModel model_b(batchers_.back().get(), desc_b_.model);
 
-    MG_LOG(INFO) << "DualNet factories created from " << desc_a_ << "\n  and "
+    MG_LOG(INFO) << "Model factories created from " << desc_a_ << "\n  and "
                  << desc_b_ << " in "
                  << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
 
@@ -192,13 +189,14 @@ class Evaluator {
   }
 
  private:
-  void ThreadRun(int thread_id, Model* black_model, Model* white_model) {
+  void ThreadRun(int thread_id, EvaluatedModel* black_model,
+                 EvaluatedModel* white_model) {
     // Only print the board using ANSI colors if stderr is sent to the
     // terminal.
     const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
 
     // The player and other_player reference this pointer.
-    std::unique_ptr<DualNet> dual_net;
+    std::unique_ptr<Model> model;
 
     std::vector<std::string> bigtable_spec =
         absl::StrSplit(FLAGS_output_bigtable, ',');
@@ -219,25 +217,22 @@ class Evaluator {
     }
 
     const bool verbose = thread_id == 0;
-    auto black = absl::make_unique<MctsPlayer>(black_model->NewDualNet(),
-                                               nullptr, &game, player_options);
-    auto white = absl::make_unique<MctsPlayer>(white_model->NewDualNet(),
-                                               nullptr, &game, player_options);
+    auto black = absl::make_unique<MctsPlayer>(black_model->NewModel(), nullptr,
+                                               &game, player_options);
+    auto white = absl::make_unique<MctsPlayer>(white_model->NewModel(), nullptr,
+                                               &game, player_options);
 
-    BatchingDualNetFactory::StartGame(black->network(), white->network());
+    BatchingModelFactory::StartGame(black->model(), white->model());
     auto* curr_player = black.get();
     auto* next_player = white.get();
     while (!game.game_over() && !curr_player->root()->at_move_limit()) {
       if (curr_player->root()->position.n() >= kMinPassAliveMoves &&
           curr_player->root()->position.CalculateWholeBoardPassAlive()) {
         // Play pass moves to end the game.
-        MG_CHECK(curr_player->PlayMove(Coord::kPass));
-        MG_CHECK(next_player->PlayMove(Coord::kPass));
-        MG_CHECK(curr_player->PlayMove(Coord::kPass));
-        // We don't PlayMove(kPass) a fourth time because the game is over after
-        // the third call so we can't play any more moves.
-        // TODO(tommadams): seriously, we need to call PlayMove on the Game
-        // object not the Players.
+        while (!game.game_over()) {
+          MG_CHECK(curr_player->PlayMove(Coord::kPass));
+          std::swap(curr_player, next_player);
+        }
         break;
       }
 
@@ -258,7 +253,7 @@ class Evaluator {
       }
       std::swap(curr_player, next_player);
     }
-    BatchingDualNetFactory::EndGame(black->network(), white->network());
+    BatchingModelFactory::EndGame(black->model(), white->model());
 
     if (game.result() > 0) {
       black_model->UpdateWinStats(game);
@@ -300,7 +295,7 @@ class Evaluator {
 
   const ModelDescriptor desc_a_;
   const ModelDescriptor desc_b_;
-  std::vector<std::unique_ptr<BatchingDualNetFactory>> batchers_;
+  std::vector<std::unique_ptr<BatchingModelFactory>> batchers_;
 };
 
 }  // namespace

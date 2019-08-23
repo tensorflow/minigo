@@ -59,7 +59,8 @@ void Puzzle() {
   auto start_time = absl::Now();
 
   auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
-  BatchingDualNetFactory batcher(NewDualNetFactory(model_desc.engine));
+  BatchingModelFactory batcher(
+      NewModelFactory(model_desc.engine, true, FLAGS_seed));
 
   Game::Options game_options;
   game_options.resign_enabled = false;
@@ -67,10 +68,8 @@ void Puzzle() {
   MctsPlayer::Options player_options;
   player_options.inject_noise = false;
   player_options.soft_pick = false;
-  player_options.random_symmetry = true;
   player_options.value_init_penalty = FLAGS_value_init_penalty;
   player_options.virtual_losses = FLAGS_virtual_losses;
-  player_options.random_seed = FLAGS_seed;
   player_options.num_readouts = FLAGS_num_readouts;
 
   std::atomic<size_t> total_moves(0);
@@ -96,13 +95,13 @@ void Puzzle() {
 
       total_moves += moves.size();
 
-      auto model = batcher.NewDualNet(model_desc.model);
+      auto model = batcher.NewModel(model_desc.model);
       Game game(model->name(), model->name(), game_options);
 
       // Create player.
       auto player = absl::make_unique<MctsPlayer>(std::move(model), nullptr,
                                                   &game, player_options);
-      batcher.StartGame(player->network(), player->network());
+      batcher.StartGame(player->model(), player->model());
 
       // Play through each game. For each position in the game, compare the
       // model's suggested move to the actual move played in the game.
@@ -123,7 +122,7 @@ void Puzzle() {
           ++correct_moves;
         }
       }
-      batcher.EndGame(player->network(), player->network());
+      batcher.EndGame(player->model(), player->model());
     });
   }
 

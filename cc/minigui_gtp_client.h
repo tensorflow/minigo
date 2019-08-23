@@ -30,8 +30,8 @@
 #include "absl/types/span.h"
 #include "cc/color.h"
 #include "cc/dual_net/batching_dual_net.h"
-#include "cc/dual_net/dual_net.h"
 #include "cc/gtp_client.h"
+#include "cc/model/model.h"
 #include "cc/thread.h"
 #include "cc/thread_safe_queue.h"
 
@@ -39,7 +39,7 @@ namespace minigo {
 
 class MiniguiGtpClient : public GtpClient {
  public:
-  MiniguiGtpClient(std::unique_ptr<DualNetFactory> model_factory,
+  MiniguiGtpClient(std::unique_ptr<ModelFactory> model_factory,
                    std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
                    const std::string& model_path,
                    const Game::Options& game_options,
@@ -128,7 +128,7 @@ class MiniguiGtpClient : public GtpClient {
   class WinRateEvaluator {
    public:
     WinRateEvaluator(int num_workers, int num_eval_reads,
-                     DualNetFactory* model_factory,
+                     ModelFactory* model_factory,
                      std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
                      const std::string& model_path,
                      const Game::Options& game_options,

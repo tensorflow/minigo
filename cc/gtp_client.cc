@@ -32,14 +32,14 @@ namespace minigo {
 
 GtpClient::GtpClient(std::unique_ptr<ModelFactory> model_factory,
                      std::shared_ptr<InferenceCache> inference_cache,
-                     const std::string& model_path,
+                     const std::string& model_descriptor,
                      const Game::Options& game_options,
                      const MctsPlayer::Options& player_options,
                      const GtpClient::Options& client_options)
     : model_factory_(std::move(model_factory)),
       inference_cache_(inference_cache),
       options_(client_options) {
-  auto model = model_factory_->NewModel(model_path);
+  auto model = model_factory_->NewModel(model_descriptor);
   game_ = absl::make_unique<Game>(model->name(), model->name(), game_options);
 
   // Create the main player. Its model doesn't run through the batcher used for
@@ -78,8 +78,10 @@ void GtpClient::Run() {
   Model::Output output;
   Model::Input input;
   input.to_play = Color::kBlack;
-  input.position_history.push_back(&position);
-  player_->model()->RunMany({&input}, {&output}, nullptr);
+  input.position_history.push_back(&stones);
+  std::vector<const Model::Input*> inputs = {&input};
+  std::vector<Model::Output*> outputs = {&output};
+  player_->model()->RunMany(inputs, &outputs, nullptr);
   MG_LOG(INFO) << "GTP engine ready";
 
   // Start a background thread that pushes lines read from stdin into the
@@ -420,7 +422,7 @@ GtpClient::Response GtpClient::HandleName(CmdArgs args) {
   if (!response.ok) {
     return response;
   }
-  return Response::Ok(absl::StrCat("minigo-", player_->network()->name()));
+  return Response::Ok(absl::StrCat("minigo-", player_->model()->name()));
 }
 
 GtpClient::Response GtpClient::HandlePlay(CmdArgs args) {

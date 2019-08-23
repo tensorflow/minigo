@@ -34,7 +34,7 @@
 namespace minigo {
 
 MiniguiGtpClient::MiniguiGtpClient(
-    std::unique_ptr<DualNetFactory> model_factory,
+    std::unique_ptr<ModelFactory> model_factory,
     std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
     const std::string& model_path, const Game::Options& game_options,
     const MctsPlayer::Options& player_options,
@@ -57,7 +57,7 @@ MiniguiGtpClient::MiniguiGtpClient(
   int num_workers = 16;
   int num_win_rate_evals = 8;
   model_factory_ =
-      absl::make_unique<BatchingDualNetFactory>(std::move(model_factory_));
+      absl::make_unique<BatchingModelFactory>(std::move(model_factory_));
   auto worker_options = player_options;
   worker_options.virtual_losses = 1;
   win_rate_evaluator_ = absl::make_unique<WinRateEvaluator>(
@@ -446,7 +446,7 @@ bool MiniguiGtpClient::VariationTree::SelectNode(const std::string& id) {
 }
 
 MiniguiGtpClient::WinRateEvaluator::WinRateEvaluator(
-    int num_workers, int num_eval_reads, DualNetFactory* model_factory,
+    int num_workers, int num_eval_reads, ModelFactory* model_factory,
     std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
     const std::string& model_path, const Game::Options& game_options,
     const MctsPlayer::Options& player_options)
@@ -456,7 +456,7 @@ MiniguiGtpClient::WinRateEvaluator::WinRateEvaluator(
   for (int i = 0; i < num_workers; ++i) {
     auto game = absl::make_unique<Game>("b", "w", game_options);
     auto player = absl::make_unique<MctsPlayer>(
-        model_factory->NewDualNet(model_path), inference_cache, game.get(),
+        model_factory->NewModel(model_path), inference_cache, game.get(),
         player_options);
     workers_.push_back(absl::make_unique<Worker>(
         std::move(game), std::move(player), &eval_queue_));
@@ -539,7 +539,7 @@ MiniguiGtpClient::WinRateEvaluator::Worker::~Worker() {
 }
 
 void MiniguiGtpClient::WinRateEvaluator::Worker::Prepare() {
-  BatchingDualNetFactory::StartGame(player_->network(), player_->network());
+  BatchingModelFactory::StartGame(player_->model(), player_->model());
 }
 
 void MiniguiGtpClient::WinRateEvaluator::Worker::EvalAsync(
@@ -565,7 +565,7 @@ void MiniguiGtpClient::WinRateEvaluator::Worker::Run() {
       MG_CHECK(player_->PlayMove(c));
     }
     player_->TreeSearch();
-    BatchingDualNetFactory::EndGame(player_->network(), player_->network());
+    BatchingModelFactory::EndGame(player_->model(), player_->model());
 
     nlohmann::json j = {
         {"id", node->id},

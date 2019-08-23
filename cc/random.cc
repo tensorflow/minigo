@@ -18,7 +18,14 @@ namespace minigo {
 
 namespace {
 uint64_t ChooseSeed(uint64_t seed) {
-  return seed != 0 ? seed : DeviceRandomUint64();
+  if (seed == 0) {
+    std::random_device rd;
+    seed = rd();
+    if (sizeof(std::random_device::result_type) < 8) {
+      seed = (seed << 32) | rd();
+    }
+  }
+  return seed;
 }
 }  // namespace
 
@@ -54,24 +61,6 @@ void Random::NormalDistribution(float mean, float stddev,
   std::normal_distribution<float> distribution(mean, stddev);
   for (float& sample : samples) {
     sample = distribution(impl_);
-  }
-}
-
-uint64_t DeviceRandomUint64() {
-  std::random_device rd;
-  uint64_t result = rd();
-  if (sizeof(std::random_device::result_type) < 8) {
-    result = (result << 32) | rd();
-  }
-  return result;
-}
-
-uint64_t DeviceRandomUint64NonZero() {
-  for (;;) {
-    auto result = DeviceRandomUint64();
-    if (result != 0) {
-      return result;
-    }
   }
 }
 

@@ -25,10 +25,10 @@ namespace {
 
 // Note that the features returned aren't valid input features for the model:
 struct Inference {
-  Inference(InferenceCache::Key key, const DualNet::Output& output)
+  Inference(InferenceCache::Key key, const Model::Output& output)
       : key(key), output(output) {}
   InferenceCache::Key key;
-  DualNet::Output output;
+  Model::Output output;
 };
 
 // Verify the LRU behavior of the basic cache.
@@ -45,7 +45,7 @@ TEST(InferenceCacheTest, Basic) {
     prev_move = GetRandomLegalMove(position, &rnd);
     position.PlayMove(prev_move);
 
-    DualNet::Output output;
+    Model::Output output;
     rnd.Uniform(&output.policy);
     output.value = rnd();
     inferences.emplace_back(key, output);
@@ -57,7 +57,7 @@ TEST(InferenceCacheTest, Basic) {
   }
 
   // Verify that the elements stored in the cache are as expected.
-  DualNet::Output output;
+  Model::Output output;
   for (int i = 0; i < 3; ++i) {
     ASSERT_TRUE(cache.TryGet(inferences[i].key, &output));
     EXPECT_EQ(inferences[i].output.policy, output.policy);
@@ -86,7 +86,7 @@ TEST(InferenceCacheTest, ThreadSafe) {
     prev_move = GetRandomLegalMove(position, &rnd);
     position.PlayMove(prev_move);
 
-    DualNet::Output output;
+    Model::Output output;
     rnd.Uniform(&output.policy);
     output.value = rnd();
     inferences.emplace_back(key, output);
@@ -98,7 +98,7 @@ TEST(InferenceCacheTest, ThreadSafe) {
   }
 
   // Verify that the elements stored in the cache are as expected.
-  DualNet::Output output;
+  Model::Output output;
   for (const auto& inference : inferences) {
     ASSERT_TRUE(cache.TryGet(inference.key, &output));
     EXPECT_EQ(inference.output.policy, output.policy);

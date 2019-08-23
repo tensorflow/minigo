@@ -102,8 +102,9 @@ std::unique_ptr<Session> CreateSession(const GraphDef& graph_def,
 TpuDualNet::TpuDualNet(const std::string& tpu_name,
                        const std::string& graph_path,
                        const tensorflow::GraphDef& graph_def, int num_replicas,
-                       uint64_t random_seed)
-    : DualNet(std::string(file::Stem(graph_path)), random_seed),
+                       bool random_symmetry, uint64_t random_seed)
+    : DualNet(std::string(file::Stem(graph_path)), random_symmetry,
+              random_seed),
       num_replicas_(num_replicas) {
   session_ = CreateSession(graph_def, tpu_name);
   for (int i = 0; i < num_replicas_; ++i) {
@@ -186,10 +187,10 @@ void TpuDualNet::Reserve(size_t capacity) {
 }
 
 TpuDualNetFactory::TpuDualNetFactory(int buffer_count, std::string tpu_name,
-                                     uint64_t random_seed)
-    : tpu_name_(std::move(tpu_name)),
-      buffer_count_(buffer_count),
-      rnd_(random_seed) {
+                                     bool random_symmetry, uint64_t random_seed)
+    : DualNetFactory(random_symmetry, random_seed),
+      tpu_name_(std::move(tpu_name)),
+      buffer_count_(buffer_count) {
   // Create a session containing ops for initializing & shutting down a TPU.
   GraphDef graph_def;
   ::tensorflow::protobuf::TextFormat::ParseFromString(kTpuOpsGraphDef,
@@ -210,8 +211,6 @@ TpuDualNetFactory::~TpuDualNetFactory() {
 
 std::unique_ptr<Model> TpuDualNetFactory::NewModel(
     const std::string& descriptor) {
-  absl::MutexLock lock(&mutex_);
-
   GraphDef graph_def;
   auto* env = Env::Default();
   TF_CHECK_OK(ReadBinaryProto(env, descriptor, &graph_def));
@@ -245,7 +244,8 @@ std::unique_ptr<Model> TpuDualNetFactory::NewModel(
   std::vector<std::unique_ptr<Model>> models;
   for (int i = 0; i < buffer_count_; ++i) {
     models.push_back(absl::make_unique<TpuDualNet>(
-        tpu_name_, descriptor, graph_def, num_replicas, rnd_.UniformUint64()));
+        tpu_name_, descriptor, graph_def, num_replicas, random_symmetry(),
+        GetModelSeed()));
   }
 
   return absl::make_unique<BufferedModel>(descriptor, std::move(models));

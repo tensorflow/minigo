@@ -35,17 +35,15 @@ namespace {
 
 class LiteDualNet : public DualNet {
  public:
-  explicit LiteDualNet(std::string graph_path);
-
-  void RunManyImpl(std::string* model) override;
+  LiteDualNet(std::string graph_path, bool random_symmetry,
+              uint64_t random_seed);
 
  private:
+  void RunManyImpl(std::string* model_name) override;
   void Reserve(size_t capacity);
 
   template <typename T>
-  void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, T* feature_data,
-               const T* policy_data, const T* value_data);
+  void RunManyImpl(T* feature_data, const T* policy_data, const T* value_data);
 
   std::unique_ptr<tflite::FlatBufferModel> model_;
   std::unique_ptr<tflite::Interpreter> interpreter_;
@@ -62,8 +60,10 @@ class LiteDualNet : public DualNet {
   size_t batch_capacity_;
 };
 
-minigo::LiteDualNet::LiteDualNet(std::string graph_path)
-    : DualNet(std::string(file::Stem(graph_path))),
+LiteDualNet::LiteDualNet(std::string graph_path, bool random_symmetry,
+                         uint64_t random_seed)
+    : DualNet(std::string(file::Stem(graph_path)), random_symmetry,
+              random_seed),
       graph_path_(std::move(graph_path)),
       batch_capacity_(0) {
   model_ = FlatBufferModel::BuildFromFile(graph_path_.c_str());
@@ -105,7 +105,7 @@ minigo::LiteDualNet::LiteDualNet(std::string graph_path)
   }
 }
 
-void minigo::LiteDualNet::Reserve(size_t capacity) {
+void LiteDualNet::Reserve(size_t capacity) {
   MG_CHECK(capacity > 0);
   if (capacity <= batch_capacity_) {
     return;
@@ -125,24 +125,21 @@ void minigo::LiteDualNet::Reserve(size_t capacity) {
   batch_capacity_ = capacity;
 }
 
-void minigo::LiteDualNet::RunMany(
-    std::vector<const DualNet::BoardFeatures*> features,
-    std::vector<DualNet::Output*> outputs, std::string* model) {
-  if (model != nullptr) {
-    *model = graph_path_;
-  }
-
-  Reserve(features.size());
+void LiteDualNet::RunManyImpl(std::string* model_name) {
+  Reserve(features_.size());
 
   switch (input_->type) {
     case kTfLiteFloat32:
-      return RunMany(features, outputs, input_->data.f, policy_->data.f,
-                     value_->data.f);
+      return RunManyImpl(input_->data.f, policy_->data.f, value_->data.f);
     case kTfLiteUInt8:
-      return RunMany(features, outputs, input_->data.uint8, policy_->data.uint8,
-                     value_->data.uint8);
+      return RunManyImpl(input_->data.uint8, policy_->data.uint8,
+                         value_->data.uint8);
     default:
       MG_LOG(FATAL) << "Unsupported input type";
+  }
+
+  if (model_name != nullptr) {
+    *model_name = graph_path_;
   }
 }
 
@@ -166,10 +163,9 @@ uint8_t Convert<uint8_t, float>(const TfLiteQuantizationParams& params,
 };
 
 template <typename T>
-void minigo::LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
-                                  std::vector<Output*> outputs, T* feature_data,
-                                  const T* policy_data, const T* value_data) {
-  int num_features = static_cast<int>(features.size());
+void LiteDualNet::RunManyImpl(T* feature_data, const T* policy_data,
+                              const T* value_data) {
+  int num_features = static_cast<int>(features_.size());
 
   // Allow a smaller batch size than we run inference on because the first
   // inference made when starting the game has batch size 1 (instead of the
@@ -179,7 +175,7 @@ void minigo::LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
   // TODO(tommadams): Make BoardFeatures a uint8_t array and memcpy here.
   const auto& input_params = input_->params;
   for (int j = 0; j < num_features; ++j) {
-    const auto& board = *features[j];
+    const auto& board = features_[j];
     for (size_t i = 0; i < board.size(); ++i) {
       // TODO(csigg): Apply dequantization parameters?
       feature_data[j * kNumStoneFeatures + i] =
@@ -193,17 +189,22 @@ void minigo::LiteDualNet::RunMany(std::vector<const BoardFeatures*> features,
   const auto& value_params = value_->params;
   for (int j = 0; j < num_features; ++j) {
     for (int i = 0; i < kNumMoves; ++i) {
-      outputs[j]->policy[i] =
+      raw_outputs_[j].policy[i] =
           Convert<float>(policy_params, policy_data[j * num_features + i]);
     }
-    outputs[j]->value = Convert<float>(value_params, value_data[j]);
+    raw_outputs_[j].value = Convert<float>(value_params, value_data[j]);
   }
 }
 }  // namespace
 
-std::unique_ptr<DualNet> LiteDualNetFactory::NewDualNet(
-    const std::string& model) {
-  return absl::make_unique<LiteDualNet>(model);
+LiteDualNetFactory::LiteDualNetFactory(bool random_symmetry,
+                                       uint64_t random_seed)
+    : DualNetFactory(random_symmetry, random_seed) {}
+
+std::unique_ptr<Model> LiteDualNetFactory::NewModel(
+    const std::string& descriptor) {
+  return absl::make_unique<LiteDualNet>(descriptor, random_symmetry(),
+                                        GetModelSeed());
 }
 
 }  // namespace minigo

@@ -54,6 +54,7 @@ ModelDescriptor ParseModelDescriptor(absl::string_view descriptor) {
 }
 
 std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
+                                              bool random_symmetry,
                                               uint64_t random_seed) {
   MG_CHECK(!engine_desc.empty());
 
@@ -78,14 +79,14 @@ std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
 #ifdef MG_ENABLE_TF_DUAL_NET
   if (engine == "tf") {
     MG_CHECK(arg_str.empty());
-    return absl::make_unique<TfDualNetFactory>(random_seed);
+    return absl::make_unique<TfDualNetFactory>(random_symmetry, random_seed);
   }
 #endif  // MG_ENABLE_TF_DUAL_NET
 
 #ifdef MG_ENABLE_LITE_DUAL_NET
   if (engine == "lite") {
     MG_CHECK(arg_str.empty());
-    return absl::make_unique<LiteDualNetFactory>();
+    return absl::make_unique<LiteDualNetFactory>(random_symmetry, random_seed);
   }
 #endif  // MG_ENABLE_LITE_DUAL_NET
 
@@ -97,7 +98,7 @@ std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
     int buffer_count = 0;
     MG_CHECK(absl::SimpleAtoi(args[0], &buffer_count)) << args[0];
     return absl::make_unique<TpuDualNetFactory>(buffer_count, args[1],
-                                                random_seed);
+                                                random_symmetry, random_seed);
   }
 #endif  // MG_ENABLE_TPU_DUAL_NET
 

@@ -70,11 +70,11 @@ void PlaceOnDevice(GraphDef* graph_def, const std::string& device) {
 class TfDualNet : public DualNet {
  public:
   TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
-            uint64_t random_seed);
+            bool random_symmetry, uint64_t random_seed);
   ~TfDualNet() override;
-  void RunManyImpl(std::string* model_name) override;
 
  private:
+  void RunManyImpl(std::string* model_name) override;
   void Reserve(size_t capacity);
 
   std::unique_ptr<Session> session_;
@@ -86,8 +86,9 @@ class TfDualNet : public DualNet {
 };
 
 TfDualNet::TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
-                     uint64_t random_seed)
-    : DualNet(std::string(file::Stem(graph_path)), random_seed),
+                     bool random_symmetry, uint64_t random_seed)
+    : DualNet(std::string(file::Stem(graph_path)), random_symmetry,
+              random_seed),
       graph_path_(graph_path) {
   SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
@@ -149,8 +150,8 @@ void TfDualNet::Reserve(size_t capacity) {
 
 }  // namespace
 
-TfDualNetFactory::TfDualNetFactory(uint64_t random_seed)
-    : device_count_(0), rnd_(random_seed) {
+TfDualNetFactory::TfDualNetFactory(bool random_symmetry, uint64_t random_seed)
+    : DualNetFactory(random_symmetry, random_seed) {
 #if MINIGO_ENABLE_GPU
   if (tensorflow::ValidateGPUMachineManager().ok()) {
     device_count_ = tensorflow::GPUMachineManager()->VisibleDeviceCount();
@@ -160,8 +161,6 @@ TfDualNetFactory::TfDualNetFactory(uint64_t random_seed)
 
 std::unique_ptr<Model> TfDualNetFactory::NewModel(
     const std::string& descriptor) {
-  absl::MutexLock lock(&mutex_);
-
   GraphDef graph_def;
   auto* env = Env::Default();
   TF_CHECK_OK(ReadBinaryProto(env, descriptor, &graph_def));
@@ -185,10 +184,10 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
     // we can can initialize the TfDualNet instances with the factory's seed and
     // a unique stream, instead of randomly generating a new seed. A
     // monotonically incrementing number is sufficient for the stream ID.
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def,
-                                                  rnd_.UniformUint64()));
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def,
-                                                  rnd_.UniformUint64()));
+    models.push_back(absl::make_unique<TfDualNet>(
+        descriptor, graph_def, random_symmetry(), GetModelSeed()));
+    models.push_back(absl::make_unique<TfDualNet>(
+        descriptor, graph_def, random_symmetry(), GetModelSeed()));
   }
 
   return absl::make_unique<BufferedModel>(descriptor, std::move(models));

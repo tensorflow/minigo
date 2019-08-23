@@ -33,9 +33,6 @@
 #if MG_ENABLE_LITE_DUAL_NET
 #include "cc/dual_net/lite_dual_net.h"
 #endif
-#if MG_ENABLE_TRT_DUAL_NET
-#include "cc/dual_net/trt_dual_net.h"
-#endif
 
 namespace minigo {
 namespace {
@@ -142,37 +139,36 @@ TEST(DualNetTest, TestStoneFeaturesWithCapture) {
 // Checks that the different backends produce the same result.
 TEST(DualNetTest, TestBackendsEqual) {
   struct Test {
-    Test(std::unique_ptr<DualNetFactory> factory, std::string basename)
+    Test(std::unique_ptr<ModelFactory> factory, std::string basename)
         : factory(std::move(factory)), basename(std::move(basename)) {}
-    std::unique_ptr<DualNetFactory> factory;
+    std::unique_ptr<ModelFactory> factory;
     std::string basename;
   };
 
   std::map<std::string, Test> tests;
 
 #if MG_ENABLE_TF_DUAL_NET
-  tests.emplace("TfDualNet",
-                Test(absl::make_unique<TfDualNetFactory>(), "test_model.pb"));
+  tests.emplace("TfDualNet", Test(absl::make_unique<TfDualNetFactory>(false, 0),
+                                  "test_model.pb"));
 #endif
 #if MG_ENABLE_LITE_DUAL_NET
-  tests.emplace("LiteDualNet", Test(absl::make_unique<LiteDualNetFactory>(),
-                                    "test_model.tflite"));
+  tests.emplace("LiteDualNet",
+                Test(absl::make_unique<LiteDualNetFactory>(false, 0),
+                     "test_model.tflite"));
 #endif
 
-#if MG_ENABLE_TRT_DUAL_NET
-  // Only run TRT test if TensorFlow has been compiled with TRT support.
-  const auto* op_registry = tensorflow::OpRegistry::Global();
-  const tensorflow::OpRegistrationData* op_def_data;
-  if (op_registry->LookUp("TRTEngineOp", &op_def_data).ok()) {
-    tests.emplace("TrtDualNet", Test(absl::make_unique<TrtDualNetFactory>(1),
-                                     "test_model.trt.pb"));
+  Random rnd;
+  Model::Input input;
+  input.to_play = Color::kBlack;
+  Position::Stones stones;
+  for (auto& x : stones) {
+    auto color = static_cast<Color>(rnd.UniformUint64() % 3);
+    if (color != Color::kEmpty) {
+      x = Stone(color, 0);
+    }
   }
-#endif
 
-  DualNet::BoardFeatures features;
-  Random().Uniform(0.0f, 1.0f, absl::MakeSpan(features));
-
-  DualNet::Output ref_output;
+  Model::Output ref_output;
   std::string ref_name;
 
   auto policy_string = [](const std::array<float, kNumMoves>& policy) {
@@ -187,11 +183,13 @@ TEST(DualNetTest, TestBackendsEqual) {
     auto& test = kv.second;
     MG_LOG(INFO) << "Running " << name;
 
-    auto dual_net =
-        test.factory->NewDualNet(absl::StrCat("cc/dual_net/", test.basename));
+    auto model =
+        test.factory->NewModel(absl::StrCat("cc/dual_net/", test.basename));
 
-    DualNet::Output output;
-    dual_net->RunMany({&features}, {&output}, nullptr);
+    Model::Output output;
+    std::vector<const Model::Input*> inputs = {&input};
+    std::vector<Model::Output*> outputs = {&output};
+    model->RunMany(inputs, &outputs, nullptr);
 
     if (ref_name.empty()) {
       ref_output = output;

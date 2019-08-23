@@ -20,7 +20,7 @@
 namespace minigo {
 namespace {
 
-TEST(ReloadingDualNetTest, ParseModelPathPattern_Valid) {
+TEST(ReloadingModelTest, ParseModelPathPattern_Valid) {
   struct Test {
     std::string pattern;
     std::string expected_directory;
@@ -35,27 +35,27 @@ TEST(ReloadingDualNetTest, ParseModelPathPattern_Valid) {
 
   for (const auto& test : tests) {
     std::string actual_directory, actual_basename_pattern;
-    ASSERT_TRUE(ReloadingDualNetUpdater::ParseModelPathPattern(
+    ASSERT_TRUE(ReloadingModelUpdater::ParseModelPathPattern(
         test.pattern, &actual_directory, &actual_basename_pattern));
     EXPECT_EQ(test.expected_directory, actual_directory);
     EXPECT_EQ(test.expected_basename_pattern, actual_basename_pattern);
   }
 }
 
-TEST(ReloadingDualNetTest, ParseModelPathPattern_Invalid) {
+TEST(ReloadingModelTest, ParseModelPathPattern_Invalid) {
   std::vector<std::string> tests = {
       "nodir.pb", "foo/%x.pb", "%d/foo.pb", "%d", "", "foo/%d-%d",
   };
 
   for (const auto& pattern : tests) {
     std::string directory, basename_pattern;
-    EXPECT_FALSE(ReloadingDualNetUpdater::ParseModelPathPattern(
+    EXPECT_FALSE(ReloadingModelUpdater::ParseModelPathPattern(
         pattern, &directory, &basename_pattern))
         << pattern;
   }
 }
 
-TEST(ReloadingDualNetTest, MatchBasename_Valid) {
+TEST(ReloadingModelTest, MatchBasename_Valid) {
   struct Test {
     std::string basename;
     std::string pattern;
@@ -74,13 +74,13 @@ TEST(ReloadingDualNetTest, MatchBasename_Valid) {
 
   for (const auto& test : tests) {
     int actual_generation;
-    ASSERT_TRUE(ReloadingDualNetUpdater::MatchBasename(
+    ASSERT_TRUE(ReloadingModelUpdater::MatchBasename(
         test.basename, test.pattern, &actual_generation));
     EXPECT_EQ(test.expected_generation, actual_generation);
   }
 }
 
-TEST(ReloadingDualNetTest, MatchBasename_Invalid) {
+TEST(ReloadingModelTest, MatchBasename_Invalid) {
   struct Test {
     std::string basename;
     std::string pattern;
@@ -92,7 +92,7 @@ TEST(ReloadingDualNetTest, MatchBasename_Invalid) {
 
   for (const auto& test : tests) {
     int generation;
-    EXPECT_FALSE(ReloadingDualNetUpdater::MatchBasename(
+    EXPECT_FALSE(ReloadingModelUpdater::MatchBasename(
         test.basename, test.pattern, &generation));
   }
 }

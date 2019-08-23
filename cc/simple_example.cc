@@ -43,14 +43,9 @@ void SimpleExample() {
   // the board state after each move).
   const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
 
-  // Passing a non-zero random seed when creating a model factory causes
-  // its Models to apply a random symmetry to the input position when performing
-  // inference.
-  auto factory_seed = DeviceRandomUint64NonZero();
-
   // Load the model specified by the command line arguments.
   auto descriptor = ParseModelDescriptor(FLAGS_model);
-  auto model_factory = NewModelFactory(descriptor.engine, random_seed);
+  auto model_factory = NewModelFactory(descriptor.engine, true, 0);
   auto model = model_factory->NewModel(descriptor.model);
 
   // Create a game object that tracks the move history & final score.

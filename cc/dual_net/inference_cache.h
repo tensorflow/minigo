@@ -15,7 +15,7 @@
 #ifndef CC_DUAL_NET_INFERENCE_CACHE_H_
 #define CC_DUAL_NET_INFERENCE_CACHE_H_
 
-// TODO(tommadams): move this class nto //cc/model/
+// TODO(tommadams): move this class into //cc/model/
 
 #include <array>
 #include <memory>

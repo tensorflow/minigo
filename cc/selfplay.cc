@@ -243,15 +243,8 @@ class SelfPlayer {
 
     {
       absl::MutexLock lock(&mutex_);
-      uint64_t factory_seed = 0;
-      if (FLAGS_random_symmetry) {
-        if (FLAGS_seed) {
-          factory_seed = FLAGS_seed * 127;
-        } else {
-          factory_seed = DeviceRandomUint64NonZero();
-        }
-      }
-      auto model_factory = NewModelFactory(engine_, factory_seed);
+      auto model_factory =
+          NewModelFactory(engine_, FLAGS_random_symmetry, FLAGS_seed * 127);
       // If the model path contains a pattern, wrap the implementation factory
       // in a ReloadingDualNetFactory to automatically reload the latest model
       // that matches the pattern.
@@ -378,10 +371,10 @@ class SelfPlayer {
       while (!game->game_over() && !player->root()->at_move_limit()) {
         if (player->root()->position.n() >= kMinPassAliveMoves &&
             player->root()->position.CalculateWholeBoardPassAlive()) {
-          // Play two pass moves to end the game.
-          // We don't mark these moves as trainable.
-          MG_CHECK(player->PlayMove(Coord::kPass));
-          MG_CHECK(player->PlayMove(Coord::kPass));
+          // Play pass moves to end the game.
+          while (!game->game_over()) {
+            MG_CHECK(player->PlayMove(Coord::kPass));
+          }
           break;
         }
 
@@ -448,7 +441,7 @@ class SelfPlayer {
           MG_CHECK(player->PlayMove(move));
         }
 
-        if (!fastplay) {
+        if (!fastplay && move != Coord::kResign) {
           (*game).MarkLastMoveAsTrainable();
         }
 

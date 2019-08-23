@@ -162,8 +162,7 @@ class MctsPlayer {
 
   // TODO(tommadams): Make SelectLeaves and ProcessLeaves private, or remove
   // them entirely.
-  void SelectLeaves(MctsNode* root, int num_leaves,
-                    std::vector<MctsNode*>* leaves);
+  void SelectLeaves(int num_leaves, std::vector<MctsNode*>* leaves);
 
   // Run inference for the given leaf nodes & incorportate the inference output.
   void ProcessLeaves(const std::vector<MctsNode*>& leaves);

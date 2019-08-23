@@ -31,8 +31,8 @@
 #include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "cc/color.h"
-#include "cc/dual_net/dual_net.h"
 #include "cc/mcts_player.h"
+#include "cc/model/model.h"
 #include "cc/sgf.h"
 #include "cc/thread_safe_queue.h"
 
@@ -54,9 +54,10 @@ class GtpClient {
     bool courtesy_pass = false;
   };
 
-  GtpClient(std::unique_ptr<DualNetFactory> model_factory,
+  GtpClient(std::unique_ptr<ModelFactory> model_factory,
             std::shared_ptr<InferenceCache> inference_cache,
-            const std::string& model_path, const Game::Options& game_options,
+            const std::string& model_descriptor,
+            const Game::Options& game_options,
             const MctsPlayer::Options& player_options,
             const GtpClient::Options& client_options);
   virtual ~GtpClient();
@@ -178,7 +179,7 @@ class GtpClient {
   Response ParseSgf(const std::string& sgf_str,
                     std::vector<std::unique_ptr<sgf::Node>>* trees);
 
-  std::unique_ptr<DualNetFactory> model_factory_;
+  std::unique_ptr<ModelFactory> model_factory_;
   std::shared_ptr<InferenceCache> inference_cache_;
   std::unique_ptr<MctsPlayer> player_;
   std::unique_ptr<Game> game_;

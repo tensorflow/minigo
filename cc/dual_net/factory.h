@@ -34,6 +34,7 @@ std::ostream& operator<<(std::ostream& os, const ModelDescriptor& desc);
 ModelDescriptor ParseModelDescriptor(absl::string_view descriptor);
 
 std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
+                                              bool random_symmetry,
                                               uint64_t random_seed);
 
 }  // namespace minigo

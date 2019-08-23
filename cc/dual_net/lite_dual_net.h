@@ -18,13 +18,16 @@
 #include <memory>
 #include <string>
 
+#include "absl/synchronization/mutex.h"
 #include "cc/dual_net/dual_net.h"
+#include "cc/random.h"
 
 namespace minigo {
 
 class LiteDualNetFactory : public DualNetFactory {
  public:
-  std::unique_ptr<DualNet> NewDualNet(const std::string& model) override;
+  LiteDualNetFactory(bool random_symmetry, uint64_t random_seed);
+  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 };
 
 }  // namespace minigo

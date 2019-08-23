@@ -124,7 +124,7 @@ Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise) {
   // a prior call to SuggestMove.
   if (!root_->HasFlag(MctsNode::Flag::kExpanded)) {
     tree_search_leaves_.clear();
-    SelectLeaves(root_, 1, &tree_search_leaves_);
+    SelectLeaves(1, &tree_search_leaves_);
     ProcessLeaves(tree_search_leaves_);
   }
 
@@ -195,7 +195,7 @@ void MctsPlayer::GetModelInput(const MctsNode* node,
                                Model::Input* input) const {
   input->to_play = node->position.to_play();
   input->position_history.clear();
-  // TODO(tommadams): add a method to the model that returns the position
+  // TODO(tommadams): add a method to Model that returns the required position
   // history size.
   int n = kMaxPositionHistory;
   for (int j = 0; j < n; ++j) {
@@ -209,12 +209,11 @@ void MctsPlayer::GetModelInput(const MctsNode* node,
 
 void MctsPlayer::TreeSearch() {
   tree_search_leaves_.clear();
-  SelectLeaves(root_, options_.virtual_losses, &tree_search_leaves_);
+  SelectLeaves(options_.virtual_losses, &tree_search_leaves_);
   ProcessLeaves(tree_search_leaves_);
 }
 
-void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
-                              std::vector<MctsNode*>* leaves) {
+void MctsPlayer::SelectLeaves(int num_leaves, std::vector<MctsNode*>* leaves) {
   Model::Output cached_output;
 
   int max_cache_misses = num_leaves * 2;
@@ -222,12 +221,12 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
   int num_cache_misses = 0;
   int num_cache_hits = 0;
   while (num_cache_misses < max_cache_misses) {
-    auto* leaf = root->SelectLeaf();
+    auto* leaf = root_->SelectLeaf();
 
     if (leaf->game_over() || leaf->at_move_limit()) {
       float value =
           leaf->position.CalculateScore(game_->options().komi) > 0 ? 1 : -1;
-      leaf->IncorporateEndGameResult(value, root);
+      leaf->IncorporateEndGameResult(value, root_);
       ++num_cache_misses;
       continue;
     }
@@ -238,20 +237,20 @@ void MctsPlayer::SelectLeaves(MctsNode* root, int num_leaves,
         ++num_cache_hits;
         leaf->IncorporateResults(options_.value_init_penalty,
                                  cached_output.policy, cached_output.value,
-                                 root);
+                                 root_);
         continue;
       }
     }
 
     ++num_cache_misses;
 
-    leaf->AddVirtualLoss(root);
+    leaf->AddVirtualLoss(root_);
     leaves->push_back(leaf);
     if (++num_selected == num_leaves) {
       // We found enough leaves.
       break;
     }
-    if (leaf == root) {
+    if (leaf == root_) {
       // If the root is a leaf, we can't possibly find any other leaves.
       break;
     }

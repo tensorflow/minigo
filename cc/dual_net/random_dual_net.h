@@ -54,7 +54,7 @@ class RandomDualNetFactory : public ModelFactory {
 
  private:
   absl::Mutex mutex_;
-  Random rnd_;
+  Random rnd_ GUARDED_BY(&mutex_);
 };
 
 }  // namespace minigo

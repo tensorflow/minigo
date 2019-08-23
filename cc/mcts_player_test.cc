@@ -22,6 +22,7 @@
 #include "cc/algorithm.h"
 #include "cc/color.h"
 #include "cc/constants.h"
+#include "cc/dual_net/dual_net.h"
 #include "cc/dual_net/fake_dual_net.h"
 #include "cc/position.h"
 #include "cc/test_utils.h"
@@ -59,9 +60,9 @@ class TestablePlayer : public MctsPlayer {
       : MctsPlayer(absl::make_unique<FakeDualNet>(), nullptr, game,
                    player_options) {}
 
-  explicit TestablePlayer(std::unique_ptr<DualNet> network, Game* game,
+  explicit TestablePlayer(std::unique_ptr<Model> model, Game* game,
                           const Options& options)
-      : MctsPlayer(std::move(network), nullptr, game, options) {}
+      : MctsPlayer(std::move(model), nullptr, game, options) {}
 
   TestablePlayer(absl::Span<const float> fake_priors, float fake_value,
                  Game* game, const Options& options)
@@ -74,9 +75,11 @@ class TestablePlayer : public MctsPlayer {
   using MctsPlayer::TreeSearch;
   using MctsPlayer::UndoMove;
 
-  DualNet::Output Run(const DualNet::BoardFeatures& features) {
-    DualNet::Output output;
-    network()->RunMany({&features}, {&output}, nullptr);
+  Model::Output Run(const Model::Input& input) {
+    Model::Output output;
+    std::vector<const Model::Input*> inputs = {&input};
+    std::vector<Model::Output*> outputs = {&output};
+    model()->RunMany(inputs, &outputs, nullptr);
     return output;
   }
 
@@ -103,11 +106,10 @@ class MctsPlayerTest : public ::testing::Test {
     auto player =
         absl::make_unique<TestablePlayer>(game_.get(), player_options);
     auto* first_node = player->root()->SelectLeaf();
-    DualNet::BoardFeatures features;
-    std::vector<const Position::Stones*> positions = {
-        &player->root()->position.stones()};
-    DualNet::SetFeatures(positions, Color::kBlack, &features);
-    auto output = player->Run(features);
+    Model::Input input;
+    input.to_play = Color::kBlack;
+    input.position_history.push_back(&player->root()->position.stones());
+    auto output = player->Run(input);
     first_node->IncorporateResults(0.0, output.policy, output.value,
                                    player->root());
     return player;
@@ -121,10 +123,6 @@ class MctsPlayerTest : public ::testing::Test {
     // Always use a deterministic random seed.
     MctsPlayer::Options player_options;
     player_options.random_seed = 17;
-    // Don't apply random symmetries. If we did, the probabilities we set in
-    // the FakeDualNet won't be chosen correctly (since the board position will
-    // be randomly transformed).
-    player_options.random_symmetry = false;
 
     std::array<float, kNumMoves> probs;
     for (auto& p : probs) {
@@ -456,19 +454,19 @@ TEST_F(MctsPlayerTest, ExtractDataResignEnd) {
 // four connected neighbor is set true the policy is set to 0.01.
 class MergeFeaturesNet : public DualNet {
  public:
-  MergeFeaturesNet() : DualNet("MergeFeatures") {}
+  MergeFeaturesNet(bool random_symmetry, uint64_t random_seed)
+      : DualNet("MergeFeatures", random_symmetry, random_seed) {}
 
-  void RunMany(std::vector<const BoardFeatures*> features,
-               std::vector<Output*> outputs, std::string* model) override {
-    for (size_t i = 0; i < features.size(); ++i) {
-      Run(*features[i], outputs[i]);
+ private:
+  void RunManyImpl(std::string* model_name) override {
+    for (size_t i = 0; i < features_.size(); ++i) {
+      Run(features_[i], &raw_outputs_[i]);
     }
-    if (model != nullptr) {
-      *model = "MergeFeaturesNet";
+    if (model_name != nullptr) {
+      *model_name = "MergeFeaturesNet";
     }
   }
 
- private:
   void Run(const BoardFeatures& features, Output* output) {
     for (int c = 0; c < kN * kN; ++c) {
       bool present = false;
@@ -490,15 +488,14 @@ class MergeFeaturesNet : public DualNet {
 TEST_F(MctsPlayerTest, SymmetriesTest) {
   MctsPlayer::Options options;
   options.random_seed = 17;
-  options.random_symmetry = true;
-  TestablePlayer player(absl::make_unique<MergeFeaturesNet>(), game_.get(),
-                        options);
+  TestablePlayer player(absl::make_unique<MergeFeaturesNet>(true, 42),
+                        game_.get(), options);
 
   // Without playing a move, all features planes should be zero except the last
   // one (it's black's turn to play).
   auto* root = player.root();
   root->AddVirtualLoss(root);
-  player.ProcessLeaves(std::vector<MctsNode*>({root}), true);
+  player.ProcessLeaves(std::vector<MctsNode*>({root}));
   for (int i = 0; i < kN * kN; ++i) {
     ASSERT_EQ(0.0, root->child_P(i));
   }
@@ -522,7 +519,7 @@ TEST_F(MctsPlayerTest, SymmetriesTest) {
   for (int i = 0; i < 100; ++i) {
     auto* leaf = nodes.back().get();
     leaf->AddVirtualLoss(root);
-    player.ProcessLeaves(std::vector<MctsNode*>({leaf}), true);
+    player.ProcessLeaves(std::vector<MctsNode*>({leaf}));
     ASSERT_EQ(0.0, leaf->child_P(Coord::FromGtp("pass")));
     for (const auto move : moves) {
       // Playing where stones exist is illegal and should have been marked as 0.

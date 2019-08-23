@@ -96,8 +96,7 @@ void Gtp() {
   MG_LOG(INFO) << game_options << " " << player_options;
 
   auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
-  auto model_factory =
-      NewDualNetFactory(model_desc.engine, DeviceRandomUint64NonZero());
+  auto model_factory = NewModelFactory(model_desc.engine, true, 0);
 
   std::shared_ptr<ThreadSafeInferenceCache> inference_cache;
   if (FLAGS_cache_size_mb > 0) {
