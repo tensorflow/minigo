@@ -152,7 +152,7 @@ class BasicInferenceCache : public InferenceCache {
 // Thread safe wrapper around BasicInferenceCache.
 // In order to reduce lock contention when playing large numbers of games in
 // parallel, ThreadSafeInferenceCache can use multiple BasicInferenceCaches,
-// each guarded by their own mutex lock. The cache a element is assigned to is
+// each guarded by their own mutex lock. The cache an element is assigned to is
 // determined by InferenceCache::Key::Shard.
 class ThreadSafeInferenceCache : public InferenceCache {
  public:

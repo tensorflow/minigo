@@ -14,6 +14,7 @@
 
 #include "cc/dual_net/inference_cache.h"
 
+#include <thread>
 #include <vector>
 
 #include "cc/random.h"
@@ -103,6 +104,42 @@ TEST(InferenceCacheTest, ThreadSafe) {
     ASSERT_TRUE(cache.TryGet(inference.key, &output));
     EXPECT_EQ(inference.output.policy, output.policy);
     EXPECT_EQ(inference.output.value, output.value);
+  }
+}
+
+TEST(InferenceCacheTest, StressTest) {
+  constexpr int kCacheSize = 32;
+  constexpr int kNumThreads = 10;
+  constexpr int kNumShards = 3;
+  constexpr int kNumIterations = 100000;
+
+  ThreadSafeInferenceCache cache(kCacheSize, kNumShards);
+  std::vector<std::thread> threads;
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads.emplace_back([&cache, i]() {
+      int hits = 0;
+      int misses = 0;
+      Model::Output output;
+      Random rnd((i + 31) * 27);
+      for (int i = 0; i < kNumIterations; ++i) {
+        TestablePosition position("");
+        // Create cache keys that only differ by a few bits so that the test
+        // gets a roughly 50/50 split of cache hits and misses.
+        auto key = InferenceCache::Key::CreateTestKey(rnd.UniformInt(0, 7),
+                                                      rnd.UniformInt(0, 8));
+        if (cache.TryGet(key, &output)) {
+          hits += 1;
+        } else {
+          misses += 1;
+        }
+        cache.Add(key, output);
+      }
+      MG_LOG(INFO) << "thread:" << i << " hits:" << hits
+                   << " misses:" << misses;
+    });
+  }
+  for (auto& t : threads) {
+    t.join();
   }
 }
 
