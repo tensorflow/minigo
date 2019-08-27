@@ -162,7 +162,7 @@ bazel test --define=board_size=9 cc/...  &&  bazel test cc/...
 Note that Minigo is compiled for a 19x19 board by default, which explains the
 lack of a `--define=board_size=19` in the second `bazel test` invocation.
 
-## Running with AddressSanitizer
+## Running with Address Sanitizer
 
 Bazel supports building with AddressSanitizer to check for C++ memory errors:
 
@@ -173,6 +173,29 @@ bazel build cc:selfplay \
   --copt=-fno-omit-frame-pointer \
   --copt=-O1
 ```
+
+If you need to programatic control of the sanitizers at runtime, you will have
+to make Bazel aware of the sanitizer include path. Edit `WORKSPACE`, changing
+`path` as appropriate:
+
+```
+new_local_repository(
+    name = "sanitizers",
+    path = "/usr/lib/gcc/x86_64-linux-gnu/7/include/sanitizer/",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "sanitizers",
+    hdrs = glob(["**/*.h"])
+)
+"""
+)
+```
+
+Then add `@sanitizers` as a dependency to your `BUILD` target and you'll be able
+to include `asan_interface.h` and `lsan_interface.h`. This will allow you to do
+things like suppress leak checking at exit by calling `__lsan_disable()`.
+
 
 ## Profiling
 
