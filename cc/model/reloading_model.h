@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_DUAL_NET_RELOADING_DUAL_NET_H_
-#define CC_DUAL_NET_RELOADING_DUAL_NET_H_
+#ifndef CC_MODEL_RELOADING_MODEL_H_
+#define CC_MODEL_RELOADING_MODEL_H_
 
 #include <atomic>
 #include <memory>
@@ -24,7 +24,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
-#include "cc/dual_net/dual_net.h"
+#include "cc/model/model.h"
 
 namespace minigo {
 
@@ -134,4 +134,4 @@ class ReloadingModelUpdater {
 
 }  // namespace minigo
 
-#endif  // CC_DUAL_NET_RELOADING_DUAL_NET_H_
+#endif  // CC_MODEL_RELOADING_MODEL_H_

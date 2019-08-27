@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_DUAL_NET_INFERENCE_CACHE_H_
-#define CC_DUAL_NET_INFERENCE_CACHE_H_
-
-// TODO(tommadams): move this class into //cc/model/
+#ifndef CC_MODEL_INFERENCE_CACHE_H_
+#define CC_MODEL_INFERENCE_CACHE_H_
 
 #include <array>
 #include <memory>
@@ -186,4 +184,4 @@ class ThreadSafeInferenceCache : public InferenceCache {
 
 }  // namespace minigo
 
-#endif  // CC_DUAL_NET_INFERENCE_CACHE_H_
+#endif  // CC_MODEL_INFERENCE_CACHE_H_

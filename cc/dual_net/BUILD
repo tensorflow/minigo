@@ -88,20 +88,6 @@ minigo_cc_library(
 )
 
 minigo_cc_library(
-    name = "inference_cache",
-    srcs = ["inference_cache.cc"],
-    hdrs = ["inference_cache.h"],
-    deps = [
-        "//cc:base",
-        "//cc:logging",
-        "//cc/model",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
-
-minigo_cc_library(
     name = "random_dual_net",
     srcs = ["random_dual_net.cc"],
     hdrs = ["random_dual_net.h"],
@@ -112,25 +98,6 @@ minigo_cc_library(
         "//cc/model",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
-    ],
-)
-
-minigo_cc_library(
-    name = "reloading_dual_net",
-    srcs = ["reloading_dual_net.cc"],
-    hdrs = ["reloading_dual_net.h"],
-    deps = [
-        ":dual_net",
-        "//cc:base",
-        "//cc:logging",
-        "//cc:position",
-        "//cc/file",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/time",
     ],
 )
 
@@ -196,51 +163,6 @@ minigo_cc_library(
     ],
 )
 
-minigo_cc_library(
-    name = "batching_dual_net",
-    srcs = ["batching_dual_net.cc"],
-    hdrs = ["batching_dual_net.h"],
-    deps = [
-        "//cc:base",
-        "//cc:logging",
-        "//cc/model",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/time",
-        "@wtf",
-    ],
-)
-
-minigo_cc_test(
-    name = "batching_dual_net_test",
-    size = "small",
-    srcs = ["batching_dual_net_test.cc"],
-    deps = [
-        ":batching_dual_net",
-        "//cc/model",
-        "//cc/model:buffered_model",
-        "//cc/tensorflow",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-minigo_cc_test(
-    name = "reloading_dual_net_test",
-    size = "small",
-    srcs = ["reloading_dual_net_test.cc"],
-    deps = [
-        ":reloading_dual_net",
-        "//cc:logging",
-        "//cc/file",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
 minigo_cc_test_9_only(
     name = "dual_net_test",
     size = "small",
@@ -256,17 +178,5 @@ minigo_cc_test_9_only(
         "//cc:symmetries",
         "//cc:test_utils",
         "@com_google_googletest//:gtest_main",
-    ],
-)
-
-minigo_cc_test(
-    name = "inference_cache_test",
-    srcs = ["inference_cache_test.cc"],
-    deps = [
-        ":inference_cache",
-        "//cc:random",
-        "//cc:test_utils",
-        "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest",
     ],
 )

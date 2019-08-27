@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/dual_net/reloading_dual_net.h"
+#include "cc/model/reloading_model.h"
 
 #include "cc/file/path.h"
 #include "gtest/gtest.h"

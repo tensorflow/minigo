@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_DUAL_NET_BATCHING_DUAL_NET_H_
-#define CC_DUAL_NET_BATCHING_DUAL_NET_H_
-
-// TODO(tommadams): rename file to batching_model.h
+#ifndef CC_MODEL_BATCHING_MODEL_H_
+#define CC_MODEL_BATCHING_MODEL_H_
 
 #include <atomic>
 #include <memory>
@@ -156,4 +154,4 @@ class BatchingModelFactory : public ModelFactory {
 
 }  // namespace minigo
 
-#endif  // CC_DUAL_NET_BATCHING_DUAL_NET_H_
+#endif  // CC_MODEL_BATCHING_MODEL_H_

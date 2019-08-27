@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/dual_net/batching_dual_net.h"
+#include "cc/model/batching_model.h"
 
 #include <queue>
 #include <string>
