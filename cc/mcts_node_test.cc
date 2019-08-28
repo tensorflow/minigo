@@ -95,7 +95,7 @@ TEST(MctsNodeTest, UpperConfidenceBound) {
 // Verifies that no matter who is to play, when we know nothing else, the
 // priors should be respected, and the same move should be picked.
 TEST(MctsNodeTest, ActionFlipping) {
-  Random rnd(1);
+  Random rnd(1, 1);
 
   std::array<float, kNumMoves> probs;
   std::uniform_real_distribution<float> dist(0.02, 0.021);
@@ -329,7 +329,7 @@ TEST(MctsNodeTest, NeverSelectIllegalMoves) {
 
   // and even after injecting noise, we should still not select an illegal
   // move
-  Random rnd(1);
+  Random rnd(1, 1);
   for (int i = 0; i < 10; ++i) {
     std::array<float, kNumMoves> noise;
     rnd.Uniform(0, 1, &noise);
@@ -481,7 +481,7 @@ TEST(MctsNodeTest, InjectNoiseOnlyLegalMoves) {
 
   // and even after injecting noise, we should still not select an illegal
   // move
-  Random rnd(1);
+  Random rnd(1, 1);
   std::array<float, kNumMoves> noise;
   rnd.Uniform(0, 1, &noise);
   root.InjectNoise(noise, 0.25);

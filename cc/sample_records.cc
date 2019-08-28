@@ -45,8 +45,10 @@ namespace minigo {
 
 class ReadThread : public Thread {
  public:
-  ReadThread(uint64_t seed, std::vector<std::string> paths, float sample_frac)
-      : rnd_(seed), paths_(std::move(paths)), sample_frac_(sample_frac) {}
+  ReadThread(std::vector<std::string> paths, float sample_frac)
+      : rnd_(FLAGS_seed, Random::kUniqueStream),
+        paths_(std::move(paths)),
+        sample_frac_(sample_frac) {}
 
   std::vector<std::string>& sampled_records() { return sampled_records_; }
   const std::vector<std::string>& sampled_records() const {
@@ -131,8 +133,6 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
   MG_CHECK(!src_paths.empty());
   MG_CHECK(!dst_path.empty());
 
-  Random rnd(FLAGS_seed);
-
   int num_paths = static_cast<int>(src_paths.size());
   int num_threads = std::min<int>(FLAGS_num_threads, num_paths);
 
@@ -148,8 +148,8 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
     for (int j = begin; j < end; ++j) {
       thread_paths.push_back(std::move(src_paths[j]));
     }
-    threads.push_back(absl::make_unique<ReadThread>(
-        rnd.UniformUint64(), std::move(thread_paths), FLAGS_sample_frac));
+    threads.push_back(absl::make_unique<ReadThread>(std::move(thread_paths),
+                                                    FLAGS_sample_frac));
   }
   for (auto& t : threads) {
     t->Start();
@@ -173,6 +173,7 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
 
   // Shuffle the records if requested.
   if (FLAGS_shuffle) {
+    Random rnd(FLAGS_seed, Random::kUniqueStream);
     MG_LOG(INFO) << absl::Now() << " : shuffling";
     auto gen = [&rnd](int i) { return rnd.UniformInt(0, i); };
     std::random_shuffle(records.begin(), records.end(), gen);

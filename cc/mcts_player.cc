@@ -76,7 +76,7 @@ MctsPlayer::MctsPlayer(std::unique_ptr<Model> model,
     : model_(std::move(model)),
       game_root_(&root_stats_, {&bv_, &gv_, Color::kBlack}),
       game_(game),
-      rnd_(options.random_seed),
+      rnd_(options.random_seed, Random::kUniqueStream),
       options_(options),
       inference_cache_(std::move(inference_cache)) {
   // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.
@@ -185,8 +185,7 @@ Coord MctsPlayer::PickMove() {
     return Coord::kPass;
   }
 
-  float e = rnd_();
-  Coord c = SearchSorted(cdf, e * cdf.back());
+  Coord c = rnd_.SampleCdf(absl::MakeSpan(cdf));
   MG_DCHECK(root_->child_N(c) != 0);
   return c;
 }

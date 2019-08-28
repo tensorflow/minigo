@@ -473,7 +473,7 @@ TEST(PositionTest, PlayGame) {
 // passes if the player has no legal moves). Under these conditions, the game
 // will never end.
 TEST(PositionTest, PlayRandomLegalMoves) {
-  Random rnd(983465983);
+  Random rnd(983465983, 1);
   TestablePosition position("");
 
   for (int i = 0; i < 10000; ++i) {

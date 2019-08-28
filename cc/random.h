@@ -26,7 +26,19 @@ namespace minigo {
 // library.
 class Random {
  public:
-  explicit Random(uint64_t seed = 0);
+  static constexpr uint64_t kUniqueSeed = 0;
+  static constexpr int kUniqueStream = 0;
+
+  // The implementation supports generating multiple streams of uncorrelated
+  // random numbers from a single seed.
+  // If seed == Random::kUniqueSeed, a seed will be chosen from the platform's
+  // random entropy source.
+  // If stream == Random::kUniqueStream, a stream will be chosen from a
+  // thread-safe global incrementing ID.
+  // It's recommended that for reproducible results (modulo threading timing),
+  // all Random instances use a seed speficied by a flag, and
+  // Random::kUniqueStream for the stream.
+  explicit Random(uint64_t seed, int stream);
 
   // Draw samples from a Dirichlet distribution.
   void Dirichlet(float alpha, absl::Span<float> samples);
@@ -70,6 +82,10 @@ class Random {
     return distribution(impl_);
   }
 
+  // Samples the given CDF at random, returning the index of the element found.
+  // Guarantees that elements with zero probability
+  int SampleCdf(absl::Span<float> cdf);
+
   uint64_t UniformUint64() {
     uint64_t a = impl_();
     uint64_t b = impl_();
@@ -82,10 +98,38 @@ class Random {
   }
 
   uint64_t seed() const { return seed_; }
+  int stream() const { return static_cast<int>(impl_.inc >> 1); }
 
  private:
+  // The implementation is based on 32bit PCG Random:
+  //   http://www.pcg-random.org/
+  struct Impl {
+    using result_type = uint32_t;
+    static constexpr result_type min() { return 0; }
+    static constexpr result_type max() { return 0xffffffff; }
+
+    Impl(uint64_t seed, int stream)
+        : state(0), inc((static_cast<uint64_t>(stream) << 1) | 1) {
+      operator()();
+      state += seed;
+      operator()();
+    }
+
+    result_type operator()() {
+      auto old_state = state;
+      state = old_state * 6364136223846793005ULL + inc;
+      uint32_t xor_shifted = ((old_state >> 18u) ^ old_state) >> 27u;
+      uint32_t rot = old_state >> 59u;
+      auto result = (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31));
+      return result;
+    }
+
+    uint64_t state;
+    const uint64_t inc;
+  };
+
   uint64_t seed_;
-  std::mt19937 impl_;
+  Impl impl_;
 };
 
 }  // namespace minigo

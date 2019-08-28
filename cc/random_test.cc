@@ -24,7 +24,7 @@ namespace minigo {
 namespace {
 
 TEST(RandomTest, TestUniformArray) {
-  Random rnd(66);
+  Random rnd(66, 45243);
 
   std::array<float, 100> sum;
   for (auto& s : sum) {
@@ -49,7 +49,7 @@ TEST(RandomTest, TestUniformArray) {
 }
 
 TEST(RandomTest, TestOperator) {
-  Random rnd(42);
+  Random rnd(42, 897692);
   float sum = 0;
   for (int iter = 0; iter < 10000; ++iter) {
     sum += rnd();
@@ -59,7 +59,7 @@ TEST(RandomTest, TestOperator) {
 }
 
 TEST(RandomTest, Dirichlet) {
-  Random rnd(777);
+  Random rnd(777, 8724784);
 
   std::array<float, 40> sum;
   for (auto& s : sum) {
@@ -88,6 +88,26 @@ TEST(RandomTest, Dirichlet) {
   EXPECT_NEAR(0.01, avg[5], 0.01);
   for (int i = 6; i < 40; ++i) {
     EXPECT_NEAR(0, avg[i], 0.01);
+  }
+}
+
+TEST(RandomTest, SampleCdf) {
+  Random rnd(893745, 73462594);
+  std::array<float, 8> cdf;
+  for (int i = 0; i < 8; ++i) {
+    cdf[i] = i < 3 ? 0 : 10;
+  }
+  for (int iter = 0; iter < 10000; ++iter) {
+    EXPECT_EQ(3, rnd.SampleCdf(absl::MakeSpan(cdf)));
+  }
+}
+
+TEST(RandomTest, Streams) {
+  constexpr uint64_t seed = 9872659;
+  Random a(seed, 1);
+  Random b(seed, 2);
+  for (int iter = 0; iter < 10000; ++iter) {
+    EXPECT_NE(a.UniformUint64(), b.UniformUint64());
   }
 }
 

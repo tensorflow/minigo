@@ -119,16 +119,11 @@ void DualNet::RunMany(const std::vector<const Input*>& inputs,
 DualNet::DualNet(std::string name, bool random_symmetry, uint64_t random_seed)
     : Model(std::move(name), 1),
       random_symmetry_(random_symmetry),
-      rnd_(random_seed) {}
+      rnd_(random_seed, Random::kUniqueStream) {}
 
 DualNet::~DualNet() = default;
 
 DualNetFactory::DualNetFactory(bool random_symmetry, uint64_t random_seed)
-    : random_symmetry_(random_symmetry), rnd_(random_seed) {}
-
-uint64_t DualNetFactory::GetModelSeed() {
-  absl::MutexLock lock(&mutex_);
-  return rnd_.UniformUint64();
-}
+    : random_symmetry_(random_symmetry), random_seed_(random_seed) {}
 
 }  // namespace minigo

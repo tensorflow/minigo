@@ -157,7 +157,7 @@ TEST(DualNetTest, TestBackendsEqual) {
                      "test_model.tflite"));
 #endif
 
-  Random rnd;
+  Random rnd(Random::kUniqueSeed, Random::kUniqueStream);
   Model::Input input;
   input.to_play = Color::kBlack;
   Position::Stones stones;

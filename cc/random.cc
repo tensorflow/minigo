@@ -14,6 +14,8 @@
 
 #include "cc/random.h"
 
+#include <atomic>
+
 namespace minigo {
 
 namespace {
@@ -27,9 +29,18 @@ uint64_t ChooseSeed(uint64_t seed) {
   }
   return seed;
 }
+
+int ChooseStream(int stream) {
+  if (stream == 0) {
+    static std::atomic<int> s{0};
+    stream = s++;
+  }
+  return stream;
+}
 }  // namespace
 
-Random::Random(uint64_t seed) : seed_(ChooseSeed(seed)), impl_(seed_) {}
+Random::Random(uint64_t seed, int stream)
+    : seed_(ChooseSeed(seed)), impl_(seed_, ChooseStream(stream)) {}
 
 void Random::Dirichlet(float alpha, absl::Span<float> samples) {
   std::gamma_distribution<float> distribution(alpha);
@@ -62,6 +73,20 @@ void Random::NormalDistribution(float mean, float stddev,
   for (float& sample : samples) {
     sample = distribution(impl_);
   }
+}
+
+int Random::SampleCdf(absl::Span<float> cdf) {
+  // Take care to handle the case where the first elements in the CDF have zero
+  // probability: discard any 0.0 values that the random number generator
+  // produces. Admittedly, this isn't going to happen very often.
+  float e;
+  do {
+    e = operator()();
+  } while (e == 0);
+
+  float x = cdf.back() * e;
+  return std::distance(cdf.begin(),
+                       std::lower_bound(cdf.begin(), cdf.end(), x));
 }
 
 }  // namespace minigo

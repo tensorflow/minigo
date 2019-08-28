@@ -179,15 +179,10 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
     if (device_count_ > 0) {
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
-    // TODO(tommadams): replace Random implementation with
-    // http://www.pcg-random.org, which supports multiple streams. That way,
-    // we can can initialize the TfDualNet instances with the factory's seed and
-    // a unique stream, instead of randomly generating a new seed. A
-    // monotonically incrementing number is sufficient for the stream ID.
     models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, graph_def, random_symmetry(), GetModelSeed()));
+        descriptor, graph_def, random_symmetry_, random_seed_));
     models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, graph_def, random_symmetry(), GetModelSeed()));
+        descriptor, graph_def, random_symmetry_, random_seed_));
   }
 
   return absl::make_unique<BufferedModel>(descriptor, std::move(models));

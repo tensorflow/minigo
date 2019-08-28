@@ -20,7 +20,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/model/model.h"
@@ -92,18 +91,9 @@ class DualNetFactory : public ModelFactory {
   //              (e.g. /dev/rand).
   DualNetFactory(bool random_symmetry, uint64_t random_seed);
 
-  bool random_symmetry() const { return random_symmetry_; }
-
  protected:
-  uint64_t GetModelSeed() LOCKS_EXCLUDED(&mutex_);
-
- private:
   const bool random_symmetry_;
-
-  // TODO(tommadams): switch Random to use pcg32, then we can replace this mutex
-  // with an std::atomic<uint32_t> sequence number instead.
-  absl::Mutex mutex_;
-  Random rnd_ GUARDED_BY(&mutex_);
+  const uint64_t random_seed_;
 };
 
 }  // namespace minigo

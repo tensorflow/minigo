@@ -24,7 +24,6 @@ minigo_cc_library(
         "//cc:random",
         "//cc:symmetries",
         "//cc/model",
-        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:span",
         "@wtf",
     ],
@@ -97,7 +96,6 @@ minigo_cc_library(
         "//cc:random",
         "//cc/model",
         "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -121,7 +119,6 @@ minigo_cc_library(
         "//cc/tensorflow",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
         "@wtf",
     ],
 )

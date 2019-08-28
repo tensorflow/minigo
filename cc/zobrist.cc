@@ -28,7 +28,7 @@ std::array<Hash, kN * kN> kIllegalEmptyPointHashes;
 }  // namespace internal
 
 void Init(uint64_t seed) {
-  minigo::Random rnd(seed);
+  minigo::Random rnd(seed, Random::kUniqueStream);
 
   internal::kBlackToPlayHash = rnd.UniformUint64();
   internal::kOpponentPassedHash = rnd.UniformUint64();

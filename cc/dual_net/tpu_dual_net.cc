@@ -244,8 +244,8 @@ std::unique_ptr<Model> TpuDualNetFactory::NewModel(
   std::vector<std::unique_ptr<Model>> models;
   for (int i = 0; i < buffer_count_; ++i) {
     models.push_back(absl::make_unique<TpuDualNet>(
-        tpu_name_, descriptor, graph_def, num_replicas, random_symmetry(),
-        GetModelSeed()));
+        tpu_name_, descriptor, graph_def, num_replicas, random_symmetry_,
+        random_seed_));
   }
 
   return absl::make_unique<BufferedModel>(descriptor, std::move(models));

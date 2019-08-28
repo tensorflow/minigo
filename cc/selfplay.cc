@@ -216,7 +216,9 @@ void LogEndGameInfo(const Game& game, absl::Duration game_time) {
 class SelfPlayer {
  public:
   explicit SelfPlayer(ModelDescriptor desc)
-      : engine_(std::move(desc.engine)), model_(std::move(desc.model)) {}
+      : rnd_(Random::kUniqueSeed, Random::kUniqueStream),
+        engine_(std::move(desc.engine)),
+        model_(std::move(desc.model)) {}
 
   void Run() {
     auto player_start_time = absl::Now();
@@ -244,7 +246,7 @@ class SelfPlayer {
     {
       absl::MutexLock lock(&mutex_);
       auto model_factory =
-          NewModelFactory(engine_, FLAGS_random_symmetry, FLAGS_seed * 127);
+          NewModelFactory(engine_, FLAGS_random_symmetry, FLAGS_seed);
       // If the model path contains a pattern, wrap the implementation factory
       // in a ReloadingDualNetFactory to automatically reload the latest model
       // that matches the pattern.
@@ -575,7 +577,7 @@ class SelfPlayer {
 
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
-  minigo::zobrist::Init(FLAGS_seed * 614944751);
+  minigo::zobrist::Init(FLAGS_seed);
 
   WTF_THREAD_ENABLE("Main");
   {

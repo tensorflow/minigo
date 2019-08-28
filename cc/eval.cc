@@ -147,13 +147,13 @@ class Evaluator {
       : desc_a_(std::move(desc_a)), desc_b_(std::move(desc_b)) {
     // Create a batcher for the first model.
     batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-        NewModelFactory(desc_a_.engine, true, FLAGS_seed * 492888653)));
+        NewModelFactory(desc_a_.engine, true, FLAGS_seed)));
 
     // If the second model requires a different factory, create one & a second
     // batcher too.
     if (desc_b_.engine != desc_a_.engine) {
       batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-          NewModelFactory(desc_b_.engine, true, FLAGS_seed * 295220389)));
+          NewModelFactory(desc_b_.engine, true, FLAGS_seed)));
     }
   }
 
@@ -303,7 +303,7 @@ class Evaluator {
 
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
-  minigo::zobrist::Init(FLAGS_seed * 614944751);
+  minigo::zobrist::Init(FLAGS_seed);
   minigo::Evaluator evaluator(minigo::ParseModelDescriptor(FLAGS_model),
                               minigo::ParseModelDescriptor(FLAGS_model_two));
   evaluator.Run();

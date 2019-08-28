@@ -141,7 +141,7 @@ void Puzzle() {
 
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
-  minigo::zobrist::Init(FLAGS_seed * 614944751);
+  minigo::zobrist::Init(FLAGS_seed);
   minigo::Puzzle();
   return 0;
 }

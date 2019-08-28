@@ -28,7 +28,7 @@ namespace minigo {
 RandomDualNet::RandomDualNet(std::string name, uint64_t seed,
                              float policy_stddev, float value_stddev)
     : Model(std::move(name), 1),
-      rnd_(seed),
+      rnd_(seed, Random::kUniqueStream),
       policy_stddev_(policy_stddev),
       value_stddev_(value_stddev) {}
 
@@ -57,7 +57,7 @@ void RandomDualNet::RunMany(const std::vector<const Input*>& inputs,
   }
 }
 
-RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : rnd_(seed) {}
+RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : seed_(seed) {}
 
 std::unique_ptr<Model> RandomDualNetFactory::NewModel(
     const std::string& descriptor) {
@@ -71,18 +71,8 @@ std::unique_ptr<Model> RandomDualNetFactory::NewModel(
   MG_CHECK(absl::SimpleAtof(parts[0], &policy_stddev));
   MG_CHECK(absl::SimpleAtof(parts[1], &value_stddev));
 
-  uint64_t seed;
-  {
-    absl::MutexLock lock(&mutex_);
-    // TODO(tommadams): replace Random implementation with
-    // http://www.pcg-random.org, which supports multiple streams. That way,
-    // we can can initialize the RandomModel instances with the factory's seed
-    // and a unique stream, instead of randomly generating a new seed. A
-    // monotonically incrementing number is sufficient for the stream ID.
-    seed = rnd_.UniformUint64();
-  }
   return absl::make_unique<RandomDualNet>(absl::StrCat("rnd:", descriptor),
-                                          seed, policy_stddev, value_stddev);
+                                          seed_, policy_stddev, value_stddev);
 }
 
 }  // namespace minigo

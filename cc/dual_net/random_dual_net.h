@@ -15,8 +15,6 @@
 #ifndef CC_DUAL_NET_RANDOM_DUAL_NET_H_
 #define CC_DUAL_NET_RANDOM_DUAL_NET_H_
 
-// TODO(tommadams): rename file to random_model.h
-
 #include <array>
 
 #include "absl/synchronization/mutex.h"
@@ -53,8 +51,7 @@ class RandomDualNetFactory : public ModelFactory {
   std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 
  private:
-  absl::Mutex mutex_;
-  Random rnd_ GUARDED_BY(&mutex_);
+  const uint64_t seed_;
 };
 
 }  // namespace minigo

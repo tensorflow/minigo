@@ -203,8 +203,8 @@ LiteDualNetFactory::LiteDualNetFactory(bool random_symmetry,
 
 std::unique_ptr<Model> LiteDualNetFactory::NewModel(
     const std::string& descriptor) {
-  return absl::make_unique<LiteDualNet>(descriptor, random_symmetry(),
-                                        GetModelSeed());
+  return absl::make_unique<LiteDualNet>(descriptor, random_symmetry_,
+                                        random_seed_);
 }
 
 }  // namespace minigo

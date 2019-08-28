@@ -179,7 +179,7 @@ TEST_F(MctsPlayerTest, InjectNoise) {
     EXPECT_EQ(root->child_U(0), root->child_U(i));
   }
 
-  Random rnd(456943875);
+  Random rnd(456943875, 1);
   std::array<float, kNumMoves> noise;
   rnd.Dirichlet(kDirichletAlpha, &noise);
   root->InjectNoise(noise, 0.25);
@@ -235,7 +235,7 @@ TEST_F(MctsPlayerTest, PickMoveSoft) {
   int count_1_0 = 0;
   int count_2_0 = 0;
   int count_3_0 = 0;
-  for (int i = 0; i < 160; ++i) {
+  for (int i = 0; i < 1600; ++i) {
     auto move = player->PickMove();
     if (move == Coord(1, 0)) {
       ++count_1_0;
@@ -246,9 +246,9 @@ TEST_F(MctsPlayerTest, PickMoveSoft) {
       ++count_3_0;
     }
   }
-  EXPECT_NEAR(100, count_2_0, 5);
-  EXPECT_NEAR(50, count_1_0, 5);
-  EXPECT_NEAR(10, count_3_0, 5);
+  EXPECT_NEAR(1000, count_2_0, 50);
+  EXPECT_NEAR(500, count_1_0, 50);
+  EXPECT_NEAR(100, count_3_0, 50);
 }
 
 TEST_F(MctsPlayerTest, DontPassIfLosing) {

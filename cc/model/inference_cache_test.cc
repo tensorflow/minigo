@@ -37,7 +37,7 @@ TEST(InferenceCacheTest, Basic) {
   BasicInferenceCache cache(3);
 
   // Create some positions & inference outputs.
-  Random rnd(614944751);
+  Random rnd(614944751, 1);
   std::vector<Inference> inferences;
   auto prev_move = Coord::kInvalid;
   TestablePosition position("");
@@ -78,7 +78,7 @@ TEST(InferenceCacheTest, ThreadSafe) {
   ThreadSafeInferenceCache cache(4, 2);
 
   // Create some positions & inference outputs.
-  Random rnd(614944751);
+  Random rnd(614944751, 1);
   std::vector<Inference> inferences;
   auto prev_move = Coord::kInvalid;
   TestablePosition position("");
@@ -120,7 +120,7 @@ TEST(InferenceCacheTest, StressTest) {
       int hits = 0;
       int misses = 0;
       Model::Output output;
-      Random rnd((i + 31) * 27);
+      Random rnd(27, i);
       for (int i = 0; i < kNumIterations; ++i) {
         TestablePosition position("");
         // Create cache keys that only differ by a few bits so that the test

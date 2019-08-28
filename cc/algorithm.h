@@ -38,14 +38,6 @@ inline int ArgMax(const T& container, Compare cmp) {
                                         std::end(container), std::move(cmp)));
 }
 
-template <typename T, typename U>
-inline int SearchSorted(const T& container, const U& value) {
-  MG_CHECK(!container.empty());
-  return std::distance(
-      container.begin(),
-      std::lower_bound(container.begin(), container.end(), value));
-}
-
 }  // namespace minigo
 
 #endif  // CC_ALGORITHM_H_
