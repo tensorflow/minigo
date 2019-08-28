@@ -19,6 +19,8 @@
 namespace minigo {
 
 namespace {
+std::atomic<int> unique_stream_id{0};
+
 uint64_t ChooseSeed(uint64_t seed) {
   if (seed == 0) {
     std::random_device rd;
@@ -32,8 +34,7 @@ uint64_t ChooseSeed(uint64_t seed) {
 
 int ChooseStream(int stream) {
   if (stream == 0) {
-    static std::atomic<int> s{0};
-    stream = s++;
+    stream = unique_stream_id.fetch_add(1);
   }
   return stream;
 }
