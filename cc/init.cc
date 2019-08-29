@@ -1,4 +1,3 @@
-
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +14,7 @@
 
 #include "cc/init.h"
 
+#include "absl/debugging/failure_signal_handler.h"
 #include "absl/debugging/symbolize.h"
 #include "gflags/gflags.h"
 
@@ -23,6 +23,8 @@ namespace minigo {
 void Init(int* pargc, char*** pargv) {
   gflags::SetUsageMessage((*pargv)[0]);
   absl::InitializeSymbolizer((*pargv)[0]);
+  absl::FailureSignalHandlerOptions options;
+  absl::InstallFailureSignalHandler(options);
   gflags::ParseCommandLineFlags(pargc, pargv, true);
 }
 

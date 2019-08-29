@@ -175,8 +175,7 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
   if (FLAGS_shuffle) {
     Random rnd(FLAGS_seed, Random::kUniqueStream);
     MG_LOG(INFO) << absl::Now() << " : shuffling";
-    auto gen = [&rnd](int i) { return rnd.UniformInt(0, i); };
-    std::random_shuffle(records.begin(), records.end(), gen);
+    rnd.Shuffle(&records);
   }
 
   // Write result.

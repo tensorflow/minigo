@@ -97,6 +97,7 @@ minigo_cc_library(
     hdrs = ["init.h"],
     deps = [
         "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/debugging:failure_signal_handler",
         "@com_google_absl//absl/debugging:symbolize",
     ],
 )
@@ -225,8 +226,10 @@ minigo_cc_library(
 
 minigo_cc_library(
     name = "symmetries",
+    srcs = ["symmetries.cc"],
     hdrs = ["symmetries.h"],
     deps = [
+        ":base",
         ":logging",
     ],
 )
@@ -408,6 +411,7 @@ minigo_cc_test(
     srcs = ["symmetries_test.cc"],
     deps = [
         ":symmetries",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -531,6 +535,7 @@ minigo_cc_binary(
         "//cc/dual_net:factory",
         "//cc/file",
         "//cc/model:batching_model",
+        "//cc/model:inference_cache",
         "//cc/model:reloading_model",
         "//cc/platform",
         "@com_github_gflags_gflags//:gflags",

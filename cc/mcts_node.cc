@@ -173,7 +173,7 @@ void MctsNode::ReshapeFinalVisits() {
   float best_cas =
       CalculateSingleMoveChildActionScore(to_play, U_common, uint16_t(best));
 
-  //int total = 0;
+  // int total = 0;
   // We explored this child with uncertainty about its value.  Now, after
   // searching, we change the visit count to reflect how many visits we would
   // have given it with our newer understanding of its regret relative to our
@@ -186,15 +186,17 @@ void MctsNode::ReshapeFinalVisits() {
     // Change N_child to the smallest value that satisfies the inequality
     // best_cas > Q + (U_scale * P * sqrt(N_parent) / N_child)
     // Solving for N_child, we get:
-    int new_N = std::max(0, std::min(static_cast<int>(child_N(i)),
-        static_cast<int>(-1 * (U_scale() * child_P(i) * std::sqrt(N())) /
-        ((child_Q(i) * to_play) - best_cas)) - 1 ));
-    //total += edges[i].N - new_N;
+    int new_N = std::max(
+        0, std::min(
+               static_cast<int>(child_N(i)),
+               static_cast<int>(-1 * (U_scale() * child_P(i) * std::sqrt(N())) /
+                                ((child_Q(i) * to_play) - best_cas)) -
+                   1));
+    // total += edges[i].N - new_N;
     edges[i].N = new_N;
   }
-  //MG_LOG(INFO) << "Pruned " << total << " visits.";
+  // MG_LOG(INFO) << "Pruned " << total << " visits.";
 }
-
 
 std::array<MctsNode::ChildInfo, kNumMoves> MctsNode::CalculateRankedChildInfo()
     const {

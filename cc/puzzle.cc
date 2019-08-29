@@ -69,6 +69,7 @@ void Puzzle() {
   player_options.soft_pick = false;
   player_options.value_init_penalty = FLAGS_value_init_penalty;
   player_options.virtual_losses = FLAGS_virtual_losses;
+  player_options.random_seed = FLAGS_seed;
   player_options.num_readouts = FLAGS_num_readouts;
   player_options.random_seed = FLAGS_seed;
 

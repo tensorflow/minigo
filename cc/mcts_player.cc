@@ -229,9 +229,11 @@ void MctsPlayer::SelectLeaves(int num_leaves) {
 
     InferenceCache::Key cache_key;
     if (inference_cache_ != nullptr) {
-      cache_key = InferenceCache::Key(leaf->move, leaf->position);
+      cache_key =
+          InferenceCache::Key(leaf->move, canonical_sym, leaf->position);
 
-      if (inference_cache_->TryGet(cache_key, &cached_output)) {
+      if (inference_cache_->TryGet(cache_key, canonical_sym, inference_sym,
+                                   &cached_output)) {
         ++num_cache_hits;
         leaf->IncorporateResults(options_.value_init_penalty,
                                  cached_output.policy, cached_output.value,
@@ -422,7 +424,8 @@ void MctsPlayer::ProcessLeaves() {
     // Merge the inference output with those in the inference cache, possibly
     // updating the values in `output`.
     if (inference_cache_ != nullptr) {
-      inference_cache_->Add(inference.cache_key, output);
+      inference_cache_->Merge(inference.cache_key, inference.canonical_sym,
+                              inference.inference_sym, &output);
     }
 
     // Propagate the results back up the tree to the root.

@@ -34,6 +34,7 @@ class Coord {
   static constexpr uint16_t kInvalid = 0xffff;
   static const char kGtpColumns[20];
 
+  Coord() = default;
   Coord(uint16_t value) : value_(value) {}  // NOLINT(runtime/explicit)
 
   Coord(int row, int col) {
@@ -66,7 +67,7 @@ class Coord {
   }
 
  private:
-  uint16_t value_;
+  uint16_t value_ = kInvalid;
 };
 
 // Formats the coord as a GTP string.

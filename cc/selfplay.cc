@@ -41,6 +41,7 @@
 #include "cc/logging.h"
 #include "cc/mcts_player.h"
 #include "cc/model/batching_model.h"
+#include "cc/model/inference_cache.h"
 #include "cc/model/reloading_model.h"
 #include "cc/platform/utils.h"
 #include "cc/random.h"
@@ -135,6 +136,12 @@ DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 DEFINE_int32(num_games, 0,
              "Total number of games to play. Defaults to parallel_games. "
              "Only one of num_games and run_forever must be set.");
+DEFINE_int32(cache_size_mb, 0, "Size of the inference cache in MB.");
+DEFINE_int32(cache_shards, 8,
+             "Number of ways to shard the inference cache. The cache uses "
+             "is locked on a per-shard basis, so more shards means less "
+             "contention but each shard is smaller. The number of shards "
+             "is clamped such that it's always <= parallel_games.");
 
 // Output flags.
 DEFINE_string(output_dir, "",
@@ -228,6 +235,17 @@ class SelfPlayer {
 
   void Run() {
     auto player_start_time = absl::Now();
+
+    if (FLAGS_cache_size_mb > 0) {
+      auto capacity =
+          BasicInferenceCache::CalculateCapacity(FLAGS_cache_size_mb);
+      MG_LOG(INFO) << "Will cache up to " << capacity
+                   << " inferences, using roughly " << FLAGS_cache_size_mb
+                   << "MB.\n";
+      auto num_shards = std::min(FLAGS_parallel_games, FLAGS_cache_shards);
+      inference_cache_ =
+          std::make_shared<ThreadSafeInferenceCache>(capacity, num_shards);
+    }
 
     // Figure out how many games we should play.
     MG_CHECK(FLAGS_parallel_games >= 1);
@@ -351,7 +369,7 @@ class SelfPlayer {
         game = absl::make_unique<Game>(model_, model_,
                                        thread_options.game_options);
         player = absl::make_unique<MctsPlayer>(batcher_->NewModel(model_),
-                                               nullptr, game.get(),
+                                               inference_cache_, game.get(),
                                                thread_options.player_options);
         if (model_name_.empty()) {
           model_name_ = player->model()->name();
@@ -436,6 +454,10 @@ class SelfPlayer {
                          << " Captures X: " << position.num_captures()[0]
                          << " O: " << position.num_captures()[1];
             MG_LOG(INFO) << root->Describe();
+            if (inference_cache_ != nullptr) {
+              MG_LOG(INFO) << "Inference cache stats: "
+                           << inference_cache_->GetStats();
+            }
           }
         }
 
@@ -558,6 +580,7 @@ class SelfPlayer {
   Random rnd_ GUARDED_BY(&mutex_);
   std::string model_name_ GUARDED_BY(&mutex_);
   std::vector<std::thread> threads_;
+  std::shared_ptr<ThreadSafeInferenceCache> inference_cache_;
 
   // True if we should run selfplay indefinitely.
   bool run_forever_ GUARDED_BY(&mutex_) = false;

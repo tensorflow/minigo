@@ -15,7 +15,9 @@
 #include "cc/symmetries.h"
 
 #include <array>
+#include <sstream>
 
+#include "absl/strings/str_join.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -25,7 +27,7 @@ namespace minigo {
 namespace symmetry {
 namespace {
 
-TEST(SymmetriesTest, TestRot90_1) {
+TEST(SymmetryTest, TestRot90_1) {
   // clang-format off
   const std::array<float, 16> original = {{
      1,  2,  3,  4,
@@ -46,7 +48,7 @@ TEST(SymmetriesTest, TestRot90_1) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestRot180_1) {
+TEST(SymmetryTest, TestRot180_1) {
   // clang-format off
   std::array<float, 16> original = {{
      1,  2,  3,  4,
@@ -72,7 +74,7 @@ TEST(SymmetriesTest, TestRot180_1) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestRot270_1) {
+TEST(SymmetryTest, TestRot270_1) {
   // clang-format off
   std::array<float, 16> original = {{
      1,  2,  3,  4,
@@ -99,7 +101,7 @@ TEST(SymmetriesTest, TestRot270_1) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlip_1) {
+TEST(SymmetryTest, TestFlip_1) {
   // clang-format off
   std::array<float, 16> original = {{
      1,  2,  3,  4,
@@ -120,7 +122,7 @@ TEST(SymmetriesTest, TestFlip_1) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlipRot90_1) {
+TEST(SymmetryTest, TestFlipRot90_1) {
   // clang-format off
   std::array<float, 16> original = {{
      1,  2,  3,  4,
@@ -146,7 +148,7 @@ TEST(SymmetriesTest, TestFlipRot90_1) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlipRot180_1) {
+TEST(SymmetryTest, TestFlipRot180_1) {
   // clang-format off
   std::array<float, 16> original = {{
      1,  2,  3,  4,
@@ -172,7 +174,7 @@ TEST(SymmetriesTest, TestFlipRot180_1) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlipRot270_1) {
+TEST(SymmetryTest, TestFlipRot270_1) {
   // clang-format off
   std::array<float, 16> original = {{
      1,  2,  3,  4,
@@ -198,7 +200,7 @@ TEST(SymmetriesTest, TestFlipRot270_1) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestRot90_3) {
+TEST(SymmetryTest, TestRot90_3) {
   // clang-format off
   const std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -219,7 +221,7 @@ TEST(SymmetriesTest, TestRot90_3) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestRot180_3) {
+TEST(SymmetryTest, TestRot180_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -245,7 +247,7 @@ TEST(SymmetriesTest, TestRot180_3) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestRot270_3) {
+TEST(SymmetryTest, TestRot270_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -272,7 +274,7 @@ TEST(SymmetriesTest, TestRot270_3) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlip_3) {
+TEST(SymmetryTest, TestFlip_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -293,7 +295,7 @@ TEST(SymmetriesTest, TestFlip_3) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlipRot90_3) {
+TEST(SymmetryTest, TestFlipRot90_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -319,7 +321,7 @@ TEST(SymmetriesTest, TestFlipRot90_3) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlipRot180_3) {
+TEST(SymmetryTest, TestFlipRot180_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -345,7 +347,7 @@ TEST(SymmetriesTest, TestFlipRot180_3) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, TestFlipRot270_3) {
+TEST(SymmetryTest, TestFlipRot270_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -371,23 +373,134 @@ TEST(SymmetriesTest, TestFlipRot270_3) {
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetriesTest, Inverses) {
-  for (int i = 0; i < kNumSymmetries; ++i) {
-    // clang-format off
-    std::array<float, 48> original = {{
-       11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
-       51,  52,  53,   61,  62,  63,   71,  72,  73,   81,  82,  83,
-       91,  92,  93,  101, 102, 103,  111, 112, 113,  121, 122, 123,
-      131, 132, 133,  141, 142, 143,  151, 152, 153,  161, 162, 163,
-    }};
-    // clang-format on
+TEST(SymmetryTest, Inverses) {
+  // clang-format off
+  std::array<float, 48> original = {{
+     11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
+     51,  52,  53,   61,  62,  63,   71,  72,  73,   81,  82,  83,
+     91,  92,  93,  101, 102, 103,  111, 112, 113,  121, 122, 123,
+    131, 132, 133,  141, 142, 143,  151, 152, 153,  161, 162, 163,
+  }};
+  // clang-format on
 
-    Symmetry sym = static_cast<Symmetry>(i);
+  for (auto sym : kAllSymmetries) {
     std::array<float, 48> transformed, inverse;
     ApplySymmetry<4, 3>(sym, original.data(), transformed.data());
     ApplySymmetry<4, 3>(Inverse(sym), transformed.data(), inverse.data());
 
     EXPECT_THAT(inverse, ElementsAreArray(original));
+  }
+}
+
+// Verify the ApplySymmetry overload for Coord matches that for arrays.
+TEST(SymmetryTest, Coord) {
+  std::array<int, kN * kN> original;
+  for (int i = 0; i < kN * kN; ++i) {
+    original[i] = i;
+  }
+
+  for (auto sym : kAllSymmetries) {
+    EXPECT_EQ(Coord::kPass, ApplySymmetry(sym, Coord::kPass));
+    EXPECT_EQ(Coord::kResign, ApplySymmetry(sym, Coord::kResign));
+    EXPECT_EQ(Coord::kInvalid, ApplySymmetry(sym, Coord::kInvalid));
+
+    std::array<int, kN * kN> transformed;
+    ApplySymmetry<kN, 1>(sym, original.data(), transformed.data());
+
+    for (int i = 0; i < kN * kN; ++i) {
+      EXPECT_EQ(original[i], transformed[ApplySymmetry(sym, i)]) << sym;
+    }
+  }
+}
+
+// Build the symmetry concat table and verify it matches the one in the .cc
+// file.
+TEST(SymmetryTest, ConcatTable) {
+  Symmetry table[kNumSymmetries][kNumSymmetries];
+
+  // Table with which we will figure out how to concatenate two symmetries.
+  std::array<int, 4> original = {0, 1, 2, 3};
+  for (auto a : kAllSymmetries) {
+    std::array<int, 4> after_a;
+    ApplySymmetry<2, 1>(a, original.data(), after_a.data());
+
+    for (auto b : kAllSymmetries) {
+      std::array<int, 4> after_a_b;
+      ApplySymmetry<2, 1>(b, after_a.data(), after_a_b.data());
+
+      bool found = false;
+      for (auto c : kAllSymmetries) {
+        std::array<int, 4> concat;
+        ApplySymmetry<2, 1>(c, original.data(), concat.data());
+        if (concat == after_a_b) {
+          MG_CHECK(!found);
+          found = true;
+          table[a][b] = c;
+        }
+      }
+
+      MG_CHECK(found);
+    }
+  }
+
+  MG_LOG(INFO)
+      << "constexpr Symmetry kConcatTable[kNumSymmetries][kNumSymmetries] = {";
+  for (int i = 0; i < kNumSymmetries; ++i) {
+    std::vector<std::string> row;
+    for (int j = 0; j < kNumSymmetries; ++j) {
+      std::ostringstream oss;
+      oss << table[i][j];
+      row.push_back(oss.str());
+    }
+    MG_LOG(INFO) << "  {" << absl::StrJoin(row, ", ") << "},";
+  }
+  MG_LOG(INFO) << "};";
+
+  for (auto a : kAllSymmetries) {
+    for (auto b : kAllSymmetries) {
+      EXPECT_EQ(table[a][b], Concat(a, b));
+    }
+  }
+}
+
+TEST(SymmetryTest, ConcatSymmetryCoord) {
+  for (int i = 0; i < kN * kN; ++i) {
+    for (auto a : kAllSymmetries) {
+      Coord after_a = ApplySymmetry(a, i);
+
+      for (auto b : kAllSymmetries) {
+        Coord after_a_b = ApplySymmetry(b, after_a);
+
+        auto c = Concat(a, b);
+        Coord after_c = ApplySymmetry(c, i);
+        EXPECT_EQ(after_a_b, after_c)
+            << "coord:" << Coord(i) << "  a:" << a << "  after_a:" << after_a
+            << "  b:" << b << "  after_a_b:" << after_a_b << "  c:" << c
+            << "  after_c:" << after_c;
+      }
+    }
+  }
+}
+
+TEST(SymmetryTest, ConcatSymmetryArray) {
+  std::array<int, kN * kN> original;
+  for (int i = 0; i < kN * kN; ++i) {
+    original[i] = i;
+  }
+
+  for (auto a : kAllSymmetries) {
+    std::array<int, kN * kN> after_a;
+    ApplySymmetry<kN, 1>(a, original.data(), after_a.data());
+
+    for (auto b : kAllSymmetries) {
+      std::array<int, kN * kN> after_a_b;
+      ApplySymmetry<kN, 1>(b, after_a.data(), after_a_b.data());
+
+      auto c = Concat(a, b);
+      std::array<int, kN * kN> after_c;
+      ApplySymmetry<kN, 1>(c, original.data(), after_c.data());
+      EXPECT_EQ(after_a_b, after_c);
+    }
   }
 }
 

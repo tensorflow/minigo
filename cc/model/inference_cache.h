@@ -27,11 +27,29 @@
 #include "cc/coord.h"
 #include "cc/model/model.h"
 #include "cc/position.h"
+#include "cc/symmetries.h"
 #include "cc/zobrist.h"
 
 namespace minigo {
 
-// An LRU cache for inferences.
+// A symmetry-aware cache of inference results.
+// The cache has to deal with two different symmetries: the _canonical_
+// symmetry and the _inference_ symmetry.
+//
+// The canonical symmetry is the one that transforms a position from its
+// canonical form to the form that was actually played in the current game. The
+// inference cache doesn't specify what this canonical form is but all users
+// that share the same cache instance must agree. Examples canonical forms
+// include:
+//  - requiring that the first move is play in the upper-left corner of
+//    the board.
+//  - using the symmtery that generates the smallest Zobrist hash.
+//
+// The inference symmetry is the symmetry applied to a position when running
+// inference: because models have a bias the MCTS code randomly applies
+// symmetries to positions while searching. Note that this symmetry is relative
+// to the actual position played during the game and not the canonical form of
+// the position.
 class InferenceCache {
  public:
   // The key used for the inference cache.
@@ -51,7 +69,8 @@ class InferenceCache {
 
     // Constructs a cache key from the given position and previous move made to
     // get to that position.
-    Key(Coord prev_move, const Position& position);
+    Key(Coord prev_move, symmetry::Symmetry canonical_sym,
+        const Position& position);
 
     template <typename H>
     friend H AbslHashValue(H h, Key key) {
@@ -67,9 +86,6 @@ class InferenceCache {
     friend std::ostream& operator<<(std::ostream& os, Key key);
 
    private:
-    Key(zobrist::Hash cache_hash, zobrist::Hash stone_hash)
-        : cache_hash_(cache_hash), stone_hash_(stone_hash) {}
-
     // There is a vanishingly small chance that two Positions could have
     // different stone hashes but the same computed hash for the inference
     // cache key. To avoid potential crashes in this case, the key compares both
@@ -79,19 +95,40 @@ class InferenceCache {
     zobrist::Hash stone_hash_ = 0;
   };
 
+  struct Stats {
+    size_t size = 0;
+    size_t capacity = 0;
+    size_t num_hits = 0;
+    size_t num_complete_misses = 0;
+    size_t num_symmetry_misses = 0;
+  };
+
   virtual ~InferenceCache();
 
   // Clears the cache.
   virtual void Clear() = 0;
 
-  // Adds the (features, inference output) pair to the cache.
+  // Merges the (key, inference output) pair into the cache for the given
+  // inference symmetry.
+  // If the cache already contains different symmetries for the cache key,
+  // the output is updated to contain their average.
   // If the cache is full, the least-recently-used pair is evicted.
-  virtual void Add(Key key, const Model::Output& output) = 0;
+  virtual void Merge(Key key, symmetry::Symmetry canonical_sym,
+                     symmetry::Symmetry inference_sym,
+                     Model::Output* output) = 0;
 
-  // Looks up the inference output for the given features.
-  // If found, the features are marked as most-recently-used.
-  virtual bool TryGet(Key key, Model::Output* output) = 0;
+  // Looks up the inference output for the given features and symmetries.
+  // If the matching inference symmetry has already been merged into the cache,
+  // the average of _all_ symmetries for the position is returned.
+  // The features are marked as most-recently-used.
+  virtual bool TryGet(Key key, symmetry::Symmetry canonical_sym,
+                      symmetry::Symmetry inference_sym,
+                      Model::Output* output) = 0;
+
+  virtual Stats GetStats() const = 0;
 };
+
+std::ostream& operator<<(std::ostream& os, const InferenceCache::Stats& stats);
 
 // Not thread safe.
 class BasicInferenceCache : public InferenceCache {
@@ -103,8 +140,11 @@ class BasicInferenceCache : public InferenceCache {
   explicit BasicInferenceCache(size_t capacity);
 
   void Clear() override;
-  void Add(Key key, const Model::Output& output) override;
-  bool TryGet(Key key, Model::Output* output) override;
+  void Merge(Key key, symmetry::Symmetry canonical_sym,
+             symmetry::Symmetry inference_sym, Model::Output* output) override;
+  bool TryGet(Key key, symmetry::Symmetry canonical_sym,
+              symmetry::Symmetry inference_sym, Model::Output* output) override;
+  Stats GetStats() const override;
 
  private:
   struct ListNode {
@@ -113,9 +153,21 @@ class BasicInferenceCache : public InferenceCache {
   };
 
   struct Element : public ListNode {
-    Element(Key key, const Model::Output& output) : key(key), output(output) {}
+    // We don't initialize the output in the constructor to avoid an unnecessary
+    // copy when merging new symmetries of an existing key into the cache.
+    Element(Key key, symmetry::Symmetry inference_sym)
+        : key(key),
+          valid_symmetry_bits(1 << inference_sym),
+          num_valid_symmetries(1) {}
     Key key;
     Model::Output output;
+
+    // If bit (1 << symmetry) is set, then that symmetry has been merged into
+    // the cache.
+    uint8_t valid_symmetry_bits;
+
+    // Num bits set in valid_symmetry_bits.
+    uint8_t num_valid_symmetries;
   };
 
   // Removes the given element from the LRU list.
@@ -146,7 +198,7 @@ class BasicInferenceCache : public InferenceCache {
   using Map = absl::node_hash_map<Key, Element>;
   Map map_;
 
-  const size_t capacity_;
+  Stats stats_;
 };
 
 // Thread safe wrapper around BasicInferenceCache.
@@ -166,13 +218,19 @@ class ThreadSafeInferenceCache : public InferenceCache {
   ThreadSafeInferenceCache(size_t total_capacity, int num_shards);
 
   // Note that each shard is locked and cleared in turn: if a Clear call is
-  // made concurrently with multiple Add calls, there may never be a point in
+  // made concurrently with multiple Merge calls, there may never be a point in
   // time where the cache is completely empty (unless num_shards == 1).
   void Clear() override;
 
-  void Add(Key key, const Model::Output& output) override;
+  void Merge(Key key, symmetry::Symmetry canonical_sym,
+             symmetry::Symmetry inference_sym, Model::Output* output) override;
 
-  bool TryGet(Key key, Model::Output* output) override;
+  bool TryGet(Key key, symmetry::Symmetry canonical_sym,
+              symmetry::Symmetry inference_sym, Model::Output* output) override;
+
+  // These stats are only approximate, since each shard is locked and queried
+  // for their stats in turn. Nevertheless, the results should be close enough.
+  Stats GetStats() const override;
 
  private:
   struct Shard {
