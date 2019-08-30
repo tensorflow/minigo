@@ -3,5 +3,5 @@
 --conv_width=32
 --fc_width=64
 --trunk_layers=9
---value_cost_weight=0.25
+--value_cost_weight=1
 --summary_steps=64

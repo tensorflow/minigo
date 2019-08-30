@@ -4,10 +4,12 @@
 # the RL loop.
 
 --num_games=4096
---num_readouts=240
+--num_readouts=400
+--fastplay_frequency=0.7
+--fastplay_readouts=80
 --value_init_penalty=0.2
---holdout_pct=0.03
---disable_resign_pct=0.1
+--holdout_pct=0.00
+--disable_resign_pct=1.0
 --resign_threshold=-0.99
 
 # Device-specific selfplay flags.

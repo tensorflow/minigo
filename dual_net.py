@@ -27,7 +27,6 @@ import numpy as np
 import random
 
 import tensorflow as tf
-import tensorflow.contrib.tensorrt as trt
 from tensorflow.contrib import summary
 from tensorflow.contrib.tpu.python.tpu import tpu_config
 from tensorflow.contrib.tpu.python.tpu import tpu_estimator
@@ -630,6 +629,7 @@ def freeze_graph(model_path, use_trt=False, trt_max_batch_size=8,
         n.sess, n.sess.graph.as_graph_def(), output_names)
 
     if use_trt:
+        import tensorflow.contrib.tensorrt as trt
         out_graph = trt.create_inference_graph(
             input_graph_def=out_graph,
             outputs=output_names,
