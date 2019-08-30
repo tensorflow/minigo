@@ -148,17 +148,17 @@ TEST(DualNetTest, TestBackendsEqual) {
   std::map<std::string, Test> tests;
 
 #if MG_ENABLE_TF_DUAL_NET
-  tests.emplace("TfDualNet", Test(absl::make_unique<TfDualNetFactory>(false, 0),
-                                  "test_model.pb"));
+  tests.emplace("TfDualNet",
+                Test(absl::make_unique<TfDualNetFactory>(), "test_model.pb"));
 #endif
 #if MG_ENABLE_LITE_DUAL_NET
-  tests.emplace("LiteDualNet",
-                Test(absl::make_unique<LiteDualNetFactory>(false, 0),
-                     "test_model.tflite"));
+  tests.emplace("LiteDualNet", Test(absl::make_unique<LiteDualNetFactory>(),
+                                    "test_model.tflite"));
 #endif
 
   Random rnd(Random::kUniqueSeed, Random::kUniqueStream);
   Model::Input input;
+  input.sym = symmetry::kIdentity;
   input.to_play = Color::kBlack;
   Position::Stones stones;
   for (auto& x : stones) {

@@ -176,7 +176,7 @@ void GtpClient::Ponder() {
   // Remember the number of reads at the root.
   int n = player_->root()->N();
 
-  player_->TreeSearch();
+  player_->TreeSearch(player_->options().virtual_losses);
 
   // Increment the ponder count by difference new and old reads.
   ponder_read_count_ += player_->root()->N() - n;

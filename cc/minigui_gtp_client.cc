@@ -378,7 +378,8 @@ void MiniguiGtpClient::RefreshPendingWinRateEvals() {
   win_rate_evaluator_->SetCurrentVariation(std::move(variation));
 }
 
-void MiniguiGtpClient::TreeSearchCb(const std::vector<MctsNode*>& leaves) {
+void MiniguiGtpClient::TreeSearchCb(
+    const std::vector<const MctsNode*>& leaves) {
   if (!leaves.empty() && report_search_interval_ != absl::ZeroDuration()) {
     auto now = absl::Now();
     if (now - last_report_time_ > report_search_interval_) {
@@ -564,7 +565,7 @@ void MiniguiGtpClient::WinRateEvaluator::Worker::Run() {
     for (auto c : node->GetVariation()) {
       MG_CHECK(player_->PlayMove(c));
     }
-    player_->TreeSearch();
+    player_->TreeSearch(player_->options().virtual_losses);
     BatchingModelFactory::EndGame(player_->model(), player_->model());
 
     nlohmann::json j = {

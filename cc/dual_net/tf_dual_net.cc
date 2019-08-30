@@ -69,8 +69,7 @@ void PlaceOnDevice(GraphDef* graph_def, const std::string& device) {
 
 class TfDualNet : public DualNet {
  public:
-  TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
-            bool random_symmetry, uint64_t random_seed);
+  TfDualNet(const std::string& graph_path, const GraphDef& graph_def);
   ~TfDualNet() override;
 
  private:
@@ -85,11 +84,8 @@ class TfDualNet : public DualNet {
   const std::string graph_path_;
 };
 
-TfDualNet::TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
-                     bool random_symmetry, uint64_t random_seed)
-    : DualNet(std::string(file::Stem(graph_path)), random_symmetry,
-              random_seed),
-      graph_path_(graph_path) {
+TfDualNet::TfDualNet(const std::string& graph_path, const GraphDef& graph_def)
+    : DualNet(std::string(file::Stem(graph_path))), graph_path_(graph_path) {
   SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
   session_.reset(NewSession(options));
@@ -150,8 +146,7 @@ void TfDualNet::Reserve(size_t capacity) {
 
 }  // namespace
 
-TfDualNetFactory::TfDualNetFactory(bool random_symmetry, uint64_t random_seed)
-    : DualNetFactory(random_symmetry, random_seed) {
+TfDualNetFactory::TfDualNetFactory() {
 #if MINIGO_ENABLE_GPU
   if (tensorflow::ValidateGPUMachineManager().ok()) {
     device_count_ = tensorflow::GPUMachineManager()->VisibleDeviceCount();
@@ -179,10 +174,8 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
     if (device_count_ > 0) {
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
-    models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, graph_def, random_symmetry_, random_seed_));
-    models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, graph_def, random_symmetry_, random_seed_));
+    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def));
+    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def));
   }
 
   return absl::make_unique<BufferedModel>(descriptor, std::move(models));

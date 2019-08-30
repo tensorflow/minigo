@@ -147,13 +147,13 @@ class Evaluator {
       : desc_a_(std::move(desc_a)), desc_b_(std::move(desc_b)) {
     // Create a batcher for the first model.
     batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-        NewModelFactory(desc_a_.engine, true, FLAGS_seed)));
+        NewModelFactory(desc_a_.engine)));
 
     // If the second model requires a different factory, create one & a second
     // batcher too.
     if (desc_b_.engine != desc_a_.engine) {
       batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-          NewModelFactory(desc_b_.engine, true, FLAGS_seed)));
+          NewModelFactory(desc_b_.engine)));
     }
   }
 
@@ -209,18 +209,11 @@ class Evaluator {
 
     Game game(black_model->name(), white_model->name(), game_options_);
 
-    auto player_options = player_options_;
-    // If an random seed was explicitly specified, make sure we use a
-    // different seed for each thread.
-    if (player_options.random_seed != 0) {
-      player_options.random_seed += 1299283 * thread_id;
-    }
-
     const bool verbose = thread_id == 0;
     auto black = absl::make_unique<MctsPlayer>(black_model->NewModel(), nullptr,
-                                               &game, player_options);
+                                               &game, player_options_);
     auto white = absl::make_unique<MctsPlayer>(white_model->NewModel(), nullptr,
-                                               &game, player_options);
+                                               &game, player_options_);
 
     BatchingModelFactory::StartGame(black->model(), white->model());
     auto* curr_player = black.get();
@@ -236,7 +229,7 @@ class Evaluator {
         break;
       }
 
-      auto move = curr_player->SuggestMove(player_options.num_readouts);
+      auto move = curr_player->SuggestMove(player_options_.num_readouts);
       if (verbose) {
         std::cerr << curr_player->root()->Describe() << "\n";
       }

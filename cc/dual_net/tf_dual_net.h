@@ -23,9 +23,9 @@
 
 namespace minigo {
 
-class TfDualNetFactory : public DualNetFactory {
+class TfDualNetFactory : public ModelFactory {
  public:
-  TfDualNetFactory(bool random_symmetry, uint64_t random_seed);
+  TfDualNetFactory();
 
   std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 

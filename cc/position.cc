@@ -55,6 +55,14 @@ const std::array<inline_vector<Coord, 4>, kN* kN> kNeighborCoords = []() {
   return result;
 }();
 
+zobrist::Hash Position::CalculateStoneHash(const Position::Stones& stones) {
+  zobrist::Hash hash = 0;
+  for (int c = 0; c < kN * kN; ++c) {
+    hash ^= zobrist::MoveHash(c, stones[c].color());
+  }
+  return hash;
+}
+
 Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play)
     : board_visitor_(bv), group_visitor_(gv), to_play_(to_play) {
   // All moves are initially legal.
@@ -83,6 +91,8 @@ void Position::PlayMove(Coord c, Color color, ZobristHistory* zobrist_history) {
   n_ += 1;
   to_play_ = OtherColor(to_play_);
   UpdateLegalMoves(zobrist_history);
+
+  MG_DCHECK(stone_hash_ == CalculateStoneHash(stones_));
 }
 
 std::string Position::ToSimpleString() const {

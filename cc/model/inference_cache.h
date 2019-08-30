@@ -47,6 +47,8 @@ class InferenceCache {
     static Key CreateTestKey(zobrist::Hash cache_hash,
                              zobrist::Hash stone_hash);
 
+    Key() = default;
+
     // Constructs a cache key from the given position and previous move made to
     // get to that position.
     Key(Coord prev_move, const Position& position);
@@ -73,8 +75,8 @@ class InferenceCache {
     // cache key. To avoid potential crashes in this case, the key compares both
     // for equality. Note that it's sufficient to use cache_hash_ for the Key's
     // actual hash value.
-    zobrist::Hash cache_hash_;
-    zobrist::Hash stone_hash_;
+    zobrist::Hash cache_hash_ = 0;
+    zobrist::Hash stone_hash_ = 0;
   };
 
   virtual ~InferenceCache();

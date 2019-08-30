@@ -22,6 +22,13 @@ Model::Model(std::string name, int buffer_count)
     : name_(std::move(name)), buffer_count_(buffer_count) {}
 Model::~Model() = default;
 
+void Model::ApplySymmetry(symmetry::Symmetry sym, const Output& src,
+                          Output* dst) {
+  symmetry::ApplySymmetry<kN, 1>(sym, src.policy.data(), dst->policy.data());
+  dst->policy[Coord::kPass] = src.policy[Coord::kPass];
+  dst->value = src.value;
+}
+
 ModelFactory::~ModelFactory() = default;
 
 }  // namespace minigo

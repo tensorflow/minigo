@@ -111,5 +111,22 @@ TEST(RandomTest, Streams) {
   }
 }
 
+TEST(RandomTest, Shuffle) {
+  Random rnd(0, 0);
+
+  std::vector<int> original;
+  for (int i = 0; i < 1000; ++i) {
+    original.push_back(i);
+  }
+
+  auto shuffled = original;
+  rnd.Shuffle(&shuffled);
+  EXPECT_NE(original, shuffled);
+
+  auto shuffled_again = original;
+  rnd.Shuffle(&shuffled_again);
+  EXPECT_NE(shuffled, shuffled_again);
+}
+
 }  // namespace
 }  // namespace minigo

@@ -35,8 +35,7 @@ namespace {
 
 class LiteDualNet : public DualNet {
  public:
-  LiteDualNet(std::string graph_path, bool random_symmetry,
-              uint64_t random_seed);
+  explicit LiteDualNet(std::string graph_path);
 
  private:
   void RunManyImpl(std::string* model_name) override;
@@ -60,10 +59,8 @@ class LiteDualNet : public DualNet {
   size_t batch_capacity_;
 };
 
-LiteDualNet::LiteDualNet(std::string graph_path, bool random_symmetry,
-                         uint64_t random_seed)
-    : DualNet(std::string(file::Stem(graph_path)), random_symmetry,
-              random_seed),
+LiteDualNet::LiteDualNet(std::string graph_path)
+    : DualNet(std::string(file::Stem(graph_path))),
       graph_path_(std::move(graph_path)),
       batch_capacity_(0) {
   model_ = FlatBufferModel::BuildFromFile(graph_path_.c_str());
@@ -197,14 +194,9 @@ void LiteDualNet::RunManyImpl(T* feature_data, const T* policy_data,
 }
 }  // namespace
 
-LiteDualNetFactory::LiteDualNetFactory(bool random_symmetry,
-                                       uint64_t random_seed)
-    : DualNetFactory(random_symmetry, random_seed) {}
-
 std::unique_ptr<Model> LiteDualNetFactory::NewModel(
     const std::string& descriptor) {
-  return absl::make_unique<LiteDualNet>(descriptor, random_symmetry_,
-                                        random_seed_);
+  return absl::make_unique<LiteDualNet>(descriptor);
 }
 
 }  // namespace minigo

@@ -71,7 +71,6 @@ class TestablePlayer : public MctsPlayer {
 
   using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;
-  using MctsPlayer::ProcessLeaves;
   using MctsPlayer::TreeSearch;
   using MctsPlayer::UndoMove;
 
@@ -81,13 +80,6 @@ class TestablePlayer : public MctsPlayer {
     std::vector<Model::Output*> outputs = {&output};
     model()->RunMany(inputs, &outputs, nullptr);
     return output;
-  }
-
-  void TreeSearch(int virtual_losses) {
-    auto o = options();
-    o.virtual_losses = virtual_losses;
-    SetOptions(o);
-    TreeSearch();
   }
 };
 
@@ -446,89 +438,6 @@ TEST_F(MctsPlayerTest, ExtractDataResignEnd) {
   EXPECT_LT(0, root->position.CalculateScore(game_->options().komi));
   EXPECT_EQ(-1, game_->result());
   EXPECT_EQ("W+R", game_->result_string());
-}
-
-// Fake DualNet implementation used to verify that MctsPlayer symmetries work
-// correctly. For each position on the board, MergeFeaturesNet returns a policy
-// value depending on the feature planes of that square, if the square or any
-// four connected neighbor is set true the policy is set to 0.01.
-class MergeFeaturesNet : public DualNet {
- public:
-  MergeFeaturesNet(bool random_symmetry, uint64_t random_seed)
-      : DualNet("MergeFeatures", random_symmetry, random_seed) {}
-
- private:
-  void RunManyImpl(std::string* model_name) override {
-    for (size_t i = 0; i < features_.size(); ++i) {
-      Run(features_[i], &raw_outputs_[i]);
-    }
-    if (model_name != nullptr) {
-      *model_name = "MergeFeaturesNet";
-    }
-  }
-
-  void Run(const BoardFeatures& features, Output* output) {
-    for (int c = 0; c < kN * kN; ++c) {
-      bool present = false;
-      for (const auto n : kNeighborCoords[c]) {
-        const float* src = features.data() + n * DualNet::kNumStoneFeatures;
-        for (int f = 0; f < DualNet::kNumStoneFeatures - 1; ++f) {
-          if (src[f] != 0) {
-            present = true;
-          }
-        }
-      }
-      output->policy[c] = 0.01 * present;
-    }
-    output->policy[Coord::kPass] = 0.0;
-    output->value = 0.0;
-  }
-};
-
-TEST_F(MctsPlayerTest, SymmetriesTest) {
-  MctsPlayer::Options options;
-  options.random_seed = 17;
-  TestablePlayer player(absl::make_unique<MergeFeaturesNet>(true, 42),
-                        game_.get(), options);
-
-  // Without playing a move, all features planes should be zero except the last
-  // one (it's black's turn to play).
-  auto* root = player.root();
-  root->AddVirtualLoss(root);
-  player.ProcessLeaves(std::vector<MctsNode*>({root}));
-  for (int i = 0; i < kN * kN; ++i) {
-    ASSERT_EQ(0.0, root->child_P(i));
-  }
-
-  // Play an odd number of moves.
-  // Because it's white to play next, the output of the MergeFeaturesNet should
-  // only be non-zero except near locations where we have played.
-  std::vector<std::unique_ptr<MctsNode>> nodes;
-  std::vector<std::string> moves = {"B3", "F1", "C7"};
-  auto* parent = root;
-  for (const auto& move : moves) {
-    nodes.push_back(absl::make_unique<MctsNode>(parent, Coord::FromGtp(move)));
-    parent = nodes.back().get();
-  }
-
-  // 4 squares near B3 + 3 next to F1 + 4 near C7 should have equal policy.
-  float policy_fraction = 1.0 / (4 + 3 + 4);
-
-  // Run the MergeFeaturesNet many times to have a good chance of exercising all
-  // the symmetries.
-  for (int i = 0; i < 100; ++i) {
-    auto* leaf = nodes.back().get();
-    leaf->AddVirtualLoss(root);
-    player.ProcessLeaves(std::vector<MctsNode*>({leaf}));
-    ASSERT_EQ(0.0, leaf->child_P(Coord::FromGtp("pass")));
-    for (const auto move : moves) {
-      // Playing where stones exist is illegal and should have been marked as 0.
-      ASSERT_EQ(0.0, leaf->child_P(Coord::FromGtp(move)));
-      for (const auto n : kNeighborCoords[Coord::FromGtp(move)]) {
-        ASSERT_NEAR(policy_fraction, leaf->child_P(n), 1e-7);
-      }
-    }
-  }
 }
 
 TEST_F(MctsPlayerTest, UndoMove) {

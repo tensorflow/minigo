@@ -29,6 +29,7 @@
 #include "cc/constants.h"
 #include "cc/inline_vector.h"
 #include "cc/position.h"
+#include "cc/symmetries.h"
 #include "cc/zobrist.h"
 
 namespace minigo {
@@ -101,6 +102,9 @@ class MctsNode {
   enum class Flag : uint8_t {
     // Node is expanded.
     kExpanded = (1 << 0),
+
+    // Node has a valid canonical symmetry.
+    kHasCanonicalSymmetry = (1 << 1),
   };
 
   void SetFlag(Flag flag) { flags |= static_cast<uint8_t>(flag); }
@@ -172,6 +176,16 @@ class MctsNode {
   Coord move;
 
   uint8_t flags = 0;
+
+  // If HasFlag(Flag::kHasCanonicalSymmetry) == true, canonical_symmetry holds
+  // the symmetry that transforms the canonical form of the position to its real
+  // one.
+  // TODO(tommadams): for now, the canonical symmetry is just the one whose
+  // Zobrist hash is the smallest, which is sufficient for use with the
+  // inference cache. It would be more generally useful to use the real
+  // canonical transform such that the first move is in the top-right corner,
+  // etc.
+  uint8_t canonical_symmetry = symmetry::kIdentity;
 
   std::array<EdgeStats, kNumMoves> edges;
 

@@ -218,7 +218,7 @@ class MiniguiGtpClient : public GtpClient {
   // WinRateEvaluator's searches). Calls ReportSearchStatus if the time since
   // the time it called ReportSearchStatus is greater than
   // report_search_interval_.
-  void TreeSearchCb(const std::vector<MctsNode*>& leaves);
+  void TreeSearchCb(const std::vector<const MctsNode*>& leaves);
 
   absl::Duration report_search_interval_;
   absl::Time last_report_time_;

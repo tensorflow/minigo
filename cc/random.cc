@@ -40,6 +40,10 @@ int ChooseStream(int stream) {
 }
 }  // namespace
 
+constexpr uint64_t Random::kLargePrime;
+constexpr uint64_t Random::kUniqueSeed;
+constexpr int Random::kUniqueStream;
+
 Random::Random(uint64_t seed, int stream)
     : seed_(ChooseSeed(seed)), impl_(seed_, ChooseStream(stream)) {}
 

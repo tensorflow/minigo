@@ -20,6 +20,7 @@ minigo_cc_library(
         "//cc:base",
         "//cc:inline_vector",
         "//cc:position",
+        "//cc:symmetries",
     ],
 )
 
@@ -58,6 +59,7 @@ minigo_cc_library(
         ":model",
         "//cc:base",
         "//cc:logging",
+        "//cc:symmetries",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
@@ -105,7 +107,9 @@ minigo_cc_test(
     deps = [
         ":inference_cache",
         "//cc:random",
+        "//cc:symmetries",
         "//cc:test_utils",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest",
     ],

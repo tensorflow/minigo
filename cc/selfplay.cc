@@ -170,6 +170,7 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   player_options->policy_softmax_temp = FLAGS_policy_softmax_temp;
   player_options->virtual_losses = FLAGS_virtual_losses;
   player_options->random_seed = FLAGS_seed;
+  player_options->random_symmetry = FLAGS_random_symmetry;
   player_options->num_readouts = FLAGS_num_readouts;
   player_options->seconds_per_move = FLAGS_seconds_per_move;
   player_options->time_limit = FLAGS_time_limit;
@@ -250,8 +251,7 @@ class SelfPlayer {
 
     {
       absl::MutexLock lock(&mutex_);
-      auto model_factory =
-          NewModelFactory(engine_, FLAGS_random_symmetry, FLAGS_seed);
+      auto model_factory = NewModelFactory(engine_);
       // If the model path contains a pattern, wrap the implementation factory
       // in a ReloadingDualNetFactory to automatically reload the latest model
       // that matches the pattern.
@@ -295,9 +295,6 @@ class SelfPlayer {
       verbose = thread_id == 0;
       // If an random seed was explicitly specified, make sure we use a
       // different seed for each thread.
-      if (player_options.random_seed != 0) {
-        player_options.random_seed += 1299283 * thread_id;
-      }
       game_options.resign_enabled = (*rnd)() >= FLAGS_disable_resign_pct;
 
       holdout_pct = FLAGS_holdout_pct;

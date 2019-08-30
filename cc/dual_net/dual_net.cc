@@ -77,18 +77,6 @@ void DualNet::RunMany(const std::vector<const Input*>& inputs,
 
   MG_CHECK(inputs.size() == outputs->size());
 
-  // Decide what symmetries to apply.
-  symmetries_used_.resize(0);
-  if (random_symmetry_) {
-    symmetries_used_.reserve(inputs.size());
-    for (size_t i = 0; i < inputs.size(); ++i) {
-      symmetries_used_.push_back(static_cast<symmetry::Symmetry>(
-          rnd_.UniformInt(0, symmetry::kNumSymmetries - 1)));
-    }
-  } else {
-    symmetries_used_.resize(inputs.size(), symmetry::kIdentity);
-  }
-
   // Generate input features & apply symmetries.
   // TODO(tommadams): apply symmetries in place.
   BoardFeatures raw_features;
@@ -96,7 +84,7 @@ void DualNet::RunMany(const std::vector<const Input*>& inputs,
   for (size_t i = 0; i < inputs.size(); ++i) {
     SetFeatures(inputs[i]->position_history, inputs[i]->to_play, &raw_features);
     symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
-        symmetries_used_[i], raw_features.data(), features_[i].data());
+        inputs[i]->sym, raw_features.data(), features_[i].data());
   }
 
   raw_outputs_.resize(inputs.size());
@@ -108,7 +96,7 @@ void DualNet::RunMany(const std::vector<const Input*>& inputs,
   for (size_t i = 0; i < raw_outputs_.size(); ++i) {
     const auto& raw_output = raw_outputs_[i];
     auto* final_output = (*outputs)[i];
-    symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(symmetries_used_[i]),
+    symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(inputs[i]->sym),
                                    raw_output.policy.data(),
                                    final_output->policy.data());
     final_output->policy[Coord::kPass] = raw_output.policy[Coord::kPass];
@@ -116,14 +104,8 @@ void DualNet::RunMany(const std::vector<const Input*>& inputs,
   }
 }
 
-DualNet::DualNet(std::string name, bool random_symmetry, uint64_t random_seed)
-    : Model(std::move(name), 1),
-      random_symmetry_(random_symmetry),
-      rnd_(random_seed, Random::kUniqueStream) {}
+DualNet::DualNet(std::string name) : Model(std::move(name), 1) {}
 
 DualNet::~DualNet() = default;
-
-DualNetFactory::DualNetFactory(bool random_symmetry, uint64_t random_seed)
-    : random_symmetry_(random_symmetry), random_seed_(random_seed) {}
 
 }  // namespace minigo

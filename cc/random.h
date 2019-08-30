@@ -26,6 +26,7 @@ namespace minigo {
 // library.
 class Random {
  public:
+  static constexpr uint64_t kLargePrime = 6364136223846793005ULL;
   static constexpr uint64_t kUniqueSeed = 0;
   static constexpr int kUniqueStream = 0;
 
@@ -100,6 +101,19 @@ class Random {
   uint64_t seed() const { return seed_; }
   int stream() const { return static_cast<int>(impl_.inc >> 1); }
 
+  // Mixes the 64 bits into 32 bits that have improved entropy.
+  // Useful if you have a 64 bit number with weaker entropy.
+  static inline uint32_t MixBits(uint64_t x) {
+    uint32_t xor_shifted = ((x >> 18u) ^ x) >> 27u;
+    uint32_t rot = x >> 59u;
+    return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31));
+  }
+
+  template <typename T>
+  void Shuffle(T* array_like) {
+    std::shuffle(array_like->begin(), array_like->end(), impl_);
+  }
+
  private:
   // The implementation is based on 32bit PCG Random:
   //   http://www.pcg-random.org/
@@ -116,11 +130,8 @@ class Random {
     }
 
     result_type operator()() {
-      auto old_state = state;
-      state = old_state * 6364136223846793005ULL + inc;
-      uint32_t xor_shifted = ((old_state >> 18u) ^ old_state) >> 27u;
-      uint32_t rot = old_state >> 59u;
-      auto result = (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31));
+      auto result = MixBits(state);
+      state = state * kLargePrime + inc;
       return result;
     }
 

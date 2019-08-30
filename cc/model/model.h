@@ -22,6 +22,7 @@
 #include "cc/constants.h"
 #include "cc/inline_vector.h"
 #include "cc/position.h"
+#include "cc/symmetries.h"
 
 namespace minigo {
 
@@ -29,6 +30,7 @@ class Model {
  public:
   struct Input {
     Color to_play;
+    symmetry::Symmetry sym;
 
     // position_history[0] holds the current position and position_history[i]
     // holds the position from i moves ago.
@@ -40,6 +42,9 @@ class Model {
     std::array<float, kNumMoves> policy;
     float value;
   };
+
+  static void ApplySymmetry(symmetry::Symmetry sym, const Output& src,
+                            Output* dst);
 
   // TODO(tommadams): is there some way to avoid having buffer_count in the base
   // class? All subclasses except BufferedModel set this to 1.

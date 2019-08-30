@@ -53,9 +53,7 @@ ModelDescriptor ParseModelDescriptor(absl::string_view descriptor) {
   return result;
 }
 
-std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
-                                              bool random_symmetry,
-                                              uint64_t random_seed) {
+std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc) {
   MG_CHECK(!engine_desc.empty());
 
   std::vector<std::string> parts =
@@ -79,14 +77,14 @@ std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
 #ifdef MG_ENABLE_TF_DUAL_NET
   if (engine == "tf") {
     MG_CHECK(arg_str.empty());
-    return absl::make_unique<TfDualNetFactory>(random_symmetry, random_seed);
+    return absl::make_unique<TfDualNetFactory>();
   }
 #endif  // MG_ENABLE_TF_DUAL_NET
 
 #ifdef MG_ENABLE_LITE_DUAL_NET
   if (engine == "lite") {
     MG_CHECK(arg_str.empty());
-    return absl::make_unique<LiteDualNetFactory>(random_symmetry, random_seed);
+    return absl::make_unique<LiteDualNetFactory>();
   }
 #endif  // MG_ENABLE_LITE_DUAL_NET
 
@@ -97,8 +95,7 @@ std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc,
     MG_CHECK(args.size() == 2) << "\"" << arg_str << "\"";
     int buffer_count = 0;
     MG_CHECK(absl::SimpleAtoi(args[0], &buffer_count)) << args[0];
-    return absl::make_unique<TpuDualNetFactory>(buffer_count, args[1],
-                                                random_symmetry, random_seed);
+    return absl::make_unique<TpuDualNetFactory>(buffer_count, args[1]);
   }
 #endif  // MG_ENABLE_TPU_DUAL_NET
 

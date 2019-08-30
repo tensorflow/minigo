@@ -101,10 +101,8 @@ std::unique_ptr<Session> CreateSession(const GraphDef& graph_def,
 
 TpuDualNet::TpuDualNet(const std::string& tpu_name,
                        const std::string& graph_path,
-                       const tensorflow::GraphDef& graph_def, int num_replicas,
-                       bool random_symmetry, uint64_t random_seed)
-    : DualNet(std::string(file::Stem(graph_path)), random_symmetry,
-              random_seed),
+                       const tensorflow::GraphDef& graph_def, int num_replicas)
+    : DualNet(std::string(file::Stem(graph_path)),
       num_replicas_(num_replicas) {
   session_ = CreateSession(graph_def, tpu_name);
   for (int i = 0; i < num_replicas_; ++i) {
@@ -186,11 +184,8 @@ void TpuDualNet::Reserve(size_t capacity) {
   batch_capacity_ = capacity;
 }
 
-TpuDualNetFactory::TpuDualNetFactory(int buffer_count, std::string tpu_name,
-                                     bool random_symmetry, uint64_t random_seed)
-    : DualNetFactory(random_symmetry, random_seed),
-      tpu_name_(std::move(tpu_name)),
-      buffer_count_(buffer_count) {
+TpuDualNetFactory::TpuDualNetFactory(int buffer_count, std::string tpu_name)
+    : tpu_name_(std::move(tpu_name)), buffer_count_(buffer_count) {
   // Create a session containing ops for initializing & shutting down a TPU.
   GraphDef graph_def;
   ::tensorflow::protobuf::TextFormat::ParseFromString(kTpuOpsGraphDef,
@@ -243,9 +238,8 @@ std::unique_ptr<Model> TpuDualNetFactory::NewModel(
 
   std::vector<std::unique_ptr<Model>> models;
   for (int i = 0; i < buffer_count_; ++i) {
-    models.push_back(absl::make_unique<TpuDualNet>(
-        tpu_name_, descriptor, graph_def, num_replicas, random_symmetry_,
-        random_seed_));
+    models.push_back(absl::make_unique<TpuDualNet>(tpu_name_, descriptor,
+                                                   graph_def, num_replicas));
   }
 
   return absl::make_unique<BufferedModel>(descriptor, std::move(models));

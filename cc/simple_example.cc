@@ -45,7 +45,7 @@ void SimpleExample() {
 
   // Load the model specified by the command line arguments.
   auto descriptor = ParseModelDescriptor(FLAGS_model);
-  auto model_factory = NewModelFactory(descriptor.engine, true, 0);
+  auto model_factory = NewModelFactory(descriptor.engine);
   auto model = model_factory->NewModel(descriptor.model);
 
   // Create a game object that tracks the move history & final score.

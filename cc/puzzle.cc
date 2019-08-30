@@ -59,8 +59,7 @@ void Puzzle() {
   auto start_time = absl::Now();
 
   auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
-  BatchingModelFactory batcher(
-      NewModelFactory(model_desc.engine, true, FLAGS_seed));
+  BatchingModelFactory batcher(NewModelFactory(model_desc.engine));
 
   Game::Options game_options;
   game_options.resign_enabled = false;
@@ -71,6 +70,7 @@ void Puzzle() {
   player_options.value_init_penalty = FLAGS_value_init_penalty;
   player_options.virtual_losses = FLAGS_virtual_losses;
   player_options.num_readouts = FLAGS_num_readouts;
+  player_options.random_seed = FLAGS_seed;
 
   std::atomic<size_t> total_moves(0);
   std::atomic<size_t> correct_moves(0);

@@ -32,6 +32,7 @@
 #include "cc/model/model.h"
 #include "cc/position.h"
 #include "cc/random.h"
+#include "cc/symmetries.h"
 
 namespace minigo {
 
@@ -60,6 +61,11 @@ class MctsPlayer {
     // Seed used from random permutations.
     // If the default value of 0 is used, a time-based seed is chosen.
     uint64_t random_seed = 0;
+
+    // If true, flip & rotate the board features when performing inference. The
+    // symmetry chosen is psuedo-randomly chosen in a deterministic way based
+    // on the position itself and the random_seed.
+    bool random_symmetry = true;
 
     // Number of readouts to perform (ignored if seconds_per_move is non-zero).
     int num_readouts = 0;
@@ -115,7 +121,8 @@ class MctsPlayer {
   };
 
   // Callback invoked on each batch of leaves expanded during tree search.
-  using TreeSearchCallback = std::function<void(const std::vector<MctsNode*>&)>;
+  using TreeSearchCallback =
+      std::function<void(const std::vector<const MctsNode*>&)>;
 
   // If position is non-null, the player will be initilized with that board
   // state. Otherwise, the player is initialized with an empty board with black
@@ -162,14 +169,7 @@ class MctsPlayer {
 
   void SetOptions(const Options& options) { options_ = options; }
 
-  void TreeSearch();
-
-  // TODO(tommadams): Make SelectLeaves and ProcessLeaves private, or remove
-  // them entirely.
-  void SelectLeaves(int num_leaves, std::vector<MctsNode*>* leaves);
-
-  // Run inference for the given leaf nodes & incorportate the inference output.
-  void ProcessLeaves(const std::vector<MctsNode*>& leaves);
+  void TreeSearch(int num_leaves);
 
   // Protected methods that get exposed for testing.
  protected:
@@ -198,7 +198,22 @@ class MctsPlayer {
     int last_move = 0;
   };
 
-  void GetModelInput(const MctsNode* node, Model::Input* input) const;
+  symmetry::Symmetry GetCanonicalSymmetry(const MctsNode* node) const {
+    return static_cast<symmetry::Symmetry>(node->canonical_symmetry);
+  }
+
+  symmetry::Symmetry GetInferenceSymmetry(const MctsNode* node) const {
+    if (options_.random_symmetry) {
+      uint64_t bits = Random::MixBits(
+          node->position.stone_hash() * Random::kLargePrime + inference_mix_);
+      return static_cast<symmetry::Symmetry>(bits % symmetry::kNumSymmetries);
+    } else {
+      return symmetry::kIdentity;
+    }
+  }
+
+  void SelectLeaves(int num_leaves);
+  void ProcessLeaves();
 
   void UpdateGame(Coord c);
 
@@ -229,15 +244,31 @@ class MctsPlayer {
 
   std::shared_ptr<InferenceCache> inference_cache_;
 
-  // Vectors reused when running TreeSearch.
-  std::vector<MctsNode*> tree_search_leaves_;
-  std::vector<Model::Input> inputs_;
-  std::vector<Model::Output> outputs_;
+  struct TreeSearchInference {
+    TreeSearchInference(InferenceCache::Key cache_key,
+                        symmetry::Symmetry canonical_sym,
+                        symmetry::Symmetry inference_sym, MctsNode* leaf)
+        : cache_key(cache_key),
+          canonical_sym(canonical_sym),
+          inference_sym(inference_sym),
+          leaf(leaf) {}
+    InferenceCache::Key cache_key;
+    symmetry::Symmetry canonical_sym;
+    symmetry::Symmetry inference_sym;
+    MctsNode* leaf;
+    Model::Input input;
+    Model::Output output;
+  };
+
+  std::vector<TreeSearchInference> tree_search_inferences_;
   std::vector<const Model::Input*> input_ptrs_;
   std::vector<Model::Output*> output_ptrs_;
-  std::vector<const Position::Stones*> recent_positions_;
 
   TreeSearchCallback tree_search_cb_ = nullptr;
+
+  // Random number combined with each Position's Zobrist hash in order to
+  // deterministically choose the symmetry to apply when performing inference.
+  const int64_t inference_mix_;
 };
 
 }  // namespace minigo
