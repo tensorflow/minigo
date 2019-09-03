@@ -198,10 +198,21 @@ class MctsPlayer {
     int last_move = 0;
   };
 
+  // A position's canonical symmetry is the symmetry that transforms the
+  // canonical form of a position into its actual form. For example, one way of
+  // defining a canonical symmetry is that the first move must be played in the
+  // top-right corner. For the early moves of a game, there will not be a
+  // canonical symmetry defined; in these cases, GetCanonicalSymmetry returns
+  // symmetry::kIdentity.
   symmetry::Symmetry GetCanonicalSymmetry(const MctsNode* node) const {
     return static_cast<symmetry::Symmetry>(node->canonical_symmetry);
   }
 
+  // Returns the symmetry that should be applied to this node's position when
+  // performing inference. The MctsPlayer picks a symmetry using a pseudo-random
+  // but deterministic function so that the same MctsPlayer instance is
+  // guaranteed to return the same symmetry for a given position but different
+  // MctsPlayer instances may return different symmetries for the same position.
   symmetry::Symmetry GetInferenceSymmetry(const MctsNode* node) const {
     if (options_.random_symmetry) {
       uint64_t bits = Random::MixBits(

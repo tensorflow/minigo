@@ -199,7 +199,6 @@ Coord MctsPlayer::PickMove() {
   return c;
 }
 
-// TODO(tommadams): break back this into SelectLeaves and ProcessLeaves.
 void MctsPlayer::TreeSearch(int num_leaves) {
   SelectLeaves(num_leaves);
   ProcessLeaves();

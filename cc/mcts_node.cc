@@ -73,6 +73,11 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
   } else {
     // TODO(tommadams): skip this check if `move` is kPass or on the diagonal.
     static_assert(symmetry::kIdentity == 0, "kIdentity must be 0");
+
+    // When choosing a canonical symmetry, we consider the "best" symmetry to
+    // be the one with the smallest Zobrist hash. The "best" symmetry is only
+    // canonical if its hash value is also unique among the hashes from the
+    // other possible symmetries.
     auto best_symmetry = symmetry::kIdentity;
     auto best_hash = position.stone_hash();
     bool found_unique_hash = true;
