@@ -129,6 +129,32 @@ Coord MctsNode::GetMostVisitedMove() const {
   return c;
 }
 
+void MctsNode::ReshapeFinalVisits() {
+  Coord best = GetMostVisitedMove();
+  float U_common = U_scale() * std::sqrt(1.0f + N());
+  float to_play = position.to_play() == Color::kBlack ? 1 : -1;
+  float best_cas =
+      CalculateSingleMoveChildActionScore(to_play, U_common, uint16_t(best));
+
+  //int total = 0;
+  for (int i = 0; i < kNumMoves; ++i) {
+    if (i == uint16_t(best)) {
+      continue;
+    }
+
+    // Change N_child to the smallest value that satisfies the inequality
+    // best_cas > Q + (U_scale * P * sqrt(N_parent) / N_child)
+    // Solving for N_child, we get:
+    int new_N = std::max(0, std::min(static_cast<int>(child_N(i)),
+        static_cast<int>(-1 * (U_scale() * child_P(i) * std::sqrt(N())) /
+        ((child_Q(i) * to_play) - best_cas)) - 1 ));
+    //total += edges[i].N - new_N;
+    edges[i].N = new_N;
+  }
+  //MG_LOG(INFO) << "Pruned " << total << " visits.";
+}
+
+
 std::array<MctsNode::ChildInfo, kNumMoves> MctsNode::CalculateRankedChildInfo()
     const {
   auto child_action_score = CalculateChildActionScore();
@@ -136,6 +162,7 @@ std::array<MctsNode::ChildInfo, kNumMoves> MctsNode::CalculateRankedChildInfo()
   for (int i = 0; i < kNumMoves; ++i) {
     child_info[i].c = i;
     child_info[i].N = child_N(i);
+    child_info[i].P = child_P(i);
     child_info[i].action_score = child_action_score[i];
   }
   std::sort(child_info.begin(), child_info.end(),
@@ -143,10 +170,10 @@ std::array<MctsNode::ChildInfo, kNumMoves> MctsNode::CalculateRankedChildInfo()
               if (a.N != b.N) {
                 return a.N > b.N;
               }
-              if (a.action_score != b.action_score) {
-                return a.action_score > b.action_score;
+              if (a.P != b.P) {
+                return a.P > b.P;
               }
-              return a.c > b.c;
+              return a.action_score > b.action_score;
             });
   return child_info;
 }

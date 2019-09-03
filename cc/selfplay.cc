@@ -105,6 +105,10 @@ DEFINE_int32(fastplay_readouts, 20,
              "aka 'playout cap oscillation'.\nIf this is set, "
              "'fastplay_frequency' should be nonzero.");
 
+DEFINE_bool(target_pruning, false,
+            "If true, subtract visits from all moves that weren't the best move "
+            "until the uncertainty level compensates.");
+
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
               "If non-zero, the number of seconds to spend thinking about each "
@@ -172,6 +176,7 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   player_options->decay_factor = FLAGS_decay_factor;
   player_options->fastplay_frequency = FLAGS_fastplay_frequency;
   player_options->fastplay_readouts = FLAGS_fastplay_readouts;
+  player_options->target_pruning = FLAGS_target_pruning;
 }
 
 void LogEndGameInfo(const Game& game, absl::Duration game_time) {

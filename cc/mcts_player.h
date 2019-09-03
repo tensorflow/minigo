@@ -107,6 +107,10 @@ class MctsPlayer {
     float fastplay_frequency = 0;
     int fastplay_readouts = 20;
 
+    // Adjust the targets after reading to discard reads caused by 'unhelpful'
+    // noise.
+    bool target_pruning = false;
+
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 

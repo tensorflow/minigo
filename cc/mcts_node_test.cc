@@ -428,6 +428,110 @@ TEST(MctsNodeTest, TestSelectLeaf) {
   EXPECT_LE(2, leaves.size());
 }
 
+class ReshapeTargetTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    best_ = -1;
+  }
+
+  void SearchPosition(const Position& p) {
+    float to_play = p.to_play() == Color::kBlack ? 1 : -1;
+
+    std::array<float, kNumMoves> probs;
+    for (float& prob : probs) {
+      prob = 0.001;
+    }
+    probs[17] = 0.99;
+
+    MctsNode::EdgeStats root_stats;
+    root_ = new MctsNode(&root_stats, p);
+    root_->SelectLeaf()->IncorporateResults(0.0, probs, 0, root_);
+
+    MctsNode* leaf;
+
+    // We gave one move a high prior and a neutral value.
+    // After many reads, U will increase for the other moves, but they're worse
+    // than the one with the high prior.
+    // As a result, we can prune those away until the uncertainty rises to
+    // compensate for their worse reward estimate.
+    for (int i = 0; i < 10000; ++i) {
+      leaf = root_->SelectLeaf();
+      if (leaf->move == 17) {
+        leaf->BackupValue(0.0, root_);
+      } else {
+        leaf->BackupValue(to_play * -0.10, root_);
+      }
+    }
+
+    // Child_Q(i), as an average, is actually just computed as W/N.
+    // Since we're changing N, we'll want to save the Q-values for the children,
+    pre_scores_ = root_->CalculateChildActionScore();
+
+    std::array<float, kNumMoves> saved_Q;
+    for (int i = 0; i < kNumMoves; ++i) {
+      saved_Q[i] = root_->child_Q(i);
+    }
+    best_ = root_->GetMostVisitedMove();
+    root_->ReshapeFinalVisits();
+
+    float U_common = root_->U_scale() * std::sqrt(std::max<float>(1, root_->N() - 1));
+
+    // Our tests want to verify that we lowered N until the action score
+    // (computed using the after-search estimate of Q) was nearly equal to the
+    // action score of the best move.
+    //
+    // Since "reshaping the target distribution" means twiddling the visit
+    // counts, the action scores -- based on Q -- will be misleading.  So,
+    // compute the action score using the saved values of Q, as outlined above.
+    for (int i = 0; i < kNumMoves; ++i) {
+      post_scores_[i] = (saved_Q[i] * to_play +
+                         (U_common * root_->child_P(i) / (1 + root_->child_N(i))));
+      post_scores_[i] -= 1000.0f * !p.legal_move(i);
+    }
+  }
+
+  std::array<float, kNumMoves> post_scores_;
+  std::array<float, kNumMoves> pre_scores_;
+  size_t best_;
+  MctsNode* root_;
+};
+
+
+TEST_F(ReshapeTargetTest, TestReshapeTargetsWhite) {
+  auto board = TestablePosition("", Color::kWhite);
+  SearchPosition(board);
+  int tot_N = 0;
+
+  // Scores should never get smaller as a result of visits being deducted.
+  for (int i = 0; i < kNumMoves; i++) {
+    EXPECT_LE(pre_scores_[i], post_scores_[i]);
+    tot_N += root_->child_N(i);
+  }
+  // Score for original best move should be the same.
+  EXPECT_EQ(pre_scores_[best_], post_scores_[best_]);
+  // Root visits is now greater than sum(child visits)
+  EXPECT_LT(tot_N, root_->N());
+  // For the default cpuct params, this should only trim ~1% of reads.
+  // If we trimmed over 10%, something is probably wrong.
+  EXPECT_GT(tot_N, root_->N() * 0.90);
+}
+
+
+// As above
+TEST_F(ReshapeTargetTest, TestReshapeTargetsBlack) {
+  auto board = TestablePosition("", Color::kBlack);
+  SearchPosition(board);
+  int tot_N = 0;
+  for (int i = 0; i < kNumMoves; i++) {
+    EXPECT_LE(pre_scores_[i], post_scores_[i]);
+    tot_N += root_->child_N(i);
+  }
+  EXPECT_EQ(pre_scores_[best_], post_scores_[best_]);
+  EXPECT_LT(tot_N, root_->N());
+  EXPECT_GT(tot_N, root_->N() * 0.90);
+}
+
+
 TEST(MctsNodeTest, NormalizeTest) {
   // Generate probability with sum of policy less than 1
   std::array<float, kNumMoves> probs;
