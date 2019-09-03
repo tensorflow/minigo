@@ -113,8 +113,9 @@ class MctsPlayer {
     float fastplay_frequency = 0;
     int fastplay_readouts = 20;
 
-    // Adjust the targets after reading to discard reads caused by 'unhelpful'
-    // noise.
+    // "Target pruning" adjusts the targets after reading to discard reads
+    // caused by 'unhelpful' noise & reflect the 'better' understanding of the
+    // reward distribution.  "False" == no pruning will be applied.
     bool target_pruning = false;
 
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);

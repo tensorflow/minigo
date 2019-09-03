@@ -174,6 +174,10 @@ void MctsNode::ReshapeFinalVisits() {
       CalculateSingleMoveChildActionScore(to_play, U_common, uint16_t(best));
 
   //int total = 0;
+  // We explored this child with uncertainty about its value.  Now, after
+  // searching, we change the visit count to reflect how many visits we would
+  // have given it with our newer understanding of its regret relative to our
+  // best move.
   for (int i = 0; i < kNumMoves; ++i) {
     if (i == uint16_t(best)) {
       continue;
