@@ -78,6 +78,7 @@ void GtpClient::Run() {
   Model::Output output;
   Model::Input input;
   input.to_play = Color::kBlack;
+  input.sym = symmetry::kIdentity;
   input.position_history.push_back(&stones);
   std::vector<const Model::Input*> inputs = {&input};
   std::vector<Model::Output*> outputs = {&output};
