@@ -20,8 +20,10 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "cc/model/buffered_model.h"
 #include "absl/strings/str_split.h"
 #include "cc/logging.h"
+#include "cc/platform/utils.h"
 
 namespace minigo {
 
@@ -61,9 +63,6 @@ RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : seed_(seed) {}
 
 std::unique_ptr<Model> RandomDualNetFactory::NewModel(
     const std::string& descriptor) {
-  // TODO(tommadams): return a BufferedModel that wraps one RandomModel per
-  // CPU core.
-
   std::vector<absl::string_view> parts = absl::StrSplit(descriptor, ':');
   MG_CHECK(parts.size() == 2);
 
@@ -71,8 +70,15 @@ std::unique_ptr<Model> RandomDualNetFactory::NewModel(
   MG_CHECK(absl::SimpleAtof(parts[0], &policy_stddev));
   MG_CHECK(absl::SimpleAtof(parts[1], &value_stddev));
 
-  return absl::make_unique<RandomDualNet>(absl::StrCat("rnd:", descriptor),
-                                          seed_, policy_stddev, value_stddev);
+  int num_cpus = GetNumLogicalCpus();
+  auto qualified_descriptor = absl::StrCat("rnd:", descriptor);
+  std::vector<std::unique_ptr<Model>> models;
+  for (int i = 0; i < num_cpus; ++i) {
+    models.push_back(absl::make_unique<RandomDualNet>(
+        qualified_descriptor, seed_, policy_stddev, value_stddev));
+  }
+
+  return absl::make_unique<BufferedModel>(std::move(models));
 }
 
 }  // namespace minigo

@@ -26,16 +26,13 @@ namespace minigo {
 
 class BufferedModel : public Model {
  public:
-  BufferedModel(std::string name, std::vector<std::unique_ptr<Model>> impls);
-
-  const std::string& name() const { return name_; }
+  explicit BufferedModel(std::vector<std::unique_ptr<Model>> impls);
 
   void RunMany(const std::vector<const Input*>& inputs,
                std::vector<Output*>* outputs, std::string* model_name) override;
 
  private:
   ThreadSafeQueue<std::unique_ptr<Model>> impls_;
-  const std::string name_;
 };
 
 }  // namespace minigo

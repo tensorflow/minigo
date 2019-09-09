@@ -1,5 +1,3 @@
-# rl_loop.flags: Flags for the reinforcement learning loop.
-
 --flags_dir=ml_perf/flags/9/
 --checkpoint_dir=ml_perf/checkpoint/9/
 
@@ -7,4 +5,14 @@
 --gating_win_rate=0.49
 --window_size=10
 --engine=tf
---parallel_post_train=true
+
+--train_devices=0
+--eval_devices=0
+--selfplay_devices=1,2,3,4,5,6,7
+
+--bootstrap_target_win_rate=0.05
+
+--bootstrap_num_models=8
+--selfplay_num_games=4096
+--selfplay_num_games_per_thread=3
+--eval_num_games=100

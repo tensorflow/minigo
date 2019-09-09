@@ -68,7 +68,6 @@ minigo_cc_library(
         "//cc/platform",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/time",
     ],
 )
 

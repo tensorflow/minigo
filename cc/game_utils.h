@@ -20,7 +20,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/time/time.h"
 #include "cc/game.h"
 
 namespace minigo {
@@ -62,9 +61,8 @@ std::string FormatWinStatsTable(
     const std::vector<std::pair<std::string, WinStats>>& stats);
 
 // Returns the name (specifically the basename stem) for an output game file
-// (e.g. SGF, TF example, etc) based on the current time, hostname, process ID
-// and game ID.
-std::string GetOutputName(absl::Time now, size_t game_id);
+// (e.g. SGF, TF example, etc) based on the hostname, process ID and game ID.
+std::string GetOutputName(size_t game_id);
 
 // Writes an SGF of the given game.
 void WriteSgf(const std::string& output_dir, const std::string& output_name,

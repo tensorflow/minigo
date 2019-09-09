@@ -31,8 +31,9 @@
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
 
-DEFINE_double(sample_frac, 0, "Fraction of records to read from each file.");
-DEFINE_int32(num_threads, 1, "Number of threads to run on.");
+DEFINE_double(sample_frac, 1, "Fraction of records to read from each file.");
+DEFINE_int32(num_read_threads, 1,
+             "Number of threads to use when reading source files.");
 DEFINE_int32(compression, 1,
              "Compression level between 0 (disabled) and 9. Default is 1.");
 DEFINE_uint64(seed, 0, "Random seed.");
@@ -134,16 +135,16 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
   MG_CHECK(!dst_path.empty());
 
   int num_paths = static_cast<int>(src_paths.size());
-  int num_threads = std::min<int>(FLAGS_num_threads, num_paths);
+  int num_read_threads = std::min<int>(FLAGS_num_read_threads, num_paths);
 
   MG_LOG(INFO) << absl::Now() << " : reading " << num_paths << " records on "
-               << num_threads << " threads";
+               << num_read_threads << " threads";
 
   std::vector<std::unique_ptr<ReadThread>> threads;
-  for (int i = 0; i < num_threads; ++i) {
+  for (int i = 0; i < num_read_threads; ++i) {
     // Get the record paths that this thread should run on.
-    int begin = i * num_paths / num_threads;
-    int end = (i + 1) * num_paths / num_threads;
+    int begin = i * num_paths / num_read_threads;
+    int end = (i + 1) * num_paths / num_read_threads;
     std::vector<std::string> thread_paths;
     for (int j = begin; j < end; ++j) {
       thread_paths.push_back(std::move(src_paths[j]));
@@ -190,7 +191,12 @@ int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
   std::vector<std::string> src_paths;
   for (int i = 1; i < argc; ++i) {
-    src_paths.emplace_back(argv[i]);
+    const auto& pattern = argv[i];
+    std::vector<std::string> paths;
+    TF_CHECK_OK(tensorflow::Env::Default()->GetMatchingPaths(pattern, &paths));
+    for (auto& path : paths){
+      src_paths.push_back(std::move(path));
+    }
   }
   minigo::Run(std::move(src_paths), FLAGS_dst);
   return 0;

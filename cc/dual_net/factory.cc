@@ -76,8 +76,16 @@ std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc) {
 
 #ifdef MG_ENABLE_TF_DUAL_NET
   if (engine == "tf") {
-    MG_CHECK(arg_str.empty());
-    return absl::make_unique<TfDualNetFactory>();
+    std::vector<int> devices;
+    if (!arg_str.empty()) {
+      std::vector<std::string> args = absl::StrSplit(arg_str, ":");
+      for (const auto& arg : args) {
+        int device;
+        MG_CHECK(absl::SimpleAtoi(arg, &device)) << "\"" << arg << "\"";
+        devices.push_back(device);
+      }
+    }
+    return absl::make_unique<TfDualNetFactory>(devices);
   }
 #endif  // MG_ENABLE_TF_DUAL_NET
 

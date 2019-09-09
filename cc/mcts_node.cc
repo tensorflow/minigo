@@ -312,7 +312,7 @@ void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise,
   }
 }
 
-MctsNode* MctsNode::SelectLeaf() {
+MctsNode* MctsNode::SelectLeaf(bool allow_pass) {
   auto* node = this;
   for (;;) {
     // If a node has never been evaluated, we have no basis to select a child.
@@ -327,7 +327,19 @@ MctsNode* MctsNode::SelectLeaf() {
     }
 
     auto child_action_score = node->CalculateChildActionScore();
-    Coord best_move = ArgMax(child_action_score);
+    Coord best_move;
+
+
+    best_move = ArgMax(child_action_score);
+    if (allow_pass) {
+      best_move = ArgMax(child_action_score);
+    } else {
+      best_move = ArgMax(absl::MakeSpan(child_action_score.data(), kN * kN));
+    }
+
+    if (!node->position.legal_move(best_move)) {
+      best_move = Coord::kPass;
+    }
     node = node->MaybeAddChild(best_move);
   }
 }
@@ -401,6 +413,8 @@ void MctsNode::IncorporateResults(float value_init_penalty,
     // inferences are being performed, nodes in the tree may already be expanded
     // and have non-zero W values at the time we need to incorporate a result
     // for the node from the value head.
+    // TODO(tommadams): Minigui doesn't work this way any more so we can just
+    // assign.
     edges[i].W += reduced_value;
   }
   BackupValue(value, up_to);

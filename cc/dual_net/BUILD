@@ -95,6 +95,8 @@ minigo_cc_library(
         "//cc:logging",
         "//cc:random",
         "//cc/model",
+        "//cc/model:buffered_model",
+        "//cc/platform",
         "@com_google_absl//absl/memory",
     ],
 )

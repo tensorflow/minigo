@@ -242,7 +242,7 @@ std::unique_ptr<Model> TpuDualNetFactory::NewModel(
                                                    graph_def, num_replicas));
   }
 
-  return absl::make_unique<BufferedModel>(descriptor, std::move(models));
+  return absl::make_unique<BufferedModel>(std::move(models));
 }
 
 }  // namespace minigo

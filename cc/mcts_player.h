@@ -58,9 +58,8 @@ class MctsPlayer {
 
     int virtual_losses = 8;
 
-    // Seed used from random permutations.
-    // If the default value of 0 is used, a time-based seed is chosen.
-    uint64_t random_seed = 0;
+    // Random seed & stream used for random permutations.
+    uint64_t random_seed = Random::kUniqueSeed;
 
     // If true, flip & rotate the board features when performing inference. The
     // symmetry chosen is psuedo-randomly chosen in a deterministic way based
@@ -117,6 +116,8 @@ class MctsPlayer {
     // caused by 'unhelpful' noise & reflect the 'better' understanding of the
     // reward distribution.  "False" == no pruning will be applied.
     bool target_pruning = false;
+
+    bool allow_pass = true;
 
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };

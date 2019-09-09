@@ -3,8 +3,6 @@
 
 --flagfile=ml_perf/flags/9/selfplay.flags
 
-# Don't perform holdout for the first bootstrap round.
 --holdout_pct=0
-
---num_games=8192
---num_readouts=20
+# --parallel_games=16
+# --allow_pass=false

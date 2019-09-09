@@ -81,7 +81,7 @@ class ReloadingModelFactory : public ModelFactory {
   absl::flat_hash_map<std::string, std::unique_ptr<ReloadingModelUpdater>>
       updaters_ GUARDED_BY(&mutex_);
 
-  std::atomic<bool> running_;
+  std::atomic<bool> running_{true};
   std::unique_ptr<ModelFactory> factory_impl_;
   const absl::Duration poll_interval_;
   std::thread thread_;

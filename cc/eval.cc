@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 
+#include <atomic>
 #include <cmath>
 #include <functional>
 #include <iostream>
@@ -46,6 +47,7 @@
 #include "gflags/gflags.h"
 
 // Game options flags.
+DEFINE_bool(resign_enabled, true, "Whether resign is enabled.");
 DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
 DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed.");
@@ -86,6 +88,7 @@ namespace {
 
 void ParseOptionsFromFlags(Game::Options* game_options,
                            MctsPlayer::Options* player_options) {
+  game_options->resign_enabled = FLAGS_resign_enabled;
   game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
   game_options->ignore_repeated_moves = true;
   player_options->virtual_losses = FLAGS_virtual_losses;
@@ -262,7 +265,7 @@ class Evaluator {
     // Write SGF.
     std::string output_name = "NO_SGF_SAVED";
     if (!FLAGS_sgf_dir.empty()) {
-      output_name = absl::StrCat(GetOutputName(absl::Now(), thread_id), "-",
+      output_name = absl::StrCat(GetOutputName(game_id_++), "-",
                                  black->name(), "-", white->name());
       game.AddComment(
           absl::StrCat("B inferences: ", black->GetModelsUsedForInference()));
@@ -285,6 +288,7 @@ class Evaluator {
   Game::Options game_options_;
   MctsPlayer::Options player_options_;
   std::vector<std::thread> threads_;
+  std::atomic<size_t> game_id_{0};
 
   const ModelDescriptor desc_a_;
   const ModelDescriptor desc_b_;

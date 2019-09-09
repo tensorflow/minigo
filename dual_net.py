@@ -97,6 +97,9 @@ flags.DEFINE_integer(
     help=('Number of TPU cores. For a single TPU device, this is 8 because each'
           ' TPU has 4 chips each with 2 cores.'))
 
+flags.DEFINE_string('gpu_device_list', None,
+                    'Comma-separated list of GPU device IDs to use.')
+
 flags.DEFINE_bool('quantize', False,
                   'Whether create a quantized model. When loading a model for '
                   'inference, this must match how the model was trained.')
@@ -159,6 +162,8 @@ class DualNetwork():
         self.inference_output = None
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
+        if FLAGS.gpu_device_list is not None:
+            config.gpu_options.visible_device_list = FLAGS.gpu_device_list
         self.sess = tf.Session(graph=tf.Graph(), config=config)
         self.initialize_graph()
 

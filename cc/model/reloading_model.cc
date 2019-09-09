@@ -179,7 +179,6 @@ void ReloadingModel::UpdateImpl(std::unique_ptr<Model> model_impl) {
 ReloadingModelFactory::ReloadingModelFactory(std::unique_ptr<ModelFactory> impl,
                                              absl::Duration poll_interval)
     : factory_impl_(std::move(impl)), poll_interval_(poll_interval) {
-  running_ = true;
   thread_ = std::thread(&ReloadingModelFactory::ThreadRun, this);
 }
 

@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 
+#include <atomic>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -60,6 +61,7 @@ DEFINE_uint64(seed, 0,
               "game has resignation disabled or is a holdout.");
 DEFINE_double(holdout_pct, 0.03,
               "Fraction of games to hold out for validation.");
+DEFINE_bool(allow_pass, true, "");
 
 // Tree search flags.
 DEFINE_int32(num_readouts, 100,
@@ -185,6 +187,7 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   player_options->fastplay_frequency = FLAGS_fastplay_frequency;
   player_options->fastplay_readouts = FLAGS_fastplay_readouts;
   player_options->target_pruning = FLAGS_target_pruning;
+  player_options->allow_pass = FLAGS_allow_pass;
 }
 
 void LogEndGameInfo(const Game& game, absl::Duration game_time) {
@@ -229,7 +232,7 @@ void LogEndGameInfo(const Game& game, absl::Duration game_time) {
 class SelfPlayer {
  public:
   explicit SelfPlayer(ModelDescriptor desc)
-      : rnd_(Random::kUniqueSeed, Random::kUniqueStream),
+      : rnd_(FLAGS_seed, Random::kUniqueStream),
         engine_(std::move(desc.engine)),
         model_(std::move(desc.model)) {}
 
@@ -271,7 +274,7 @@ class SelfPlayer {
       absl::MutexLock lock(&mutex_);
       auto model_factory = NewModelFactory(engine_);
       // If the model path contains a pattern, wrap the implementation factory
-      // in a ReloadingDualNetFactory to automatically reload the latest model
+      // in a ReloadingModelFactory to automatically reload the latest model
       // that matches the pattern.
       if (model_.find("%d") != std::string::npos) {
         model_factory = absl::make_unique<ReloadingModelFactory>(
@@ -279,7 +282,7 @@ class SelfPlayer {
       }
       // Note: it's more efficient to perform the reload wrapping before the
       // batch wrapping because this way, we only need to reload the single
-      // implementation DualNet when a new model is found. If we performed batch
+      // implementation Model when a new model is found. If we performed batch
       // wrapping before reload wrapping, the reload code would need to update
       // all the BatchingModel wrappers.
       batcher_ =
@@ -498,7 +501,7 @@ class SelfPlayer {
 
       // Write the outputs.
       auto now = absl::Now();
-      auto output_name = GetOutputName(now, thread_id);
+      auto output_name = GetOutputName(game_id_++);
 
       bool is_holdout;
       {
@@ -592,6 +595,8 @@ class SelfPlayer {
   WinStats win_stats_ GUARDED_BY(&mutex_);
 
   uint64_t flags_timestamp_ = 0;
+
+  std::atomic<size_t> game_id_{0};
 
   const std::string engine_;
   const std::string model_;

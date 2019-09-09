@@ -61,9 +61,8 @@ std::string FormatWinStatsTable(
   return result;
 }
 
-std::string GetOutputName(absl::Time now, size_t game_id) {
-  return absl::StrCat(absl::ToUnixSeconds(now), "-", GetHostname(), "-",
-                      GetProcessId(), "-", game_id);
+std::string GetOutputName(size_t game_id) {
+  return absl::StrCat(GetHostname(), "-", GetProcessId(), "-", game_id);
 }
 
 void WriteSgf(const std::string& output_dir, const std::string& output_name,

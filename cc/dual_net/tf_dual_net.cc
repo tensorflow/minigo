@@ -22,6 +22,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/notification.h"
 #include "cc/constants.h"
 #include "cc/file/path.h"
@@ -69,7 +70,8 @@ void PlaceOnDevice(GraphDef* graph_def, const std::string& device) {
 
 class TfDualNet : public DualNet {
  public:
-  TfDualNet(const std::string& graph_path, const GraphDef& graph_def);
+  TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
+            const std::vector<int>& devices);
   ~TfDualNet() override;
 
  private:
@@ -84,10 +86,15 @@ class TfDualNet : public DualNet {
   const std::string graph_path_;
 };
 
-TfDualNet::TfDualNet(const std::string& graph_path, const GraphDef& graph_def)
+TfDualNet::TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
+                     const std::vector<int>& devices)
     : DualNet(std::string(file::Stem(graph_path))), graph_path_(graph_path) {
   SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
+  if (!devices.empty()) {
+    options.config.mutable_gpu_options()->set_visible_device_list(
+        absl::StrJoin(devices, ","));
+  }
   session_.reset(NewSession(options));
   TF_CHECK_OK(session_->Create(graph_def));
 
@@ -146,10 +153,14 @@ void TfDualNet::Reserve(size_t capacity) {
 
 }  // namespace
 
-TfDualNetFactory::TfDualNetFactory() {
+TfDualNetFactory::TfDualNetFactory(std::vector<int> devices)
+    : devices_(std::move(devices)) {
 #if MINIGO_ENABLE_GPU
-  if (tensorflow::ValidateGPUMachineManager().ok()) {
-    device_count_ = tensorflow::GPUMachineManager()->VisibleDeviceCount();
+  if (devices_.empty() && tensorflow::ValidateGPUMachineManager().ok()) {
+    int num_devices = tensorflow::GPUMachineManager()->VisibleDeviceCount();
+    for (int i = 0; i < num_devices; ++i) {
+      devices_.push_back(i);
+    }
   }
 #endif
 }
@@ -170,15 +181,17 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
   std::vector<std::unique_ptr<Model>> models;
   // Create two worker models per device (or two threads for CPU inference if
   // there are no accelerator devices present).
-  for (int i = 0; i < std::max(device_count_, 1); ++i) {
-    if (device_count_ > 0) {
+  for (size_t i = 0; i < std::max<size_t>(devices_.size(), 1); ++i) {
+    if (!devices_.empty()) {
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def));
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def));
+    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def,
+                                                  devices_));
+    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def,
+                                                  devices_));
   }
 
-  return absl::make_unique<BufferedModel>(descriptor, std::move(models));
+  return absl::make_unique<BufferedModel>(std::move(models));
 }
 
 }  // namespace minigo

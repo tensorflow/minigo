@@ -46,7 +46,7 @@ commands. This may vary on a different operating system or graphics card.
     ./cc/configure_tensorflow.sh
 
     # Compile and run C++ self-play and evaluation binaries
-    bazel build  -c opt  --define=tf=1  --define=board_size=9  cc:selfplay  cc:eval
+    bazel build  -c opt  --define=tf=1  --define=board_size=9  cc:sample_records  cc:selfplay  cc:eval
 
     # Download required files from Google Cloud Storage
     BOARD_SIZE=9 python ml_perf/get_data.py
