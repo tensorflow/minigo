@@ -61,7 +61,6 @@ DEFINE_uint64(seed, 0,
               "game has resignation disabled or is a holdout.");
 DEFINE_double(holdout_pct, 0.03,
               "Fraction of games to hold out for validation.");
-DEFINE_bool(allow_pass, true, "");
 
 // Tree search flags.
 DEFINE_int32(num_readouts, 100,
@@ -187,7 +186,6 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   player_options->fastplay_frequency = FLAGS_fastplay_frequency;
   player_options->fastplay_readouts = FLAGS_fastplay_readouts;
   player_options->target_pruning = FLAGS_target_pruning;
-  player_options->allow_pass = FLAGS_allow_pass;
 }
 
 void LogEndGameInfo(const Game& game, absl::Duration game_time) {

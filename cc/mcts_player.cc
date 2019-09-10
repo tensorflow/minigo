@@ -212,9 +212,8 @@ void MctsPlayer::SelectLeaves(int num_leaves) {
   int num_selected = 0;
   int num_cache_misses = 0;
   int num_cache_hits = 0;
-  bool allow_pass_reads = options_.allow_pass;// && (root_->position.n() >= temperature_cutoff_);
   while (num_cache_misses < max_cache_misses) {
-    auto* leaf = root_->SelectLeaf(allow_pass_reads);
+    auto* leaf = root_->SelectLeaf();
 
     if (leaf->game_over() || leaf->at_move_limit()) {
       float value =

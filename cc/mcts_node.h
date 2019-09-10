@@ -131,7 +131,7 @@ class MctsNode {
   // If inference is being batched and SelectLeaf chooses a node that has
   // already been added to the batch (IncorporateResults has not yet been
   // called), then SelectLeaf will return that same node.
-  MctsNode* SelectLeaf(bool allow_pass);
+  MctsNode* SelectLeaf();
 
   void IncorporateResults(float value_init_penalty,
                           absl::Span<const float> move_probabilities,

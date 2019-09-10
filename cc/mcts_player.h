@@ -117,8 +117,6 @@ class MctsPlayer {
     // reward distribution.  "False" == no pruning will be applied.
     bool target_pruning = false;
 
-    bool allow_pass = true;
-
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 

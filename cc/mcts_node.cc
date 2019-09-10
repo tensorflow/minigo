@@ -312,7 +312,7 @@ void MctsNode::InjectNoise(const std::array<float, kNumMoves>& noise,
   }
 }
 
-MctsNode* MctsNode::SelectLeaf(bool allow_pass) {
+MctsNode* MctsNode::SelectLeaf() {
   auto* node = this;
   for (;;) {
     // If a node has never been evaluated, we have no basis to select a child.
@@ -327,16 +327,7 @@ MctsNode* MctsNode::SelectLeaf(bool allow_pass) {
     }
 
     auto child_action_score = node->CalculateChildActionScore();
-    Coord best_move;
-
-
-    best_move = ArgMax(child_action_score);
-    if (allow_pass) {
-      best_move = ArgMax(child_action_score);
-    } else {
-      best_move = ArgMax(absl::MakeSpan(child_action_score.data(), kN * kN));
-    }
-
+    auto best_move = ArgMax(child_action_score);
     if (!node->position.legal_move(best_move)) {
       best_move = Coord::kPass;
     }
