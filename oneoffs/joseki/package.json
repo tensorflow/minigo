@@ -1,0 +1,43 @@
+{
+  "name": "joseki",
+  "version": "0.1.0",
+  "private": true,
+  "proxy": "http://localhost:8000",
+  "dependencies": {
+    "@material-ui/core": "^4.3.3",
+    "@material-ui/icons": "^4.2.1",
+    "@material-ui/lab": "^4.0.0-alpha.24",
+    "arrow-keys-react": "^1.0.6",
+    "axios": "^0.19.0",
+    "colormap": "^2.3.1",
+    "normalize.css": "latest",
+    "react": "^16.9.0",
+    "react-dom": "^16.9.0",
+    "react-go-board": "^0.8.0",
+    "react-google-charts": "^3.0.14",
+    "react-keyboard-event-handler": "^1.5.1",
+    "react-scripts": "3.1.1",
+    "serve": "^11.1.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

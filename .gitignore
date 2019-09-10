@@ -10,6 +10,8 @@ pyvenv.cfg
 .DS_store
 logs/
 saved_models/
+wgo/*
+oneoffs/wgo/*
 ratings.db
 cbt_ratings.db
 .rsync_log

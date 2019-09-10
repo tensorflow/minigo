@@ -1,3 +1,17 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Opening_freqs_export -- Write out static views of opening frequency data.
 
 Once opening_freqs.py has created a sqlite db with data on joseki information,
@@ -10,18 +24,18 @@ runs), and then attempts to prune "uninteresting" subsequences via the logic in
 rendered into a javascript object inside a jinja template, including their
 frequency histograms.
 
-At some point, this should be made into a properly dynamic webapp;  For now this
-is a proof of concept.
+This was a static proof of concept which was the precursor for the React based
+joseki explorer.
 
 
 create_hourly_reports -- This renders a much simpler html fragment with just an
-SGF viewer showing the most popular joseki for a given hour.  Currently orphaned.
+SGF viewer showing the most popular joseki for a given hour.  Dead code, but
+useful for unfinished runs.
 
 """
 
 import os
 import sqlite3
-import functools
 import json
 import datetime as dt
 import collections
@@ -31,13 +45,12 @@ from jinja2 import Template
 from absl import app
 from absl import flags
 
-
+import oneoffs.joseki.opening_freqs as openings
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("in_dir", None, "sgfs here are parsed.")
-flags.DEFINE_string("db_path", 'joseki.db', "Path to josekidb")
-flags.DEFINE_string("template", 'joseki.html', "Path to template to render")
+# See also flags in opening_freqs
+flags.DEFINE_string("template", 'joseki_static_report.html', "Path to template to render")
 flags.DEFINE_string("out_file", 'openings.html', "Where to write the report")
 flags.DEFINE_integer("top_n", 100, "Number of top openings to use per run")
 
@@ -215,33 +228,6 @@ def top_seqs_by_run(db, topN=300):
     return top_seqs_by_run
 
 
-def run_time_ranges(db):
-    ts = lambda hr: int(dt.datetime.strptime(hr, "%Y-%m-%d-%H").timestamp())
-    runs = {r[0]: (ts(r[1]), ts(r[2])) for r in db.execute('''
-        select run, min(hour), max(hour) from joseki_counts group by 1;
-        ''').fetchall()}
-    return runs
-
-
-def build_run_time_transformers(ranges, buckets=250):
-    """ Build a dict of functions to transform from a timestamp into a relative
-    offset.  E.g.
-    input: {'v17': (1234567890, 1235567879) ... }
-    output: {'v17': lambda t: (t - min) * (1/max) ... }
-    """
-
-    funcs = {}
-    def f(t, min_, max_):
-        #return "%0.2f" % ((t-min_) * (1/(max_-min_)))
-        key = (t-min_) * (1/(max_-min_))
-        return "%0.3f" % (int(buckets*key) / (buckets / 100.0))
-
-    for run, range_ in ranges.items():
-        funcs[run] = functools.partial(f, min_=range_[0], max_=range_[1])
-
-    return funcs
-
-
 def create_top_report(top_n=100):
     """
     Creates an html page showing the most common sequences in the database, and
@@ -250,8 +236,8 @@ def create_top_report(top_n=100):
     db = sqlite3.connect(FLAGS.db_path)
     ts = lambda hr: int(dt.datetime.strptime(hr, "%Y-%m-%d-%H").timestamp())
     print('querying')
-    ranges = run_time_ranges(db)
-    interps = build_run_time_transformers(ranges)
+    ranges = openings.run_time_ranges(db)
+    interps = openings.build_run_time_transformers(ranges)
     seqs_by_run = top_seqs_by_run(db, top_n)
     runs = sorted(seqs_by_run.keys())
 
