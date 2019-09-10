@@ -259,75 +259,26 @@ async def bootstrap_selfplay(state):
     holdout_dir = os.path.join(fsdb.holdout_dir(), output_name)
     sgf_dir = os.path.join(fsdb.sgf_dir(), output_name)
 
-    selfplay_cmds = []
-    for i in range(FLAGS.bootstrap_num_models):
-        device = i % len(FLAGS.selfplay_devices)
-        architecture_flags = os.path.join(FLAGS.flags_dir,
-                                          'architecture.flags')
-        model_path = os.path.join(
-            fsdb.models_dir(), 'bootstrap-{}'.format(i))
-        await run(
-           'python', 'bootstrap.py',
-           '--flagfile={}'.format(architecture_flags),
-           '--export_path={}'.format(model_path),
-           '--work_dir=/tmp/work_dir')
-        await run(
-            'python', 'freeze_graph.py',
-             '--flagfile={}'.format(architecture_flags),
-             '--model_path={}'.format(model_path))
+    lines = await run(
+        'bazel-bin/cc/selfplay',
+        '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
+                               'bootstrap.flags')),
+        '--num_games={}'.format(FLAGS.selfplay_num_games),
+        '--parallel_games=32',
+        '--model=random:0,0.4:0.4',
+        '--output_dir={}'.format(output_dir),
+        '--holdout_dir={}'.format(holdout_dir),
+        '--sgf_dir={}'.format(sgf_dir))
+    logging.info('\n'.join(lines[-6:]))
 
-        selfplay_cmds.append([
-            'bazel-bin/cc/selfplay',
-            '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-                                   'bootstrap.flags')),
-            '--num_games={}'.format(FLAGS.selfplay_num_games //
-                                    FLAGS.bootstrap_num_models),
-            '--model={}:{},{}.pb'.format(FLAGS.engine, device, model_path),
-            '--output_dir={}/{}'.format(output_dir, i),
-            '--holdout_dir={}/{}'.format(holdout_dir, i),
-            '--sgf_dir={}'.format(sgf_dir),
-        ])
-
-    all_lines = await run_commands(selfplay_cmds)
-    for lines in all_lines:
-        result = '\n'.join(lines[-6:])
-        logging.info(result)
-
-    src_pattern = os.path.join(output_dir, '*/*', '*.zz')
+    # Write examples to a single record.
+    src_pattern = os.path.join(output_dir, '*', '*.zz')
     dst_path = os.path.join(fsdb.golden_chunk_dir(),
-                            state.output_model_name + '.tfrecord.zz')
+                            output_name + '.tfrecord.zz')
     logging.info('Writing golden chunk "{}" from "{}"'.format(dst_path,
                                                               src_pattern))
     lines = await sample_records(src_pattern, dst_path)
     logging.info('\n'.join(lines))
-
-
-### async def bootstrap_selfplay(state):
-###     output_name = '000000-000000'
-###     output_dir = os.path.join(fsdb.selfplay_dir(), output_name)
-###     holdout_dir = os.path.join(fsdb.holdout_dir(), output_name)
-###     sgf_dir = os.path.join(fsdb.sgf_dir(), output_name)
-### 
-###     lines = await run(
-###         'bazel-bin/cc/selfplay',
-###         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-###                                'bootstrap.flags')),
-###         '--num_games=8192',
-###         '--parallel_games=32',
-###         '--model=random:0,0.4:0.4',
-###         '--output_dir={}'.format(output_dir),
-###         '--holdout_dir={}'.format(holdout_dir),
-###         '--sgf_dir={}'.format(sgf_dir))
-###     logging.info('\n'.join(lines[-6:]))
-### 
-###     # Write examples to a single record.
-###     src_pattern = os.path.join(output_dir, '*', '*.zz')
-###     dst_path = os.path.join(fsdb.golden_chunk_dir(),
-###                             output_name + '.tfrecord.zz')
-###     logging.info('Writing golden chunk "{}" from "{}"'.format(dst_path,
-###                                                               src_pattern))
-###     lines = await sample_records(src_pattern, dst_path)
-###     logging.info('\n'.join(lines))
 
 
 # Self-play a number of games.
