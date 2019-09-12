@@ -343,6 +343,9 @@ GtpClient::Response GtpClient::HandleGenmove(CmdArgs args) {
   if (options_.courtesy_pass && player_->root()->move == Coord::kPass) {
     c = Coord::kPass;
   } else {
+    if (!options_.tree_reuse) {
+      player_->ClearChildren();
+    }
     c = player_->SuggestMove(player_->options().num_readouts);
   }
   MG_LOG(INFO) << player_->root()->Describe();
@@ -548,6 +551,9 @@ GtpClient::Response GtpClient::HandleUndo(CmdArgs args) {
 
   if (!player_->UndoMove()) {
     return Response::Error("cannot undo");
+  }
+  if (!options_.tree_reuse) {
+    player_->root()->ClearChildren();
   }
 
   return Response::Ok();

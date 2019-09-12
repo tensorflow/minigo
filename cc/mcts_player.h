@@ -82,19 +82,6 @@ class MctsPlayer {
     // of time spent thinking as the game progresses.
     float decay_factor = 0.98;
 
-    // If true, children of the current root node are pruned when a move is
-    // played. Under normal play, only the descendents of the move played ever
-    // have a chance of being visited again during tree search. However, when
-    // using Minigo to explore different variations and ponder about the best
-    // moves, it makes sense to keep the full tree around.
-    bool prune_orphaned_nodes = true;
-
-    // If true, the subtree of a played move that was expanded during tree
-    // search will be kept.
-    // If false, all children of the current root will be deleted before each
-    // move is played.
-    bool tree_reuse = true;
-
     // "Playout Cap Oscillation" as per the KataGo paper.
     // If fastplay_frequency > 0, tree search is modified as follows:
     //   - Each move is either a "low-readout" fast move, or a full, slow move.
@@ -131,26 +118,28 @@ class MctsPlayer {
              std::shared_ptr<InferenceCache> inference_cache, Game* game,
              const Options& options);
 
-  virtual ~MctsPlayer();
+  ~MctsPlayer();
 
   void InitializeGame(const Position& position);
 
-  virtual void NewGame();
+  void NewGame();
 
-  virtual Coord SuggestMove(int new_readouts, bool inject_noise = false);
+  Coord SuggestMove(int new_readouts, bool inject_noise = false);
 
   // Plays the move at point c.
   // If game is non-null, adds a new move to the game's move history and sets
   // the game over state if appropriate.
-  virtual bool PlayMove(Coord c);
+  bool PlayMove(Coord c);
 
   // Moves the root_ node up to its parent, popping the last move off the game
   // history but preserving the game tree.
-  virtual bool UndoMove();
+  bool UndoMove();
 
   bool ShouldResign() const;
 
   void SetTreeSearchCallback(TreeSearchCallback cb);
+
+  void ClearChildren() { root_->ClearChildren(); }
 
   // Returns a string containing the list of all models used for inference, and
   // which moves they were used for.
@@ -223,7 +212,31 @@ class MctsPlayer {
     }
   }
 
-  void SelectLeaves(int num_leaves);
+  // Inject noise into the root node.
+  void InjectNoise(float dirichlet_alpha);
+
+  // Expand the root node if necessary.
+  // In order to correctly count the number of reads performed or to inject
+  // noise, the root node must be expanded. The root will always be expanded
+  // unless this is the first time SuggestMove has been called for a game, or
+  // PlayMove was called without a prior call to SuggestMove, or the child nodes
+  // of the tree have been cleared.
+  void MaybeExpandRoot();
+
+  // Select up to `num_inferences` leaves to perform inference on, storing the
+  // selected leaves in `tree_search_inferences_`. If the player has an
+  // inference cache, this can cause more nodes to be added to the tree when
+  // the selected leaves are already in the cache. To limit this, SelectLeaves
+  // will add no more than `max_num_leaves` leaves to the tree.
+  //
+  // In some positions, the model may favor one move so heavily that it
+  // overcomes the effects of virtual loss. In this case, SelectLeaves may
+  // choose the same leaf multiple times.
+  void SelectLeaves(int num_inferences, int max_num_leaves);
+
+  // Run inference on the contents of `inferences_` that was previously
+  // populated by a call to SelectLeaves, and propagate the results back up the
+  // tree to the root.
   void ProcessLeaves();
 
   void UpdateGame(Coord c);

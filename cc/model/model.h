@@ -29,7 +29,10 @@ namespace minigo {
 class Model {
  public:
   struct Input {
+    // Whether it's Black or White to play.
     Color to_play;
+
+    // Symmetry to apply to the input features when performing inference.
     symmetry::Symmetry sym;
 
     // position_history[0] holds the current position and position_history[i]

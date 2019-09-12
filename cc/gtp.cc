@@ -82,7 +82,6 @@ void Gtp() {
   player_options.inject_noise = false;
   player_options.soft_pick = false;
   player_options.value_init_penalty = FLAGS_value_init_penalty;
-  player_options.tree_reuse = false;
   player_options.virtual_losses = FLAGS_virtual_losses;
   player_options.num_readouts = FLAGS_num_readouts;
   player_options.seconds_per_move = FLAGS_seconds_per_move;
@@ -92,6 +91,9 @@ void Gtp() {
   GtpClient::Options client_options;
   client_options.ponder_limit = FLAGS_ponder_limit;
   client_options.courtesy_pass = FLAGS_courtesy_pass;
+  // Disable tree reuse and rely on the inference cache when running in Minigui
+  // mode: we don't want to pollute the tree when investigating variations.
+  client_options.tree_reuse = !FLAGS_minigui;
 
   MG_LOG(INFO) << game_options << " " << player_options;
 

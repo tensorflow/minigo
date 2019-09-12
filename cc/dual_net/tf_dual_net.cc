@@ -141,7 +141,7 @@ void TfDualNet::RunManyImpl(std::string* model_name) {
 
 void TfDualNet::Reserve(size_t capacity) {
   MG_CHECK(capacity > 0);
-  if (capacity <= batch_capacity_) {
+  if (capacity <= batch_capacity_ && capacity > 3 * batch_capacity_ / 4) {
     return;
   }
   inputs_.clear();
@@ -185,10 +185,10 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
     if (!devices_.empty()) {
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def,
-                                                  devices_));
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, graph_def,
-                                                  devices_));
+    models.push_back(
+        absl::make_unique<TfDualNet>(descriptor, graph_def, devices_));
+    models.push_back(
+        absl::make_unique<TfDualNet>(descriptor, graph_def, devices_));
   }
 
   return absl::make_unique<BufferedModel>(std::move(models));

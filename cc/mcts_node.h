@@ -108,6 +108,7 @@ class MctsNode {
   };
 
   void SetFlag(Flag flag) { flags |= static_cast<uint8_t>(flag); }
+  void ClearFlag(Flag flag) { flags &= ~static_cast<uint8_t>(flag); }
   bool HasFlag(Flag flag) const {
     return (flags & static_cast<uint8_t>(flag)) != 0;
   }
@@ -148,6 +149,9 @@ class MctsNode {
   // Remove all children from the node except c.
   void PruneChildren(Coord c);
 
+  // Clears all children and stats of this node.
+  void ClearChildren();
+
   // Adjust the visit counts via whatever hairbrained scheme.
   void ReshapeFinalVisits();
 
@@ -159,7 +163,6 @@ class MctsNode {
     float U = U_common * child_P(i) / (1 + child_N(i));
     return Q * to_play + U - 1000.0f * !position.legal_move(i);
   }
-
 
   MctsNode* MaybeAddChild(Coord c);
 

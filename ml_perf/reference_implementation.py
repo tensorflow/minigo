@@ -118,7 +118,7 @@ class State:
     @property
     def best_model_path(self):
         return '{}.pb'.format(
-             os.path.join(fsdb.models_dir(), self.best_model_name))
+            os.path.join(fsdb.models_dir(), self.best_model_name))
 
     @property
     def train_model_path(self):
@@ -182,6 +182,51 @@ def initialize_from_checkpoint(state):
     for basename in os.listdir(work_dir):
         path = os.path.join(work_dir, basename)
         shutil.copy(path, fsdb.working_dir())
+
+
+def create_checkpoint():
+    for sub_dir in ['work_dir', 'golden_chunks']:
+        ensure_dir_exists(os.path.join(FLAGS.checkpoint_dir, sub_dir))
+
+    # List all the training checkpoints.
+    pattern = os.path.join(FLAGS.base_dir, 'work_dir', 'model.ckpt-*.index')
+    model_paths = glob.glob(pattern)
+
+    # Sort the checkpoints by step number.
+    def extract_step(path):
+        name = os.path.splitext(os.path.basename(path))[0]
+        return int(re.match('model.ckpt-(\d+)', name).group(1))
+    model_paths.sort(key=lambda x: extract_step(x))
+
+    # Get the name of the latest checkpoint.
+    step = extract_step(model_paths[-1])
+    name = 'model.ckpt-{}'.format(step)
+
+    # Copy the model to the checkpoint directory.
+    for ext in ['.data-00000-of-00001', '.index', '.meta']:
+        basename = name + ext
+        src_path = os.path.join(FLAGS.base_dir, 'work_dir', basename)
+        dst_path = os.path.join(FLAGS.checkpoint_dir, 'work_dir', basename)
+        print('Copying {} {}'.format(src_path, dst_path))
+        shutil.copy(src_path, dst_path)
+
+    # Write the checkpoint state proto.
+    checkpoint_path = os.path.join(
+        FLAGS.checkpoint_dir, 'work_dir', 'checkpoint')
+    print('Writing {}'.format(checkpoint_path))
+    with gfile.GFile(checkpoint_path, 'w') as f:
+        f.write('model_checkpoint_path: "{}"\n'.format(name))
+        f.write('all_model_checkpoint_paths: "{}"\n'.format(name))
+
+    # Copy the most recent golden chunks.
+    pattern = os.path.join(FLAGS.base_dir, 'data',
+                           'golden_chunks', '*.tfrecord.zz')
+    src_paths = sorted(glob.glob(pattern))[-FLAGS.window_size:]
+    for i, src_path in enumerate(src_paths):
+        dst_path = os.path.join(FLAGS.checkpoint_dir, 'golden_chunks',
+                                '000000-{:06}.tfrecord.zz'.format(i))
+        print('Copying {} {}'.format(src_path, dst_path))
+        shutil.copy(src_path, dst_path)
 
 
 def parse_win_stats_table(stats_str, num_lines):
@@ -262,7 +307,7 @@ async def bootstrap_selfplay(state):
     lines = await run(
         'bazel-bin/cc/selfplay',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-                               'bootstrap.flags')),
+                                            'bootstrap.flags')),
         '--num_games={}'.format(FLAGS.selfplay_num_games),
         '--parallel_games=32',
         '--model=random:0,0.4:0.4',
@@ -305,7 +350,7 @@ async def selfplay(state):
         commands.append([
             'bazel-bin/cc/selfplay',
             '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-                                   'selfplay.flags')),
+                                                'selfplay.flags')),
             '--num_games={}'.format(num_games),
             '--parallel_games={}'.format(parallel_games),
             '--model={}:{},{}'.format(FLAGS.engine, device,
@@ -472,7 +517,11 @@ def rl_loop():
             win_rate_vs_target = wait(evaluate_model(
                 state.train_model_path, target_model_path, sgf_dir))
             if (win_rate_vs_target >= FLAGS.bootstrap_target_win_rate and
-                prev_win_rate_vs_target > 0):
+                    prev_win_rate_vs_target > 0):
+                # The tranined model won a sufficient number of games against
+                # the target. Create the checkpoint that will be used to start
+                # the real benchmark and exit.
+                create_checkpoint(state)
                 break
             prev_win_rate_vs_target = win_rate_vs_target
 
@@ -491,7 +540,7 @@ def main(unused_argv):
     dirs = [fsdb.models_dir(), fsdb.selfplay_dir(), fsdb.holdout_dir(),
             fsdb.eval_dir(), fsdb.golden_chunk_dir(), fsdb.working_dir()]
     for d in dirs:
-        ensure_dir_exists(d);
+        ensure_dir_exists(d)
 
     # Copy the flag files so there's no chance of them getting accidentally
     # overwritten while the RL loop is running.
@@ -500,10 +549,11 @@ def main(unused_argv):
     FLAGS.flags_dir = flags_dir
 
     # Copy the target model to the models directory so we can find it easily.
-    shutil.copy(FLAGS.target_path, os.path.join(fsdb.models_dir(), 'target.pb'))
+    shutil.copy(FLAGS.target_path, os.path.join(
+        fsdb.models_dir(), 'target.pb'))
 
     logging.getLogger().addHandler(
-          logging.FileHandler(os.path.join(FLAGS.base_dir, 'rl_loop.log')))
+        logging.FileHandler(os.path.join(FLAGS.base_dir, 'rl_loop.log')))
     formatter = logging.Formatter('[%(asctime)s] %(message)s',
                                   '%Y-%m-%d %H:%M:%S')
     for handler in logging.getLogger().handlers:

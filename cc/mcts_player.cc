@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 #include <sstream>
 #include <utility>
 
@@ -106,33 +107,16 @@ bool MctsPlayer::UndoMove() {
   }
   root_ = root_->parent;
   game_->UndoMove();
-  if (!options_.tree_reuse) {
-    // Reset the root to a fresh node.
-    if (root_->parent != nullptr) {
-      *root_ = MctsNode(root_->parent, root_->move);
-    } else {
-      *root_ = MctsNode(root_->stats, root_->position);
-    }
-  }
   return true;
 }
 
 Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise) {
   auto start = absl::Now();
 
-  // In order to correctly count the number of reads performed, the root node
-  // must be expanded. The root will always be expanded unless this is the first
-  // time SuggestMove has been called for a game, or PlayMove was called without
-  // a prior call to SuggestMove.
-  if (!root_->HasFlag(MctsNode::Flag::kExpanded)) {
-    TreeSearch(1);
+  if (inject_noise) {
+    InjectNoise(kDirichletAlpha);
   }
 
-  if (inject_noise) {
-    std::array<float, kNumMoves> noise;
-    rnd_.Dirichlet(kDirichletAlpha, &noise);
-    root_->InjectNoise(noise, options_.noise_mix);
-  }
   int current_readouts = root_->N();
 
   if (options_.seconds_per_move > 0) {
@@ -200,11 +184,26 @@ Coord MctsPlayer::PickMove() {
 }
 
 void MctsPlayer::TreeSearch(int num_leaves) {
-  SelectLeaves(num_leaves);
+  MaybeExpandRoot();
+  SelectLeaves(num_leaves, std::numeric_limits<int>::max());
   ProcessLeaves();
 }
 
-void MctsPlayer::SelectLeaves(int num_leaves) {
+void MctsPlayer::InjectNoise(float dirichlet_alpha) {
+  MaybeExpandRoot();
+  std::array<float, kNumMoves> noise;
+  rnd_.Dirichlet(kDirichletAlpha, &noise);
+  root_->InjectNoise(noise, options_.noise_mix);
+}
+
+void MctsPlayer::MaybeExpandRoot() {
+  if (!root_->HasFlag(MctsNode::Flag::kExpanded)) {
+    SelectLeaves(1, 1);
+    ProcessLeaves();
+  }
+}
+
+void MctsPlayer::SelectLeaves(int num_leaves, int max_num_leaves) {
   tree_search_inferences_.clear();
   Model::Output cached_output;
 
@@ -212,7 +211,8 @@ void MctsPlayer::SelectLeaves(int num_leaves) {
   int num_selected = 0;
   int num_cache_misses = 0;
   int num_cache_hits = 0;
-  while (num_cache_misses < max_cache_misses) {
+  while (num_cache_misses < max_cache_misses &&
+         num_cache_misses + num_cache_hits < max_num_leaves) {
     auto* leaf = root_->SelectLeaf();
 
     if (leaf->game_over() || leaf->at_move_limit()) {
@@ -319,20 +319,10 @@ bool MctsPlayer::PlayMove(Coord c) {
 
   UpdateGame(c);
 
-  if (options_.tree_reuse) {
-    root_ = root_->MaybeAddChild(c);
-    // TODO(tommadams): remove the prune_orphaned_nodes and always prune
-    // children once the inference cache is fully working. Disable child pruning
-    // was a temporary hack to make Minigui usable.
-    if (options_.prune_orphaned_nodes) {
-      // Don't need to keep the parent's children around anymore because we'll
-      // never revisit them during normal play.
-      root_->parent->PruneChildren(c);
-    }
-  } else {
-    root_->children.clear();
-    root_ = root_->MaybeAddChild(c);
-  }
+  root_ = root_->MaybeAddChild(c);
+  // Don't need to keep the parent's children around anymore because we'll
+  // never revisit them during normal play.
+  root_->parent->PruneChildren(c);
 
   // Handle consecutive passing or termination by move limit.
   if (root_->at_move_limit()) {

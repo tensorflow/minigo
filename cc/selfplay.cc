@@ -107,9 +107,10 @@ DEFINE_int32(fastplay_readouts, 20,
              "aka 'playout cap oscillation'.\nIf this is set, "
              "'fastplay_frequency' should be nonzero.");
 
-DEFINE_bool(target_pruning, false,
-            "If true, subtract visits from all moves that weren't the best move "
-            "until the uncertainty level compensates.");
+DEFINE_bool(
+    target_pruning, false,
+    "If true, subtract visits from all moves that weren't the best move until "
+    "the uncertainty level compensates.");
 
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
@@ -412,6 +413,13 @@ class SelfPlayer {
         int readouts =
             (fastplay ? thread_options.player_options.fastplay_readouts
                       : thread_options.player_options.num_readouts);
+
+        if (thread_options.player_options.fastplay_frequency > 0 && !fastplay) {
+          // We're using playout count oscillation and doing a slow play.
+          // Clear the root's search state so that the injected noise has a
+          // more significant effect.
+          player->root()->ClearChildren();
+        }
 
         // Choose the move to play, optionally adding noise.
         Coord move = Coord::kInvalid;

@@ -52,6 +52,12 @@ class GtpClient {
 
     // If true, we will always pass if the opponent passes.
     bool courtesy_pass = false;
+
+    // If true, the subtree of a played move that was expanded during tree
+    // search will be kept.
+    // If false, all children of the current root will be deleted before each
+    // move is played.
+    bool tree_reuse = true;
   };
 
   GtpClient(std::unique_ptr<ModelFactory> model_factory,

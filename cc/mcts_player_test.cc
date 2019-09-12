@@ -341,13 +341,12 @@ TEST_F(MctsPlayerTest, ColdStartParallelTreeSearch) {
   player->TreeSearch(4);
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
 
-  // Even though we attempted to run 4 parallel searchs, the root should have
-  // only been selected once (the subsequent calls to SelectLeaf should have
-  // returned null).
-  EXPECT_EQ(1, root->N());
+  // The TreeSearch(4) call will have first expanded the root node so that it
+  // can perform the requested search for a total of 5 visits.
+  EXPECT_EQ(5, root->N());
 
-  // 0.085 = average(0, 0.17), since 0 is the prior on the root.
-  EXPECT_NEAR(0.085, root->Q(), 0.01);
+  // 0.14167 = average(0, 0.17) / (N + 1), since 0 is the prior on the root.
+  EXPECT_NEAR(0.14167, root->Q(), 0.001) << root->W() << " : " << root->N();
 }
 
 TEST_F(MctsPlayerTest, TreeSearchFailsafe) {
