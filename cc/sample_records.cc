@@ -19,6 +19,9 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 #include "absl/time/clock.h"
 #include "cc/init.h"
 #include "cc/logging.h"
@@ -31,9 +34,19 @@
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
 
-DEFINE_double(sample_frac, 1, "Fraction of records to read from each file.");
+DEFINE_double(sample_frac, 0,
+              "Fraction of records to read. Exactly one of sample_frac or "
+              "num_records must be non-zero.");
+DEFINE_uint64(num_records, 0,
+              "Exact number of records to sample. Exactly one of sample_frac "
+              "or num_records must be non-zero.");
 DEFINE_int32(num_read_threads, 1,
              "Number of threads to use when reading source files.");
+DEFINE_int32(num_write_threads, 1,
+             "Number of threads to use when writing destination files. If "
+             "num_write threads is > 1, the destination file will be sharded "
+             "with one shard per write thread. Shards will be named "
+             "<basename>-NNNNN-of-NNNNN.tfrecord.zz");
 DEFINE_int32(compression, 1,
              "Compression level between 0 (disabled) and 9. Default is 1.");
 DEFINE_uint64(seed, 0, "Random seed.");
@@ -46,10 +59,14 @@ namespace minigo {
 
 class ReadThread : public Thread {
  public:
-  ReadThread(std::vector<std::string> paths, float sample_frac)
+  struct Options {
+    float sample_frac = 1;
+  };
+
+  ReadThread(std::vector<std::string> paths, const Options& options)
       : rnd_(FLAGS_seed, Random::kUniqueStream),
         paths_(std::move(paths)),
-        sample_frac_(sample_frac) {}
+        options_(options) {}
 
   std::vector<std::string>& sampled_records() { return sampled_records_; }
   const std::vector<std::string>& sampled_records() const {
@@ -83,7 +100,7 @@ class ReadThread : public Thread {
           continue;
         }
 
-        if (rnd_() < sample_frac_) {
+        if (options_.sample_frac < 1 && rnd_() < options_.sample_frac) {
           sampled_records_.push_back(std::move(record));
         }
       }
@@ -92,8 +109,61 @@ class ReadThread : public Thread {
 
   Random rnd_;
   const std::vector<std::string> paths_;
-  const float sample_frac_;
   std::vector<std::string> sampled_records_;
+  const Options options_;
+};
+
+class WriteThread : public Thread {
+ public:
+  struct Options {
+    int shard = 0;
+    int num_shards = 1;
+    int compression = 1;
+  };
+
+  WriteThread(std::vector<std::string> records, std::string path,
+              const Options& options)
+      : records_(std::move(records)), options_(options) {
+    if (options_.num_shards == 1) {
+      path_ = path;
+    } else {
+      absl::string_view path = path;
+      // TODO(tommadams): expect the suffix .tfrecord if
+      // options_.compression == 0.
+      MG_CHECK(absl::ConsumeSuffix(&path, ".tfrecord.zz"))
+          << "expected path to have extension '.tfrecords.zz'";
+      path_ = absl::StrFormat("%s-%05d-of-%05d.tfrecord.zz", path,
+                              options_.shard, options_.num_shards);
+    }
+  }
+
+ private:
+  void Run() override {
+    std::unique_ptr<tensorflow::WritableFile> file;
+    TF_CHECK_OK(tensorflow::Env::Default()->NewWritableFile(path_, &file));
+
+    tensorflow::io::RecordWriterOptions options;
+    if (options_.compression > 0) {
+      MG_CHECK(options_.compression <= 9);
+      options.compression_type =
+          tensorflow::io::RecordWriterOptions::ZLIB_COMPRESSION;
+      options.zlib_options.compression_level = options_.compression;
+    } else {
+      options.compression_type = tensorflow::io::RecordWriterOptions::NONE;
+    }
+
+    tensorflow::io::RecordWriter writer(file.get(), options);
+    for (const auto& record : records_) {
+      TF_CHECK_OK(writer.WriteRecord(record));
+    }
+
+    TF_CHECK_OK(writer.Close());
+    TF_CHECK_OK(file->Close());
+  }
+
+  std::string path_;
+  std::vector<std::string> records_;
+  const Options options_;
 };
 
 template <typename T>
@@ -106,39 +176,18 @@ void MoveAppend(std::vector<T>* src, std::vector<T>* dst) {
   }
 }
 
-void WriteRecords(const std::vector<std::string>& records,
-                  const std::string& path, int compression) {
-  std::unique_ptr<tensorflow::WritableFile> file;
-  TF_CHECK_OK(tensorflow::Env::Default()->NewWritableFile(path, &file));
-
-  tensorflow::io::RecordWriterOptions options;
-  if (compression > 0) {
-    MG_CHECK(compression <= 9);
-    options.compression_type =
-        tensorflow::io::RecordWriterOptions::ZLIB_COMPRESSION;
-    options.zlib_options.compression_level = compression;
-  } else {
-    options.compression_type = tensorflow::io::RecordWriterOptions::NONE;
-  }
-
-  tensorflow::io::RecordWriter writer(file.get(), options);
-  for (const auto& record : records) {
-    TF_CHECK_OK(writer.WriteRecord(record));
-  }
-
-  TF_CHECK_OK(writer.Close());
-  TF_CHECK_OK(file->Close());
-}
-
-void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
-  MG_CHECK(!src_paths.empty());
-  MG_CHECK(!dst_path.empty());
-
-  int num_paths = static_cast<int>(src_paths.size());
+std::vector<std::string> Read(std::vector<std::string> paths) {
+  int num_paths = static_cast<int>(paths.size());
   int num_read_threads = std::min<int>(FLAGS_num_read_threads, num_paths);
 
   MG_LOG(INFO) << absl::Now() << " : reading " << num_paths << " records on "
                << num_read_threads << " threads";
+
+  ReadThread::Options read_options;
+  // If --sample_frac wasn't set, default to reading all records: we need to
+  // read all records from all files in order to fairly read exaclty
+  // --num_records records.
+  read_options.sample_frac = FLAGS_sample_frac == 0 ? 1 : FLAGS_sample_frac;
 
   std::vector<std::unique_ptr<ReadThread>> threads;
   for (int i = 0; i < num_read_threads; ++i) {
@@ -147,10 +196,10 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
     int end = (i + 1) * num_paths / num_read_threads;
     std::vector<std::string> thread_paths;
     for (int j = begin; j < end; ++j) {
-      thread_paths.push_back(std::move(src_paths[j]));
+      thread_paths.push_back(std::move(paths[j]));
     }
-    threads.push_back(absl::make_unique<ReadThread>(std::move(thread_paths),
-                                                    FLAGS_sample_frac));
+    threads.push_back(
+        absl::make_unique<ReadThread>(std::move(thread_paths), read_options));
   }
   for (auto& t : threads) {
     t->Start();
@@ -172,16 +221,83 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
     MoveAppend(&t->sampled_records(), &records);
   }
 
-  // Shuffle the records if requested.
-  if (FLAGS_shuffle) {
-    Random rnd(FLAGS_seed, Random::kUniqueStream);
-    MG_LOG(INFO) << absl::Now() << " : shuffling";
-    rnd.Shuffle(&records);
+  return records;
+}
+
+void Shuffle(std::vector<std::string>* records) {
+  Random rnd(FLAGS_seed, Random::kUniqueStream);
+  MG_LOG(INFO) << absl::Now() << " : shuffling";
+  rnd.Shuffle(records);
+}
+
+void Write(std::vector<std::string> records, const std::string& path) {
+  MG_LOG(INFO) << absl::Now() << " : writing to " << path;
+
+  WriteThread::Options write_options;
+  write_options.num_shards = FLAGS_num_write_threads;
+  write_options.compression = FLAGS_compression;
+
+  size_t num_records;
+  if (FLAGS_num_records != 0) {
+    // TODO(tommadams): add support for either duplicating some records or allow
+    // fewer than requested number of records to be written.
+    MG_CHECK(FLAGS_num_records <= records.size())
+        << "--num_records=" << FLAGS_num_records << " but there are only "
+        << records.size() << " available";
+    num_records = FLAGS_num_records;
+  } else {
+    num_records = static_cast<size_t>(records.size());
   }
 
-  // Write result.
-  MG_LOG(INFO) << absl::Now() << " : writing to " << dst_path;
-  WriteRecords(records, dst_path, FLAGS_compression);
+  std::vector<std::unique_ptr<WriteThread>> threads;
+  for (int shard = 0; shard < FLAGS_num_write_threads; ++shard) {
+    write_options.shard = shard;
+
+    // Calculate the range of source records for this shard.
+    size_t begin_src = shard * records.size() / FLAGS_num_write_threads;
+    size_t end_src = (shard + 1) * records.size() / FLAGS_num_write_threads;
+    size_t num_src = end_src - begin_src;
+
+    // Calculate the number of destination records for this shard.
+    size_t begin_dst = shard * num_records / FLAGS_num_write_threads;
+    size_t end_dst = (shard + 1) * num_records / FLAGS_num_write_threads;
+    size_t num_dst = end_dst - begin_dst;
+
+    // Sample the records for this shard.
+    std::vector<std::string> shard_records;
+    shard_records.reserve(num_dst);
+    for (size_t i = begin_dst; i < end_dst; ++i) {
+      size_t j = begin_src + i * num_src / num_dst;
+      shard_records.push_back(std::move(records[j]));
+    }
+
+    threads.push_back(absl::make_unique<WriteThread>(std::move(shard_records),
+                                                     path, write_options));
+  }
+  for (auto& t : threads) {
+    t->Start();
+  }
+  for (auto& t : threads) {
+    t->Join();
+  }
+}
+
+void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
+  MG_CHECK((FLAGS_sample_frac != 0) != (FLAGS_num_records != 0))
+      << "expected exactly one of --sample_frac and --num_records to be "
+         "non-zero";
+
+  MG_CHECK(!src_paths.empty());
+  MG_CHECK(!dst_path.empty());
+
+  auto records = Read(std::move(src_paths));
+
+  if (FLAGS_shuffle) {
+    Shuffle(&records);
+  }
+
+  Write(std::move(records), dst_path);
+
   MG_LOG(INFO) << absl::Now() << " : done";
 }
 
@@ -194,7 +310,7 @@ int main(int argc, char* argv[]) {
     const auto& pattern = argv[i];
     std::vector<std::string> paths;
     TF_CHECK_OK(tensorflow::Env::Default()->GetMatchingPaths(pattern, &paths));
-    for (auto& path : paths){
+    for (auto& path : paths) {
       src_paths.push_back(std::move(path));
     }
   }

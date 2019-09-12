@@ -10,9 +10,10 @@
 --eval_devices=0
 --selfplay_devices=1,2,3,4,5,6,7
 
+--train_filter=0.5
+
 --bootstrap_target_win_rate=0.05
 
---bootstrap_num_models=8
 --selfplay_num_games=8192
 --selfplay_num_games_per_thread=3
 --eval_num_games=100
