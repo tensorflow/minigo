@@ -1,4 +1,5 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
 # This must be kept up to date with the io_bazel_rules_closure archive from
 # tensorflow/WORKSPACE.
