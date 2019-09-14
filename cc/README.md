@@ -23,6 +23,9 @@ sudo ldconfig
 
 Now, you're ready to compile TensorFlow from source:
 
+Currently this builds Tensorflow version **1.13.1** (see
+[WORKSPACE](../WORKSPACE) for details)
+
 ```shell
 sudo apt-get install zip
 ./cc/configure_tensorflow.sh
