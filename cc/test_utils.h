@@ -35,6 +35,7 @@ class TestablePosition : public Position {
   TestablePosition(const std::array<Color, kN * kN>& stones,
                    Color to_play = Color::kBlack);
 
+  using Position::GroupAt;
   using Position::PlayMove;
 
   // Convenience functions that automatically parse coords.

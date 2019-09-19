@@ -75,7 +75,9 @@ Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
   group_visitor_ = gv;
 }
 
-void Position::PlayMove(Coord c, Color color, ZobristHistory* zobrist_history) {
+Position::UndoState Position::PlayMove(Coord c, Color color,
+                                       ZobristHistory* zobrist_history) {
+  UndoState undo(c, to_play_, ko_);
   if (c == Coord::kPass || c == Coord::kResign) {
     ko_ = Coord::kInvalid;
   } else {
@@ -85,7 +87,7 @@ void Position::PlayMove(Coord c, Color color, ZobristHistory* zobrist_history) {
       to_play_ = color;
     }
     MG_DCHECK(ClassifyMove(c) != MoveType::kIllegal) << c;
-    AddStoneToBoard(c, color);
+    undo.captures = AddStoneToBoard(c, color);
   }
 
   n_ += 1;
@@ -93,6 +95,81 @@ void Position::PlayMove(Coord c, Color color, ZobristHistory* zobrist_history) {
   UpdateLegalMoves(zobrist_history);
 
   MG_DCHECK(stone_hash_ == CalculateStoneHash(stones_));
+
+  return undo;
+}
+
+void Position::UndoMove(const UndoState& undo) {
+  to_play_ = undo.to_play;
+  ko_ = undo.ko;
+  Coord c = undo.c;
+
+  if (c != Coord::kPass) {
+    auto undo_color = stones_[c].color();
+    auto undo_group_id = stones_[c].group_id();
+    MG_CHECK(undo_color != Color::kEmpty);
+
+    // Remove the stone from the board.
+    stones_[c] = {};
+    stone_hash_ ^= zobrist::MoveHash(c, undo_color);
+
+    // Update the liberty counts of neighboring groups and count how many
+    // neighboring stones belong to the same group as the stone removed by the
+    // undo. If there are more than one neighbors in the same group, the group
+    // may have been split by the removal of this stone.
+    tiny_set<GroupId, 4> neighbor_groups;
+    int num_group_neighbors = 0;
+    int num_lost_liberties = 0;
+    for (auto nc : kNeighborCoords[c]) {
+      if (stones_[nc].empty()) {
+        // A liberty isn't lost if it's also the liberty of another stone in the
+        // same group.
+        if (!HasNeighboringGroup(nc, undo_group_id)) {
+          num_lost_liberties += 1;
+        }
+        continue;
+      }
+      auto ng = stones_[nc].group_id();
+      if (ng == undo_group_id) {
+        num_group_neighbors += 1;
+      }
+      if (neighbor_groups.insert(ng)) {
+        groups_[ng].num_liberties += 1;
+      }
+    }
+
+    if (num_group_neighbors > 1) {
+      // The stone removed by this undo had more than one neighbor of the same
+      // color: it's possible that the removal of this stone has split a group.
+      // Assign a new group for each neighbor of the same color. If multiple
+      // neighbors are part of the same group, the first call to AssignNewGroup
+      // will change the remaining neighbors' group IDs, so they're no longer
+      // undo_group_id.
+      for (auto nc : kNeighborCoords[c]) {
+        if (stones_[nc].color() == undo_color &&
+            stones_[nc].group_id() == undo_group_id) {
+          AssignNewGroup(nc);
+        }
+      }
+      groups_.free(undo_group_id);
+    } else {
+      groups_[undo_group_id].size -= 1;
+      if (groups_[undo_group_id].size == 0) {
+        groups_.free(undo_group_id);
+      } else {
+        groups_[undo_group_id].num_liberties -= num_lost_liberties;
+      }
+    }
+
+    // Put any captured stones back on the board, updating their neighbouring
+    // groups' liberty counts.
+    auto other_color = OtherColor(undo_color);
+    for (auto cc : undo.captures) {
+      UncaptureGroup(other_color, c, cc);
+    }
+  }
+
+  UpdateLegalMoves(nullptr);
 }
 
 std::string Position::ToSimpleString() const {
@@ -153,7 +230,7 @@ std::string Position::ToPrettyString(bool use_ansi_colors) const {
   return oss.str();
 }
 
-void Position::AddStoneToBoard(Coord c, Color color) {
+inline_vector<Coord, 4> Position::AddStoneToBoard(Coord c, Color color) {
   auto potential_ko = IsKoish(c);
   auto opponent_color = OtherColor(color);
 
@@ -223,6 +300,7 @@ void Position::AddStoneToBoard(Coord c, Color color) {
   stone_hash_ ^= zobrist::MoveHash(c, color);
 
   // Remove captured groups.
+  inline_vector<Coord, 4> captured_coords;
   for (const auto& p : captured_groups) {
     int num_captured_stones = groups_[p.first].size;
     if (color == Color::kBlack) {
@@ -231,6 +309,7 @@ void Position::AddStoneToBoard(Coord c, Color color) {
       num_captures_[1] += num_captured_stones;
     }
     RemoveGroup(p.second);
+    captured_coords.push_back(p.second);
   }
 
   // Update ko.
@@ -241,6 +320,8 @@ void Position::AddStoneToBoard(Coord c, Color color) {
   } else {
     ko_ = Coord::kInvalid;
   }
+
+  return captured_coords;
 }
 
 void Position::RemoveGroup(Coord c) {
@@ -300,6 +381,66 @@ void Position::MergeGroup(Coord c) {
           // each one is only counted as a liberty once, even if it is
           // neighbored by multiple stones in this group.
           board_visitor_->Visit(nc);
+        }
+      }
+    }
+  }
+}
+
+GroupId Position::UncaptureGroup(Color color, Coord capture_c, Coord group_c) {
+  // Allocate a new group. Since this new group was previously captured by the
+  // move at capture_c, by definition it must only have one liberty.
+  // Initialize the group's size to zero and increment it as we put stones on
+  // the board.
+  auto group_id = groups_.alloc(0, 1);
+  auto other_color = OtherColor(color);
+
+  auto* bv = board_visitor_;
+  bv->Begin();
+  bv->Visit(group_c);
+  while (!bv->Done()) {
+    auto c = bv->Next();
+    stones_[c] = {color, group_id};
+    stone_hash_ ^= zobrist::MoveHash(c, color);
+    groups_[group_id].size += 1;
+    tiny_set<GroupId, 4> neighbor_groups;
+    for (auto nc : kNeighborCoords[c]) {
+      if (nc != capture_c) {
+        auto ns = stones_[nc];
+        auto neighbor_color = ns.color();
+        if (neighbor_color == Color::kEmpty) {
+          bv->Visit(nc);
+        } else if (neighbor_color == other_color &&
+                   neighbor_groups.insert(ns.group_id())) {
+          groups_[ns.group_id()].num_liberties -= 1;
+        }
+      }
+    }
+  }
+
+  return group_id;
+}
+
+void Position::AssignNewGroup(Coord c) {
+  auto color = stones_[c].color();
+  MG_CHECK(color != Color::kEmpty);
+  auto other_color = OtherColor(color);
+
+  auto group_id = groups_.alloc(0, 0);
+
+  auto* bv = board_visitor_;
+  bv->Begin();
+  bv->Visit(c);
+  while (!bv->Done()) {
+    auto c = bv->Next();
+    if (stones_[c].color() == Color::kEmpty) {
+      groups_[group_id].num_liberties += 1;
+    } else {
+      stones_[c] = {color, group_id};
+      groups_[group_id].size += 1;
+      for (auto nc : kNeighborCoords[c]) {
+        if (stones_[nc].color() != other_color) {
+          bv->Visit(nc);
         }
       }
     }

@@ -468,6 +468,125 @@ TEST(PositionTest, PlayGame) {
   EXPECT_EQ(-0.5, board.CalculateScore(kDefaultKomi));
 }
 
+void ValidatePosition(TestablePosition* p) {
+  auto calculate_group_info = [p](Coord c) {
+    Group group;
+
+    const auto& stones = p->stones();
+    auto color = stones[c].color();
+    auto expected_group_id = stones[c].group_id();
+    MG_CHECK(color != Color::kEmpty);
+
+    auto other_color = OtherColor(color);
+    auto& bv = p->board_visitor;
+    bv.Begin();
+    bv.Visit(c);
+    while (!bv.Done()) {
+      c = bv.Next();
+      if (stones[c].color() == Color::kEmpty) {
+        group.num_liberties += 1;
+      } else {
+        MG_CHECK(stones[c].group_id() == expected_group_id);
+        group.size += 1;
+        for (auto nc : kNeighborCoords[c]) {
+          if (stones[nc].color() != other_color) {
+            bv.Visit(nc);
+          }
+        }
+      }
+    }
+
+    return group;
+  };
+
+  for (int i = 0; i < kN * kN; ++i) {
+    auto c = static_cast<Coord>(i);
+    if (p->stones()[c].empty()) {
+      continue;
+    }
+    auto expected_group = calculate_group_info(c);
+    auto actual_group = p->GroupAt(c);
+    MG_CHECK(expected_group.size == actual_group.size)
+        << c << " : expected_group_size:" << expected_group.size
+        << " actual_group_size:" << actual_group.size;
+    MG_CHECK(expected_group.num_liberties == actual_group.num_liberties)
+        << c << " : expected_num_liberties:" << expected_group.num_liberties
+        << " actual_num_liberties:" << actual_group.num_liberties;
+  }
+}
+
+TEST(PositionTest, UndoMove) {
+  // Play a move at point `c` with color `color` on a board generated from
+  // `board_str`. Then undo the move again and validate the board state.
+  auto test_undo = [](const std::string& c, Color color,
+                      const std::string& board_str) {
+    TestablePosition board(board_str);
+    ValidatePosition(&board);
+    auto undo = board.PlayMove(Coord::FromGtp(c), color);
+    ValidatePosition(&board);
+    board.UndoMove(undo);
+    ValidatePosition(&board);
+  };
+
+  // Test that undo correctly updates liberty counts.
+  test_undo("B9", Color::kBlack, R"(
+     X.
+     X.)");
+  test_undo("D8", Color::kWhite, R"(
+     XXX.
+     XOO.
+     XXX.)");
+  test_undo("B8", Color::kWhite, R"(
+     XXX
+     X..
+     XXX)");
+
+  // Test that nothing explodes when we undo a pass.
+  test_undo("pass", Color::kWhite, R"()");
+
+  // Test undoing a single move.
+  test_undo("C3", Color::kWhite, R"()");
+
+  // Test that undo correctly restores a single captured group.
+  test_undo("C7", Color::kBlack, R"(
+     XXXXX
+     XOOOX
+     XO.OX
+     XOOOX
+     XXXXX)");
+
+  // Test that undo correctly restores a multiple captured groups.
+  test_undo("D6", Color::kBlack, R"(
+     ...X...
+     ..XOX..
+     .XXOXX.
+     XOO.OOX
+     .XXOXX.
+     ..XOX..
+     ...X...)");
+
+  // Test that undo splits a group that was joined by the undone move.
+  test_undo("B8", Color::kWhite, R"(
+     .O.
+     O.O
+     .O.)");
+  test_undo("B9", Color::kBlack, R"(
+     X.X
+     X.X
+     X.X)");
+
+  // Test that undo doesn't split a group that's joined in another location.
+  test_undo("B9", Color::kBlack, R"(
+     X.X
+     X.X
+     XXX)");
+
+  test_undo("C9", Color::kBlack, R"(
+     OO.OX
+     OXXOX
+     .X.X.)");
+}
+
 // A regression test for a bug where Position::RemoveGroup didn't recycle the
 // removed group's ID. The test plays repeatedly plays a random legal move (or
 // passes if the player has no legal moves). Under these conditions, the game
@@ -476,6 +595,14 @@ TEST(PositionTest, PlayRandomLegalMoves) {
   Random rnd(983465983, 1);
   TestablePosition position("");
 
+  struct State {
+    State(zobrist::Hash stone_hash, const Position::UndoState& undo)
+        : stone_hash(stone_hash), undo(undo) {}
+    zobrist::Hash stone_hash;
+    Position::UndoState undo;
+  };
+
+  std::vector<State> states;
   for (int i = 0; i < 10000; ++i) {
     std::vector<Coord> legal_moves;
     for (int c = 0; c < kN * kN; ++c) {
@@ -483,12 +610,25 @@ TEST(PositionTest, PlayRandomLegalMoves) {
         legal_moves.push_back(c);
       }
     }
+
+    auto stone_hash = position.stone_hash();
     if (!legal_moves.empty()) {
       auto c = legal_moves[rnd.UniformInt(0, legal_moves.size() - 1)];
-      position.PlayMove(c, position.to_play());
+      states.emplace_back(stone_hash, position.PlayMove(c, position.to_play()));
     } else {
-      position.PlayMove(Coord::kPass, position.to_play());
+      states.emplace_back(stone_hash,
+                          position.PlayMove(Coord::kPass, position.to_play()));
     }
+  }
+
+  // Undo all the moves, validating as we go.
+  ValidatePosition(&position);
+  while (!states.empty()) {
+    const auto& state = states.back();
+    position.UndoMove(state.undo);
+    ValidatePosition(&position);
+    MG_CHECK(position.stone_hash() == state.stone_hash);
+    states.pop_back();
   }
 }
 

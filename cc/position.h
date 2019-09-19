@@ -63,7 +63,7 @@ class BoardVisitor {
   // Returns true when there are no more points to visit.
   bool Done() const { return stack_.empty(); }
 
-  // Returns the coordinates of the next point in the queue to visit.
+  // Returns the coordinates of the next point in the stack to visit.
   Coord Next() {
     auto c = stack_.back();
     stack_.pop_back();
@@ -71,7 +71,7 @@ class BoardVisitor {
   }
 
   // If this is the first time Visit has been passed coordinate c since the most
-  // recent call to Begin, Visit pushes the coordinate onto its queue of points
+  // recent call to Begin, Visit pushes the coordinate onto its stack of points
   // to visit and returns true. Otherwise, Visit returns false.
   bool Visit(Coord c) {
     if (visited_[c] != epoch_) {
@@ -93,7 +93,7 @@ class BoardVisitor {
 
 // GroupVisitor simply keeps track of which groups have been visited since the
 // most recent call to Begin. Unlike BoardVisitor, it does not keep a pending
-// queue of groups to visit.
+// stack of groups to visit.
 class GroupVisitor {
  public:
   GroupVisitor() = default;
@@ -140,6 +140,16 @@ class Position {
  public:
   using Stones = std::array<Stone, kN * kN>;
 
+  // State required to undo a call to PlayMove.
+  struct UndoState {
+    UndoState(Coord c, Color to_play, Coord ko)
+        : c(c), to_play(to_play), ko(ko) {}
+    Coord c;
+    Color to_play;
+    Coord ko;
+    inline_vector<Coord, 4> captures;
+  };
+
   // Calculates the Zobrist hash for an array of stones. Prefer using
   // Position::stone_hash() if possible.
   static zobrist::Hash CalculateStoneHash(const Stones& stones);
@@ -167,8 +177,12 @@ class Position {
   // If zobrist_history is non-null, move legality considers positional superko.
   // If zobrist_history is null, positional superko is not considered when
   // updating the legal moves, only ko.
-  void PlayMove(Coord c, Color color = Color::kEmpty,
-                ZobristHistory* zobrist_history = nullptr);
+  // Returns an UndoState object that allows the move to be undone.
+  UndoState PlayMove(Coord c, Color color = Color::kEmpty,
+                     ZobristHistory* zobrist_history = nullptr);
+
+  // Undoes the move recent call to PlayMove.
+  void UndoMove(const UndoState& undo);
 
   // TODO(tommadams): Do we really need to store this on the position? Return
   // the number of captured stones from AddStoneToBoard and track the number of
@@ -257,7 +271,9 @@ class Position {
   // Updates num_captures_.
   // If the move captures a single stone, sets ko_ to the coordinate of that
   // stone. Sets ko_ to kInvalid otherwise.
-  void AddStoneToBoard(Coord c, Color color);
+  // Returns a list of the neighbors of c that belonged to groups that were
+  // captured by this move.
+  inline_vector<Coord, 4> AddStoneToBoard(Coord c, Color color);
 
   // Updates legal_moves_.
   // If zobrist_history is non-null, this takes into account positional superko.
@@ -272,6 +288,14 @@ class Position {
   // into that stone's group. Called when a stone is placed on the board that
   // has two or more distinct neighboring groups of the same color.
   void MergeGroup(Coord c);
+
+  // Called as part of UndoMove for the given color at point capture_c.
+  // Replaces the previously captured stones at point group_c.
+  GroupId UncaptureGroup(Color color, Coord capture_c, Coord group_c);
+
+  // Called as part of UndoMove.
+  // Create a new group for the chain of stones at c.
+  void AssignNewGroup(Coord c);
 
   // Returns true if the point at coordinate c neighbors the given group.
   bool HasNeighboringGroup(Coord c, GroupId group_id) const;

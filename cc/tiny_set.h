@@ -47,6 +47,16 @@ class tiny_set : private inline_vector<T, Capacity> {
     impl::push_back(x);
     return true;
   }
+
+  // Returns true if the set contains x.
+  bool contains(const T& x) const {
+    for (const auto& y : *this) {
+      if (x == y) {
+        return true;
+      }
+    }
+    return false;
+  }
 };
 
 }  // namespace minigo
