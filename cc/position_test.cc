@@ -522,10 +522,24 @@ TEST(PositionTest, UndoMove) {
                       const std::string& board_str) {
     TestablePosition board(board_str);
     ValidatePosition(&board);
+
+    std::array<Color, kN * kN> original_stones;
+    for (int i = 0; i < kN * kN; ++i) {
+      original_stones[i] = board.stones()[i].color();
+    }
+
+    auto ko = board.ko();
     auto undo = board.PlayMove(Coord::FromGtp(c), color);
     ValidatePosition(&board);
     board.UndoMove(undo);
+    MG_CHECK(board.ko() == ko);
     ValidatePosition(&board);
+
+    std::array<Color, kN * kN> undone_stones;
+    for (int i = 0; i < kN * kN; ++i) {
+      undone_stones[i] = board.stones()[i].color();
+    }
+    MG_CHECK(original_stones == undone_stones);
   };
 
   // Test that undo correctly updates liberty counts.
@@ -540,6 +554,10 @@ TEST(PositionTest, UndoMove) {
      XXX
      X..
      XXX)");
+  test_undo("C9", Color::kBlack, R"(
+     OO.OX
+     OXXOX
+     .X.X.)");
 
   // Test that nothing explodes when we undo a pass.
   test_undo("pass", Color::kWhite, R"()");
@@ -548,6 +566,10 @@ TEST(PositionTest, UndoMove) {
   test_undo("C3", Color::kWhite, R"()");
 
   // Test that undo correctly restores a single captured group.
+  test_undo("C8", Color::kWhite, R"(
+     .O.
+     OX.
+     .O.)");
   test_undo("C7", Color::kBlack, R"(
      XXXXX
      XOOOX
@@ -581,10 +603,11 @@ TEST(PositionTest, UndoMove) {
      X.X
      XXX)");
 
-  test_undo("C9", Color::kBlack, R"(
-     OO.OX
-     OXXOX
-     .X.X.)");
+  // Test that undo handles ko correctly.
+  test_undo("C8", Color::kBlack, R"(
+     .XO.
+     XO.O
+     .XO.)");
 }
 
 // A regression test for a bug where Position::RemoveGroup didn't recycle the

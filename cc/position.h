@@ -237,6 +237,7 @@ class Position {
   Color to_play() const { return to_play_; }
   const Stones& stones() const { return stones_; }
   int n() const { return n_; }
+  Coord ko() const { return ko_; }
   zobrist::Hash stone_hash() const { return stone_hash_; }
   bool legal_move(Coord c) const {
     MG_DCHECK(c < kNumMoves);
