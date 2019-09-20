@@ -18,6 +18,7 @@ import random
 
 import bigtable_input
 import coords
+import dual_net
 import features as features_lib
 import go
 import sgf_wrapper
@@ -78,6 +79,8 @@ def batch_parse_tf_example(batch_size, example_batch):
     Returns:
         A tuple (feature_tensor, dict of output tensors)
     """
+    planes = dual_net.get_features_planes()
+
     features = {
         'x': tf.FixedLenFeature([], tf.string),
         'pi': tf.FixedLenFeature([], tf.string),
@@ -86,8 +89,7 @@ def batch_parse_tf_example(batch_size, example_batch):
     parsed = tf.parse_example(example_batch, features)
     x = tf.decode_raw(parsed['x'], tf.uint8)
     x = tf.cast(x, tf.float32)
-    x = tf.reshape(x, [batch_size, go.N, go.N,
-                       features_lib.NEW_FEATURES_PLANES])
+    x = tf.reshape(x, [batch_size, go.N, go.N, planes])
     pi = tf.decode_raw(parsed['pi'], tf.float32)
     pi = tf.reshape(pi, [batch_size, go.N * go.N + 1])
     outcome = parsed['outcome']
@@ -268,7 +270,9 @@ def make_dataset_from_selfplay(data_extracts):
     Args:
         data_extracts: An iterable of (position, pi, result) tuples
     """
-    tf_examples = (make_tf_example(features_lib.extract_features(pos), pi, result)
+    f = dual_net.get_features()
+    tf_examples = (make_tf_example(features_lib.extract_features(pos, f),
+                                   pi, result)
                    for pos, pi, result in data_extracts)
     return tf_examples
 
@@ -280,7 +284,8 @@ def make_dataset_from_sgf(sgf_filename, tf_record):
 
 
 def _make_tf_example_from_pwc(position_w_context):
-    features = features_lib.extract_features(position_w_context.position)
+    f = dual_net.get_features()
+    features = features_lib.extract_features(position_w_context.position, f)
     pi = _one_hot(coords.to_flat(position_w_context.next_move))
     value = position_w_context.result
     return make_tf_example(features, pi, value)

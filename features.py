@@ -21,7 +21,7 @@ All features with 8 planes are 1-hot encoded, with plane i marked with 1
 only if the feature was equal to i. Any features >= 8 would be marked as 8.
 
 This file includes the features from the first paper as DEFAULT_FEATURES
-and the features from AGZ as NEW_FEATURES.
+and the features from AGZ as AGZ_FEATURES.
 """
 
 import numpy as np
@@ -116,6 +116,18 @@ def liberty_feature(position):
     return make_onehot(position.get_liberties(), P)
 
 
+@planes(3)
+def few_liberties_feature(position):
+    feature = position.get_liberties()
+    onehot_features = np.zeros(feature.shape + (3,), dtype=np.uint8)
+    onehot_index_offsets = np.arange(0, utils.product(
+        onehot_features.shape), 3) + feature.ravel()
+    nonzero_elements = ((feature != 0) & (feature <= 3)).ravel()
+    nonzero_index_offsets = onehot_index_offsets[nonzero_elements] - 1
+    onehot_features.ravel()[nonzero_index_offsets] = 1
+    return onehot_features
+
+
 @planes(P)
 def would_capture_feature(position):
     features = np.zeros([go.N, go.N], dtype=np.uint8)
@@ -139,13 +151,21 @@ DEFAULT_FEATURES = [
 
 DEFAULT_FEATURES_PLANES = sum(f.planes for f in DEFAULT_FEATURES)
 
-NEW_FEATURES = [
+AGZ_FEATURES = [
     stone_features,
     color_to_play_feature
 ]
 
-NEW_FEATURES_PLANES = sum(f.planes for f in NEW_FEATURES)
+AGZ_FEATURES_PLANES = sum(f.planes for f in AGZ_FEATURES)
+
+EXTRA_FEATURES = [
+    stone_features,
+    color_to_play_feature,
+    few_liberties_feature,
+]
+
+EXTRA_FEATURES_PLANES = sum(f.planes for f in EXTRA_FEATURES)
 
 
-def extract_features(position, features=NEW_FEATURES):
+def extract_features(position, features):
     return np.concatenate([feature(position) for feature in features], axis=2)

@@ -144,6 +144,10 @@ flags.DEFINE_bool(
     help=('Use Swish activation function inplace of ReLu. '
           'https://arxiv.org/pdf/1710.05941.pdf'))
 
+flags.DEFINE_bool(
+    'use_extra_features', False,
+    help='Use extra inpute features.')
+
 
 # TODO(seth): Verify if this is still required.
 flags.register_multi_flags_validator(
@@ -197,7 +201,8 @@ class DualNetwork():
         return probs[0], values[0]
 
     def run_many(self, positions):
-        processed = list(map(features_lib.extract_features, positions))
+        f = get_features()
+        processed = [features_lib.extract_features(p, f) for p in positions]
         if FLAGS.use_random_symmetry:
             syms_used, processed = symmetries.randomize_symmetries_feat(
                 processed)
@@ -210,12 +215,26 @@ class DualNetwork():
         return probabilities, value
 
 
+def get_features_planes():
+    if FLAGS.use_extra_features:
+        return features_lib.EXTRA_FEATURES_PLANES
+    else:
+        return features_lib.AGZ_FEATURES_PLANES
+
+
+def get_features():
+    if FLAGS.use_extra_features:
+        return features_lib.EXTRA_FEATURES
+    else:
+        return features_lib.AGZ_FEATURES
+
+
 def get_inference_input():
     """Set up placeholders for input features/labels.
 
     Returns the feature, output tensors that get passed into model_fn."""
     return (tf.placeholder(tf.float32,
-                           [None, go.N, go.N, features_lib.NEW_FEATURES_PLANES],
+                           [None, go.N, go.N, get_features_planes()],
                            name='pos_tensor'),
             {'pi_tensor': tf.placeholder(tf.float32, [None, go.N * go.N + 1]),
              'value_tensor': tf.placeholder(tf.float32, [None])})
@@ -227,7 +246,7 @@ def model_fn(features, labels, mode, params):
 
     Args:
         features: tensor with shape
-            [BATCH_SIZE, go.N, go.N, features_lib.NEW_FEATURES_PLANES]
+            [BATCH_SIZE, go.N, go.N, get_features_planes()]
         labels: dict from string to tensor with shape
             'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
             'value_tensor': [BATCH_SIZE]
@@ -670,8 +689,7 @@ def freeze_graph_tpu(model_path):
         replicated_features = []
         for i in range(FLAGS.num_tpu_cores):
             features = tf.placeholder(
-                tf.float32, [None, go.N, go.N,
-                             features_lib.NEW_FEATURES_PLANES],
+                tf.float32, [None, go.N, go.N, get_features_planes()],
                 name='pos_tensor_%d' % i)
             replicated_features.append((features,))
         outputs = tf.contrib.tpu.replicate(

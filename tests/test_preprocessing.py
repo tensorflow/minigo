@@ -16,6 +16,7 @@ import random
 import tempfile
 
 import coords
+import dual_net
 import preprocessing
 import features
 import go
@@ -31,10 +32,11 @@ TEST_SGF = "(;CA[UTF-8]SZ[9]PB[Seth the best]PW[Andrew opens H4]KM[6.5]HA[0]RE[W
 
 class TestPreprocessing(test_utils.MinigoUnitTest):
     def create_random_data(self, num_examples):
+        planes = dual_net.get_features_planes()
         raw_data = []
         for _ in range(num_examples):
             feature = (256 * np.random.random([
-                go.N, go.N, features.NEW_FEATURES_PLANES])).astype(np.uint8)
+                go.N, go.N, planes])).astype(np.uint8)
             pi = np.random.random([go.N * go.N + 1]).astype(np.float32)
             value = np.random.random()
             raw_data.append((feature, pi, value))
@@ -158,13 +160,14 @@ class TestPreprocessing(test_utils.MinigoUnitTest):
         first_move = coords.from_sgf('fd')
         next_pos = start_pos.play_move(first_move)
         second_move = coords.from_sgf('cf')
+        f = dual_net.get_features()
         expected_data = [
             (
-                features.extract_features(start_pos),
+                features.extract_features(start_pos, f),
                 preprocessing._one_hot(coords.to_flat(first_move)),
                 -1
             ), (
-                features.extract_features(next_pos),
+                features.extract_features(next_pos, f),
                 preprocessing._one_hot(coords.to_flat(second_move)),
                 -1
             )]
