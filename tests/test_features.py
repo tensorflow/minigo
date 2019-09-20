@@ -23,7 +23,8 @@ TEST_BOARD = test_utils.load_board('''
 .X.....OO
 X........
 XXXXXXXXX
-''' + EMPTY_ROW * 6)
+OX......O
+''' + EMPTY_ROW * 5)
 
 TEST_POSITION = go.Position(
     board=TEST_BOARD,
@@ -122,6 +123,25 @@ class TestFeatureExtraction(test_utils.MinigoUnitTest):
         self.assertEqual(1, f[0, 8, 2])
         # the group at 1, 0 has 18 liberties
         self.assertEqual(1, f[1, 0, 7])
+
+    def test_few_liberties_feature(self):
+        f = features.few_liberties_feature(TEST_POSITION)
+        self.assertEqual(
+            f.shape, (9, 9, features.few_liberties_feature.planes))
+
+        self.assertEqualNPArray([0, 0, 0], f[0, 0])
+        # the stone at 0, 1 has 3 liberties.
+        self.assertEqualNPArray([0, 0, 1], f[0, 1])
+        # the group at 0, 7 has 3 liberties.
+        self.assertEqualNPArray([0, 0, 1], f[0, 7])
+        self.assertEqualNPArray([0, 0, 1], f[0, 8])
+        # the group at 1, 0 has 18 liberties but few_liberties_feature only has
+        # non-zero entries for groups with {1, 2, 3} liberties.
+        self.assertEqualNPArray([0, 0, 0], f[0, 0])
+        # the group at 3, 0 has 1 liberty.
+        self.assertEqualNPArray([1, 0, 0], f[3, 0])
+        # the group at 3, 8 has 2 liberties.
+        self.assertEqualNPArray([0, 1, 0], f[3, 8])
 
     def test_recent_moves_feature(self):
         f = features.recent_move_feature(TEST_POSITION)
