@@ -18,9 +18,24 @@
 
 namespace minigo {
 
-Model::Model(std::string name, int buffer_count)
-    : name_(std::move(name)), buffer_count_(buffer_count) {}
+Model::Model(std::string name, FeatureType feature_type, int buffer_count)
+    : name_(std::move(name)),
+      feature_type_(feature_type),
+      buffer_count_(buffer_count) {}
 Model::~Model() = default;
+
+int Model::GetNumFeaturePlanes(FeatureType feature_type) {
+  switch (feature_type) {
+    case Model::FeatureType::kAgz:
+      return Model::kNumAgzFeaturePlanes;
+    case Model::FeatureType::kExtra:
+      return Model::kNumExtraFeaturePlanes;
+    default:
+      MG_LOG(FATAL) << "invalid feature type "
+                    << static_cast<int>(feature_type);
+      return 0;
+  }
+}
 
 void Model::ApplySymmetry(symmetry::Symmetry sym, const Output& src,
                           Output* dst) {

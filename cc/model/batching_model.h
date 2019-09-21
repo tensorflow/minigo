@@ -62,6 +62,9 @@ class ModelBatcher {
   ~ModelBatcher();
 
   const std::string& name() const { return model_impl_->name(); }
+  Model::FeatureType feature_type() const {
+    return model_impl_->feature_type();
+  }
 
   void StartGame() LOCKS_EXCLUDED(&mutex_);
   void EndGame() LOCKS_EXCLUDED(&mutex_);

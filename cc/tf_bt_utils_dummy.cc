@@ -20,7 +20,8 @@ namespace tf_utils {
 
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
-                       const std::string& table_name, const Game& game) {
+                       const std::string& table_name,
+                       Model::FeatureType feature_type, const Game& game) {
   MG_LOG(FATAL)
       << "Can't write TensorFlow examples to Bigtable without Bigtable "
          "support enabled. "

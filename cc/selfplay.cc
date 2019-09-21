@@ -518,14 +518,14 @@ class SelfPlayer {
           is_holdout ? thread_options.holdout_dir : thread_options.output_dir;
       if (!example_dir.empty()) {
         tf_utils::WriteGameExamples(GetOutputDir(now, example_dir), output_name,
-                                    *game);
+                                    player->model()->feature_type(), *game);
       }
       if (use_bigtable) {
         const auto& gcp_project_name = bigtable_spec[0];
         const auto& instance_name = bigtable_spec[1];
         const auto& table_name = bigtable_spec[2];
         tf_utils::WriteGameExamples(gcp_project_name, instance_name, table_name,
-                                    *game);
+                                    player->model()->feature_type(), *game);
       }
 
       game->AddComment(

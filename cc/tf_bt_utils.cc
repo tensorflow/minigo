@@ -91,8 +91,9 @@ void WriteTfExamples(Table& table, const std::string& row_prefix,
 
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
-                       const std::string& table_name, const Game& game) {
-  auto examples = MakeExamples(game);
+                       const std::string& table_name,
+                       Model::FeatureType feature_type, const Game& game) {
+  auto examples = MakeExamples(feature_type, game);
   Table table(
       CreateDefaultDataClient(gcp_project_name, instance_name, ClientOptions()),
       table_name);

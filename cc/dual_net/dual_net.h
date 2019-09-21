@@ -40,40 +40,38 @@ class DualNet : public Model {
   // Size of move history in the stone features.
   static constexpr int kMoveHistory = 8;
 
-  // Number of features per stone.
-  static constexpr int kNumStoneFeatures = kMoveHistory * 2 + 1;
-
   // Index of the per-stone feature that describes whether the black or white
   // player is to play next.
   static constexpr int kPlayerFeature = kMoveHistory * 2;
 
-  // Total number of features for the board.
-  static constexpr int kNumBoardFeatures = kN * kN * kNumStoneFeatures;
+  // Number of features per stone.
+  static constexpr int kNumAgzStoneFeatures = kMoveHistory * 2 + 1;
 
-  // TODO(tommadams): Change features type from float to uint8_t.
-  using StoneFeatures = std::array<float, kNumStoneFeatures>;
-  using BoardFeatures = std::array<float, kNumBoardFeatures>;
+  static constexpr int kNumLibertyFeatures = 3;
+
+  static constexpr int kNumExtraStoneFeatures =
+      kNumAgzStoneFeatures + kNumLibertyFeatures;
+
+  static constexpr int kMaxBoardFeaturesSize = kN * kN * kNumExtraStoneFeatures;
 
   using Input = Model::Input;
   using Output = Model::Output;
 
-  static void SetFeatures(absl::Span<const Position::Stones* const> history,
-                          Color to_play, BoardFeatures* features);
+  // A buffer large enough to hold features for all input types.
+  template <typename T>
+  using BoardFeatureBuffer = std::array<T, kMaxBoardFeaturesSize>;
 
-  explicit DualNet(std::string name);
+  // TODO(tommadams): Rename SetFeatures.
+  static void SetInputs(const std::vector<const Input*>& model_inputs,
+                        FeatureType feature_type, Tensor* features);
+
+  static void GetOutputs(const std::vector<const Input*>& model_inputs,
+                         const Tensor& policy, const Tensor& value,
+                         std::vector<Output*>* model_outputs);
+
+  DualNet(std::string name, FeatureType feature_type, int buffer_count)
+      : Model(std::move(name), feature_type, buffer_count) {}
   ~DualNet() override;
-
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
-
- private:
-  // Runs inference on a batch of input features.
-  // TODO(tommadams): rename model -> model_name.
-  virtual void RunManyImpl(std::string* model_name) = 0;
-
- protected:
-  std::vector<BoardFeatures> features_;
-  std::vector<Output> raw_outputs_;
 };
 
 }  // namespace minigo

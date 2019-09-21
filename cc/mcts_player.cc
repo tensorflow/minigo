@@ -248,13 +248,12 @@ void MctsPlayer::SelectLeaves(int num_leaves, int max_num_leaves) {
                                          inference_sym, leaf);
 
     auto& input = tree_search_inferences_.back().input;
-    input.to_play = leaf->position.to_play();
     input.sym = inference_sym;
     // TODO(tommadams): add a method to Model that returns the required position
     // history size.
     auto* node = leaf;
     for (int i = 0; i < input.position_history.capacity(); ++i) {
-      input.position_history.push_back(&node->position.stones());
+      input.position_history.push_back(&node->position);
       node = node->parent;
       if (node == nullptr) {
         break;
@@ -378,7 +377,7 @@ void MctsPlayer::UpdateGame(Coord c) {
   }
 
   // Update the game history.
-  game_->AddMove(root_->position.to_play(), c, root_->position.stones(),
+  game_->AddMove(root_->position.to_play(), c, root_->position,
                  std::move(comment), root_->Q(), search_pi, std::move(models));
 }
 

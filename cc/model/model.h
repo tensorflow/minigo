@@ -28,17 +28,37 @@ namespace minigo {
 
 class Model {
  public:
-  struct Input {
-    // Whether it's Black or White to play.
-    Color to_play;
+  enum class FeatureType {
+    kAgz,
+    kExtra,
 
+    kNumFeatureTypes,
+  };
+
+  static constexpr int kNumAgzFeaturePlanes = 17;
+  static constexpr int kNumExtraFeaturePlanes = 20;
+
+  // Simple tensor representation.
+  // TODO(tommadams): Tensors are assumed to be tightly packed for now.
+  struct Tensor {
+    Tensor() = default;
+    Tensor(int n, int h, int w, int c, float* data)
+        : n(n), h(h), w(w), c(c), data(data) {}
+
+    int n = 0;
+    int h = 0;
+    int w = 0;
+    int c = 0;
+    float* data = nullptr;
+  };
+
+  struct Input {
     // Symmetry to apply to the input features when performing inference.
-    symmetry::Symmetry sym;
+    symmetry::Symmetry sym = symmetry::kNumSymmetries;
 
     // position_history[0] holds the current position and position_history[i]
     // holds the position from i moves ago.
-    inline_vector<const Position::Stones*, kMaxPositionHistory>
-        position_history;
+    inline_vector<const Position*, kMaxPositionHistory> position_history;
   };
 
   struct Output {
@@ -46,15 +66,18 @@ class Model {
     float value;
   };
 
+  static int GetNumFeaturePlanes(FeatureType feature_type);
+
   static void ApplySymmetry(symmetry::Symmetry sym, const Output& src,
                             Output* dst);
 
   // TODO(tommadams): is there some way to avoid having buffer_count in the base
   // class? All subclasses except BufferedModel set this to 1.
-  Model(std::string name, int buffer_count);
+  Model(std::string name, FeatureType feature_type, int buffer_count);
   virtual ~Model();
 
   const std::string& name() const { return name_; }
+  FeatureType feature_type() const { return feature_type_; }
 
   // Returns the ideal number of inference requests in flight for this model.
   int buffer_count() const { return buffer_count_; }
@@ -65,6 +88,7 @@ class Model {
 
  private:
   const std::string name_;
+  const FeatureType feature_type_;
   const int buffer_count_;
 };
 

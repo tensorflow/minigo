@@ -182,7 +182,8 @@ class Position {
                      ZobristHistory* zobrist_history = nullptr);
 
   // Undoes the move recent call to PlayMove.
-  void UndoMove(const UndoState& undo);
+  void UndoMove(const UndoState& undo,
+                ZobristHistory* zobrist_history = nullptr);
 
   // TODO(tommadams): Do we really need to store this on the position? Return
   // the number of captured stones from AddStoneToBoard and track the number of
@@ -242,6 +243,12 @@ class Position {
   bool legal_move(Coord c) const {
     MG_DCHECK(c < kNumMoves);
     return legal_moves_[c];
+  }
+  // Returns the number of liberties the chain at c has.
+  int num_chain_liberties(Coord c) const {
+    MG_DCHECK(c <= kN * kN);
+    auto s = stones_[c];
+    return s.empty() ? 0 : groups_[s.group_id()].num_liberties;
   }
 
   // The following methods are protected to enable direct testing by unit tests.

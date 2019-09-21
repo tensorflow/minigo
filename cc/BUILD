@@ -268,6 +268,7 @@ minigo_cc_library(
                ":logging",
                ":game",
                "//cc/file",
+               "//cc/model",
                "//cc/dual_net",
                "@com_google_absl//absl/strings:str_format",
            ] + select({

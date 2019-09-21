@@ -179,7 +179,8 @@ void ModelBatcher::RunBatch() {
 }  // namespace internal
 
 BatchingModel::BatchingModel(std::shared_ptr<internal::ModelBatcher> batcher)
-    : Model(batcher->name(), 1), batcher_(std::move(batcher)) {}
+    : Model(batcher->name(), batcher->feature_type(), 1),
+      batcher_(std::move(batcher)) {}
 
 void BatchingModel::RunMany(const std::vector<const Model::Input*>& inputs,
                             std::vector<Output*>* outputs, std::string* model) {

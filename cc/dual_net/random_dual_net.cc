@@ -29,7 +29,7 @@ namespace minigo {
 
 RandomDualNet::RandomDualNet(std::string name, uint64_t seed,
                              float policy_stddev, float value_stddev)
-    : Model(std::move(name), 1),
+    : Model(std::move(name), Model::FeatureType::kAgz, 1),
       rnd_(seed, Random::kUniqueStream),
       policy_stddev_(policy_stddev),
       value_stddev_(value_stddev) {}

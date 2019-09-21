@@ -99,7 +99,8 @@ Position::UndoState Position::PlayMove(Coord c, Color color,
   return undo;
 }
 
-void Position::UndoMove(const UndoState& undo) {
+void Position::UndoMove(const UndoState& undo,
+                        ZobristHistory* zobrist_history) {
   to_play_ = undo.to_play;
   ko_ = undo.ko;
   Coord c = undo.c;
@@ -169,7 +170,7 @@ void Position::UndoMove(const UndoState& undo) {
     }
   }
 
-  UpdateLegalMoves(nullptr);
+  UpdateLegalMoves(zobrist_history);
 }
 
 std::string Position::ToSimpleString() const {

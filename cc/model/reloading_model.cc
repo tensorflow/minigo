@@ -156,7 +156,7 @@ std::unique_ptr<ReloadingModel> ReloadingModelUpdater::NewReloadingModel() {
 
 ReloadingModel::ReloadingModel(std::string name, ReloadingModelUpdater* updater,
                                std::unique_ptr<Model> impl)
-    : Model(std::move(name), impl->buffer_count()),
+    : Model(std::move(name), impl->feature_type(), impl->buffer_count()),
       updater_(updater),
       model_impl_(std::move(impl)) {}
 

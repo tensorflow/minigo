@@ -42,25 +42,15 @@
 #include "tensorflow/stream_executor/platform.h"
 #endif
 
-using tensorflow::DT_FLOAT;
-using tensorflow::DT_INT32;
-using tensorflow::Env;
-using tensorflow::GraphDef;
-using tensorflow::NewSession;
-using tensorflow::ReadBinaryProto;
-using tensorflow::Session;
-using tensorflow::SessionOptions;
-using tensorflow::Tensor;
-using tensorflow::TensorShape;
-
 namespace minigo {
 namespace {
 
-void PlaceOnDevice(GraphDef* graph_def, const std::string& device) {
+void PlaceOnDevice(tensorflow::GraphDef* graph_def, const std::string& device) {
   for (auto& node : *graph_def->mutable_node()) {
     if (node.op() == "Const") {
       auto it = node.attr().find("dtype");
-      if (it != node.attr().end() && it->second.type() == DT_INT32) {
+      if (it != node.attr().end() &&
+          it->second.type() == tensorflow::DT_INT32) {
         continue;  // Const nodes of type int32 need to be in CPU.
       }
     }
@@ -70,32 +60,38 @@ void PlaceOnDevice(GraphDef* graph_def, const std::string& device) {
 
 class TfDualNet : public DualNet {
  public:
-  TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
-            const std::vector<int>& devices);
+  TfDualNet(const std::string& graph_path, FeatureType feature_type,
+            const tensorflow::GraphDef& graph_def);
   ~TfDualNet() override;
 
- private:
-  void RunManyImpl(std::string* model_name) override;
-  void Reserve(size_t capacity);
+  void RunMany(const std::vector<const Input*>& inputs,
+               std::vector<Output*>* outputs, std::string* model_name) override;
 
-  std::unique_ptr<Session> session_;
-  std::vector<std::pair<std::string, Tensor>> inputs_;
+ private:
+  void Reserve(int capacity);
+
+  std::unique_ptr<tensorflow::Session> session_;
+  std::vector<std::pair<std::string, tensorflow::Tensor>> inputs_;
   std::vector<std::string> output_names_;
-  std::vector<Tensor> outputs_;
-  size_t batch_capacity_ = 0;
+  std::vector<tensorflow::Tensor> outputs_;
   const std::string graph_path_;
+  const int num_feature_planes_;
+  int batch_capacity_ = 0;
 };
 
-TfDualNet::TfDualNet(const std::string& graph_path, const GraphDef& graph_def,
+TfDualNet::TfDualNet(const std::string& graph_path, FeatureType feature_type,
+                     const tensorflow::GraphDef& graph_def,
                      const std::vector<int>& devices)
-    : DualNet(std::string(file::Stem(graph_path))), graph_path_(graph_path) {
-  SessionOptions options;
+    : DualNet(std::string(file::Stem(graph_path)), feature_type, 1),
+      graph_path_(graph_path),
+      num_feature_planes_(Model::GetNumFeaturePlanes(feature_type)) {
+  tensorflow::SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
   if (!devices.empty()) {
     options.config.mutable_gpu_options()->set_visible_device_list(
         absl::StrJoin(devices, ","));
   }
-  session_.reset(NewSession(options));
+  session_.reset(tensorflow::NewSession(options));
   TF_CHECK_OK(session_->Create(graph_def));
 
   output_names_.emplace_back("policy_output");
@@ -108,46 +104,43 @@ TfDualNet::~TfDualNet() {
   }
 }
 
-void TfDualNet::RunManyImpl(std::string* model_name) {
-  size_t num_features = features_.size();
-  Reserve(num_features);
+void TfDualNet::RunMany(const std::vector<const Input*>& inputs,
+                        std::vector<Output*>* outputs,
+                        std::string* model_name) {
+  WTF_SCOPE("TfDualNet::Run", size_t)(inputs.size());
+  MG_CHECK(inputs.size() == outputs->size());
 
-  auto* feature_data = inputs_[0].second.flat<float>().data();
-  // Copy the features into the input tensor.
-  for (const auto& feature : features_) {
-    feature_data = std::copy(feature.begin(), feature.end(), feature_data);
-  }
+  Reserve(inputs.size());
+
+  Tensor features(batch_capacity_, kN, kN, num_feature_planes_,
+                  inputs_[0].second.flat<float>().data());
+  DualNet::SetInputs(inputs, feature_type(), &features);
 
   // Run the model.
   {
-    WTF_SCOPE("Session::Run", size_t)(batch_capacity_);
+    WTF_SCOPE("Session::Run", int)(batch_capacity_);
     TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
   }
 
-  // Copy the policy and value out of the output tensors.
-  const auto& policy_tensor = outputs_[0].flat<float>();
-  const auto& value_tensor = outputs_[1].flat<float>();
-  for (size_t i = 0; i < num_features; ++i) {
-    auto& output = raw_outputs_[i];
-    memcpy(output.policy.data(), policy_tensor.data() + i * kNumMoves,
-           sizeof(output.policy));
-    output.value = value_tensor.data()[i];
-  }
+  Tensor policy(batch_capacity_, kNumMoves, 1, 1,
+                outputs_[0].flat<float>().data());
+  Tensor value(batch_capacity_, 1, 1, 1, outputs_[1].flat<float>().data());
+  DualNet::GetOutputs(inputs, policy, value, outputs);
 
   if (model_name != nullptr) {
     *model_name = graph_path_;
   }
 }
 
-void TfDualNet::Reserve(size_t capacity) {
+void TfDualNet::Reserve(int capacity) {
   MG_CHECK(capacity > 0);
   if (capacity <= batch_capacity_ && capacity > 3 * batch_capacity_ / 4) {
     return;
   }
   inputs_.clear();
-  inputs_.emplace_back(
-      "pos_tensor", Tensor(DT_FLOAT, TensorShape({static_cast<int>(capacity),
-                                                  kN, kN, kNumStoneFeatures})));
+  inputs_.emplace_back("pos_tensor", tensorflow::Tensor(tensorflow::DT_FLOAT,
+                                                        {capacity, kN, kN,
+                                                         num_feature_planes_}));
   batch_capacity_ = capacity;
 }
 
@@ -167,15 +160,42 @@ TfDualNetFactory::TfDualNetFactory(std::vector<int> devices)
 
 std::unique_ptr<Model> TfDualNetFactory::NewModel(
     const std::string& descriptor) {
-  GraphDef graph_def;
-  auto* env = Env::Default();
-  TF_CHECK_OK(ReadBinaryProto(env, descriptor, &graph_def));
+  tensorflow::GraphDef graph_def;
+  auto* env = tensorflow::Env::Default();
+  TF_CHECK_OK(tensorflow::ReadBinaryProto(env, descriptor, &graph_def));
 
   // Check that we're not loading a TPU model.
   for (const auto& node : graph_def.node()) {
     MG_CHECK(!absl::StartsWithIgnoreCase(node.name(), "tpu"))
         << "found node named \"" << node.name()
         << "\", this model looks like it was compiled for TPU";
+  }
+
+  // Look at the shape of the feature tensor to figure out what type of model
+  // it is.
+  int num_feature_planes = 0;
+  for (const auto& node : graph_def.node()) {
+    if (node.name() == "pos_tensor") {
+      auto it = node.attr().find("shape");
+      MG_CHECK(it != node.attr().end());
+      MG_CHECK(it->second.has_shape());
+      MG_CHECK(it->second.shape().dim().size() == 4);
+      num_feature_planes = it->second.shape().dim(3).size();
+    }
+  }
+  MG_CHECK(num_feature_planes != 0)
+      << "Couldn't determine model type from GraphDef: pos_tensor not found";
+  Model::FeatureType feature_type = Model::FeatureType::kNumFeatureTypes;
+  switch (num_feature_planes) {
+    case 17:
+      feature_type = Model::FeatureType::kAgz;
+      break;
+    case 20:
+      feature_type = Model::FeatureType::kExtra;
+      break;
+    default:
+      MG_LOG(FATAL) << "unrecognized number of features: "
+                    << num_feature_planes;
   }
 
   std::vector<std::unique_ptr<Model>> models;
@@ -185,10 +205,10 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
     if (!devices_.empty()) {
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
-    models.push_back(
-        absl::make_unique<TfDualNet>(descriptor, graph_def, devices_));
-    models.push_back(
-        absl::make_unique<TfDualNet>(descriptor, graph_def, devices_));
+    models.push_back(absl::make_unique<TfDualNet>(descriptor, feature_type,
+                                                  graph_def, devices_));
+    models.push_back(absl::make_unique<TfDualNet>(descriptor, feature_type,
+                                                  graph_def, devices_));
   }
 
   return absl::make_unique<BufferedModel>(std::move(models));

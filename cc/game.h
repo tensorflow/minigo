@@ -54,6 +54,8 @@ class Game {
   };
 
   struct Move {
+    explicit Move(const Position& position) : position(position) {}
+
     Color color;
 
     Coord c = Coord::kInvalid;
@@ -68,10 +70,14 @@ class Game {
 
     std::array<float, kNumMoves> search_pi;
 
-    // Stones on the board before the move was played.
+    // TODO(tommadams): it's dangerous to keep a position copy around here
+    // because its BoardVisitor & GroupVisitor members aren't guaranteed to
+    // be kept around. Replace the implementation of Position with a different
+    // one that doesn't require BoardVisitor.& GroupVisitor.
+    // Position of the board before this move was played.
     // This is used to build training features after a selfplay game has
     // finished.
-    Position::Stones stones;
+    Position position;
 
     bool trainable = false;
   };
@@ -90,7 +96,7 @@ class Game {
 
   void AddComment(const std::string& comment);
 
-  void AddMove(Color color, Coord c, const Position::Stones& stones,
+  void AddMove(Color color, Coord c, const Position& position,
                std::string comment, float Q,
                const std::array<float, kNumMoves>& search_pi,
                std::vector<std::string> models);
@@ -108,8 +114,8 @@ class Game {
   // Returns up to the last `num_moves` of moves that lead up to the requested
   // `move`, including the move itself.
   // If `move < num_moves`, history will be truncated to the first `move` moves.
-  void GetStoneHistory(int move, int num_moves,
-                       std::vector<const Position::Stones*>* history) const;
+  template <typename T>
+  void GetPositionHistory(int move, int num_moves, T* history) const;
 
   // Get information on the bleakest move for a completed game, if the game has
   // history and was played with resign disabled. This only makes sense if
@@ -159,6 +165,16 @@ class Game {
   std::string comment_;
   std::vector<std::unique_ptr<Move>> moves_;
 };
+
+template <typename T>
+void Game::GetPositionHistory(int move, int num_moves, T* history) const {
+  history->clear();
+  MG_CHECK(move >= 0);
+  MG_CHECK(move < static_cast<int>(moves_.size()));
+  for (int i = 0; i < num_moves && move - i >= 0; ++i) {
+    history->push_back(&moves_[move - i]->position);
+  }
+}
 
 }  // namespace minigo
 

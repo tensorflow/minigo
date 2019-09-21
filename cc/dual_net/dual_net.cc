@@ -20,91 +20,121 @@
 
 namespace minigo {
 
-constexpr int DualNet::kNumStoneFeatures;
-constexpr int DualNet::kNumBoardFeatures;
-
 // Generates the board features from the history of recent moves, where
 // history[0] is the current board position, and history[i] is the board
 // position from i moves ago.
 // history.size() must be <= kMoveHistory.
 // TODO(tommadams): make this a templated class, so it can set either uint8 or
 // float features.
-void DualNet::SetFeatures(absl::Span<const Position::Stones* const> history,
-                          Color to_play, DualNet::BoardFeatures* features) {
-  MG_CHECK(history.size() <= DualNet::kMoveHistory);
-  Color my_color = to_play;
-  Color their_color = OtherColor(my_color);
+void DualNet::SetInputs(const std::vector<const Input*>& model_inputs,
+                        FeatureType feature_type, Tensor* features) {
+  MG_CHECK(static_cast<int>(model_inputs.size()) <= features->n);
+  MG_CHECK(features->w == kN && features->h == kN);
 
-  // Write the features for the position history that we have.
-  size_t j = 0;
-  for (j = 0; j < history.size(); ++j) {
-    auto* dst = features->data() + j * 2;
-    const auto* end = dst + DualNet::kNumBoardFeatures;
-    const auto* src = history[j]->data();
-    while (dst < end) {
-      auto color = src->color();
-      ++src;
-      dst[0] = color == my_color ? 1 : 0;
-      dst[1] = color == their_color ? 1 : 0;
-      dst += DualNet::kNumStoneFeatures;
+  std::array<float, kMaxBoardFeaturesSize> raw_features;
+  for (size_t input_idx = 0; input_idx < model_inputs.size(); ++input_idx) {
+    const auto& model_input = *model_inputs[input_idx];
+    const auto& history = model_input.position_history;
+    const auto& position = *history[0];
+
+    MG_CHECK(history.size() <= DualNet::kMoveHistory);
+
+    Color my_color = position.to_play();
+    Color their_color = OtherColor(my_color);
+
+    auto features_size = features->w * features->h * features->c;
+
+    // Write the features for the position history that we have.
+    int j = 0;
+    for (j = 0; j < history.size(); ++j) {
+      auto* dst = raw_features.data() + j * 2;
+      const auto* end = dst + features_size;
+      const auto* src = history[j]->stones().data();
+      while (dst < end) {
+        auto color = src->color();
+        ++src;
+        dst[0] = color == my_color ? 1 : 0;
+        dst[1] = color == their_color ? 1 : 0;
+        dst += features->c;
+      }
     }
-  }
 
-  // Pad the features with zeros if we have fewer than 8 moves of history.
-  for (; j < DualNet::kMoveHistory; ++j) {
-    auto* dst = features->data() + j * 2;
-    const auto* end = dst + DualNet::kNumBoardFeatures;
-    while (dst < end) {
-      dst[0] = 0;
-      dst[1] = 0;
-      dst += DualNet::kNumStoneFeatures;
+    // Pad the features with zeros if we have fewer than 8 moves of history.
+    for (; j < DualNet::kMoveHistory; ++j) {
+      auto* dst = raw_features.data() + j * 2;
+      const auto* end = dst + features_size;
+      while (dst < end) {
+        dst[0] = 0;
+        dst[1] = 0;
+        dst += features->c;
+      }
     }
-  }
 
-  // Set the "to play" feature plane.
-  float to_play_feature = to_play == Color::kBlack ? 1 : 0;
-  auto* dst = features->data() + DualNet::kPlayerFeature;
-  const auto* end = dst + DualNet::kNumBoardFeatures;
-  while (dst < end) {
-    dst[0] = to_play_feature;
-    dst += DualNet::kNumStoneFeatures;
+    // Set the "to play" feature plane.
+    float to_play_feature = my_color == Color::kBlack ? 1 : 0;
+    auto* dst = raw_features.data() + DualNet::kPlayerFeature;
+    const auto* end = dst + features_size;
+    while (dst < end) {
+      dst[0] = to_play_feature;
+      dst += features->c;
+    }
+
+    switch (feature_type) {
+      case FeatureType::kAgz:
+        // No extra features to set.
+        MG_CHECK(features->c == kNumAgzStoneFeatures);
+        symmetry::ApplySymmetry<kN, DualNet::kNumAgzStoneFeatures>(
+            model_input.sym, raw_features.data(),
+            features->data + input_idx * features_size);
+        break;
+
+      case FeatureType::kExtra: {
+        // Set the liberties features.
+        dst = raw_features.data() + kNumAgzStoneFeatures;
+        for (int i = 0; i < kN * kN; ++i) {
+          auto num_liberties = position.num_chain_liberties(i);
+          dst[0] = dst[1] = dst[2] = 0;
+          if (num_liberties >= 1 && num_liberties <= 3) {
+            dst[num_liberties - 1] = 1;
+          }
+          dst += features->c;
+        }
+
+        MG_CHECK(features->c == kNumExtraStoneFeatures);
+        symmetry::ApplySymmetry<kN, DualNet::kNumExtraStoneFeatures>(
+            model_input.sym, raw_features.data(),
+            features->data + input_idx * features_size);
+        break;
+      }
+
+      default:
+        MG_LOG(FATAL) << "unexpected features type "
+                      << static_cast<int>(feature_type);
+    }
   }
 }
 
-void DualNet::RunMany(const std::vector<const Input*>& inputs,
-                      std::vector<Output*>* outputs, std::string* model_name) {
-  WTF_SCOPE("DualNet::RunMany", size_t)(inputs.size());
+void DualNet::GetOutputs(const std::vector<const Input*>& model_inputs,
+                         const DualNet::Tensor& policy,
+                         const DualNet::Tensor& value,
+                         std::vector<Output*>* model_outputs) {
+  MG_CHECK(model_outputs->size() == model_inputs.size());
+  MG_CHECK(policy.n == value.n);
+  MG_CHECK(static_cast<int>(model_inputs.size()) <= policy.n);
 
-  MG_CHECK(inputs.size() == outputs->size());
+  // Copy the policy and value out of the output tensors.
+  for (size_t input_idx = 0; input_idx < model_inputs.size(); ++input_idx) {
+    const auto sym = model_inputs[input_idx]->sym;
+    const auto* raw_policy = policy.data + kNumMoves * input_idx;
+    const auto* raw_value = value.data + input_idx;
+    auto& model_output = *(*model_outputs)[input_idx];
 
-  // Generate input features & apply symmetries.
-  // TODO(tommadams): apply symmetries in place.
-  BoardFeatures raw_features;
-  features_.resize(inputs.size());
-  for (size_t i = 0; i < inputs.size(); ++i) {
-    SetFeatures(inputs[i]->position_history, inputs[i]->to_play, &raw_features);
-    symmetry::ApplySymmetry<kN, DualNet::kNumStoneFeatures>(
-        inputs[i]->sym, raw_features.data(), features_[i].data());
-  }
-
-  raw_outputs_.resize(inputs.size());
-
-  // Run inference.
-  RunManyImpl(model_name);
-
-  // Undo symmetries.
-  for (size_t i = 0; i < raw_outputs_.size(); ++i) {
-    const auto& raw_output = raw_outputs_[i];
-    auto* final_output = (*outputs)[i];
-    symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(inputs[i]->sym),
-                                   raw_output.policy.data(),
-                                   final_output->policy.data());
-    final_output->policy[Coord::kPass] = raw_output.policy[Coord::kPass];
-    final_output->value = raw_output.value;
+    symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(sym), raw_policy,
+                                   model_output.policy.data());
+    model_output.policy[Coord::kPass] = raw_policy[Coord::kPass];
+    model_output.value = *raw_value;
   }
 }
-
-DualNet::DualNet(std::string name) : Model(std::move(name), 1) {}
 
 DualNet::~DualNet() = default;
 

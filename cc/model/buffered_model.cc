@@ -16,8 +16,10 @@
 
 namespace minigo {
 
-BufferedModel::BufferedModel(std::vector<std::unique_ptr<Model>> impls)
-    : Model(impls[0]->name(), static_cast<int>(impls.size())) {
+BufferedModel::BufferedModel(std::string name,
+                             std::vector<std::unique_ptr<Model>> impls)
+    : Model(std::move(name), impls[0]->feature_type(),
+            static_cast<int>(impls.size())) {
   for (auto& x : impls) {
     impls_.Push(std::move(x));
   }

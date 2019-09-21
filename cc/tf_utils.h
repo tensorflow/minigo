@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "cc/game.h"
+#include "cc/model/model.h"
 
 namespace minigo {
 namespace tf_utils {
@@ -31,13 +32,15 @@ namespace tf_utils {
 //   outcome: a single float containing the game result +/-1.
 // CHECK fails if the binary was not compiled with --define=tf=1.
 void WriteGameExamples(const std::string& output_dir,
-                       const std::string& output_name, const Game& game);
+                       const std::string& output_name,
+                       Model::FeatureType feature_type, const Game& game);
 
 // Writes a list of tensorflow Example protos to the specified
 // Bigtable, one example per row, starting at the given row cursor.
 void WriteGameExamples(const std::string& gcp_project_name,
                        const std::string& instance_name,
-                       const std::string& table_name, const Game& game);
+                       const std::string& table_name,
+                       Model::FeatureType feature_type, const Game& game);
 
 // Writes information about an eval game to the specified Bigtable.
 void WriteEvalRecord(const std::string& gcp_project_name,
