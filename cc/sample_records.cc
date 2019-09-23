@@ -100,7 +100,7 @@ class ReadThread : public Thread {
           continue;
         }
 
-        if (options_.sample_frac < 1 && rnd_() < options_.sample_frac) {
+        if (options_.sample_frac == 1 || rnd_() < options_.sample_frac) {
           sampled_records_.push_back(std::move(record));
         }
       }
@@ -127,12 +127,13 @@ class WriteThread : public Thread {
     if (options_.num_shards == 1) {
       path_ = path;
     } else {
-      absl::string_view path = path;
+      absl::string_view stem = path;
       // TODO(tommadams): expect the suffix .tfrecord if
       // options_.compression == 0.
-      MG_CHECK(absl::ConsumeSuffix(&path, ".tfrecord.zz"))
-          << "expected path to have extension '.tfrecords.zz'";
-      path_ = absl::StrFormat("%s-%05d-of-%05d.tfrecord.zz", path,
+      MG_CHECK(absl::ConsumeSuffix(&stem, ".tfrecord.zz"))
+          << "expected path to have extension '.tfrecords.zz', got '" << stem
+          << "'";
+      path_ = absl::StrFormat("%s-%05d-of-%05d.tfrecord.zz", stem,
                               options_.shard, options_.num_shards);
     }
   }
@@ -180,7 +181,7 @@ std::vector<std::string> Read(std::vector<std::string> paths) {
   int num_paths = static_cast<int>(paths.size());
   int num_read_threads = std::min<int>(FLAGS_num_read_threads, num_paths);
 
-  MG_LOG(INFO) << absl::Now() << " : reading " << num_paths << " records on "
+  MG_LOG(INFO) << absl::Now() << " : reading " << num_paths << " files on "
                << num_read_threads << " threads";
 
   ReadThread::Options read_options;
@@ -266,7 +267,7 @@ void Write(std::vector<std::string> records, const std::string& path) {
     // Sample the records for this shard.
     std::vector<std::string> shard_records;
     shard_records.reserve(num_dst);
-    for (size_t i = begin_dst; i < end_dst; ++i) {
+    for (size_t i = 0; i < num_dst; ++i) {
       size_t j = begin_src + i * num_src / num_dst;
       shard_records.push_back(std::move(records[j]));
     }
