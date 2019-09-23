@@ -61,7 +61,8 @@ void PlaceOnDevice(tensorflow::GraphDef* graph_def, const std::string& device) {
 class TfDualNet : public DualNet {
  public:
   TfDualNet(const std::string& graph_path, FeatureType feature_type,
-            const tensorflow::GraphDef& graph_def);
+            const tensorflow::GraphDef& graph_def,
+            const std::vector<int>& devices);
   ~TfDualNet() override;
 
   void RunMany(const std::vector<const Input*>& inputs,
@@ -205,13 +206,13 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
     if (!devices_.empty()) {
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, feature_type,
-                                                  graph_def, devices_));
-    models.push_back(absl::make_unique<TfDualNet>(descriptor, feature_type,
-                                                  graph_def, devices_));
+    models.push_back(absl::make_unique<TfDualNet>(
+        descriptor, feature_type, graph_def, std::move(devices_)));
+    models.push_back(absl::make_unique<TfDualNet>(
+        descriptor, feature_type, graph_def, std::move(devices_)));
   }
 
-  return absl::make_unique<BufferedModel>(std::move(models));
+  return absl::make_unique<BufferedModel>(descriptor, std::move(models));
 }
 
 }  // namespace minigo

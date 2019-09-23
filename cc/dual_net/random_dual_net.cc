@@ -20,16 +20,17 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
-#include "cc/model/buffered_model.h"
 #include "absl/strings/str_split.h"
 #include "cc/logging.h"
+#include "cc/model/buffered_model.h"
 #include "cc/platform/utils.h"
 
 namespace minigo {
 
-RandomDualNet::RandomDualNet(std::string name, uint64_t seed,
-                             float policy_stddev, float value_stddev)
-    : Model(std::move(name), Model::FeatureType::kAgz, 1),
+RandomDualNet::RandomDualNet(std::string name, FeatureType feature_type,
+                             uint64_t seed, float policy_stddev,
+                             float value_stddev)
+    : Model(std::move(name), feature_type, 1),
       rnd_(seed, Random::kUniqueStream),
       policy_stddev_(policy_stddev),
       value_stddev_(value_stddev) {}
@@ -64,21 +65,31 @@ RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : seed_(seed) {}
 std::unique_ptr<Model> RandomDualNetFactory::NewModel(
     const std::string& descriptor) {
   std::vector<absl::string_view> parts = absl::StrSplit(descriptor, ':');
-  MG_CHECK(parts.size() == 2);
+  MG_CHECK(parts.size() == 3);
 
+  Model::FeatureType feature_type = Model::FeatureType::kNumFeatureTypes;
   float policy_stddev, value_stddev;
-  MG_CHECK(absl::SimpleAtof(parts[0], &policy_stddev));
-  MG_CHECK(absl::SimpleAtof(parts[1], &value_stddev));
+  if (parts[0] == "agz") {
+    feature_type = Model::FeatureType::kAgz;
+  } else if (parts[1] == "extra") {
+    feature_type = Model::FeatureType::kExtra;
+  } else {
+    MG_LOG(FATAL) << "unrecognized feature type \"" << parts[0] << "\"";
+  }
+  MG_CHECK(absl::SimpleAtof(parts[1], &policy_stddev));
+  MG_CHECK(absl::SimpleAtof(parts[2], &value_stddev));
 
   int num_cpus = GetNumLogicalCpus();
   auto qualified_descriptor = absl::StrCat("rnd:", descriptor);
   std::vector<std::unique_ptr<Model>> models;
   for (int i = 0; i < num_cpus; ++i) {
-    models.push_back(absl::make_unique<RandomDualNet>(
-        qualified_descriptor, seed_, policy_stddev, value_stddev));
+    models.push_back(
+        absl::make_unique<RandomDualNet>(qualified_descriptor, feature_type,
+                                         seed_, policy_stddev, value_stddev));
   }
 
-  return absl::make_unique<BufferedModel>(std::move(models));
+  return absl::make_unique<BufferedModel>(qualified_descriptor,
+                                          std::move(models));
 }
 
 }  // namespace minigo

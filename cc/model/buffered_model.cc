@@ -21,6 +21,8 @@ BufferedModel::BufferedModel(std::string name,
     : Model(std::move(name), impls[0]->feature_type(),
             static_cast<int>(impls.size())) {
   for (auto& x : impls) {
+    // Make sure all impls use the same input features.
+    MG_CHECK(x->feature_type() == feature_type());
     impls_.Push(std::move(x));
   }
 }

@@ -25,8 +25,8 @@ namespace minigo {
 
 class RandomDualNet : public Model {
  public:
-  RandomDualNet(std::string name, uint64_t seed, float policy_stddev,
-                float value_stddev);
+  RandomDualNet(std::string name, FeatureType feature_type, uint64_t seed,
+                float policy_stddev, float value_stddev);
 
   // Output policy is a normal distribution with a mean of 0.5 and a standard
   // deviation of policy_stddev, followed by a softmax.
