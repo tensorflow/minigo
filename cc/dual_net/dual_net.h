@@ -61,9 +61,8 @@ class DualNet : public Model {
   template <typename T>
   using BoardFeatureBuffer = std::array<T, kMaxBoardFeaturesSize>;
 
-  // TODO(tommadams): Rename SetFeatures.
-  static void SetInputs(const std::vector<const Input*>& model_inputs,
-                        FeatureType feature_type, Tensor* features);
+  static void SetFeatures(const std::vector<const Input*>& model_inputs,
+                          FeatureType feature_type, Tensor* features);
 
   static void GetOutputs(const std::vector<const Input*>& model_inputs,
                          const Tensor& policy, const Tensor& value,

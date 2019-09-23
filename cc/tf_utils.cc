@@ -125,7 +125,7 @@ std::vector<tensorflow::Example> MakeExamples(Model::FeatureType feature_type,
     input.sym = symmetry::kIdentity;
     game.GetPositionHistory(i, DualNet::kMoveHistory, &input.position_history);
 
-    DualNet::SetInputs({&input}, feature_type, &features);
+    DualNet::SetFeatures({&input}, feature_type, &features);
     examples.push_back(MakeTfExample(features, move->search_pi, game.result()));
   }
   return examples;

@@ -88,6 +88,8 @@ flags.DEFINE_string('engine', 'tf', 'The engine to use for selfplay.')
 
 flags.DEFINE_boolean('bootstrap', False, '')
 
+flags.DEFINE_boolean('use_extra_features', False, '')
+
 FLAGS = flags.FLAGS
 
 
@@ -330,13 +332,14 @@ async def bootstrap_selfplay(state):
     holdout_dir = os.path.join(fsdb.holdout_dir(), output_name)
     sgf_dir = os.path.join(fsdb.sgf_dir(), output_name)
 
+    features = 'extra' if FLAGS.use_extra_features else 'agz'
     lines = await run(
         'bazel-bin/cc/selfplay',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                             'bootstrap.flags')),
         '--num_games={}'.format(FLAGS.selfplay_num_games),
         '--parallel_games=32',
-        '--model=random:0,0.4:0.4',
+        '--model=random:0,{}:0.4:0.4'.format(features),
         '--output_dir={}/0'.format(output_dir),
         '--holdout_dir={}/0'.format(holdout_dir),
         '--sgf_dir={}'.format(sgf_dir))
@@ -426,6 +429,7 @@ async def train(state, tf_records):
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
         '--work_dir={}'.format(fsdb.working_dir()),
         '--export_path={}'.format(model_path),
+        '--use_extra_features={}'.format(use_extra_features),
         '--freeze=true',
         *tf_records)
 

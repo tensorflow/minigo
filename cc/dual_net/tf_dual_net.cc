@@ -115,7 +115,7 @@ void TfDualNet::RunMany(const std::vector<const Input*>& inputs,
 
   Tensor features(batch_capacity_, kN, kN, num_feature_planes_,
                   inputs_[0].second.flat<float>().data());
-  DualNet::SetInputs(inputs, feature_type(), &features);
+  DualNet::SetFeatures(inputs, feature_type(), &features);
 
   // Run the model.
   {
