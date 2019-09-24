@@ -33,6 +33,9 @@ import utils
 flags.DEFINE_integer('shuffle_buffer_size', 2000,
                      'Size of buffer used to shuffle train examples.')
 
+flags.DEFINE_boolean('shuffle_examples', True,
+                     'Whether to shuffle training examples.')
+
 flags.DEFINE_integer('steps_to_train', None,
                      'Number of training steps to take. If not set, iterates '
                      'once over training data.')
@@ -175,6 +178,7 @@ def train(*tf_records: "Records to train on"):
                 FLAGS.train_batch_size,
                 tf_records,
                 filter_amount=FLAGS.filter_amount,
+                shuffle_examples=FLAGS.shuffle_examples,
                 shuffle_buffer_size=FLAGS.shuffle_buffer_size,
                 random_rotation=True)
 

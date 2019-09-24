@@ -286,15 +286,15 @@ async def sample_training_examples(state):
         A list of golden chunks up to num_records in length, sorted by path.
     """
 
-    dirs = [x.path for x in os.scandir(fsdb.output_dir()) if x.is_dir()]
+    dirs = [x.path for x in os.scandir(fsdb.selfplay_dir()) if x.is_dir()]
     src_patterns = []
     for d in sorted(dirs, reverse=True)[:FLAGS.window_size]:
-        src_patterns.push(os.path.join(d, '*', '*', '*.tfrecord.zz'))
+        src_patterns.append(os.path.join(d, '*', '*', '*.tfrecord.zz'))
 
     dst_path = os.path.join(fsdb.golden_chunk_dir(),
-                            '{}.tf_record.zz'.format(state.train_model_name))
+                            '{}.tfrecord.zz'.format(state.train_model_name))
 
-    logging.info('Writing training chunks to {}', dst_path)
+    logging.info('Writing training chunks to %s', dst_path)
     lines = await sample_records(src_patterns, dst_path,
                                  num_read_threads=8,
                                  num_write_threads=8,
@@ -337,8 +337,8 @@ async def bootstrap_selfplay(state):
         '--num_games={}'.format(FLAGS.selfplay_num_games),
         '--parallel_games=32',
         '--model=random:0,0.4:0.4',
-        '--output_dir={}'.format(output_dir),
-        '--holdout_dir={}'.format(holdout_dir),
+        '--output_dir={}/0'.format(output_dir),
+        '--holdout_dir={}/0'.format(holdout_dir),
         '--sgf_dir={}'.format(sgf_dir))
     logging.info('\n'.join(lines[-6:]))
 

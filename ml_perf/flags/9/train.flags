@@ -2,7 +2,8 @@
 
 --flagfile=ml_perf/flags/9/architecture.flags
 
---shuffle_buffer_size=10000
+--shuffle_buffer_size=0
+--shuffle_examples=false
 --filter_amount=1
 
 # Device specific hyperparameters re: batch size and LR schedules.
