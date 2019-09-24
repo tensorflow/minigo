@@ -284,8 +284,9 @@ def model_fn(features, labels, mode, params):
         train_op = optimizer.minimize(combined_cost, global_step=global_step)
 
     # Computations to be executed on CPU, outside of the main TPU queues.
-    def eval_metrics_host_call_fn(policy_output, value_output, pi_tensor, policy_cost,
-                                  value_cost, l2_cost, combined_cost, step,
+    def eval_metrics_host_call_fn(policy_output, value_output, pi_tensor,
+                                  value_tensor, policy_cost, value_cost,
+                                  l2_cost, combined_cost, step,
                                   est_mode=tf.estimator.ModeKeys.TRAIN):
         policy_entropy = -tf.reduce_mean(tf.reduce_sum(
             policy_output * tf.log(policy_output), axis=1))
@@ -304,6 +305,7 @@ def model_fn(features, labels, mode, params):
             tf.one_hot(policy_target_top_1, tf.shape(policy_output)[1]))
 
         value_cost_normalized = value_cost / params['value_cost_weight']
+        avg_value_observed = tf.reduce_mean(value_tensor)
 
         with tf.variable_scope('metrics'):
             metric_ops = {
@@ -313,7 +315,7 @@ def model_fn(features, labels, mode, params):
                 'l2_cost': tf.metrics.mean(l2_cost),
                 'policy_entropy': tf.metrics.mean(policy_entropy),
                 'combined_cost': tf.metrics.mean(combined_cost),
-
+                'avg_value_observed': tf.metrics.mean(avg_value_observed),
                 'policy_accuracy_top_1': tf.metrics.mean(policy_output_in_top1),
                 'policy_accuracy_top_3': tf.metrics.mean(policy_output_in_top3),
                 'policy_top_1_confidence': tf.metrics.mean(policy_top_1_confidence),
@@ -350,6 +352,7 @@ def model_fn(features, labels, mode, params):
         policy_output,
         value_output,
         labels['pi_tensor'],
+        labels['value_tensor'],
         tf.reshape(policy_cost, [1]),
         tf.reshape(value_cost, [1]),
         tf.reshape(l2_cost, [1]),
