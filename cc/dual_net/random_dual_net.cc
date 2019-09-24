@@ -88,8 +88,7 @@ std::unique_ptr<Model> RandomDualNetFactory::NewModel(
                                          seed_, policy_stddev, value_stddev));
   }
 
-  return absl::make_unique<BufferedModel>(qualified_descriptor,
-                                          std::move(models));
+  return absl::make_unique<BufferedModel>(std::move(models));
 }
 
 }  // namespace minigo

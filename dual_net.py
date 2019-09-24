@@ -144,10 +144,7 @@ flags.DEFINE_bool(
     help=('Use Swish activation function inplace of ReLu. '
           'https://arxiv.org/pdf/1710.05941.pdf'))
 
-flags.DEFINE_bool(
-    'use_extra_features', False,
-    help='Use extra inpute features.')
-
+flags.DEFINE_bool('use_extra_features', False, help='Use extra input features.')
 
 # TODO(seth): Verify if this is still required.
 flags.register_multi_flags_validator(

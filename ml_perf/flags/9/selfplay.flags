@@ -4,13 +4,15 @@
 # the RL loop.
 
 --num_readouts=240
---fastplay_frequency=0.7
---fastplay_readouts=40
+--fastplay_frequency=0
+--fastplay_readouts=10
 --value_init_penalty=0.2
---holdout_pct=0.00
---disable_resign_pct=1.0
+--holdout_pct=0
+--disable_resign_pct=0.1
 --resign_threshold=-0.99
---virtual_losses=2
+--virtual_losses=8
+--dirichlet_alpha=0.03
+--noise_mix=0.25
 ### --target_pruning=1
 
 # Device-specific selfplay flags.

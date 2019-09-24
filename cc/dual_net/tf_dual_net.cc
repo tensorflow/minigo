@@ -83,7 +83,8 @@ class TfDualNet : public DualNet {
 TfDualNet::TfDualNet(const std::string& graph_path, FeatureType feature_type,
                      const tensorflow::GraphDef& graph_def,
                      const std::vector<int>& devices)
-    : DualNet(std::string(file::Stem(graph_path)), feature_type, 1),
+    : DualNet(std::string(file::Stem(file::Basename(graph_path))),
+              feature_type, 1),
       graph_path_(graph_path),
       num_feature_planes_(Model::GetNumFeaturePlanes(feature_type)) {
   tensorflow::SessionOptions options;
@@ -212,7 +213,7 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
         descriptor, feature_type, graph_def, std::move(devices_)));
   }
 
-  return absl::make_unique<BufferedModel>(descriptor, std::move(models));
+  return absl::make_unique<BufferedModel>(std::move(models));
 }
 
 }  // namespace minigo
