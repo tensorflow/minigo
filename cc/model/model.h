@@ -38,8 +38,11 @@ class Model {
   static constexpr int kNumAgzFeaturePlanes = 17;
   static constexpr int kNumExtraFeaturePlanes = 20;
 
-  // Simple tensor representation.
-  // TODO(tommadams): Tensors are assumed to be tightly packed for now.
+  // A simple tensor representation that abstracts a real engine-specific
+  // tensor. Tensor does not own the memory pointed to by `data`.
+  // Tensors are assumed to be tightly packed for now.
+  // TODO(tommadams): Make this templated on the data type so we can support
+  // byte input features, and quantized outputs.
   struct Tensor {
     Tensor() = default;
     Tensor(int n, int h, int w, int c, float* data)

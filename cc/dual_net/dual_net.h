@@ -28,13 +28,21 @@
 
 namespace minigo {
 
-// The input features to the DualNet neural network have 17 binary feature
-// planes. 8 feature planes X_t indicate the presence of the current player's
-// stones at time t. A further 8 feature planes Y_t indicate the presence of
-// the opposing player's stones at time t. The final feature plane C holds all
-// 1s if black is to play, or 0s if white is to play. The planes are
-// concatenated together to give input features:
+// The AGZ (AlphaGo Zero) input features to the DualNet neural network have
+// 17 binary feature planes.
+// 8 feature planes X_t indicate the presence of the current player's stones at
+// time t. A further 8 feature planes Y_t indicate the presence of the opposing
+// player's stones at time t. The final feature plane C holds all 1s if black is
+// to play, or 0s if white is to play. The planes are concatenated together to
+// give input features:
 //   [X_t, Y_t, X_t-1, Y_t-1, ..., X_t-7, Y_t-7, C].
+//
+// The extra stone features append the following features:
+//  - 3 feature planes for liberties, which have the value 1 if a chain at that
+//    point has {1, 2, 3} liberties.
+//
+// TODO(tommadams): DualNet doesn't really serve any purpose any more. Move all
+// its members into the base Model class.
 class DualNet : public Model {
  public:
   // Size of move history in the stone features.
@@ -61,9 +69,27 @@ class DualNet : public Model {
   template <typename T>
   using BoardFeatureBuffer = std::array<T, kMaxBoardFeaturesSize>;
 
+  // Fills a batch of input features from the model inputs.
+  // Args:
+  //   model_inputs: a list of model inputs.
+  //   feature_type: the type of features to fill. The type of features must
+  //                 match the number of channels in the `features` tensor.
+  //   features: the `Tensor` of input features to fill. `features.n` must be
+  //             >= `model_inputs.size()`. Only the first `model_inputs.size()`
+  //             features will be set. The remaining values in `features` are
+  //             not modified.
+  // TODO(tommadams): make this a templated class, so it can set either uint8 or
+  // float features.
   static void SetFeatures(const std::vector<const Input*>& model_inputs,
                           FeatureType feature_type, Tensor* features);
 
+  // Fills a batch of inference outputs from policy and value tensors.
+  // Args:
+  //   model_inputs: the same inputs that were passed to `SetFeatures`.
+  //   policy: the policy output from the model.
+  //   value: the value output from the model.
+  //   model_outputs: the model outputs to fill. `model_inputs.size()` must ==
+  //                  `model_outputs.size()`.
   static void GetOutputs(const std::vector<const Input*>& model_inputs,
                          const Tensor& policy, const Tensor& value,
                          std::vector<Output*>* model_outputs);

@@ -175,6 +175,9 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
 
   // Look at the shape of the feature tensor to figure out what type of model
   // it is.
+  // TODO(tommadams): We'll need something more sophisticated if we want to
+  // support arbitrary combinations of features. This will do to start with
+  // though.
   int num_feature_planes = 0;
   for (const auto& node : graph_def.node()) {
     if (node.name() == "pos_tensor") {

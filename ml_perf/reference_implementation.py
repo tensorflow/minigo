@@ -491,19 +491,6 @@ async def evaluate_trained_model(state):
 
 async def sample_records(src_patterns, dst_path, num_read_threads,
                          num_write_threads, sample_frac=0, num_records=0):
-    assert dst_path.endswith('.tfrecord.zz'), dst_path
-
-    ### dst_path = dst_path[:-12] + '-00000-of-00001.tfrecord.zz'
-    ### buffer = example_buffer.ExampleBuffer(sampling_frac=FLAGS.train_filter)
-    ### paths = []
-    ### for pattern in src_patterns:
-    ###     paths += tf.gfile.Glob(pattern)
-    ### buffer.parallel_fill(paths)
-    ### buffer.examples = list(buffer.examples)
-    ### random.shuffle(buffer.examples)
-    ### buffer.flush(dst_path)
-    ### return []
-
     return await run(
         'bazel-bin/cc/sample_records',
         '--num_read_threads={}'.format(num_read_threads),

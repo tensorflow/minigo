@@ -25,6 +25,9 @@ namespace minigo {
 
 class RandomDualNet : public Model {
  public:
+  // It may seem weird to require a feature type for RandomDual net since it
+  // doesn't actually read the input features but once a game finises, we will
+  // need to know which features to serialize as training examples.
   RandomDualNet(std::string name, FeatureType feature_type, uint64_t seed,
                 float policy_stddev, float value_stddev);
 

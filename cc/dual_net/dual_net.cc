@@ -20,12 +20,6 @@
 
 namespace minigo {
 
-// Generates the board features from the history of recent moves, where
-// history[0] is the current board position, and history[i] is the board
-// position from i moves ago.
-// history.size() must be <= kMoveHistory.
-// TODO(tommadams): make this a templated class, so it can set either uint8 or
-// float features.
 void DualNet::SetFeatures(const std::vector<const Input*>& model_inputs,
                           FeatureType feature_type, Tensor* features) {
   MG_CHECK(static_cast<int>(model_inputs.size()) <= features->n);

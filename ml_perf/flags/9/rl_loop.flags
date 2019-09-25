@@ -14,6 +14,6 @@
 
 --bootstrap_target_win_rate=0.05
 
---selfplay_num_games=4096
+--selfplay_num_games=8192
 --selfplay_num_games_per_thread=3
 --eval_num_games=100

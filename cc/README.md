@@ -248,13 +248,17 @@ arguments:
    Use by passing `--model=fake`.
  - **random**: a model that returns random samples from a normal distribution,
    which can be useful for bootstrapping the reinforcement learning pipeline.
-   Use by passing `--model=random:$SEED,$POLICY_STD_DEV:$VALUE_STD_DEV`, where
+   Use by passing
+   `--model=random:$FEATURES:$SEED,$POLICY_STD_DEV:$VALUE_STD_DEV`, where
    `$SEED` is a random seed (set to `0` to choose one based on the current
-   time), `$POLICY_STD_DEV` is the standard deviation of the distribution of
-   policy samples (`0.4` is a reasonable choice) and `$VALUE_STD_DEV` is the
-   standard deviation for the distribution of value samples (again, `0.4` is
-   a reasonable choice). That was a bit of a long-winded explanation, so just
-   try `--model=random:0,0.4:0.4` to start with.
+   time), `$FEATURES` is the type of model features (e.g. `agz`),
+   `$POLICY_STD_DEV` is the standard deviation of the distribution of policy
+   samples (`0.4` is a reasonable choice) and `$VALUE_STD_DEV` is the standard
+   deviation for the distribution of value samples (again, `0.4` is a reasonable
+   choice). That was a bit of a long-winded explanation, so just try
+   `--model=random:agz:0,0.4:0.4` to start with. The random model doesn't
+   actually use the input features but it must know what they are when
+   serializing the training examples.
 
 ## Compiling a TensorFlow Lite model
 

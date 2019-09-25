@@ -62,14 +62,14 @@ def pick_examples_from_tfrecord(filename, sampling_frac=0.02):
     return choices
 
 
-### def choose(game, sampling_frac=0.02):
-###     examples = pick_examples_from_tfrecord(game, sampling_frac)
-###     timestamp = file_timestamp(game)
-###     return [(timestamp, ex) for ex in examples]
+def choose(game, sampling_frac=0.02):
+    examples = pick_examples_from_tfrecord(game, sampling_frac)
+    timestamp = file_timestamp(game)
+    return [(timestamp, ex) for ex in examples]
 
 
-### def file_timestamp(filename):
-###     return int(os.path.basename(filename).split('-')[0])
+def file_timestamp(filename):
+    return int(os.path.basename(filename).split('-')[0])
 
 
 def _ts_to_str(timestamp):
@@ -81,7 +81,7 @@ class ExampleBuffer():
         self.examples = deque(maxlen=max_size)
         self.max_size = max_size
         self.sampling_frac = sampling_frac
-        self.func = functools.partial(pick_examples_from_tfrecord, sampling_frac=sampling_frac)
+        self.func = functools.partial(choose, sampling_frac=sampling_frac)
         self.total_updates = 0
 
     def parallel_fill(self, games, threads=8):
@@ -97,35 +97,32 @@ class ExampleBuffer():
             self.examples.extend(itertools.chain.from_iterable(res))
         print("Got", len(self.examples), "examples")
 
-    ### TODO(tommadams): disabled for now because the .tfrecord.zz files no
-    ### longer start with a timestamp.
-    ### def update(self, new_games):
-    ###     """ new_games is a list of .tfrecord.zz new game records. """
-    ###     new_games.sort(key=os.path.basename)
-    ###     first_new_game = None
-    ###     for idx, game in enumerate(new_games):
-    ###         timestamp = file_timestamp(game)
-    ###         if timestamp <= self.examples[-1][0]:
-    ###             continue
-    ###         elif first_new_game is None:
-    ###             first_new_game = idx
-    ###             num_new_games = len(new_games) - idx
-    ###             print("Found {}/{} new games".format(
-    ###                 num_new_games, len(new_games)))
-    ###             self.total_updates += num_new_games
-    ###         self.examples.extend(self.func(game))
-    ###     if first_new_game is None:
-    ###         print("No new games", file_timestamp(
-    ###             new_games[-1]), self.examples[-1][0])
+    def update(self, new_games):
+        """ new_games is a list of .tfrecord.zz new game records. """
+        new_games.sort(key=os.path.basename)
+        first_new_game = None
+        for idx, game in enumerate(new_games):
+            timestamp = file_timestamp(game)
+            if timestamp <= self.examples[-1][0]:
+                continue
+            elif first_new_game is None:
+                first_new_game = idx
+                num_new_games = len(new_games) - idx
+                print("Found {}/{} new games".format(
+                    num_new_games, len(new_games)))
+                self.total_updates += num_new_games
+            self.examples.extend(self.func(game))
+        if first_new_game is None:
+            print("No new games", file_timestamp(
+                new_games[-1]), self.examples[-1][0])
 
     def flush(self, path):
         # random.shuffle on deque is O(n^2) convert to list for O(n)
         self.examples = list(self.examples)
         random.shuffle(self.examples)
         with timer("Writing examples to " + path):
-            ### preprocessing.write_tf_examples(
-            ###     path, [ex[1] for ex in self.examples], serialize=False)
-            preprocessing.write_tf_examples(path, self.examples, serialize=False)
+            preprocessing.write_tf_examples(
+                path, [ex[1] for ex in self.examples], serialize=False)
         self.examples.clear()
         self.examples = deque(maxlen=self.max_size)
 

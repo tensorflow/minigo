@@ -70,13 +70,13 @@ class Game {
 
     std::array<float, kNumMoves> search_pi;
 
+    // This is used to build training features after a selfplay game has
+    // finished.
     // TODO(tommadams): it's dangerous to keep a position copy around here
     // because its BoardVisitor & GroupVisitor members aren't guaranteed to
     // be kept around. Replace the implementation of Position with a different
     // one that doesn't require BoardVisitor.& GroupVisitor.
     // Position of the board before this move was played.
-    // This is used to build training features after a selfplay game has
-    // finished.
     Position position;
 
     bool trainable = false;
