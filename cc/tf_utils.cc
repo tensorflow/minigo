@@ -44,7 +44,7 @@ tensorflow::Feature MakeBytesFeature(const DualNet::Tensor& src) {
   MG_CHECK(src.n == 1);
 
   for (int i = 0; i < size; ++i) {
-    bytes[i] = static_cast<uint8_t>(src.data[0]);
+    bytes[i] = static_cast<uint8_t>(src.data[i]);
   }
 
   tensorflow::Feature feature;

@@ -71,7 +71,7 @@ std::unique_ptr<Model> RandomDualNetFactory::NewModel(
   float policy_stddev, value_stddev;
   if (parts[0] == "agz") {
     feature_type = Model::FeatureType::kAgz;
-  } else if (parts[1] == "extra") {
+  } else if (parts[0] == "extra") {
     feature_type = Model::FeatureType::kExtra;
   } else {
     MG_LOG(FATAL) << "unrecognized feature type \"" << parts[0] << "\"";
