@@ -78,10 +78,10 @@ class DualNet : public Model {
   //             >= `model_inputs.size()`. Only the first `model_inputs.size()`
   //             features will be set. The remaining values in `features` are
   //             not modified.
-  // TODO(tommadams): make this a templated class, so it can set either uint8 or
-  // float features.
-  static void SetFeatures(const std::vector<const Input*>& model_inputs,
-                          FeatureType feature_type, Tensor* features);
+  template <typename T>
+  static void SetFeatures(
+      const std::vector<const Input*>& model_inputs, FeatureType feature_type,
+      Tensor<T>* features);
 
   // Fills a batch of inference outputs from policy and value tensors.
   // Args:
@@ -90,9 +90,12 @@ class DualNet : public Model {
   //   value: the value output from the model.
   //   model_outputs: the model outputs to fill. `model_inputs.size()` must ==
   //                  `model_outputs.size()`.
-  static void GetOutputs(const std::vector<const Input*>& model_inputs,
-                         const Tensor& policy, const Tensor& value,
-                         std::vector<Output*>* model_outputs);
+  // Models that produce quantized outputs should unquantize them into
+  // `Tensor<float>` objects before calling GetOutputs.
+  static void GetOutputs(
+      const std::vector<const Input*>& model_inputs,
+      const Tensor<float>& policy, const Tensor<float>& value,
+      std::vector<Output*>* model_outputs);
 
   DualNet(std::string name, FeatureType feature_type, int buffer_count)
       : Model(std::move(name), feature_type, buffer_count) {}

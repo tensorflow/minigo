@@ -117,7 +117,7 @@ class WaitingModelFactory : public ModelFactory {
 
 WaitingModel::WaitingModel(WaitingModelFactory* factory, std::string model_name,
                            int buffer_count)
-    : Model("Waiting", buffer_count),
+    : Model("Waiting", Model::FeatureType::kAgz, buffer_count),
       factory_(factory),
       model_name_(std::move(model_name)) {}
 

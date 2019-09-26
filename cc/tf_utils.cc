@@ -36,20 +36,11 @@ namespace tf_utils {
 
 namespace {
 
-tensorflow::Feature MakeBytesFeature(const DualNet::Tensor& src) {
-  DualNet::BoardFeatureBuffer<uint8_t> bytes;
-
-  int size = src.h * src.w * src.c;
-  MG_CHECK(size <= static_cast<int>(bytes.size()));
-  MG_CHECK(src.n == 1);
-
-  for (int i = 0; i < size; ++i) {
-    bytes[i] = static_cast<uint8_t>(src.data[i]);
-  }
-
+tensorflow::Feature MakeBytesFeature(const DualNet::Tensor<uint8_t>& src) {
+  int size = src.n * src.h * src.w * src.c;
   tensorflow::Feature feature;
   feature.mutable_bytes_list()->add_value(
-      reinterpret_cast<const void*>(bytes.data()), size);
+      reinterpret_cast<const void*>(src.data), size);
   return feature;
 }
 
@@ -63,7 +54,7 @@ tensorflow::Feature MakeBytesFeature(const std::array<float, N>& data) {
 
 // Converts board features, and the pi & value outputs of MTCS to a tensorflow
 // example proto.
-tensorflow::Example MakeTfExample(const Model::Tensor& features,
+tensorflow::Example MakeTfExample(const Model::Tensor<uint8_t>& features,
                                   const std::array<float, kNumMoves>& pi,
                                   float outcome) {
   tensorflow::Example example;
@@ -112,8 +103,9 @@ std::vector<tensorflow::Example> MakeExamples(Model::FeatureType feature_type,
 
   int num_feature_planes = Model::GetNumFeaturePlanes(feature_type);
 
-  DualNet::BoardFeatureBuffer<float> features_buffer;
-  Model::Tensor features(1, kN, kN, num_feature_planes, features_buffer.data());
+  DualNet::BoardFeatureBuffer<uint8_t> features_buffer;
+  Model::Tensor<uint8_t> features(1, kN, kN, num_feature_planes,
+                                  features_buffer.data());
 
   for (size_t i = 0; i < game.moves().size(); ++i) {
     const auto* move = game.moves()[i].get();

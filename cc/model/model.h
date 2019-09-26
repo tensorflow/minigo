@@ -43,16 +43,17 @@ class Model {
   // Tensors are assumed to be tightly packed for now.
   // TODO(tommadams): Make this templated on the data type so we can support
   // byte input features, and quantized outputs.
+  template <typename T>
   struct Tensor {
     Tensor() = default;
-    Tensor(int n, int h, int w, int c, float* data)
+    Tensor(int n, int h, int w, int c, T* data)
         : n(n), h(h), w(w), c(c), data(data) {}
 
     int n = 0;
     int h = 0;
     int w = 0;
     int c = 0;
-    float* data = nullptr;
+    T* data = nullptr;
   };
 
   struct Input {

@@ -114,8 +114,8 @@ void TfDualNet::RunMany(const std::vector<const Input*>& inputs,
 
   Reserve(inputs.size());
 
-  Tensor features(batch_capacity_, kN, kN, num_feature_planes_,
-                  inputs_[0].second.flat<float>().data());
+  Tensor<float> features(batch_capacity_, kN, kN, num_feature_planes_,
+                         inputs_[0].second.flat<float>().data());
   DualNet::SetFeatures(inputs, feature_type(), &features);
 
   // Run the model.
@@ -124,9 +124,10 @@ void TfDualNet::RunMany(const std::vector<const Input*>& inputs,
     TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
   }
 
-  Tensor policy(batch_capacity_, kNumMoves, 1, 1,
-                outputs_[0].flat<float>().data());
-  Tensor value(batch_capacity_, 1, 1, 1, outputs_[1].flat<float>().data());
+  Tensor<float> policy(batch_capacity_, kNumMoves, 1, 1,
+                       outputs_[0].flat<float>().data());
+  Tensor<float> value(batch_capacity_, 1, 1, 1,
+                      outputs_[1].flat<float>().data());
   DualNet::GetOutputs(inputs, policy, value, outputs);
 
   if (model_name != nullptr) {

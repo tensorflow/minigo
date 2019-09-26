@@ -111,8 +111,7 @@ class MctsPlayerTest : public ::testing::Test {
         absl::make_unique<TestablePlayer>(game_.get(), player_options);
     auto* first_node = player->root()->SelectLeaf();
     Model::Input input;
-    input.to_play = Color::kBlack;
-    input.position_history.push_back(&player->root()->position.stones());
+    input.position_history.push_back(&player->root()->position);
     auto output = player->Run(input);
     first_node->IncorporateResults(0.0, output.policy, output.value,
                                    player->root());

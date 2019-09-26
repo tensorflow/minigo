@@ -20,12 +20,13 @@
 
 namespace minigo {
 
+template <typename T>
 void DualNet::SetFeatures(const std::vector<const Input*>& model_inputs,
-                          FeatureType feature_type, Tensor* features) {
+                          FeatureType feature_type, Tensor<T>* features) {
   MG_CHECK(static_cast<int>(model_inputs.size()) <= features->n);
   MG_CHECK(features->w == kN && features->h == kN);
 
-  std::array<float, kMaxBoardFeaturesSize> raw_features;
+  std::array<T, kMaxBoardFeaturesSize> raw_features;
   for (size_t input_idx = 0; input_idx < model_inputs.size(); ++input_idx) {
     const auto& model_input = *model_inputs[input_idx];
     const auto& history = model_input.position_history;
@@ -65,7 +66,7 @@ void DualNet::SetFeatures(const std::vector<const Input*>& model_inputs,
     }
 
     // Set the "to play" feature plane.
-    float to_play_feature = my_color == Color::kBlack ? 1 : 0;
+    T to_play_feature = my_color == Color::kBlack ? 1 : 0;
     auto* dst = raw_features.data() + DualNet::kPlayerFeature;
     const auto* end = dst + features_size;
     while (dst < end) {
@@ -108,10 +109,9 @@ void DualNet::SetFeatures(const std::vector<const Input*>& model_inputs,
   }
 }
 
-void DualNet::GetOutputs(const std::vector<const Input*>& model_inputs,
-                         const DualNet::Tensor& policy,
-                         const DualNet::Tensor& value,
-                         std::vector<Output*>* model_outputs) {
+void DualNet::GetOutputs(
+    const std::vector<const Input*>& model_inputs, const Tensor<float>& policy,
+    const Tensor<float>& value, std::vector<Output*>* model_outputs) {
   MG_CHECK(model_outputs->size() == model_inputs.size());
   MG_CHECK(policy.n == value.n);
   MG_CHECK(static_cast<int>(model_inputs.size()) <= policy.n);
@@ -131,5 +131,12 @@ void DualNet::GetOutputs(const std::vector<const Input*>& model_inputs,
 }
 
 DualNet::~DualNet() = default;
+
+// Explicit template specializations for the tensor types we support.
+template void DualNet::SetFeatures<float>(
+    const std::vector<const Input*>&, FeatureType, Tensor<float>*);
+template void DualNet::SetFeatures<uint8_t>(
+    const std::vector<const Input*>&, FeatureType, Tensor<uint8_t>*);
+
 
 }  // namespace minigo
