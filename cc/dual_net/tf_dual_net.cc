@@ -124,7 +124,7 @@ void TfDualNet::RunMany(const std::vector<const Input*>& inputs,
     TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
   }
 
-  Tensor<float> policy(batch_capacity_, kNumMoves, 1, 1,
+  Tensor<float> policy(batch_capacity_, 1, 1, kNumMoves,
                        outputs_[0].flat<float>().data());
   Tensor<float> value(batch_capacity_, 1, 1, 1,
                       outputs_[1].flat<float>().data());

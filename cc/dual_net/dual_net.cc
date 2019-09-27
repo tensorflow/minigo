@@ -30,6 +30,7 @@ void DualNet::SetFeatures(const std::vector<const Input*>& model_inputs,
   for (size_t input_idx = 0; input_idx < model_inputs.size(); ++input_idx) {
     const auto& model_input = *model_inputs[input_idx];
     const auto& history = model_input.position_history;
+    MG_DCHECK(!history.empty());
     const auto& position = *history[0];
 
     MG_CHECK(history.size() <= DualNet::kMoveHistory);

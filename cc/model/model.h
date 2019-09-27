@@ -56,6 +56,30 @@ class Model {
     T* data = nullptr;
   };
 
+  template <typename T>
+  class BackedTensor {
+   public:
+    BackedTensor() = default;
+    BackedTensor(int n, int h, int w, int c) {
+      resize(n, h, w, c);
+    }
+
+    void resize(int n, int h, int w, int c) {
+      auto size = n * h * w * c;
+      if (static_cast<size_t>(size) > buffer_.size()) {
+        buffer_.resize(size);
+      }
+      tensor_ = {n, h, w, c, buffer_.data()};
+    }
+
+    operator Tensor<T>&() { return tensor_; }
+    operator const Tensor<T>&() const { return tensor_; }
+
+   private:
+    Tensor<T> tensor_;
+    std::vector<T> buffer_;
+  };
+
   struct Input {
     // Symmetry to apply to the input features when performing inference.
     symmetry::Symmetry sym = symmetry::kNumSymmetries;
