@@ -54,6 +54,18 @@ static constexpr char kTtFtwBoard[] = R"(
     X.XXXXXXX
     XXXXXXXXX)";
 
+static constexpr char kOneStoneBoard[] = R"(
+    .........
+    .........
+    .........
+    .........
+    ....X....
+    .........
+    .........
+    .........
+    .........)";
+
+
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(Game* game, const MctsPlayer::Options& player_options)
@@ -288,6 +300,49 @@ TEST_F(MctsPlayerTest, ParallelTreeSearch) {
 
   // No virtual losses should be pending.
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
+}
+
+TEST_F(MctsPlayerTest, DontPassOnEmptyLosingBoard) {
+  MctsPlayer::Options options;
+  auto player = CreateBasicPlayer(options);
+  auto* root = player->root();
+  // Search a board with one black stone, white to play.
+  auto board = TestablePosition(kOneStoneBoard, Color::kWhite);
+  player->InitializeGame(board);
+  for (int i = 0; i < 80; ++i) {
+    player->TreeSearch(8);
+  }
+
+  // Expect pass-pass to have been checked.
+  auto it = root->children.find(Coord::kPass);
+  EXPECT_NE(it, root->children.end());
+  auto pass = it->second.get();
+  EXPECT_GT(pass->child_N(Coord::kPass), 0);
+
+  // Expect the first pass to be bad.
+  EXPECT_GT(root->child_Q(Coord::kPass), 0);
+  EXPECT_GT(root->child_N(Coord::kPass), 0);
+  auto best_move = ArgMax(root->edges, MctsNode::CmpN);
+  EXPECT_NE(Coord::kPass, best_move);
+
+  // Now search an empty board, black to play.
+  board = TestablePosition("", Color::kBlack);
+  player->InitializeGame(board);
+  for (int i = 0; i < 80; ++i) {
+    player->TreeSearch(8);
+  }
+
+  // Expect pass-pass to have been checked.
+  it = root->children.find(Coord::kPass);
+  EXPECT_NE(it, root->children.end());
+  pass = it->second.get();
+  EXPECT_GT(pass->child_N(Coord::kPass), 0);
+
+  // Expect the first pass to be bad.
+  EXPECT_LT(root->child_Q(Coord::kPass), 0);
+  EXPECT_GT(root->child_N(Coord::kPass), 0);
+  best_move = ArgMax(root->edges, MctsNode::CmpN);
+  EXPECT_NE(Coord::kPass, best_move);
 }
 
 TEST_F(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
