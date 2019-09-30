@@ -261,6 +261,12 @@ class Position {
     return s.empty() ? 0 : groups_[s.group_id()].num_liberties;
   }
 
+  int chain_size(Coord c) const {
+    MG_DCHECK(c <= kN * kN);
+    auto s = stones_[c];
+    return s.empty() ? 0 : groups_[s.group_id()].size;
+  }
+
   // The following methods are protected to enable direct testing by unit tests.
  protected:
   // Returns the Group of the stone at the given coordinate. Used for testing.

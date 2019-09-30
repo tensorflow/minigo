@@ -37,21 +37,18 @@
 namespace minigo {
 namespace {
 
-template <typename F>
-class DualNetTest : public ::testing::Test {
- protected:
-  static constexpr int kNumFeaturePlanes = F::kNumPlanes;
-
-  std::vector<float> GetStoneFeatures(const Tensor<float>& features, Coord c) {
-    std::vector<float> result;
-    MG_CHECK(features.n == 1);
-    MG_CHECK(features.c == kNumFeaturePlanes);
-    for (int i = 0; i < kNumFeaturePlanes; ++i) {
-      result.push_back(features.data[c * kNumFeaturePlanes + i]);
-    }
-    return result;
+template <typename T>
+std::vector<T> GetStoneFeatures(const Tensor<T>& features, Coord c) {
+  std::vector<T> result;
+  MG_CHECK(features.n == 1);
+  for (int i = 0; i < features.c; ++i) {
+    result.push_back(features.data[c * features.c + i]);
   }
-};
+  return result;
+}
+
+template <typename F>
+class DualNetTest : public ::testing::Test {};
 
 using TestFeatureTypes = ::testing::Types<AgzFeatures, ExtraFeatures>;
 TYPED_TEST_CASE(DualNetTest, TestFeatureTypes);
@@ -70,7 +67,7 @@ TYPED_TEST(DualNetTest, TestEmptyBoardBlackToPlay) {
   FeatureType::Set({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
-    auto f = this->GetStoneFeatures(features, c);
+    auto f = GetStoneFeatures(features, c);
     for (size_t i = 0; i < f.size(); ++i) {
       if (i != FeatureType::template GetPlaneIdx<ToPlayFeature>()) {
         EXPECT_EQ(0, f[i]);
@@ -95,7 +92,7 @@ TYPED_TEST(DualNetTest, TestEmptyBoardWhiteToPlay) {
   FeatureType::Set({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
-    auto f = this->GetStoneFeatures(features, c);
+    auto f = GetStoneFeatures(features, c);
     for (size_t i = 0; i < f.size(); ++i) {
       EXPECT_EQ(0, f[i]);
     }
@@ -135,28 +132,30 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
   std::vector<float> a1 = {{0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
   std::vector<float> a2 = {{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
   std::vector<float> j1 = {{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  std::vector<float> b1 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
 
-  MG_LOG(INFO) << input.position_history[0]->ToPrettyString();
   if (std::is_same<FeatureType, ExtraFeatures>::value) {
-    //                   L1 L2 L3
-    b9.insert(b9.end(), {0, 0, 1});  // 3 liberties
-    h9.insert(h9.end(), {0, 0, 1});  // 3 liberties
-    a8.insert(a8.end(), {0, 0, 1});  // 3 liberties
-    j9.insert(j9.end(), {0, 0, 1});  // 3 liberties
-    d5.insert(d5.end(), {0, 0, 0});  // 4 liberties
-    a1.insert(a1.end(), {1, 0, 0});  // 1 liberty
-    a2.insert(a2.end(), {0, 1, 0});  // 2 liberties
-    j1.insert(j1.end(), {0, 1, 0});  // 2 liberties
+    //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
+    b9.insert(b9.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
+    h9.insert(h9.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
+    a8.insert(a8.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
+    j9.insert(j9.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
+    d5.insert(d5.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    a1.insert(a1.end(), {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    a2.insert(a2.end(), {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    j1.insert(j1.end(), {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    b1.insert(b1.end(), {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0});
   }
 
-  EXPECT_EQ(b9, this->GetStoneFeatures(features, Coord::FromString("B9")));
-  EXPECT_EQ(h9, this->GetStoneFeatures(features, Coord::FromString("H9")));
-  EXPECT_EQ(a8, this->GetStoneFeatures(features, Coord::FromString("A8")));
-  EXPECT_EQ(j9, this->GetStoneFeatures(features, Coord::FromString("J9")));
-  EXPECT_EQ(d5, this->GetStoneFeatures(features, Coord::FromString("D5")));
-  EXPECT_EQ(a1, this->GetStoneFeatures(features, Coord::FromString("A1")));
-  EXPECT_EQ(a2, this->GetStoneFeatures(features, Coord::FromString("A2")));
-  EXPECT_EQ(j1, this->GetStoneFeatures(features, Coord::FromString("J1")));
+  EXPECT_EQ(b9, GetStoneFeatures(features, Coord::FromString("B9")));
+  EXPECT_EQ(h9, GetStoneFeatures(features, Coord::FromString("H9")));
+  EXPECT_EQ(a8, GetStoneFeatures(features, Coord::FromString("A8")));
+  EXPECT_EQ(j9, GetStoneFeatures(features, Coord::FromString("J9")));
+  EXPECT_EQ(d5, GetStoneFeatures(features, Coord::FromString("D5")));
+  EXPECT_EQ(a1, GetStoneFeatures(features, Coord::FromString("A1")));
+  EXPECT_EQ(a2, GetStoneFeatures(features, Coord::FromString("A2")));
+  EXPECT_EQ(j1, GetStoneFeatures(features, Coord::FromString("J1")));
+  EXPECT_EQ(b1, GetStoneFeatures(features, Coord::FromString("B1")));
 }
 
 // Verfies that features work as expected when capturing.
@@ -186,10 +185,10 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> j2 = {{0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   if (std::is_same<FeatureType, ExtraFeatures>::value) {
-    //                   L1 L2 L3
-    j2.insert(j2.end(), {0, 0, 0});
+    //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
+    j2.insert(j2.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
   }
-  EXPECT_EQ(j2, this->GetStoneFeatures(features, Coord::FromString("J2")));
+  EXPECT_EQ(j2, GetStoneFeatures(features, Coord::FromString("J2")));
 }
 
 // Checks that the different backends produce the same result.
@@ -270,6 +269,35 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
     EXPECT_NEAR(output.value, ref_output.value, 0.0001f)
         << name << " vs " << ref_name;
   }
+}
+
+TEST(WouldCaptureTest, WouldCapture) {
+  // Fill the board with black stones except for the top-left corner,
+  // leaving the board with white to play.
+  TestablePosition board(R"(
+      OOOX.XOOX
+      OXX....X.
+      .OOX.....
+      OOOOX....
+      XXXXX....)");
+
+  ModelInput input;
+  input.sym = symmetry::kIdentity;
+  input.position_history.push_back(&board);
+
+  BoardFeatureBuffer<float> buffer;
+  Tensor<float> features = {1, kN, kN, ExtraFeatures::kNumPlanes,
+                            buffer.data()};
+  ExtraFeatures::Set({&input}, &features);
+
+  //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
+  std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  std::vector<float> g8 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
+  a7.insert(a7.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+  g8.insert(g8.end(), {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0});
+  EXPECT_EQ(a7, GetStoneFeatures(features, Coord::FromString("A7")));
+  EXPECT_EQ(g8, GetStoneFeatures(features, Coord::FromString("G8")));
 }
 
 }  // namespace

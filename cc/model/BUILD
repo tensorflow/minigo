@@ -29,6 +29,7 @@ minigo_cc_library(
         "//cc:logging",
         "//cc:position",
         "//cc:symmetries",
+        "//cc:tiny_set",
         "//cc/platform",
     ],
 )

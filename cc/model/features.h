@@ -26,6 +26,7 @@
 #include "cc/model/types.h"
 #include "cc/platform/utils.h"
 #include "cc/position.h"
+#include "cc/tiny_set.h"
 
 // This header contains the different kinds of input features that we pass to
 // models. Each set of input features (the stones on the board, whose turn
@@ -110,8 +111,44 @@ struct LibertyFeatures {
   }
 };
 
+struct WouldCaptureFeatures {
+  static constexpr int kNumPlanes = 8;
+
+  template <typename T>
+  MG_ALWAYS_INLINE static void Set(const ModelInput& input, int num_planes,
+                                   T* dst) {
+    const auto& position = *input.position_history[0];
+    auto my_color = position.to_play();
+    auto their_color = OtherColor(my_color);
+    const auto& stones = position.stones();
+
+    for (int i = 0; i < kN * kN; ++i) {
+      int f = 0;
+      if (stones[i].color() == Color::kEmpty) {
+        tiny_set<GroupId, 4> neighbor_groups;
+        for (auto nc : kNeighborCoords[i]) {
+          if (stones[nc].color() == their_color &&
+              neighbor_groups.insert(stones[nc].group_id()) &&
+              position.num_chain_liberties(nc) == 1) {
+            f += position.chain_size(nc);
+          }
+        }
+      }
+      // One-hot encode the size of the chain.
+      f -= 1;
+      for (int i = 0; i < kNumPlanes - 1; ++i) {
+        dst[i] = f == i ? 1 : 0;
+      }
+      dst[kNumPlanes - 1] = f >= kNumPlanes - 1 ? 1 : 0;
+      dst += num_planes;
+    }
+  }
+};
+
 // TODO(tommadams): Move Features and FeaturesDescriptor into another header so
 // that features.h only contains the feature types structs.
+// TODO(tommadams): Move the framework tests from features_test.cc to
+// model_test.cc too.
 
 // `Features` encodes the input tensor type `T` and the list of input features
 // to be used `Fs`.
@@ -183,7 +220,8 @@ struct FeatureDescriptor {
 };
 
 using AgzFeatures = Features<StoneFeatures, ToPlayFeature>;
-using ExtraFeatures = Features<StoneFeatures, ToPlayFeature, LibertyFeatures>;
+using ExtraFeatures = Features<StoneFeatures, ToPlayFeature, LibertyFeatures,
+                               WouldCaptureFeatures>;
 
 // Maximum number of feature planes used by these features.
 constexpr int kMaxNumFeaturePlanes =
