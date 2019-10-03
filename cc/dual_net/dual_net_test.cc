@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/dual_net/dual_net.h"
-
 #include <array>
 #include <deque>
 #include <map>
+#include <type_traits>
 #include <vector>
 
+#include "cc/model/features.h"
 #include "cc/position.h"
 #include "cc/random.h"
 #include "cc/symmetries.h"
@@ -37,24 +37,12 @@
 namespace minigo {
 namespace {
 
-struct AgzFeatures {
-  static constexpr Model::FeatureType kFeatureType = Model::FeatureType::kAgz;
-  static constexpr int kNumFeaturePlanes = 17;
-};
-
-struct ExtraFeatures {
-  static constexpr Model::FeatureType kFeatureType = Model::FeatureType::kExtra;
-  static constexpr int kNumFeaturePlanes = 20;
-};
-
-template <typename FeatureType>
+template <typename F>
 class DualNetTest : public ::testing::Test {
- public:
-  static constexpr int kNumFeaturePlanes = FeatureType::kNumFeaturePlanes;
-  static constexpr Model::FeatureType kFeatureType = FeatureType::kFeatureType;
+ protected:
+  static constexpr int kNumFeaturePlanes = F::kNumPlanes;
 
-  std::vector<float> GetStoneFeatures(const Model::Tensor<float>& features,
-                                      Coord c) {
+  std::vector<float> GetStoneFeatures(const Tensor<float>& features, Coord c) {
     std::vector<float> result;
     MG_CHECK(features.n == 1);
     MG_CHECK(features.c == kNumFeaturePlanes);
@@ -65,24 +53,26 @@ class DualNetTest : public ::testing::Test {
   }
 };
 
-using FeatureTypes = ::testing::Types<AgzFeatures, ExtraFeatures>;
-TYPED_TEST_CASE(DualNetTest, FeatureTypes);
+using TestFeatureTypes = ::testing::Types<AgzFeatures, ExtraFeatures>;
+TYPED_TEST_CASE(DualNetTest, TestFeatureTypes);
 
 // Verifies SetFeatures an empty board with black to play.
 TYPED_TEST(DualNetTest, TestEmptyBoardBlackToPlay) {
+  using FeatureType = TypeParam;
+
   TestablePosition board("");
-  Model::Input input;
+  ModelInput input;
   input.sym = symmetry::kIdentity;
   input.position_history.push_back(&board);
 
-  DualNet::BoardFeatureBuffer<float> buffer;
-  Model::Tensor<float> features = {1, kN, kN, this->kNumFeaturePlanes, buffer.data()};
-  DualNet::SetFeatures({&input}, this->kFeatureType, &features);
+  BoardFeatureBuffer<float> buffer;
+  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  FeatureType::Set({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
     auto f = this->GetStoneFeatures(features, c);
     for (size_t i = 0; i < f.size(); ++i) {
-      if (i != DualNet::kPlayerFeature) {
+      if (i != FeatureType::template GetPlaneIdx<ToPlayFeature>()) {
         EXPECT_EQ(0, f[i]);
       } else {
         EXPECT_EQ(1, f[i]);
@@ -93,14 +83,16 @@ TYPED_TEST(DualNetTest, TestEmptyBoardBlackToPlay) {
 
 // Verifies SetFeatures for an empty board with white to play.
 TYPED_TEST(DualNetTest, TestEmptyBoardWhiteToPlay) {
+  using FeatureType = TypeParam;
+
   TestablePosition board("", Color::kWhite);
-  Model::Input input;
+  ModelInput input;
   input.sym = symmetry::kIdentity;
   input.position_history.push_back(&board);
 
-  DualNet::BoardFeatureBuffer<float> buffer;
-  Model::Tensor<float> features = {1, kN, kN, this->kNumFeaturePlanes, buffer.data()};
-  DualNet::SetFeatures({&input}, this->kFeatureType, &features);
+  BoardFeatureBuffer<float> buffer;
+  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  FeatureType::Set({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
     auto f = this->GetStoneFeatures(features, c);
@@ -112,6 +104,8 @@ TYPED_TEST(DualNetTest, TestEmptyBoardWhiteToPlay) {
 
 // Verifies SetFeatures.
 TYPED_TEST(DualNetTest, TestSetFeatures) {
+  using FeatureType = TypeParam;
+
   TestablePosition board("");
 
   std::vector<std::string> moves = {"B9", "H9", "A8", "J9",
@@ -122,15 +116,15 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
     positions.push_front(board);
   }
 
-  Model::Input input;
+  ModelInput input;
   input.sym = symmetry::kIdentity;
   for (const auto& p : positions) {
     input.position_history.push_back(&p);
   }
 
-  DualNet::BoardFeatureBuffer<float> buffer;
-  Model::Tensor<float> features = {1, kN, kN, this->kNumFeaturePlanes, buffer.data()};
-  DualNet::SetFeatures({&input}, this->kFeatureType, &features);
+  BoardFeatureBuffer<float> buffer;
+  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  FeatureType::Set({&input}, &features);
 
   //                        B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7 C
   std::vector<float> b9 = {{1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1}};
@@ -143,7 +137,7 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
   std::vector<float> j1 = {{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
 
   MG_LOG(INFO) << input.position_history[0]->ToPrettyString();
-  if (this->kFeatureType == Model::FeatureType::kExtra) {
+  if (std::is_same<FeatureType, ExtraFeatures>::value) {
     //                   L1 L2 L3
     b9.insert(b9.end(), {0, 0, 1});  // 3 liberties
     h9.insert(h9.end(), {0, 0, 1});  // 3 liberties
@@ -167,6 +161,8 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
 
 // Verfies that features work as expected when capturing.
 TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
+  using FeatureType = TypeParam;
+
   TestablePosition board("");
 
   std::vector<std::string> moves = {"J3", "pass", "H2", "J2",
@@ -177,20 +173,19 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
     positions.push_front(board);
   }
 
-  Model::Input input;
+  ModelInput input;
   input.sym = symmetry::kIdentity;
   for (const auto& p : positions) {
     input.position_history.push_back(&p);
   }
 
-
-  DualNet::BoardFeatureBuffer<float> buffer;
-  Model::Tensor<float> features = {1, kN, kN, this->kNumFeaturePlanes, buffer.data()};
-  DualNet::SetFeatures({&input}, this->kFeatureType, &features);
+  BoardFeatureBuffer<float> buffer;
+  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  FeatureType::Set({&input}, &features);
 
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> j2 = {{0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
-  if (this->kFeatureType == Model::FeatureType::kExtra) {
+  if (std::is_same<FeatureType, ExtraFeatures>::value) {
     //                   L1 L2 L3
     j2.insert(j2.end(), {0, 0, 0});
   }
@@ -199,7 +194,9 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
 
 // Checks that the different backends produce the same result.
 TYPED_TEST(DualNetTest, TestBackendsEqual) {
-  if (this->kFeatureType != Model::FeatureType::kAgz) {
+  using FeatureType = TypeParam;
+
+  if (!std::is_same<FeatureType, AgzFeatures>::value) {
     // TODO(tommadams): generate models for other feature types.
     return;
   }
@@ -223,16 +220,16 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
 #endif
 
   Random rnd(Random::kUniqueSeed, Random::kUniqueStream);
-  Model::Input input;
+  ModelInput input;
   input.sym = symmetry::kIdentity;
   TestablePosition position("");
-  for (int i =0; i < kN * kN; ++i) {
+  for (int i = 0; i < kN * kN; ++i) {
     auto c = GetRandomLegalMove(position, &rnd);
     position.PlayMove(c);
   }
   input.position_history.push_back(&position);
 
-  Model::Output ref_output;
+  ModelOutput ref_output;
   std::string ref_name;
 
   auto policy_string = [](const std::array<float, kNumMoves>& policy) {
@@ -250,9 +247,9 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
     auto model =
         test.factory->NewModel(absl::StrCat("cc/dual_net/", test.basename));
 
-    Model::Output output;
-    std::vector<const Model::Input*> inputs = {&input};
-    std::vector<Model::Output*> outputs = {&output};
+    ModelOutput output;
+    std::vector<const ModelInput*> inputs = {&input};
+    std::vector<ModelOutput*> outputs = {&output};
     model->RunMany(inputs, &outputs, nullptr);
 
     if (ref_name.empty()) {

@@ -114,8 +114,7 @@ class InferenceCache {
   // the output is updated to contain their average.
   // If the cache is full, the least-recently-used pair is evicted.
   virtual void Merge(Key key, symmetry::Symmetry canonical_sym,
-                     symmetry::Symmetry inference_sym,
-                     Model::Output* output) = 0;
+                     symmetry::Symmetry inference_sym, ModelOutput* output) = 0;
 
   // Looks up the inference output for the given features and symmetries.
   // If the matching inference symmetry has already been merged into the cache,
@@ -123,7 +122,7 @@ class InferenceCache {
   // The features are marked as most-recently-used.
   virtual bool TryGet(Key key, symmetry::Symmetry canonical_sym,
                       symmetry::Symmetry inference_sym,
-                      Model::Output* output) = 0;
+                      ModelOutput* output) = 0;
 
   virtual Stats GetStats() const = 0;
 };
@@ -141,9 +140,9 @@ class BasicInferenceCache : public InferenceCache {
 
   void Clear() override;
   void Merge(Key key, symmetry::Symmetry canonical_sym,
-             symmetry::Symmetry inference_sym, Model::Output* output) override;
+             symmetry::Symmetry inference_sym, ModelOutput* output) override;
   bool TryGet(Key key, symmetry::Symmetry canonical_sym,
-              symmetry::Symmetry inference_sym, Model::Output* output) override;
+              symmetry::Symmetry inference_sym, ModelOutput* output) override;
   Stats GetStats() const override;
 
  private:
@@ -160,7 +159,7 @@ class BasicInferenceCache : public InferenceCache {
           valid_symmetry_bits(1 << inference_sym),
           num_valid_symmetries(1) {}
     Key key;
-    Model::Output output;
+    ModelOutput output;
 
     // If bit (1 << symmetry) is set, then that symmetry has been merged into
     // the cache.
@@ -223,10 +222,10 @@ class ThreadSafeInferenceCache : public InferenceCache {
   void Clear() override;
 
   void Merge(Key key, symmetry::Symmetry canonical_sym,
-             symmetry::Symmetry inference_sym, Model::Output* output) override;
+             symmetry::Symmetry inference_sym, ModelOutput* output) override;
 
   bool TryGet(Key key, symmetry::Symmetry canonical_sym,
-              symmetry::Symmetry inference_sym, Model::Output* output) override;
+              symmetry::Symmetry inference_sym, ModelOutput* output) override;
 
   // These stats are only approximate, since each shard is locked and queried
   // for their stats in turn. Nevertheless, the results should be close enough.

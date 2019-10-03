@@ -28,8 +28,9 @@ class BufferedModel : public Model {
  public:
   explicit BufferedModel(std::vector<std::unique_ptr<Model>> impls);
 
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
  private:
   ThreadSafeQueue<std::unique_ptr<Model>> impls_;

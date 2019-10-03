@@ -39,8 +39,9 @@ class ReloadingModel : public Model {
                  std::unique_ptr<Model> impl);
   ~ReloadingModel() override;
 
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
   // Replaces the wrapped implementation with a new one constructed from the
   // given factory & model.

@@ -28,16 +28,17 @@ class RandomDualNet : public Model {
   // It may seem weird to require a feature type for RandomDual net since it
   // doesn't actually read the input features but once a game finises, we will
   // need to know which features to serialize as training examples.
-  RandomDualNet(std::string name, FeatureType feature_type, uint64_t seed,
-                float policy_stddev, float value_stddev);
+  RandomDualNet(std::string name, const FeatureDescriptor& feature_desc,
+                uint64_t seed, float policy_stddev, float value_stddev);
 
   // Output policy is a normal distribution with a mean of 0.5 and a standard
   // deviation of policy_stddev, followed by a softmax.
   // Output value is a normal distribution with a mean of 0 and a standard
   // deviation of value_stddev. The output value is repeatedly sampled from the
   // normal distribution until a value is found in the range [-1, 1].
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
  private:
   Random rnd_;

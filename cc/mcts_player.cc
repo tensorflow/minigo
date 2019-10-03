@@ -205,7 +205,7 @@ void MctsPlayer::MaybeExpandRoot() {
 
 void MctsPlayer::SelectLeaves(int num_leaves, int max_num_leaves) {
   tree_search_inferences_.clear();
-  Model::Output cached_output;
+  ModelOutput cached_output;
 
   int max_cache_misses = num_leaves * 2;
   int num_selected = 0;

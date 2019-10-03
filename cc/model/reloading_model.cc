@@ -156,14 +156,14 @@ std::unique_ptr<ReloadingModel> ReloadingModelUpdater::NewReloadingModel() {
 
 ReloadingModel::ReloadingModel(std::string name, ReloadingModelUpdater* updater,
                                std::unique_ptr<Model> impl)
-    : Model(std::move(name), impl->feature_type(), impl->buffer_count()),
+    : Model(std::move(name), impl->feature_descriptor(), impl->buffer_count()),
       updater_(updater),
       model_impl_(std::move(impl)) {}
 
 ReloadingModel::~ReloadingModel() { updater_->UnregisterModel(this); }
 
-void ReloadingModel::RunMany(const std::vector<const Input*>& inputs,
-                             std::vector<Output*>* outputs,
+void ReloadingModel::RunMany(const std::vector<const ModelInput*>& inputs,
+                             std::vector<ModelOutput*>* outputs,
                              std::string* model_name) {
   absl::MutexLock lock(&mutex_);
   model_impl_->RunMany(inputs, outputs, model_name);

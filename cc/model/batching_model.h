@@ -51,8 +51,8 @@ class ModelBatcher {
   // individual inferences because of virtual losses.
   struct InferenceRequest {
     ModelBatcher* other_batcher;
-    const std::vector<const Model::Input*>* inputs;
-    std::vector<Model::Output*>* outputs;
+    const std::vector<const ModelInput*>* inputs;
+    std::vector<ModelOutput*>* outputs;
     std::string* model_name;
     absl::Notification* notification;
   };
@@ -62,15 +62,15 @@ class ModelBatcher {
   ~ModelBatcher();
 
   const std::string& name() const { return model_impl_->name(); }
-  Model::FeatureType feature_type() const {
-    return model_impl_->feature_type();
+  const FeatureDescriptor& feature_descriptor() const {
+    return model_impl_->feature_descriptor();
   }
 
   void StartGame() LOCKS_EXCLUDED(&mutex_);
   void EndGame() LOCKS_EXCLUDED(&mutex_);
   void RunMany(ModelBatcher* other_batcher,
-               const std::vector<const Model::Input*>& inputs,
-               std::vector<Model::Output*>* outputs, std::string* model_name);
+               const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs, std::string* model_name);
   BatchingModelStats FlushStats() LOCKS_EXCLUDED(&mutex_);
 
  private:
@@ -108,8 +108,9 @@ class BatchingModel : public Model {
  public:
   explicit BatchingModel(std::shared_ptr<internal::ModelBatcher> batcher);
 
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
   void StartGame();
   void EndGame();

@@ -18,7 +18,7 @@
 #include <memory>
 #include <string>
 
-#include "cc/dual_net/dual_net.h"
+#include "cc/model/model.h"
 #include "cc/random.h"
 
 namespace minigo {

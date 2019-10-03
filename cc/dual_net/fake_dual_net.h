@@ -27,8 +27,9 @@ class FakeDualNet : public Model {
   FakeDualNet() : FakeDualNet(absl::Span<const float>(), 0) {}
   FakeDualNet(absl::Span<const float> priors, float value);
 
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
  private:
   std::array<float, kNumMoves> priors_;

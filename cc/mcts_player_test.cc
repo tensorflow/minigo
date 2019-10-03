@@ -22,7 +22,6 @@
 #include "cc/algorithm.h"
 #include "cc/color.h"
 #include "cc/constants.h"
-#include "cc/dual_net/dual_net.h"
 #include "cc/dual_net/fake_dual_net.h"
 #include "cc/position.h"
 #include "cc/test_utils.h"
@@ -86,10 +85,10 @@ class TestablePlayer : public MctsPlayer {
   using MctsPlayer::TreeSearch;
   using MctsPlayer::UndoMove;
 
-  Model::Output Run(const Model::Input& input) {
-    Model::Output output;
-    std::vector<const Model::Input*> inputs = {&input};
-    std::vector<Model::Output*> outputs = {&output};
+  ModelOutput Run(const ModelInput& input) {
+    ModelOutput output;
+    std::vector<const ModelInput*> inputs = {&input};
+    std::vector<ModelOutput*> outputs = {&output};
     model()->RunMany(inputs, &outputs, nullptr);
     return output;
   }
@@ -110,7 +109,7 @@ class MctsPlayerTest : public ::testing::Test {
     auto player =
         absl::make_unique<TestablePlayer>(game_.get(), player_options);
     auto* first_node = player->root()->SelectLeaf();
-    Model::Input input;
+    ModelInput input;
     input.position_history.push_back(&player->root()->position);
     auto output = player->Run(input);
     first_node->IncorporateResults(0.0, output.policy, output.value,

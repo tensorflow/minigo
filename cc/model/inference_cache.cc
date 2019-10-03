@@ -104,7 +104,7 @@ void BasicInferenceCache::Clear() {
 
 void BasicInferenceCache::Merge(Key key, symmetry::Symmetry canonical_sym,
                                 symmetry::Symmetry inference_sym,
-                                Model::Output* output) {
+                                ModelOutput* output) {
   if (map_.size() == stats_.capacity) {
     // Cache is full, remove the last element from the LRU queue.
     auto it = map_.find(static_cast<Element*>(list_.prev)->key);
@@ -161,7 +161,7 @@ void BasicInferenceCache::Merge(Key key, symmetry::Symmetry canonical_sym,
 
 bool BasicInferenceCache::TryGet(Key key, symmetry::Symmetry canonical_sym,
                                  symmetry::Symmetry inference_sym,
-                                 Model::Output* output) {
+                                 ModelOutput* output) {
   auto it = map_.find(key);
   if (it == map_.end()) {
     stats_.num_complete_misses += 1;
@@ -217,7 +217,7 @@ void ThreadSafeInferenceCache::Clear() {
 
 void ThreadSafeInferenceCache::Merge(Key key, symmetry::Symmetry canonical_sym,
                                      symmetry::Symmetry inference_sym,
-                                     Model::Output* output) {
+                                     ModelOutput* output) {
   auto* shard = shards_[key.Shard(shards_.size())].get();
   absl::MutexLock lock(&shard->mutex);
   shard->cache.Merge(key, canonical_sym, inference_sym, output);
@@ -225,7 +225,7 @@ void ThreadSafeInferenceCache::Merge(Key key, symmetry::Symmetry canonical_sym,
 
 bool ThreadSafeInferenceCache::TryGet(Key key, symmetry::Symmetry canonical_sym,
                                       symmetry::Symmetry inference_sym,
-                                      Model::Output* output) {
+                                      ModelOutput* output) {
   auto* shard = shards_[key.Shard(shards_.size())].get();
   absl::MutexLock lock(&shard->mutex);
   return shard->cache.TryGet(key, canonical_sym, inference_sym, output);

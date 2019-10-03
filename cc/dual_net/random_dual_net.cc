@@ -27,16 +27,17 @@
 
 namespace minigo {
 
-RandomDualNet::RandomDualNet(std::string name, FeatureType feature_type,
+RandomDualNet::RandomDualNet(std::string name,
+                             const FeatureDescriptor& feature_desc,
                              uint64_t seed, float policy_stddev,
                              float value_stddev)
-    : Model(std::move(name), feature_type, 1),
+    : Model(std::move(name), feature_desc, 1),
       rnd_(seed, Random::kUniqueStream),
       policy_stddev_(policy_stddev),
       value_stddev_(value_stddev) {}
 
-void RandomDualNet::RunMany(const std::vector<const Input*>& inputs,
-                            std::vector<Output*>* outputs,
+void RandomDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
+                            std::vector<ModelOutput*>* outputs,
                             std::string* model_name) {
   for (auto* output : *outputs) {
     rnd_.NormalDistribution(0.5, policy_stddev_, &output->policy);
@@ -67,14 +68,15 @@ std::unique_ptr<Model> RandomDualNetFactory::NewModel(
   std::vector<absl::string_view> parts = absl::StrSplit(descriptor, ':');
   MG_CHECK(parts.size() == 3);
 
-  Model::FeatureType feature_type = Model::FeatureType::kNumFeatureTypes;
+  FeatureDescriptor feature_desc;
   float policy_stddev, value_stddev;
   if (parts[0] == "agz") {
-    feature_type = Model::FeatureType::kAgz;
+    feature_desc = FeatureDescriptor::Create<AgzFeatures>();
   } else if (parts[0] == "extra") {
-    feature_type = Model::FeatureType::kExtra;
+    feature_desc = FeatureDescriptor::Create<ExtraFeatures>();
   } else {
     MG_LOG(FATAL) << "unrecognized feature type \"" << parts[0] << "\"";
+    return nullptr;
   }
   MG_CHECK(absl::SimpleAtof(parts[1], &policy_stddev));
   MG_CHECK(absl::SimpleAtof(parts[2], &value_stddev));
@@ -84,7 +86,7 @@ std::unique_ptr<Model> RandomDualNetFactory::NewModel(
   std::vector<std::unique_ptr<Model>> models;
   for (int i = 0; i < num_cpus; ++i) {
     models.push_back(
-        absl::make_unique<RandomDualNet>(qualified_descriptor, feature_type,
+        absl::make_unique<RandomDualNet>(qualified_descriptor, feature_desc,
                                          seed_, policy_stddev, value_stddev));
   }
 

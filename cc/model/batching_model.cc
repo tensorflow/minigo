@@ -45,8 +45,8 @@ void ModelBatcher::EndGame() {
 }
 
 void ModelBatcher::RunMany(ModelBatcher* other_batcher,
-                           const std::vector<const Model::Input*>& inputs,
-                           std::vector<Model::Output*>* outputs,
+                           const std::vector<const ModelInput*>& inputs,
+                           std::vector<ModelOutput*>* outputs,
                            std::string* model_name) {
   WTF_SCOPE("ModelBatcher::RunMany", size_t)(inputs.size());
 
@@ -119,8 +119,8 @@ void ModelBatcher::RunBatch() {
   auto batch_size = GetBatchSize();
 
   // TODO(tommadams): reserve GetBatchSize() * virtual_losses elements.
-  std::vector<const Model::Input*> inputs;
-  std::vector<Model::Output*> outputs;
+  std::vector<const ModelInput*> inputs;
+  std::vector<ModelOutput*> outputs;
   std::vector<InferenceRequest> inferences;
 
   while (!queue_.empty() && inferences.size() < batch_size) {
@@ -179,11 +179,12 @@ void ModelBatcher::RunBatch() {
 }  // namespace internal
 
 BatchingModel::BatchingModel(std::shared_ptr<internal::ModelBatcher> batcher)
-    : Model(batcher->name(), batcher->feature_type(), 1),
+    : Model(batcher->name(), batcher->feature_descriptor(), 1),
       batcher_(std::move(batcher)) {}
 
-void BatchingModel::RunMany(const std::vector<const Model::Input*>& inputs,
-                            std::vector<Output*>* outputs, std::string* model) {
+void BatchingModel::RunMany(const std::vector<const ModelInput*>& inputs,
+                            std::vector<ModelOutput*>* outputs,
+                            std::string* model) {
   batcher_->RunMany(other_batcher_.get(), inputs, outputs, model);
 }
 

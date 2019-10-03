@@ -14,21 +14,6 @@ load(
     "minigo_cc_test_9_only",
 )
 
-minigo_cc_library(
-    name = "dual_net",
-    srcs = ["dual_net.cc"],
-    hdrs = ["dual_net.h"],
-    deps = [
-        "//cc:base",
-        "//cc:position",
-        "//cc:random",
-        "//cc:symmetries",
-        "//cc/model",
-        "@com_google_absl//absl/types:span",
-        "@wtf",
-    ],
-)
-
 factory_engine_copts = select({
     "//cc/config:enable_tf": [
         "-DMG_ENABLE_TF_DUAL_NET",
@@ -62,7 +47,7 @@ minigo_cc_library(
     hdrs = ["factory.h"],
     copts = factory_engine_copts,
     deps = [
-        ":dual_net",
+        "//cc/model",
         "//cc:logging",
         ":fake_dual_net",
         ":random_dual_net",
@@ -111,12 +96,12 @@ minigo_cc_library(
     }),
     tags = ["manual"],
     deps = [
-        ":dual_net",
         "//cc:base",
         "//cc:logging",
         "//cc:random",
         "//cc:thread_safe_queue",
         "//cc/file:path",
+        "//cc/model",
         "//cc/model:buffered_model",
         "//cc/tensorflow",
         "@com_google_absl//absl/memory",
@@ -131,11 +116,11 @@ minigo_cc_library(
     hdrs = ["lite_dual_net.h"],
     tags = ["manual"],
     deps = [
-        ":dual_net",
         "//cc:base",
         "//cc:logging",
         "//cc:random",
         "//cc/file:path",
+        "//cc/model",
         "//cc/platform",
         "//cc/tensorflow:tf_lite",
         "@com_google_absl//absl/memory",
@@ -149,11 +134,11 @@ minigo_cc_library(
     hdrs = ["tpu_dual_net.h"],
     tags = ["manual"],
     deps = [
-        ":dual_net",
         "//cc:base",
         "//cc:logging",
         "//cc:thread_safe_queue",
         "//cc/file:path",
+        "//cc/model",
         "//cc/model:buffered_model",
         "//cc/tensorflow",
         "@com_google_absl//absl/memory",
@@ -169,13 +154,13 @@ minigo_cc_test_9_only(
     copts = factory_engine_copts,
     data = glob(["test_model.*"]),
     deps = [
-        ":dual_net",
         ":factory",
         "//cc:logging",
         "//cc:position",
         "//cc:random",
         "//cc:symmetries",
         "//cc:test_utils",
+        "//cc/model",
         "@com_google_googletest//:gtest_main",
     ],
 )

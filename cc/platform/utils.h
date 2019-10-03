@@ -31,6 +31,7 @@
 
 #define MG_ALIGN(x) __attribute__((aligned(x)))
 #define MG_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
+#define MG_ALWAYS_INLINE __attribute__((always_inline))
 
 #endif
 

@@ -17,18 +17,21 @@
 namespace minigo {
 
 BufferedModel::BufferedModel(std::vector<std::unique_ptr<Model>> impls)
-    : Model(impls[0]->name(), impls[0]->feature_type(),
+    : Model(impls[0]->name(), impls[0]->feature_descriptor(),
             static_cast<int>(impls.size())) {
   for (auto& x : impls) {
     // Make sure all impls use the same name & input features.
     MG_CHECK(x->name() == name());
-    MG_CHECK(x->feature_type() == feature_type());
+    MG_CHECK(x->feature_descriptor().set_bytes ==
+             feature_descriptor().set_bytes);
+    MG_CHECK(x->feature_descriptor().set_floats ==
+             feature_descriptor().set_floats);
     impls_.Push(std::move(x));
   }
 }
 
-void BufferedModel::RunMany(const std::vector<const Input*>& inputs,
-                            std::vector<Output*>* outputs,
+void BufferedModel::RunMany(const std::vector<const ModelInput*>& inputs,
+                            std::vector<ModelOutput*>* outputs,
                             std::string* model_name) {
   auto impl = impls_.Pop();
   impl->RunMany(inputs, outputs, model_name);

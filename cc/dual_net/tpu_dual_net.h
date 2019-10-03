@@ -21,7 +21,7 @@
 #include <vector>
 
 #include "cc/constants.h"
-#include "cc/dual_net/dual_net.h"
+#include "cc/model.h"
 #include "cc/random.h"
 #include "cc/thread_safe_queue.h"
 #include "tensorflow/core/framework/graph.pb.h"
@@ -30,7 +30,7 @@
 
 namespace minigo {
 
-class TpuDualNet : public DualNet {
+class TpuDualNet : public Model {
  public:
   // buffer_count: How many buffers to use for batched inference, i.e. the
   // number of inference requests the model batcher will send in parallel.

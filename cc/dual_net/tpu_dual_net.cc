@@ -102,7 +102,7 @@ std::unique_ptr<Session> CreateSession(const GraphDef& graph_def,
 TpuDualNet::TpuDualNet(const std::string& tpu_name,
                        const std::string& graph_path,
                        const tensorflow::GraphDef& graph_def, int num_replicas)
-    : DualNet(std::string(file::Stem(graph_path)),
+    : Model(std::string(file::Stem(graph_path)),
       num_replicas_(num_replicas) {
   session_ = CreateSession(graph_def, tpu_name);
   for (int i = 0; i < num_replicas_; ++i) {
@@ -116,12 +116,11 @@ TpuDualNet::TpuDualNet(const std::string& tpu_name,
   // so explicitly run inference once during construction.
   MG_LOG(INFO) << "Running warm-up inferences";
   Position::Stones stones;
-  Input input;
-  input.to_play = Color::kBlack;
+  ModelInput input;
   input.position_history.push_back(&stones);
-  Output output;
-  std::vector<const Input*> inputs = {&input};
-  std::vector<Output*> outputs = {&output};
+  ModelOutput output;
+  std::vector<const ModelInput*> inputs = {&input};
+  std::vector<ModelOutput*> outputs = {&output};
   RunMany(inputs, &outputs, nullptr);
 }
 

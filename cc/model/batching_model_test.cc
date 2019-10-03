@@ -77,8 +77,9 @@ class WaitingModel : public Model {
   // Blocks until Notify is called.
   // Each call pushes an EvaluatedBatch instance onto the factory's queue
   // containing the model name and size of the batch.
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
   // Allows one call to RunMany to complete.
   // Blocks until the executed RunMany call completes.
@@ -117,12 +118,12 @@ class WaitingModelFactory : public ModelFactory {
 
 WaitingModel::WaitingModel(WaitingModelFactory* factory, std::string model_name,
                            int buffer_count)
-    : Model("Waiting", Model::FeatureType::kAgz, buffer_count),
+    : Model("Waiting", FeatureDescriptor::Create<AgzFeatures>(), buffer_count),
       factory_(factory),
       model_name_(std::move(model_name)) {}
 
-void WaitingModel::RunMany(const std::vector<const Input*>& inputs,
-                           std::vector<Output*>* outputs,
+void WaitingModel::RunMany(const std::vector<const ModelInput*>& inputs,
+                           std::vector<ModelOutput*>* outputs,
                            std::string* model_name) {
   before_.Wait();
   factory_->PushEvaluatedBatch(model_name_, inputs.size());
@@ -217,8 +218,8 @@ TEST_F(BatchingModelTest, SelfPlay) {
   constexpr int kNumGames = 6;
 
   struct Game {
-    Model::Input input;
-    Model::Output output;
+    ModelInput input;
+    ModelOutput output;
     std::unique_ptr<Model> model;
     std::thread thread;
   };
@@ -238,8 +239,8 @@ TEST_F(BatchingModelTest, SelfPlay) {
 
     for (auto& game : games) {
       game.thread = std::thread([&game] {
-        std::vector<const Model::Input*> inputs = {&game.input};
-        std::vector<Model::Output*> outputs = {&game.output};
+        std::vector<const ModelInput*> inputs = {&game.input};
+        std::vector<ModelOutput*> outputs = {&game.output};
         game.model->RunMany(inputs, &outputs, nullptr);
       });
     }
@@ -259,8 +260,8 @@ TEST_F(BatchingModelTest, EvalDoubleBuffer) {
   constexpr int kNumGames = 6;
 
   struct Game {
-    Model::Input input;
-    Model::Output output;
+    ModelInput input;
+    ModelOutput output;
     std::unique_ptr<Model> black;
     std::unique_ptr<Model> white;
     std::thread thread;
@@ -282,8 +283,8 @@ TEST_F(BatchingModelTest, EvalDoubleBuffer) {
 
     for (auto& game : games) {
       game.thread = std::thread([&game] {
-        std::vector<const Model::Input*> inputs = {&game.input};
-        std::vector<Model::Output*> outputs = {&game.output};
+        std::vector<const ModelInput*> inputs = {&game.input};
+        std::vector<ModelOutput*> outputs = {&game.output};
         game.black->RunMany(inputs, &outputs, nullptr);
         game.white->RunMany(inputs, &outputs, nullptr);
       });

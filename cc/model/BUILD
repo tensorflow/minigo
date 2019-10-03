@@ -14,13 +14,22 @@ load(
 
 minigo_cc_library(
     name = "model",
-    srcs = ["model.cc"],
-    hdrs = ["model.h"],
+    srcs = [
+        "features_internal.h",
+        "model.cc",
+    ],
+    hdrs = [
+        "features.h",
+        "model.h",
+        "types.h",
+    ],
     deps = [
         "//cc:base",
         "//cc:inline_vector",
+        "//cc:logging",
         "//cc:position",
         "//cc:symmetries",
+        "//cc/platform",
     ],
 )
 
@@ -97,6 +106,15 @@ minigo_cc_test(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+minigo_cc_test(
+    name = "features_test",
+    srcs = ["features_test.cc"],
+    deps = [
+        ":model",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -18,27 +18,36 @@
 
 namespace minigo {
 
-Model::Model(std::string name, FeatureType feature_type, int buffer_count)
+Model::Model(std::string name, const FeatureDescriptor& feature_desc,
+             int buffer_count)
     : name_(std::move(name)),
-      feature_type_(feature_type),
+      feature_desc_(feature_desc),
       buffer_count_(buffer_count) {}
 Model::~Model() = default;
 
-int Model::GetNumFeaturePlanes(FeatureType feature_type) {
-  switch (feature_type) {
-    case Model::FeatureType::kAgz:
-      return Model::kNumAgzFeaturePlanes;
-    case Model::FeatureType::kExtra:
-      return Model::kNumExtraFeaturePlanes;
-    default:
-      MG_LOG(FATAL) << "invalid feature type "
-                    << static_cast<int>(feature_type);
-      return 0;
+void Model::GetOutputs(const std::vector<const ModelInput*>& inputs,
+                       const Tensor<float>& policy, const Tensor<float>& value,
+                       std::vector<ModelOutput*>* outputs) {
+  MG_CHECK(outputs->size() == inputs.size());
+  MG_CHECK(policy.n == value.n);
+  MG_CHECK(static_cast<int>(inputs.size()) <= policy.n);
+
+  // Copy the policy and value out of the output tensors.
+  for (size_t input_idx = 0; input_idx < inputs.size(); ++input_idx) {
+    const auto sym = inputs[input_idx]->sym;
+    const auto* raw_policy = policy.data + kNumMoves * input_idx;
+    const auto* raw_value = value.data + input_idx;
+    auto& output = *(*outputs)[input_idx];
+
+    symmetry::ApplySymmetry<kN, 1>(symmetry::Inverse(sym), raw_policy,
+                                   output.policy.data());
+    output.policy[Coord::kPass] = raw_policy[Coord::kPass];
+    output.value = *raw_value;
   }
 }
 
-void Model::ApplySymmetry(symmetry::Symmetry sym, const Output& src,
-                          Output* dst) {
+void Model::ApplySymmetry(symmetry::Symmetry sym, const ModelOutput& src,
+                          ModelOutput* dst) {
   symmetry::ApplySymmetry<kN, 1>(sym, src.policy.data(), dst->policy.data());
   dst->policy[Coord::kPass] = src.policy[Coord::kPass];
   dst->value = src.value;

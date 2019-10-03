@@ -34,8 +34,7 @@ namespace minigo {
 namespace {
 
 void Unquantize(const TfLiteQuantizationParams& params,
-                const Model::Tensor<uint8_t>& src,
-                Model::Tensor<float>* dst) {
+                const Tensor<uint8_t>& src, Tensor<float>* dst) {
   MG_CHECK(src.n == dst->n && src.h == dst->h && src.w == dst->w &&
            src.c == dst->c);
   int size = src.n * src.h * src.w * src.c;
@@ -44,12 +43,13 @@ void Unquantize(const TfLiteQuantizationParams& params,
   }
 }
 
-class LiteDualNet : public DualNet {
+class LiteDualNet : public Model {
  public:
-  explicit LiteDualNet(std::string graph_path);
+  LiteDualNet(std::string graph_path, const FeatureDescriptor& feature_desc);
 
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
  private:
   void Reserve(int capacity);
@@ -72,8 +72,9 @@ class LiteDualNet : public DualNet {
   BackedTensor<float> unquantized_value_;
 };
 
-LiteDualNet::LiteDualNet(std::string graph_path)
-    : DualNet(std::string(file::Stem(graph_path)), Model::FeatureType::kAgz, 1),
+LiteDualNet::LiteDualNet(std::string graph_path,
+                         const FeatureDescriptor& feature_desc)
+    : Model(std::string(file::Stem(graph_path)), feature_desc, 1),
       graph_path_(std::move(graph_path)),
       batch_capacity_(0) {
   model_ = FlatBufferModel::BuildFromFile(graph_path_.c_str());
@@ -97,8 +98,7 @@ LiteDualNet::LiteDualNet(std::string graph_path)
   MG_CHECK(input->dims->size == 4);
   MG_CHECK(input->dims->data[1] == kN);
   MG_CHECK(input->dims->data[2] == kN);
-  // TODO(tommadams): support other input feature types.
-  MG_CHECK(input->dims->data[3] == Model::kNumAgzFeaturePlanes);
+  MG_CHECK(input->dims->data[3] == feature_desc.num_planes);
 
   const auto& outputs = interpreter_->outputs();
   MG_CHECK(outputs.size() == 2);
@@ -124,7 +124,8 @@ void LiteDualNet::Reserve(int capacity) {
 
   // Resize input tensor to batch size.
   MG_CHECK(interpreter_->ResizeInputTensor(
-      input_idx_, {capacity, kN, kN, kNumAgzFeaturePlanes}) == kTfLiteOk);
+               input_idx_, {capacity, kN, kN,
+                            feature_descriptor().num_planes}) == kTfLiteOk);
   MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
 
   // Get the new inputs and outputs after AllocateTensor().
@@ -138,8 +139,8 @@ void LiteDualNet::Reserve(int capacity) {
   batch_capacity_ = capacity;
 }
 
-void LiteDualNet::RunMany(const std::vector<const Input*>& inputs,
-                          std::vector<Output*>* outputs,
+void LiteDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
+                          std::vector<ModelOutput*>* outputs,
                           std::string* model_name) {
   MG_CHECK(inputs.size() == outputs->size());
 
@@ -151,7 +152,7 @@ void LiteDualNet::RunMany(const std::vector<const Input*>& inputs,
     case kTfLiteFloat32: {
       Tensor<float> features(dims[0], dims[1], dims[2], dims[3],
                              input_->data.f);
-      DualNet::SetFeatures(inputs, Model::FeatureType::kAgz, &features);
+      feature_descriptor().set_floats(inputs, &features);
 
       MG_CHECK(interpreter_->Invoke() == kTfLiteOk);
 
@@ -162,7 +163,7 @@ void LiteDualNet::RunMany(const std::vector<const Input*>& inputs,
     case kTfLiteUInt8: {
       Tensor<uint8_t> features(dims[0], dims[1], dims[2], dims[3],
                                input_->data.uint8);
-      DualNet::SetFeatures(inputs, Model::FeatureType::kAgz, &features);
+      feature_descriptor().set_bytes(inputs, &features);
       MG_CHECK(interpreter_->Invoke() == kTfLiteOk);
 
       Tensor<uint8_t> quantized_policy(batch_capacity_, 1, 1, kNumMoves,
@@ -170,8 +171,8 @@ void LiteDualNet::RunMany(const std::vector<const Input*>& inputs,
       Tensor<uint8_t> quantized_value(batch_capacity_, 1, 1, 1,
                                       value_->data.uint8);
 
-      policy = unquantized_policy_;
-      value = unquantized_value_;
+      policy = unquantized_policy_.tensor();
+      value = unquantized_value_.tensor();
       Unquantize(policy_->params, quantized_policy, &policy);
       Unquantize(value_->params, quantized_value, &value);
       break;
@@ -181,7 +182,7 @@ void LiteDualNet::RunMany(const std::vector<const Input*>& inputs,
       break;
   }
 
-  DualNet::GetOutputs(inputs, policy, value, outputs);
+  Model::GetOutputs(inputs, policy, value, outputs);
 
   if (model_name != nullptr) {
     *model_name = graph_path_;
@@ -192,7 +193,9 @@ void LiteDualNet::RunMany(const std::vector<const Input*>& inputs,
 
 std::unique_ptr<Model> LiteDualNetFactory::NewModel(
     const std::string& descriptor) {
-  return absl::make_unique<LiteDualNet>(descriptor);
+  // TODO(tommadams): support extra feature types.
+  auto feature_desc = FeatureDescriptor::Create<AgzFeatures>();
+  return absl::make_unique<LiteDualNet>(descriptor, feature_desc);
 }
 
 }  // namespace minigo

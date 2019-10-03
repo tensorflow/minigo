@@ -58,15 +58,17 @@ void PlaceOnDevice(tensorflow::GraphDef* graph_def, const std::string& device) {
   }
 }
 
-class TfDualNet : public DualNet {
+class TfDualNet : public Model {
  public:
-  TfDualNet(const std::string& graph_path, FeatureType feature_type,
+  TfDualNet(const std::string& graph_path,
+            const FeatureDescriptor& feature_desc,
             const tensorflow::GraphDef& graph_def,
             const std::vector<int>& devices);
   ~TfDualNet() override;
 
-  void RunMany(const std::vector<const Input*>& inputs,
-               std::vector<Output*>* outputs, std::string* model_name) override;
+  void RunMany(const std::vector<const ModelInput*>& inputs,
+               std::vector<ModelOutput*>* outputs,
+               std::string* model_name) override;
 
  private:
   void Reserve(int capacity);
@@ -76,17 +78,16 @@ class TfDualNet : public DualNet {
   std::vector<std::string> output_names_;
   std::vector<tensorflow::Tensor> outputs_;
   const std::string graph_path_;
-  const int num_feature_planes_;
   int batch_capacity_ = 0;
 };
 
-TfDualNet::TfDualNet(const std::string& graph_path, FeatureType feature_type,
+TfDualNet::TfDualNet(const std::string& graph_path,
+                     const FeatureDescriptor& feature_desc,
                      const tensorflow::GraphDef& graph_def,
                      const std::vector<int>& devices)
-    : DualNet(std::string(file::Stem(file::Basename(graph_path))),
-              feature_type, 1),
-      graph_path_(graph_path),
-      num_feature_planes_(Model::GetNumFeaturePlanes(feature_type)) {
+    : Model(std::string(file::Stem(file::Basename(graph_path))), feature_desc,
+            1),
+      graph_path_(graph_path) {
   tensorflow::SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
   if (!devices.empty()) {
@@ -106,17 +107,18 @@ TfDualNet::~TfDualNet() {
   }
 }
 
-void TfDualNet::RunMany(const std::vector<const Input*>& inputs,
-                        std::vector<Output*>* outputs,
+void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
+                        std::vector<ModelOutput*>* outputs,
                         std::string* model_name) {
   WTF_SCOPE("TfDualNet::Run", size_t)(inputs.size());
   MG_CHECK(inputs.size() == outputs->size());
 
   Reserve(inputs.size());
 
-  Tensor<float> features(batch_capacity_, kN, kN, num_feature_planes_,
+  Tensor<float> features(batch_capacity_, kN, kN,
+                         feature_descriptor().num_planes,
                          inputs_[0].second.flat<float>().data());
-  DualNet::SetFeatures(inputs, feature_type(), &features);
+  feature_descriptor().set_floats(inputs, &features);
 
   // Run the model.
   {
@@ -128,7 +130,7 @@ void TfDualNet::RunMany(const std::vector<const Input*>& inputs,
                        outputs_[0].flat<float>().data());
   Tensor<float> value(batch_capacity_, 1, 1, 1,
                       outputs_[1].flat<float>().data());
-  DualNet::GetOutputs(inputs, policy, value, outputs);
+  Model::GetOutputs(inputs, policy, value, outputs);
 
   if (model_name != nullptr) {
     *model_name = graph_path_;
@@ -141,9 +143,10 @@ void TfDualNet::Reserve(int capacity) {
     return;
   }
   inputs_.clear();
-  inputs_.emplace_back("pos_tensor", tensorflow::Tensor(tensorflow::DT_FLOAT,
-                                                        {capacity, kN, kN,
-                                                         num_feature_planes_}));
+  inputs_.emplace_back(
+      "pos_tensor",
+      tensorflow::Tensor(tensorflow::DT_FLOAT,
+                         {capacity, kN, kN, feature_descriptor().num_planes}));
   batch_capacity_ = capacity;
 }
 
@@ -191,17 +194,19 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
   }
   MG_CHECK(num_feature_planes != 0)
       << "Couldn't determine model type from GraphDef: pos_tensor not found";
-  Model::FeatureType feature_type = Model::FeatureType::kNumFeatureTypes;
+
+  FeatureDescriptor feature_desc;
   switch (num_feature_planes) {
     case 17:
-      feature_type = Model::FeatureType::kAgz;
+      feature_desc = FeatureDescriptor::Create<AgzFeatures>();
       break;
     case 20:
-      feature_type = Model::FeatureType::kExtra;
+      feature_desc = FeatureDescriptor::Create<ExtraFeatures>();
       break;
     default:
       MG_LOG(FATAL) << "unrecognized number of features: "
                     << num_feature_planes;
+      return nullptr;
   }
 
   std::vector<std::unique_ptr<Model>> models;
@@ -212,9 +217,9 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
       PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
     }
     models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, feature_type, graph_def, std::move(devices_)));
+        descriptor, feature_desc, graph_def, std::move(devices_)));
     models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, feature_type, graph_def, std::move(devices_)));
+        descriptor, feature_desc, graph_def, std::move(devices_)));
   }
 
   return absl::make_unique<BufferedModel>(std::move(models));

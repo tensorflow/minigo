@@ -30,10 +30,10 @@ namespace minigo {
 namespace {
 
 struct Inference {
-  Inference(InferenceCache::Key key, const Model::Output& output)
+  Inference(InferenceCache::Key key, const ModelOutput& output)
       : key(key), output(output) {}
   InferenceCache::Key key;
-  Model::Output output;
+  ModelOutput output;
 };
 
 // Verify that all symmetries of a position generate the same cache key.
@@ -106,7 +106,7 @@ TEST(BasicInferenceCacheTest, LruTest) {
     prev_move = GetRandomLegalMove(position, &rnd);
     position.PlayMove(prev_move);
 
-    Model::Output output;
+    ModelOutput output;
     rnd.Uniform(&output.policy);
     output.value = rnd();
     inferences.emplace_back(key, output);
@@ -118,7 +118,7 @@ TEST(BasicInferenceCacheTest, LruTest) {
   }
 
   // Verify that the elements stored in the cache are as expected.
-  Model::Output output;
+  ModelOutput output;
   for (int i = 0; i < 3; ++i) {
     ASSERT_TRUE(cache.TryGet(inferences[i].key, sym, sym, &output));
     EXPECT_EQ(inferences[i].output.policy, output.policy);
@@ -145,7 +145,7 @@ TEST(InferenceCacheTest, SingleSymmetryTest) {
                                                 rnd.UniformUint64());
 
   // Generate the canonical output.
-  Model::Output canonical_output;
+  ModelOutput canonical_output;
   for (int i = 0; i < kNumMoves; ++i) {
     canonical_output.policy[i] = static_cast<float>(i);
   }
@@ -156,7 +156,7 @@ TEST(InferenceCacheTest, SingleSymmetryTest) {
   for (auto canonical_sym : canonical_symmetries) {
     // When running for real, the output from inference would be transformed by
     // the canonical symmetry.
-    Model::Output real_output;
+    ModelOutput real_output;
     Model::ApplySymmetry(canonical_sym, canonical_output, &real_output);
 
     // The models handle inference symmetry internally so we don't actually
@@ -168,12 +168,12 @@ TEST(InferenceCacheTest, SingleSymmetryTest) {
       BasicInferenceCache cache(3);
 
       // The cache should be empty.
-      Model::Output cached_output;
+      ModelOutput cached_output;
       EXPECT_FALSE(
           cache.TryGet(key, canonical_sym, inference_sym, &cached_output));
 
       // Merging the first symmetry for a position should not change the output.
-      Model::Output before_merge_output = real_output;
+      ModelOutput before_merge_output = real_output;
       cache.Merge(key, canonical_sym, inference_sym, &real_output);
 
       EXPECT_EQ(before_merge_output.policy, real_output.policy);
@@ -202,7 +202,7 @@ TEST(InferenceCacheTest, MergeSymmetiesTest) {
   // Generate canonical output.
   // The policy is initialized to 0.0 except for one point that doesn't lie on
   // any symmetry.
-  Model::Output canonical_output;
+  ModelOutput canonical_output;
   for (auto& x : canonical_output.policy) {
     x = 0;
   }
@@ -216,7 +216,7 @@ TEST(InferenceCacheTest, MergeSymmetiesTest) {
     BasicInferenceCache cache(3);
 
     // Build the output from this inference.
-    Model::Output real_output;
+    ModelOutput real_output;
     Model::ApplySymmetry(canonical_sym, canonical_output, &real_output);
     auto real_non_zero_point =
         symmetry::ApplySymmetry(canonical_sym, canonical_non_zero_point);
@@ -228,7 +228,7 @@ TEST(InferenceCacheTest, MergeSymmetiesTest) {
          ++symmetry_merged) {
       auto inference_sym = inference_symmetries[symmetry_merged];
 
-      Model::Output inference_output;
+      ModelOutput inference_output;
       Model::ApplySymmetry(inference_sym, real_output, &inference_output);
 
       // In order to reasonably test that the kPass policy gets averaged
@@ -243,7 +243,7 @@ TEST(InferenceCacheTest, MergeSymmetiesTest) {
       inference_output.value = 3.0f * symmetry_merged;
 
       // We haven't put this symmetry into the cache yet.
-      Model::Output cached_output;
+      ModelOutput cached_output;
       EXPECT_FALSE(
           cache.TryGet(key, canonical_sym, inference_sym, &cached_output));
 
@@ -289,7 +289,7 @@ TEST(ThreadSafeInferenceCacheTest, SimpleTest) {
     prev_move = GetRandomLegalMove(position, &rnd);
     position.PlayMove(prev_move);
 
-    Model::Output output;
+    ModelOutput output;
     rnd.Uniform(&output.policy);
     output.value = rnd();
     inferences.emplace_back(key, output);
@@ -301,7 +301,7 @@ TEST(ThreadSafeInferenceCacheTest, SimpleTest) {
   }
 
   // Verify that the elements stored in the cache are as expected.
-  Model::Output output;
+  ModelOutput output;
   for (const auto& inference : inferences) {
     ASSERT_TRUE(cache.TryGet(inference.key, sym, sym, &output));
     EXPECT_EQ(inference.output.policy, output.policy);
@@ -322,7 +322,7 @@ TEST(ThreadSafeInferenceCacheTest, StressTest) {
     threads.emplace_back([&cache, i, sym]() {
       int hits = 0;
       int misses = 0;
-      Model::Output output;
+      ModelOutput output;
       Random rnd(27, i);
       for (int i = 0; i < kNumIterations; ++i) {
         TestablePosition position("");

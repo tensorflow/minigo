@@ -280,13 +280,13 @@ class MctsPlayer {
     symmetry::Symmetry canonical_sym;
     symmetry::Symmetry inference_sym;
     MctsNode* leaf;
-    Model::Input input;
-    Model::Output output;
+    ModelInput input;
+    ModelOutput output;
   };
 
   std::vector<TreeSearchInference> tree_search_inferences_;
-  std::vector<const Model::Input*> input_ptrs_;
-  std::vector<Model::Output*> output_ptrs_;
+  std::vector<const ModelInput*> input_ptrs_;
+  std::vector<ModelOutput*> output_ptrs_;
 
   TreeSearchCallback tree_search_cb_ = nullptr;
 
