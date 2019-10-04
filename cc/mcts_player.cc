@@ -43,6 +43,7 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
      << " fastplay_frequency:" << options.fastplay_frequency
      << " fastplay_readouts:" << options.fastplay_readouts
      << " target_pruning:" << options.target_pruning
+     << " restrict_in_bensons:" << options.restrict_in_bensons
      << " random_seed:" << options.random_seed << std::flush;
   return os;
 }
@@ -110,7 +111,8 @@ bool MctsPlayer::UndoMove() {
   return true;
 }
 
-Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise) {
+Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise,
+                              bool restrict_in_bensons) {
   auto start = absl::Now();
 
   if (inject_noise) {
@@ -140,21 +142,16 @@ Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise) {
     return Coord::kResign;
   }
 
-  // Pick the move before altering the tree for training targets.
-  auto c = PickMove();
-
-  // After picking the move, destructively adjust the visit counts
-  // according to whatever flag-controlled scheme.
-  if (options_.target_pruning && inject_noise) {
-    root_->ReshapeFinalVisits();
-  }
-
-  return c;
+  return PickMove(restrict_in_bensons);
 }
 
-Coord MctsPlayer::PickMove() {
+Coord MctsPlayer::PickMove(bool restrict_in_bensons) {
   if (root_->position.n() >= temperature_cutoff_) {
-    return root_->GetMostVisitedMove();
+    auto c = root_->GetMostVisitedMove(restrict_in_bensons);
+    if (!root_->position.legal_move(c)) {
+      c = Coord::kPass;
+    }
+    return c;
   }
 
   // Select from the first kN * kN moves (instead of kNumMoves) to avoid
@@ -291,7 +288,7 @@ std::string MctsPlayer::GetModelsUsedForInference() const {
   return absl::StrJoin(parts, ", ");
 }
 
-bool MctsPlayer::PlayMove(Coord c) {
+bool MctsPlayer::PlayMove(Coord c, bool is_trainable) {
   if (root_->game_over()) {
     MG_LOG(ERROR) << "Can't play move " << c << ", game is over";
     return false;
@@ -316,7 +313,16 @@ bool MctsPlayer::PlayMove(Coord c) {
     return false;
   }
 
+  // Adjust the visits before adding the move's search_pi to the Game.
+  if (is_trainable && options_.target_pruning) {
+    root_->ReshapeFinalVisits(options_.restrict_in_bensons);
+  }
+
   UpdateGame(c);
+
+  if (is_trainable && c != Coord::kResign) {
+    game_->MarkLastMoveAsTrainable();
+  }
 
   root_ = root_->MaybeAddChild(c);
   // Don't need to keep the parent's children around anymore because we'll

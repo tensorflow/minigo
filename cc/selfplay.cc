@@ -89,6 +89,9 @@ DEFINE_double(value_init_penalty, 2.0,
 DEFINE_double(policy_softmax_temp, 0.98,
               "For soft-picked moves, the probabilities are exponentiated by "
               "policy_softmax_temp to encourage diversity in early play.\n");
+DEFINE_bool(restrict_in_bensons, false,
+              "Prevent play in benson's regions after 5 passes have been "
+              "played.\n");
 
 DEFINE_string(flags_path, "",
               "Optional path to load flags from. Flags specified in this file "
@@ -391,6 +394,9 @@ class SelfPlayer {
         BatchingModelFactory::StartGame(player->model(), player->model());
       }
       int current_readouts = 0;
+      bool fastplay;
+      int readouts;
+      int num_passes = 0;
       absl::Time search_start_time;
       while (!game->game_over() && !player->root()->at_move_limit()) {
         if (player->root()->position.n() >= kMinPassAliveMoves &&
@@ -408,10 +414,8 @@ class SelfPlayer {
           search_start_time = absl::Now();
         }
 
-        bool fastplay =
-            (rnd_() < thread_options.player_options.fastplay_frequency);
-        int readouts =
-            (fastplay ? thread_options.player_options.fastplay_readouts
+        fastplay = (rnd_() < thread_options.player_options.fastplay_frequency);
+        readouts = (fastplay ? thread_options.player_options.fastplay_readouts
                       : thread_options.player_options.num_readouts);
 
         if (thread_options.player_options.fastplay_frequency > 0 && !fastplay) {
@@ -425,7 +429,7 @@ class SelfPlayer {
         Coord move = Coord::kInvalid;
         {
           WTF_SCOPE0("SuggestMove");
-          move = player->SuggestMove(readouts, !fastplay);
+          move = player->SuggestMove(readouts, !fastplay, num_passes > 5);
         }
 
         // Log tree search stats.
@@ -473,11 +477,7 @@ class SelfPlayer {
         // Play the chosen move.
         {
           WTF_SCOPE0("PlayMove");
-          MG_CHECK(player->PlayMove(move));
-        }
-
-        if (!fastplay && move != Coord::kResign) {
-          (*game).MarkLastMoveAsTrainable();
+          MG_CHECK(player->PlayMove(move, !fastplay)); // !fastplay == is_trainable
         }
 
         // Log information about the move played.

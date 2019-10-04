@@ -38,6 +38,30 @@ static constexpr char kAlmostDoneBoard[] = R"(
     XXXXXOOOO
     XXXXOOOOO)";
 
+static constexpr char kSomeBensonsBoard[] = R"(
+    .XO.XO.OO
+    X.XXOOOO.
+    XXX.XO.OO
+    XX..XO.OO
+    .X..XO.O.
+    XX..XO.OO
+    ....XO...
+    ....XO...
+    ....OO...)";
+
+static constexpr char kOnlyBensonsBoard[] = R"(
+    ....X....
+    XXXXXXXXX
+    X.X.X.X.X
+    XXXXXXXXX
+    OOOOOOOOO
+    OOOOOOOOO
+    O.O.O.O.O
+    OOOOOOOOO
+    ....O....)";
+
+
+
 // Test puct and child action score calculation
 TEST(MctsNodeTest, UpperConfidenceBound) {
   float epsilon = 1e-7;
@@ -351,7 +375,6 @@ TEST(MctsNodeTest, DontTraverseUnexpandedChild) {
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   MctsNode root(&root_stats, board);
-  root_stats.N = 5;
   root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
 
   auto* leaf1 = root.SelectLeaf();
@@ -385,16 +408,113 @@ TEST(MctsNodeTest, GetMostVisitedPath) {
   auto* leaf1 = root.SelectLeaf();
   EXPECT_EQ(Coord(16), leaf1->move);
   leaf1->AddVirtualLoss(&root);
+  leaf1->IncorporateResults(0.0, probs, 0, &root);
 
   // Then the second highest probability.
   auto* leaf2 = root.SelectLeaf();
   EXPECT_EQ(Coord(15), leaf2->move);
   leaf1->RevertVirtualLoss(&root);
+  leaf2->IncorporateResults(0.0, probs, 0, &root);
 
   // Both Coord(15) and Coord(16) have visit counts of 1.
   // Coord(16) should be selected because of it's higher action score.
   EXPECT_EQ(Coord(16), root.GetMostVisitedMove());
 }
+
+TEST(MctsNodeTest, GetMostVisitedBensonRestriction) {
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.001;
+  }
+  probs[0] = 0.002; // A9, a bensons point, has higher prior.
+  MctsNode::EdgeStats root_stats;
+  auto board = TestablePosition(kSomeBensonsBoard, Color::kBlack);
+  MctsNode root(&root_stats, board);
+  for (int i= 0; i < 10; i++) {
+    root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
+  }
+
+  EXPECT_EQ(Coord(0), root.GetMostVisitedMove(false));
+  EXPECT_NE(Coord(0), root.GetMostVisitedMove(true));
+  EXPECT_NE(root.GetMostVisitedMove(false), root.GetMostVisitedMove(true));
+}
+
+
+// Pass is still a valid choice, with or without removing pass-alive areas.
+TEST(MctsNodeTest, BensonRestrictionStillPasses) {
+  MctsNode::EdgeStats root_stats;
+  auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
+  MctsNode root(&root_stats, board);
+
+  for (int i = 0; i < kNumMoves; ++i) {
+    if (root.position.ClassifyMove(i) != Position::MoveType::kIllegal) {
+      root.edges[i].N = 10;
+    }
+  }
+  root.edges[Coord::kPass].N = 100;
+
+  EXPECT_EQ(Coord::kPass, root.GetMostVisitedMove(false));
+  EXPECT_EQ(Coord::kPass, root.GetMostVisitedMove(true));
+}
+
+
+TEST(MctsNodeTest, ReshapePrunesBensonsVisits) {
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.001;
+  }
+  probs[0] = 0.002; // A9, a bensons point, has higher prior.
+
+  MctsNode::EdgeStats root_stats;
+  auto board = TestablePosition(kSomeBensonsBoard, Color::kBlack);
+  MctsNode root(&root_stats, board);
+  MctsNode root2(&root_stats, board);
+  for (int i= 0; i < 10; i++) {
+    root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
+    root2.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root2);
+  }
+
+  EXPECT_NE(root.edges[0].N, 0); // A9 should've had visits.
+  root.ReshapeFinalVisits(true);
+  EXPECT_EQ(root.edges[0].N, 0); // Reshape should've removed them.
+
+  EXPECT_NE(root2.edges[0].N, 0);   // A9 should've had visits.
+  auto original = root2.edges[0].N; // Store them.
+  root2.ReshapeFinalVisits(false);
+  EXPECT_NE(root2.edges[0].N, 0);   // Reshape should not have removed them.
+  EXPECT_EQ(original, root2.edges[0].N); // And they should be the same.
+}
+
+TEST(MctsNodeTest, ReshapeWhenOnlyBensons) {
+  std::array<float, kNumMoves> probs;
+  for (float& prob : probs) {
+    prob = 0.01;
+  }
+  // Let's only explore moves in benson's regions.
+  probs[Coord::kPass] = 0;
+
+  MctsNode::EdgeStats root_stats;
+  auto board = TestablePosition(kOnlyBensonsBoard, Color::kBlack);
+  MctsNode root(&root_stats, board);
+  MctsNode root2(&root_stats, board);
+  for (int i= 0; i < 10; i++) {
+    root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
+    root2.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root2);
+  }
+
+  EXPECT_EQ(root.edges[Coord::kPass].N, 0);  // Pass should have no visits.
+  EXPECT_EQ(root2.edges[Coord::kPass].N, 0);
+
+  // Reshape with bensons restricted should add one.
+  root.ReshapeFinalVisits(true);
+  EXPECT_EQ(root.edges[Coord::kPass].N, 1);
+
+  // Reshape with bensons not restricted should NOT add one.
+  root2.ReshapeFinalVisits(false);
+  EXPECT_EQ(root2.edges[Coord::kPass].N, 0);
+}
+
+
 
 // Verifies that even when one move is hugely more likely than all the others,
 // SelectLeaf will eventually start exploring other moves given enough
