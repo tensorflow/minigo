@@ -88,7 +88,9 @@ flags.DEFINE_string('engine', 'tf', 'The engine to use for selfplay.')
 
 flags.DEFINE_boolean('bootstrap', False, '')
 
-flags.DEFINE_boolean('use_extra_features', False, '')
+flags.DEFINE_boolean('validate', False, 'Run validation on holdout games')
+
+flags.DEFINE_boolean('use_extra_features', False, 'Use non-Zero input features')
 
 FLAGS = flags.FLAGS
 
@@ -368,24 +370,36 @@ async def selfplay(state):
 
     commands = []
     num_selfplay_processes = len(FLAGS.selfplay_devices)
-    for i, device in enumerate(FLAGS.selfplay_devices):
-        a = ((i - 1) * FLAGS.selfplay_num_games) // (num_selfplay_processes - 1)
-        b = (i * FLAGS.selfplay_num_games) // (num_selfplay_processes - 1)
-        num_games = b - a
-        parallel_games = (
-            (num_games + FLAGS.selfplay_num_games_per_thread - 1) //
-            FLAGS.selfplay_num_games_per_thread)
-
+    if num_selfplay_processes == 1:
         commands.append([
             'bazel-bin/cc/selfplay',
             '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                                 'selfplay.flags')),
-            '--num_games={}'.format(num_games),
-            '--parallel_games={}'.format(parallel_games),
-            '--model={}:{},{}'.format(FLAGS.engine, device,
+            '--num_games={}'.format(FLAGS.selfplay_num_games),
+            '--parallel_games={}'.format(FLAGS.selfplay_num_games_per_thread),
+            '--model={}:0,{}'.format(FLAGS.engine,
                                       state.best_model_path),
-            '--output_dir={}/{}'.format(output_dir, i),
-            '--holdout_dir={}/{}'.format(holdout_dir, i)])
+            '--output_dir={}/{}'.format(output_dir, 0),
+            '--holdout_dir={}/{}'.format(holdout_dir, 0)])
+    else:
+        for i, device in enumerate(FLAGS.selfplay_devices):
+            a = ((i - 1) * FLAGS.selfplay_num_games) // (num_selfplay_processes - 1)
+            b = (i * FLAGS.selfplay_num_games) // (num_selfplay_processes - 1)
+            num_games = b - a
+            parallel_games = (
+                (num_games + FLAGS.selfplay_num_games_per_thread - 1) //
+                FLAGS.selfplay_num_games_per_thread)
+
+            commands.append([
+                'bazel-bin/cc/selfplay',
+                '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
+                                                    'selfplay.flags')),
+                '--num_games={}'.format(num_games),
+                '--parallel_games={}'.format(parallel_games),
+                '--model={}:{},{}'.format(FLAGS.engine, device,
+                                          state.best_model_path),
+                '--output_dir={}/{}'.format(output_dir, i),
+                '--holdout_dir={}/{}'.format(holdout_dir, i)])
 
     all_lines = await run_commands(commands)
 
@@ -443,7 +457,21 @@ async def train(state, tf_records):
 
 async def train_eval(state, tf_records):
     await train(state, tf_records)
+    if FLAGS.validate:
+      await validate(state)
     return await evaluate_trained_model(state)
+
+
+async def validate(state):
+    dirs = [x.path for x in os.scandir(fsdb.holdout_dir()) if x.is_dir()]
+    src_dirs = sorted(dirs, reverse=True)[:FLAGS.window_size]
+
+    await run('python3', 'validate.py',
+        '--gpu_device_list={}'.format(','.join(FLAGS.train_devices)),
+        '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'validate.flags')),
+        '--work_dir={}'.format(fsdb.working_dir()),
+        '--expand_validation_dirs',
+              *src_dirs)
 
 
 async def evaluate_model(eval_model_path, target_model_path, sgf_dir):

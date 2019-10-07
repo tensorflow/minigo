@@ -4,4 +4,4 @@
 
 --examples_to_validate=256
 --train_batch_size=64
---summary_steps=2
+--summary_steps=8
