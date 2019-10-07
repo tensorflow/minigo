@@ -134,8 +134,11 @@ struct Features {
         << features->h << " " << features->w << " " << features->c;
     int stride = features->h * features->w * features->c;
     auto* data = features->data;
+    std::array<T, kN * kN * kNumPlanes> raw_features;
     for (const auto* input : inputs) {
-      Impl::SetAll(*input, features->c, data);
+      Impl::SetAll(*input, features->c, raw_features.data());
+      symmetry::ApplySymmetry<kN, kNumPlanes>(input->sym, raw_features.data(),
+                                              data);
       data += stride;
     }
   }

@@ -140,39 +140,59 @@ struct Set3 {
 TEST(FeaturesTest, TestSet) {
   using TestFeatures = Features<Set2, Set3, Set1>;
 
-  ModelInput input;
+  // Test all symmetries.
+  for (int sym_idx = 0; sym_idx < symmetry::kNumSymmetries; ++sym_idx) {
+    auto sym = static_cast<symmetry::Symmetry>(sym_idx);
 
-  constexpr int kBatchSize = 3;
+    ModelInput input;
+    input.sym = sym;
 
-  // The inputs aren't used by any of our test features so we don't need to
-  // initialize them to anything meaningful.
-  std::vector<const ModelInput*> inputs;
-  for (int i = 0; i < kBatchSize; ++i) {
-    inputs.push_back(&input);
-  }
+    constexpr int kBatchSize = 3;
 
-  // Allocate a feature tensor.
-  BackedTensor<int> features;
-  features.resize(kBatchSize, kN, kN, TestFeatures::kNumPlanes);
-
-  // Set the test input features.
-  TestFeatures::Set(inputs, &features.tensor());
-
-  // Verify the input features.
-  for (int j = 0, feature = 0; feature < kBatchSize; ++feature) {
-    for (int i = 0; i < kN * kN; ++i) {
-      // Features from Set2.
-      EXPECT_EQ(2000 + i, features.tensor().data[j++]);
-      EXPECT_EQ(3000 + i, features.tensor().data[j++]);
-
-      // Features from Set3.
-      EXPECT_EQ(4000 + i, features.tensor().data[j++]);
-      EXPECT_EQ(5000 + i, features.tensor().data[j++]);
-      EXPECT_EQ(6000 + i, features.tensor().data[j++]);
-
-      // Features from Set1.
-      EXPECT_EQ(1000 + i, features.tensor().data[j++]);
+    // The inputs aren't used by any of our test features so we don't need to
+    // initialize them to anything meaningful.
+    std::vector<const ModelInput*> inputs;
+    for (int i = 0; i < kBatchSize; ++i) {
+      inputs.push_back(&input);
     }
+
+    // Allocate a feature tensor.
+    BackedTensor<int> features;
+    features.resize(kBatchSize, kN, kN, TestFeatures::kNumPlanes);
+
+    // Set the test input features.
+    TestFeatures::Set(inputs, &features.tensor());
+
+    // Verify the input features.
+    for (int input = 0; input < kBatchSize; ++input) {
+      int base = input * kN * kN * TestFeatures::kNumPlanes;
+      for (int row = 0; row < kN; ++row) {
+        for (int col = 0; col < kN; ++col) {
+          // Coordinate before symmetry is applied.
+          Coord i = Coord(row, col);
+
+          // Apply symmetry to get the coordinate with which we should read the
+          // input feature tensor.
+          Coord c = symmetry::ApplySymmetry(sym, i);
+
+          // Calculate the index of the start of the features for this stone.
+          int idx = base + c * TestFeatures::kNumPlanes;
+
+          // Features from Set2.
+          EXPECT_EQ(2000 + i, features.tensor().data[idx + 0]);
+          EXPECT_EQ(3000 + i, features.tensor().data[idx + 1]);
+
+          // Features from Set3.
+          EXPECT_EQ(4000 + i, features.tensor().data[idx + 2]);
+          EXPECT_EQ(5000 + i, features.tensor().data[idx + 3]);
+          EXPECT_EQ(6000 + i, features.tensor().data[idx + 4]);
+
+          // Features from Set1.
+          EXPECT_EQ(1000 + i, features.tensor().data[idx + 5]);
+        }
+      }
+    }
+    break;
   }
 }
 
