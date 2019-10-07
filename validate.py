@@ -74,8 +74,8 @@ def main(argv):
             while dirs:
                 d = dirs.pop()
                 for path, newdirs, files in os.walk(d):
-                    tf_records.extend([os.path.join(path, f) for f in files if f.endswith('.zz')])
-                    dirs.extend([os.path.join(path, d) for d in newdirs])
+                    tf_records.extend(os.path.join(path, f) for f in files if f.endswith('.zz'))
+                    dirs.extend(os.path.join(path, d) for d in newdirs)
 
     else:
         tf_records = validation_paths
