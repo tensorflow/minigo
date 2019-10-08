@@ -30,7 +30,25 @@
 #include "cc/zobrist.h"
 
 namespace minigo {
+
 extern const std::array<inline_vector<Coord, 4>, kN * kN> kNeighborCoords;
+
+// A fixed-capacity stack of Coords used when traversing connected points on
+// the board.
+class CoordStack : private inline_vector<Coord, kN * kN> {
+  using Impl = inline_vector<Coord, kN * kN>;
+
+ public:
+  using Impl::empty;
+
+  void push(Coord c) { Impl::push_back(c); }
+
+  Coord pop() {
+    auto result = Impl::back();
+    Impl::pop_back();
+    return result;
+  }
+};
 
 // BoardVisitor visits points on the board only once.
 // A simple example that visits all points on the board only once:
@@ -64,26 +82,22 @@ class BoardVisitor {
   bool Done() const { return stack_.empty(); }
 
   // Returns the coordinates of the next point in the stack to visit.
-  Coord Next() {
-    auto c = stack_.back();
-    stack_.pop_back();
-    return c;
-  }
+  Coord Next() { return stack_.pop(); }
 
-  // If this is the first time Visit has been passed coordinate c since the most
-  // recent call to Begin, Visit pushes the coordinate onto its stack of points
-  // to visit and returns true. Otherwise, Visit returns false.
+  // If this is the first time Visit has been passed coordinate c since the
+  // most recent call to Begin, Visit pushes the coordinate onto its stack of
+  // points to visit and returns true. Otherwise, Visit returns false.
   bool Visit(Coord c) {
     if (visited_[c] != epoch_) {
       visited_[c] = epoch_;
-      stack_.push_back(c);
+      stack_.push(c);
       return true;
     }
     return false;
   }
 
  private:
-  inline_vector<Coord, kN * kN> stack_;
+  CoordStack stack_;
   std::array<uint8_t, kN * kN> visited_;
 
   // Initializing to 0xff means the visited_ array will get initialized on the
@@ -164,11 +178,7 @@ class Position {
 
   // Initializes an empty board.
   // All moves are considered legal.
-  Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play);
-
-  // Copies the position's state from another instance, while preserving the
-  // BoardVisitor and GroupVisitor it was constructed with.
-  Position(BoardVisitor* bv, GroupVisitor* gv, const Position& other);
+  explicit Position(Color to_play);
 
   Position(const Position&) = default;
   Position& operator=(const Position&) = default;
@@ -253,12 +263,6 @@ class Position {
 
   // The following methods are protected to enable direct testing by unit tests.
  protected:
-  // Sets the pass alive regions for the given color in result.
-  // The caller is responsible for initializing all elements in `result` to
-  // `Color::kEmpty` before calling.
-  void CalculatePassAliveRegionsForColor(
-      Color color, std::array<Color, kN * kN>* result) const;
-
   // Returns the Group of the stone at the given coordinate. Used for testing.
   Group GroupAt(Coord c) const {
     auto s = stones_[c];
@@ -288,6 +292,13 @@ class Position {
   void UpdateLegalMoves(ZobristHistory* zobrist_history);
 
  private:
+  // Sets the pass alive regions for the given color in result.
+  // The caller is responsible for initializing all elements in `result` to
+  // `Color::kEmpty` before calling.
+  void CalculatePassAliveRegionsForColor(
+      Color color, BoardVisitor* board_visitor, GroupVisitor* group_visitor,
+      std::array<Color, kN * kN>* result) const;
+
   // Removes the group with a stone at the given coordinate from the board,
   // updating the liberty counts of neighboring groups.
   void RemoveGroup(Coord c);
@@ -303,14 +314,12 @@ class Position {
 
   // Called as part of UndoMove.
   // Create a new group for the chain of stones at c.
-  void AssignNewGroup(Coord c);
+  void AssignNewGroup(Coord c, BoardVisitor* board_visitor);
 
   // Returns true if the point at coordinate c neighbors the given group.
   bool HasNeighboringGroup(Coord c, GroupId group_id) const;
 
   Stones stones_;
-  BoardVisitor* board_visitor_;
-  GroupVisitor* group_visitor_;
   GroupPool groups_;
 
   Color to_play_;

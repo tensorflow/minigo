@@ -77,7 +77,7 @@ MctsPlayer::MctsPlayer(std::unique_ptr<Model> model,
                        std::shared_ptr<InferenceCache> inference_cache,
                        Game* game, const Options& options)
     : model_(std::move(model)),
-      game_root_(&root_stats_, {&bv_, &gv_, Color::kBlack}),
+      game_root_(&root_stats_, Position(Color::kBlack)),
       game_(game),
       rnd_(options.random_seed, Random::kUniqueStream),
       options_(options),
@@ -95,12 +95,12 @@ MctsPlayer::~MctsPlayer() = default;
 
 void MctsPlayer::InitializeGame(const Position& position) {
   root_stats_ = {};
-  game_root_ = MctsNode(&root_stats_, Position(&bv_, &gv_, position));
+  game_root_ = MctsNode(&root_stats_, position);
   root_ = &game_root_;
   game_->NewGame();
 }
 
-void MctsPlayer::NewGame() { InitializeGame({&bv_, &gv_, Color::kBlack}); }
+void MctsPlayer::NewGame() { InitializeGame(Position(Color::kBlack)); }
 
 bool MctsPlayer::UndoMove() {
   if (root_ == &game_root_) {

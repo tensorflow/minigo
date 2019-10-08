@@ -95,7 +95,7 @@ LogStream::~LogStream() {
     std::cerr << std::flush;
   }
   if (level_ == LogLevel::FATAL) {
-    exit(1);
+    abort();
   }
 }
 

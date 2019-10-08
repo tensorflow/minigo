@@ -63,16 +63,9 @@ zobrist::Hash Position::CalculateStoneHash(const Position::Stones& stones) {
   return hash;
 }
 
-Position::Position(BoardVisitor* bv, GroupVisitor* gv, Color to_play)
-    : board_visitor_(bv), group_visitor_(gv), to_play_(to_play) {
+Position::Position(Color to_play) : to_play_(to_play) {
   // All moves are initially legal.
   std::fill(legal_moves_.begin(), legal_moves_.end(), true);
-}
-
-Position::Position(BoardVisitor* bv, GroupVisitor* gv, const Position& position)
-    : Position(position) {
-  board_visitor_ = bv;
-  group_visitor_ = gv;
 }
 
 Position::UndoState Position::PlayMove(Coord c, Color color,
@@ -140,6 +133,7 @@ void Position::UndoMove(const UndoState& undo,
     }
 
     if (num_group_neighbors > 1) {
+      BoardVisitor board_visitor;
       // The stone removed by this undo had more than one neighbor of the same
       // color: it's possible that the removal of this stone has split a group.
       // Assign a new group for each neighbor of the same color. If multiple
@@ -149,7 +143,7 @@ void Position::UndoMove(const UndoState& undo,
       for (auto nc : kNeighborCoords[c]) {
         if (stones_[nc].color() == undo_color &&
             stones_[nc].group_id() == undo_group_id) {
-          AssignNewGroup(nc);
+          AssignNewGroup(nc, &board_visitor);
         }
       }
       groups_.free(undo_group_id);
@@ -331,13 +325,12 @@ void Position::RemoveGroup(Coord c) {
   auto other_color = OtherColor(removed_color);
   auto removed_group_id = stones_[c].group_id();
 
-  board_visitor_->Begin();
-  board_visitor_->Visit(c);
-  while (!board_visitor_->Done()) {
-    c = board_visitor_->Next();
+  CoordStack stack;
+  stack.push(c);
+  stones_[c] = {};
+  while (!stack.empty()) {
+    c = stack.pop();
 
-    MG_CHECK(stones_[c].group_id() == removed_group_id);
-    stones_[c] = {};
     stone_hash_ ^= zobrist::MoveHash(c, removed_color);
     tiny_set<GroupId, 4> other_groups;
     for (auto nc : kNeighborCoords[c]) {
@@ -349,7 +342,8 @@ void Position::RemoveGroup(Coord c) {
           ++groups_[neighbor_group_id].num_liberties;
         }
       } else if (neighbor_color == removed_color) {
-        board_visitor_->Visit(nc);
+        stones_[nc] = {};
+        stack.push(nc);
       }
     }
   }
@@ -365,10 +359,11 @@ void Position::MergeGroup(Coord c) {
   group.num_liberties = 0;
   group.size = 0;
 
-  board_visitor_->Begin();
-  board_visitor_->Visit(c);
-  while (!board_visitor_->Done()) {
-    c = board_visitor_->Next();
+  BoardVisitor board_visitor;
+  board_visitor.Begin();
+  board_visitor.Visit(c);
+  while (!board_visitor.Done()) {
+    c = board_visitor.Next();
     if (stones_[c].color() == Color::kEmpty) {
       ++group.num_liberties;
     } else {
@@ -381,7 +376,7 @@ void Position::MergeGroup(Coord c) {
           // Visiting empty coords through the BoardVisitor API ensures that
           // each one is only counted as a liberty once, even if it is
           // neighbored by multiple stones in this group.
-          board_visitor_->Visit(nc);
+          board_visitor.Visit(nc);
         }
       }
     }
@@ -393,24 +388,26 @@ GroupId Position::UncaptureGroup(Color color, Coord capture_c, Coord group_c) {
   // move at capture_c, by definition it must only have one liberty.
   // Initialize the group's size to zero and increment it as we put stones on
   // the board.
-  auto group_id = groups_.alloc(0, 1);
+  auto group_id = groups_.alloc(1, 1);
   auto other_color = OtherColor(color);
 
-  auto* bv = board_visitor_;
-  bv->Begin();
-  bv->Visit(group_c);
-  while (!bv->Done()) {
-    auto c = bv->Next();
-    stones_[c] = {color, group_id};
+  CoordStack stack;
+  stack.push(group_c);
+  stones_[group_c] = {color, group_id};
+  while (!stack.empty()) {
+    auto c = stack.pop();
     stone_hash_ ^= zobrist::MoveHash(c, color);
-    groups_[group_id].size += 1;
+
     tiny_set<GroupId, 4> neighbor_groups;
     for (auto nc : kNeighborCoords[c]) {
       if (nc != capture_c) {
         auto ns = stones_[nc];
         auto neighbor_color = ns.color();
         if (neighbor_color == Color::kEmpty) {
-          bv->Visit(nc);
+          // Place the stone immediately so that the point is no longer empty.
+          stones_[nc] = {color, group_id};
+          groups_[group_id].size += 1;
+          stack.push(nc);
         } else if (neighbor_color == other_color &&
                    neighbor_groups.insert(ns.group_id())) {
           groups_[ns.group_id()].num_liberties -= 1;
@@ -422,18 +419,17 @@ GroupId Position::UncaptureGroup(Color color, Coord capture_c, Coord group_c) {
   return group_id;
 }
 
-void Position::AssignNewGroup(Coord c) {
+void Position::AssignNewGroup(Coord c, BoardVisitor* board_visitor) {
   auto color = stones_[c].color();
   MG_CHECK(color != Color::kEmpty);
   auto other_color = OtherColor(color);
 
   auto group_id = groups_.alloc(0, 0);
 
-  auto* bv = board_visitor_;
-  bv->Begin();
-  bv->Visit(c);
-  while (!bv->Done()) {
-    auto c = bv->Next();
+  board_visitor->Begin();
+  board_visitor->Visit(c);
+  while (!board_visitor->Done()) {
+    auto c = board_visitor->Next();
     if (stones_[c].color() == Color::kEmpty) {
       groups_[group_id].num_liberties += 1;
     } else {
@@ -441,7 +437,7 @@ void Position::AssignNewGroup(Coord c) {
       groups_[group_id].size += 1;
       for (auto nc : kNeighborCoords[c]) {
         if (stones_[nc].color() != other_color) {
-          bv->Visit(nc);
+          board_visitor->Visit(nc);
         }
       }
     }
@@ -531,22 +527,22 @@ float Position::CalculateScore(float komi) {
   }
 
   int score = 0;
-  auto* bv = board_visitor_;
-  auto score_empty_area = [bv, &territories](Coord c) {
+  BoardVisitor board_visitor;
+  auto score_empty_area = [&board_visitor, &territories](Coord c) {
     int num_visited = 0;
     int found_bits = 0;
     do {
-      c = bv->Next();
+      c = board_visitor.Next();
       ++num_visited;
       for (auto nc : kNeighborCoords[c]) {
         auto color = territories[nc];
         if (color == Color::kEmpty) {
-          bv->Visit(nc);
+          board_visitor.Visit(nc);
         } else {
           found_bits |= static_cast<int>(color);
         }
       }
-    } while (!bv->Done());
+    } while (!board_visitor.Done());
 
     if (found_bits == 1) {
       return num_visited;
@@ -557,13 +553,13 @@ float Position::CalculateScore(float komi) {
     }
   };
 
-  bv->Begin();
+  board_visitor.Begin();
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
       Coord c(row, col);
       auto color = territories[c];
       if (color == Color::kEmpty) {
-        if (bv->Visit(c)) {
+        if (board_visitor.Visit(c)) {
           score += score_empty_area(c);
         }
       } else if (color == Color::kBlack) {
@@ -582,8 +578,12 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions() const {
   for (auto& x : result) {
     x = Color::kEmpty;
   }
-  CalculatePassAliveRegionsForColor(Color::kBlack, &result);
-  CalculatePassAliveRegionsForColor(Color::kWhite, &result);
+  BoardVisitor board_visitor;
+  GroupVisitor group_visitor;
+  CalculatePassAliveRegionsForColor(Color::kBlack, &board_visitor,
+                                    &group_visitor, &result);
+  CalculatePassAliveRegionsForColor(Color::kWhite, &board_visitor,
+                                    &group_visitor, &result);
   return result;
 }
 
@@ -622,7 +622,8 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions() const {
 // More details:
 //   https://senseis.xmp.net/?BensonsDefinitionOfUnconditionalLife
 void Position::CalculatePassAliveRegionsForColor(
-    Color color, std::array<Color, kN * kN>* result) const {
+    Color color, BoardVisitor* board_visitor, GroupVisitor* group_visitor,
+    std::array<Color, kN * kN>* result) const {
   constexpr auto kMaxNumRegions = (kN * kN + 1) / 2 + 1;
   constexpr auto kMaxNumGroups = kN * kN;  // A safe over-estimate
 
@@ -703,11 +704,11 @@ void Position::CalculatePassAliveRegionsForColor(
   std::array<uint16_t, kN * kN> indices;
 
   // Initialize the set of groups.
-  board_visitor_->Begin();
+  board_visitor->Begin();
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
       Coord c(row, col);
-      if (stones_[c].color() != color || !board_visitor_->Visit(c)) {
+      if (stones_[c].color() != color || !board_visitor->Visit(c)) {
         continue;
       }
 
@@ -718,8 +719,8 @@ void Position::CalculatePassAliveRegionsForColor(
       auto group_idx = static_cast<uint16_t>(groups.size());
       groups.emplace_back(liberties.size());
       auto& g = groups[group_idx];
-      while (!board_visitor_->Done()) {
-        c = board_visitor_->Next();
+      while (!board_visitor->Done()) {
+        c = board_visitor->Next();
         indices[c] = group_idx;
 
         for (auto nc : kNeighborCoords[c]) {
@@ -730,7 +731,7 @@ void Position::CalculatePassAliveRegionsForColor(
             liberties.push_back(nc);
             g.num_liberties += 1;
           } else if (ns.color() == color) {
-            board_visitor_->Visit(nc);
+            board_visitor->Visit(nc);
           }
         }
       }
@@ -751,11 +752,11 @@ void Position::CalculatePassAliveRegionsForColor(
   }
 
   // Build the set of all regions.
-  board_visitor_->Begin();
+  board_visitor->Begin();
   for (int row = 0; row < kN; ++row) {
     for (int col = 0; col < kN; ++col) {
       Coord c(row, col);
-      if (stones_[c].color() == color || !board_visitor_->Visit(c)) {
+      if (stones_[c].color() == color || !board_visitor->Visit(c)) {
         continue;
       }
 
@@ -766,9 +767,9 @@ void Position::CalculatePassAliveRegionsForColor(
       auto region_idx = static_cast<uint16_t>(regions.size());
       regions.emplace_back(empty_points.size(), region_groups.size());
       auto& r = regions[region_idx];
-      group_visitor_->Begin();
-      while (!board_visitor_->Done()) {
-        c = board_visitor_->Next();
+      group_visitor->Begin();
+      while (!board_visitor->Done()) {
+        c = board_visitor->Next();
 
         indices[c] = region_idx;
         if (stones_[c].empty()) {
@@ -779,8 +780,8 @@ void Position::CalculatePassAliveRegionsForColor(
         for (auto nc : kNeighborCoords[c]) {
           auto ns = stones_[nc];
           if (ns.color() != color) {
-            board_visitor_->Visit(nc);
-          } else if (group_visitor_->Visit(ns.group_id())) {
+            board_visitor->Visit(nc);
+          } else if (group_visitor->Visit(ns.group_id())) {
             region_groups.push_back(indices[nc]);
             r.num_enclosing_groups += 1;
           }
@@ -883,7 +884,7 @@ void Position::CalculatePassAliveRegionsForColor(
   // all its enclosing groups must be pass-alive, and all but zero or one empty
   // points must be adjacent to a neighboring group.
 
-  board_visitor_->Begin();
+  board_visitor->Begin();
   for (auto& r : regions) {
     // All regions must have at least one empty point, otherwise they'd be dead.
     MG_CHECK(r.num_empty_points != 0);
@@ -929,13 +930,13 @@ void Position::CalculatePassAliveRegionsForColor(
       // This region is pass-alive, mark all the points in the region in the
       // output array.
       auto c = empty_points[r.empty_points_begin];
-      board_visitor_->Visit(c);
-      while (!board_visitor_->Done()) {
-        c = board_visitor_->Next();
+      board_visitor->Visit(c);
+      while (!board_visitor->Done()) {
+        c = board_visitor->Next();
         (*result)[c] = color;
         for (auto nc : kNeighborCoords[c]) {
           if (stones_[nc].color() != color) {
-            board_visitor_->Visit(nc);
+            board_visitor->Visit(nc);
           }
         }
       }

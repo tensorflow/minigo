@@ -60,8 +60,6 @@ static constexpr char kOnlyBensonsBoard[] = R"(
     OOOOOOOOO
     ....O....)";
 
-
-
 // Test puct and child action score calculation
 TEST(MctsNodeTest, UpperConfidenceBound) {
   float epsilon = 1e-7;
@@ -426,11 +424,11 @@ TEST(MctsNodeTest, GetMostVisitedBensonRestriction) {
   for (float& prob : probs) {
     prob = 0.001;
   }
-  probs[0] = 0.002; // A9, a bensons point, has higher prior.
+  probs[0] = 0.002;  // A9, a bensons point, has higher prior.
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kSomeBensonsBoard, Color::kBlack);
   MctsNode root(&root_stats, board);
-  for (int i= 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++) {
     root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
   }
 
@@ -438,7 +436,6 @@ TEST(MctsNodeTest, GetMostVisitedBensonRestriction) {
   EXPECT_NE(Coord(0), root.GetMostVisitedMove(true));
   EXPECT_NE(root.GetMostVisitedMove(false), root.GetMostVisitedMove(true));
 }
-
 
 // Pass is still a valid choice, with or without removing pass-alive areas.
 TEST(MctsNodeTest, BensonRestrictionStillPasses) {
@@ -457,32 +454,31 @@ TEST(MctsNodeTest, BensonRestrictionStillPasses) {
   EXPECT_EQ(Coord::kPass, root.GetMostVisitedMove(true));
 }
 
-
 TEST(MctsNodeTest, ReshapePrunesBensonsVisits) {
   std::array<float, kNumMoves> probs;
   for (float& prob : probs) {
     prob = 0.001;
   }
-  probs[0] = 0.002; // A9, a bensons point, has higher prior.
+  probs[0] = 0.002;  // A9, a bensons point, has higher prior.
 
   MctsNode::EdgeStats root_stats;
   auto board = TestablePosition(kSomeBensonsBoard, Color::kBlack);
   MctsNode root(&root_stats, board);
   MctsNode root2(&root_stats, board);
-  for (int i= 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++) {
     root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
     root2.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root2);
   }
 
-  EXPECT_NE(root.edges[0].N, 0); // A9 should've had visits.
+  EXPECT_NE(root.edges[0].N, 0);  // A9 should've had visits.
   root.ReshapeFinalVisits(true);
-  EXPECT_EQ(root.edges[0].N, 0); // Reshape should've removed them.
+  EXPECT_EQ(root.edges[0].N, 0);  // Reshape should've removed them.
 
-  EXPECT_NE(root2.edges[0].N, 0);   // A9 should've had visits.
-  auto original = root2.edges[0].N; // Store them.
+  EXPECT_NE(root2.edges[0].N, 0);    // A9 should've had visits.
+  auto original = root2.edges[0].N;  // Store them.
   root2.ReshapeFinalVisits(false);
-  EXPECT_NE(root2.edges[0].N, 0);   // Reshape should not have removed them.
-  EXPECT_EQ(original, root2.edges[0].N); // And they should be the same.
+  EXPECT_NE(root2.edges[0].N, 0);  // Reshape should not have removed them.
+  EXPECT_EQ(original, root2.edges[0].N);  // And they should be the same.
 }
 
 TEST(MctsNodeTest, ReshapeWhenOnlyBensons) {
@@ -497,7 +493,7 @@ TEST(MctsNodeTest, ReshapeWhenOnlyBensons) {
   auto board = TestablePosition(kOnlyBensonsBoard, Color::kBlack);
   MctsNode root(&root_stats, board);
   MctsNode root2(&root_stats, board);
-  for (int i= 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++) {
     root.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root);
     root2.SelectLeaf()->IncorporateResults(0.0, probs, 0, &root2);
   }
@@ -513,8 +509,6 @@ TEST(MctsNodeTest, ReshapeWhenOnlyBensons) {
   root2.ReshapeFinalVisits(false);
   EXPECT_EQ(root2.edges[Coord::kPass].N, 0);
 }
-
-
 
 // Verifies that even when one move is hugely more likely than all the others,
 // SelectLeaf will eventually start exploring other moves given enough
@@ -550,9 +544,7 @@ TEST(MctsNodeTest, TestSelectLeaf) {
 
 class ReshapeTargetTest : public ::testing::Test {
  protected:
-  void SetUp() override {
-    best_ = -1;
-  }
+  void SetUp() override { best_ = -1; }
 
   void SearchPosition(const Position& p) {
     float to_play = p.to_play() == Color::kBlack ? 1 : -1;
@@ -594,7 +586,8 @@ class ReshapeTargetTest : public ::testing::Test {
     best_ = root_->GetMostVisitedMove();
     root_->ReshapeFinalVisits();
 
-    float U_common = root_->U_scale() * std::sqrt(std::max<float>(1, root_->N() - 1));
+    float U_common =
+        root_->U_scale() * std::sqrt(std::max<float>(1, root_->N() - 1));
 
     // Our tests want to verify that we lowered N until the action score
     // (computed using the after-search estimate of Q) was nearly equal to the
@@ -604,8 +597,8 @@ class ReshapeTargetTest : public ::testing::Test {
     // counts, the action scores -- based on Q -- will be misleading.  So,
     // compute the action score using the saved values of Q, as outlined above.
     for (int i = 0; i < kNumMoves; ++i) {
-      post_scores_[i] = (saved_Q[i] * to_play +
-                         (U_common * root_->child_P(i) / (1 + root_->child_N(i))));
+      post_scores_[i] = (saved_Q[i] * to_play + (U_common * root_->child_P(i) /
+                                                 (1 + root_->child_N(i))));
       post_scores_[i] -= 1000.0f * !p.legal_move(i);
     }
   }
@@ -615,7 +608,6 @@ class ReshapeTargetTest : public ::testing::Test {
   size_t best_;
   MctsNode* root_;
 };
-
 
 TEST_F(ReshapeTargetTest, TestReshapeTargetsWhite) {
   auto board = TestablePosition("", Color::kWhite);
@@ -636,7 +628,6 @@ TEST_F(ReshapeTargetTest, TestReshapeTargetsWhite) {
   EXPECT_GT(tot_N, root_->N() * 0.90);
 }
 
-
 // As above
 TEST_F(ReshapeTargetTest, TestReshapeTargetsBlack) {
   auto board = TestablePosition("", Color::kBlack);
@@ -650,7 +641,6 @@ TEST_F(ReshapeTargetTest, TestReshapeTargetsBlack) {
   EXPECT_LT(tot_N, root_->N());
   EXPECT_GT(tot_N, root_->N() * 0.90);
 }
-
 
 TEST(MctsNodeTest, NormalizeTest) {
   // Generate probability with sum of policy less than 1
@@ -751,10 +741,8 @@ TEST(MctsNodeTest, TestSuperko) {
   for (size_t iteration = 0; iteration < non_ko_moves.size(); ++iteration) {
     std::vector<std::unique_ptr<MctsNode>> nodes;
     MctsNode::EdgeStats root_stats;
-    BoardVisitor bv;
-    GroupVisitor gv;
-    nodes.push_back(absl::make_unique<MctsNode>(
-        &root_stats, Position(&bv, &gv, Color::kBlack)));
+    nodes.push_back(
+        absl::make_unique<MctsNode>(&root_stats, Position(Color::kBlack)));
 
     for (size_t move_idx = 0; move_idx < iteration; ++move_idx) {
       Coord c = Coord::FromGtp(non_ko_moves[move_idx]);

@@ -129,11 +129,11 @@ class MctsPlayer {
   void NewGame();
 
   Coord SuggestMove(int new_readouts, bool inject_noise = false,
-                            bool restrict_in_bensons = false);
+                    bool restrict_in_bensons = false);
   // Plays the move at point c.
   // If game is non-null, adds a new move to the game's move history and sets
   // the game over state if appropriate.
-  bool PlayMove(Coord c, bool is_trainable=false);
+  bool PlayMove(Coord c, bool is_trainable = false);
 
   // Moves the root_ node up to its parent, popping the last move off the game
   // history but preserving the game tree.
@@ -166,7 +166,7 @@ class MctsPlayer {
 
   // Protected methods that get exposed for testing.
  protected:
-  Coord PickMove(bool restrict_in_bensons=false);
+  Coord PickMove(bool restrict_in_bensons = false);
 
  private:
   // State that tracks which model is used for each inference.
@@ -252,9 +252,6 @@ class MctsPlayer {
 
   MctsNode* root_;
   MctsNode game_root_;
-
-  BoardVisitor bv_;
-  GroupVisitor gv_;
 
   Game* game_;
 

@@ -59,7 +59,7 @@ TestablePosition::TestablePosition(absl::string_view board_str, Color to_play)
 
 TestablePosition::TestablePosition(const std::array<Color, kN * kN>& stones,
                                    Color to_play)
-    : Position(&board_visitor, &group_visitor, to_play) {
+    : Position(to_play) {
   for (int i = 0; i < kN * kN; ++i) {
     if (stones[i] != Color::kEmpty) {
       AddStoneToBoard(i, stones[i]);

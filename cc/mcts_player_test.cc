@@ -64,7 +64,6 @@ static constexpr char kOneStoneBoard[] = R"(
     .........
     .........)";
 
-
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(Game* game, const MctsPlayer::Options& player_options)
@@ -426,9 +425,7 @@ TEST_F(MctsPlayerTest, TreeSearchFailsafe) {
 // to decide whether to pass, it should be the first thing we check, but not
 // more than that.
 TEST_F(MctsPlayerTest, OnlyCheckGameEndOnce) {
-  BoardVisitor bv;
-  GroupVisitor gv;
-  Position position(&bv, &gv, Color::kBlack);
+  Position position(Color::kBlack);
 
   auto player =
       absl::make_unique<TestablePlayer>(game_.get(), MctsPlayer::Options());

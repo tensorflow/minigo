@@ -64,9 +64,7 @@ GameInfo ProcessSgf(const std::string& path) {
   std::vector<std::unique_ptr<sgf::Node>> trees;
   MG_CHECK(sgf::GetTrees(ast, &trees));
 
-  BoardVisitor bv;
-  GroupVisitor gv;
-  Position position(&bv, &gv, Color::kBlack);
+  Position position(Color::kBlack);
 
   Coord prev_move = Coord::kInvalid;
   const auto& moves = trees[0]->ExtractMainLine();

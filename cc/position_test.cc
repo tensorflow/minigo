@@ -478,7 +478,7 @@ void ValidatePosition(TestablePosition* p) {
     MG_CHECK(color != Color::kEmpty);
 
     auto other_color = OtherColor(color);
-    auto& bv = p->board_visitor;
+    BoardVisitor bv;
     bv.Begin();
     bv.Visit(c);
     while (!bv.Done()) {

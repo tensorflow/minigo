@@ -74,7 +74,7 @@ void GtpClient::Run() {
   // lazy initialization, causing the first inference to take substantially
   // longer than subsequent ones, which can interfere with time keeping.
   MG_LOG(INFO) << "Warming up...";
-  Position position(nullptr, nullptr, Color::kBlack);
+  Position position(Color::kBlack);
   ModelOutput output;
   ModelInput input;
   input.sym = symmetry::kIdentity;

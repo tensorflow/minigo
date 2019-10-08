@@ -52,9 +52,6 @@ class TestablePosition : public Position {
     return Position::ClassifyMove(Coord::FromString(str));
   }
   using Position::ClassifyMove;
-
-  BoardVisitor board_visitor;
-  GroupVisitor group_visitor;
 };
 
 // Removes extraneous whitespace from a board string and returns it in the same
