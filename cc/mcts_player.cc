@@ -119,7 +119,7 @@ Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise,
     InjectNoise(kDirichletAlpha);
   }
 
-  int current_readouts = root_->N();
+  int target_readouts = root_->N() + new_readouts;
 
   if (options_.seconds_per_move > 0) {
     // Use time to limit the number of reads.
@@ -130,12 +130,12 @@ Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise,
                              options_.time_limit, options_.decay_factor);
     }
     while (absl::Now() - start < absl::Seconds(seconds_per_move)) {
-      TreeSearch(options_.virtual_losses);
+      TreeSearch(options_.virtual_losses, target_readouts);
     }
   } else {
     // Use a fixed number of reads.
-    while (root_->N() < current_readouts + new_readouts) {
-      TreeSearch(options_.virtual_losses);
+    while (root_->N() < target_readouts) {
+      TreeSearch(options_.virtual_losses, target_readouts);
     }
   }
   if (ShouldResign()) {
@@ -180,9 +180,9 @@ Coord MctsPlayer::PickMove(bool restrict_in_bensons) {
   return c;
 }
 
-void MctsPlayer::TreeSearch(int num_leaves) {
+void MctsPlayer::TreeSearch(int num_leaves, int max_num_reads) {
   MaybeExpandRoot();
-  SelectLeaves(num_leaves, std::numeric_limits<int>::max());
+  SelectLeaves(num_leaves, max_num_reads);
   ProcessLeaves();
 }
 
@@ -195,21 +195,19 @@ void MctsPlayer::InjectNoise(float dirichlet_alpha) {
 
 void MctsPlayer::MaybeExpandRoot() {
   if (!root_->HasFlag(MctsNode::Flag::kExpanded)) {
-    SelectLeaves(1, 1);
+    SelectLeaves(1, root_->N() + 1);
     ProcessLeaves();
   }
 }
 
-void MctsPlayer::SelectLeaves(int num_leaves, int max_num_leaves) {
+void MctsPlayer::SelectLeaves(int num_leaves, int max_num_reads) {
   tree_search_inferences_.clear();
   ModelOutput cached_output;
 
   int max_cache_misses = num_leaves * 2;
   int num_selected = 0;
   int num_cache_misses = 0;
-  int num_cache_hits = 0;
-  while (num_cache_misses < max_cache_misses &&
-         num_cache_misses + num_cache_hits < max_num_leaves) {
+  while (num_cache_misses < max_cache_misses && root_->N() < max_num_reads) {
     auto* leaf = root_->SelectLeaf();
 
     if (leaf->game_over() || leaf->at_move_limit()) {
@@ -231,7 +229,6 @@ void MctsPlayer::SelectLeaves(int num_leaves, int max_num_leaves) {
 
       if (inference_cache_->TryGet(cache_key, canonical_sym, inference_sym,
                                    &cached_output)) {
-        ++num_cache_hits;
         leaf->IncorporateResults(options_.value_init_penalty,
                                  cached_output.policy, cached_output.value,
                                  root_);

@@ -162,7 +162,7 @@ class MctsPlayer {
 
   void SetOptions(const Options& options) { options_ = options; }
 
-  void TreeSearch(int num_leaves);
+  void TreeSearch(int num_leaves, int max_num_reads);
 
   // Protected methods that get exposed for testing.
  protected:
@@ -231,12 +231,12 @@ class MctsPlayer {
   // selected leaves in `tree_search_inferences_`. If the player has an
   // inference cache, this can cause more nodes to be added to the tree when
   // the selected leaves are already in the cache. To limit this, SelectLeaves
-  // will add no more than `max_num_leaves` leaves to the tree.
+  // will stop once the root has `max_num_reads`.
   //
   // In some positions, the model may favor one move so heavily that it
   // overcomes the effects of virtual loss. In this case, SelectLeaves may
   // choose the same leaf multiple times.
-  void SelectLeaves(int num_inferences, int max_num_leaves);
+  void SelectLeaves(int num_inferences, int max_num_reads);
 
   // Run inference on the contents of `inferences_` that was previously
   // populated by a call to SelectLeaves, and propagate the results back up the

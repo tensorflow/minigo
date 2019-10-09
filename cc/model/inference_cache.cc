@@ -111,8 +111,7 @@ void BasicInferenceCache::Merge(Key key, symmetry::Symmetry canonical_sym,
     MG_CHECK(it != map_.end());
     Unlink(&it->second);
     map_.erase(it);
-  } else {
-    stats_.size += 1;
+    stats_.size -= 1;
   }
 
   // Symmetry that converts the model output into canonical form.
@@ -131,6 +130,7 @@ void BasicInferenceCache::Merge(Key key, symmetry::Symmetry canonical_sym,
     Model::ApplySymmetry(inverse_canonical_sym, *output, &elem->output);
     elem->valid_symmetry_bits = sym_bit;
     elem->num_valid_symmetries = 1;
+    stats_.size += 1;
   } else {
     // The element was already in the cache.
     Unlink(elem);
