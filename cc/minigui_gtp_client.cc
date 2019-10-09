@@ -234,8 +234,8 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
 
 void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
                                           bool include_tree_stats) {
+  auto sorted_child_info = player_->tree().CalculateRankedChildInfo();
   auto* root = player_->root();
-  auto sorted_child_info = root->CalculateRankedChildInfo();
 
   nlohmann::json j = {
       {"id", variation_tree_->current_node()->id},
@@ -255,7 +255,7 @@ void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
 
     nlohmann::json moves = {c.ToGtp()};
     const auto* node = child_it->second.get();
-    for (const auto c : node->MostVisitedPath()) {
+    for (const auto c : node->GetMostVisitedPath()) {
       moves.push_back(c.ToGtp());
     }
     variations[c.ToGtp()] = {
@@ -301,7 +301,7 @@ void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
   }
 
   if (include_tree_stats) {
-    auto tree_stats = root->CalculateTreeStats();
+    auto tree_stats = player_->tree().CalculateStats();
     j["treeStats"] = {
         {"numNodes", tree_stats.num_nodes},
         {"numLeafNodes", tree_stats.num_leaf_nodes},

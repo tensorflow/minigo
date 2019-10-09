@@ -27,7 +27,7 @@
 #include "cc/algorithm.h"
 #include "cc/constants.h"
 #include "cc/game.h"
-#include "cc/mcts_node.h"
+#include "cc/mcts_tree.h"
 #include "cc/model/inference_cache.h"
 #include "cc/model/model.h"
 #include "cc/position.h"
@@ -143,18 +143,20 @@ class MctsPlayer {
 
   void SetTreeSearchCallback(TreeSearchCallback cb);
 
-  void ClearChildren() { root_->ClearChildren(); }
+  // TODO(tommadams): after changing MctsTree::PlayMove() to delete all
+  // ancestors of the new tree root, we can simply create a new tree instead of
+  // needing this method.
+  void ClearSubtrees() { tree_->ClearSubtrees(); }
 
   // Returns a string containing the list of all models used for inference, and
   // which moves they were used for.
   std::string GetModelsUsedForInference() const;
 
   // Returns the root of the current search tree, i.e. the current board state.
-  // TODO(tommadams): Remove mutable access to the root once MiniguiGtpPlayer
-  // no longer calls SelectLeaves directly.
-  MctsNode* root() { return root_; }
-  const MctsNode* root() const { return root_; }
+  // TODO(tommadams): convert all callers to player->tree().root();
+  const MctsNode* root() const { return tree_->root(); }
 
+  const MctsTree& tree() const { return *tree_; }
   const Options& options() const { return options_; }
   const std::string& name() const { return model_->name(); }
   Model* model() { return model_.get(); }
@@ -167,6 +169,7 @@ class MctsPlayer {
   // Protected methods that get exposed for testing.
  protected:
   Coord PickMove(bool restrict_in_bensons = false);
+  MctsTree* mutable_tree() { return tree_.get(); }
 
  private:
   // State that tracks which model is used for each inference.
@@ -248,10 +251,7 @@ class MctsPlayer {
   std::unique_ptr<Model> model_;
   int temperature_cutoff_;
 
-  MctsNode::EdgeStats root_stats_;
-
-  MctsNode* root_;
-  MctsNode game_root_;
+  std::unique_ptr<MctsTree> tree_;
 
   Game* game_;
 

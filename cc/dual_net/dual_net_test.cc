@@ -18,6 +18,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "cc/model/features.h"
 #include "cc/position.h"
 #include "cc/random.h"

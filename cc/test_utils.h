@@ -21,7 +21,6 @@
 #include "cc/color.h"
 #include "cc/coord.h"
 #include "cc/group.h"
-#include "cc/mcts_node.h"
 #include "cc/position.h"
 #include "cc/random.h"
 
@@ -48,10 +47,10 @@ class TestablePosition : public Position {
   Color IsKoish(absl::string_view str) const {
     return Position::IsKoish(Coord::FromString(str));
   }
-  MoveType ClassifyMove(absl::string_view str) const {
-    return Position::ClassifyMove(Coord::FromString(str));
+  MoveType ClassifyMoveIgnoringSuperko(absl::string_view str) const {
+    return Position::ClassifyMoveIgnoringSuperko(Coord::FromString(str));
   }
-  using Position::ClassifyMove;
+  using Position::ClassifyMoveIgnoringSuperko;
 };
 
 // Removes extraneous whitespace from a board string and returns it in the same
@@ -59,8 +58,6 @@ class TestablePosition : public Position {
 std::string CleanBoardString(absl::string_view str);
 
 std::array<Color, kN * kN> ParseBoard(absl::string_view str);
-
-int CountPendingVirtualLosses(const MctsNode* node);
 
 // Get a random legal move.
 // Only returns Coord::kPass if no other move is legal.

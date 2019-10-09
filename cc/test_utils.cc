@@ -99,19 +99,4 @@ std::array<Color, kN * kN> ParseBoard(absl::string_view str) {
   return result;
 }
 
-int CountPendingVirtualLosses(const MctsNode* node) {
-  int num = 0;
-  std::vector<const MctsNode*> pending{node};
-  while (!pending.empty()) {
-    node = pending.back();
-    pending.pop_back();
-    MG_CHECK(node->num_virtual_losses_applied >= 0);
-    num += node->num_virtual_losses_applied;
-    for (const auto& p : node->children) {
-      pending.push_back(p.second.get());
-    }
-  }
-  return num;
-}
-
 }  // namespace minigo

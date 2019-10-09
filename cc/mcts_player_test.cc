@@ -65,6 +65,21 @@ static constexpr char kOneStoneBoard[] = R"(
     .........
     .........)";
 
+int CountPendingVirtualLosses(const MctsNode* node) {
+  int num = 0;
+  std::vector<const MctsNode*> pending{node};
+  while (!pending.empty()) {
+    node = pending.back();
+    pending.pop_back();
+    MG_CHECK(node->num_virtual_losses_applied >= 0);
+    num += node->num_virtual_losses_applied;
+    for (const auto& p : node->children) {
+      pending.push_back(p.second.get());
+    }
+  }
+  return num;
+}
+
 class TestablePlayer : public MctsPlayer {
  public:
   explicit TestablePlayer(Game* game, const MctsPlayer::Options& player_options)
@@ -80,6 +95,7 @@ class TestablePlayer : public MctsPlayer {
       : MctsPlayer(absl::make_unique<FakeDualNet>(fake_priors, fake_value),
                    nullptr, game, options) {}
 
+  using MctsPlayer::mutable_tree;
   using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;
   using MctsPlayer::TreeSearch;
@@ -108,12 +124,12 @@ class MctsPlayerTest : public ::testing::Test {
 
     auto player =
         absl::make_unique<TestablePlayer>(game_.get(), player_options);
-    auto* first_node = player->root()->SelectLeaf();
+    auto* tree = player->mutable_tree();
+
     ModelInput input;
     input.position_history.push_back(&player->root()->position);
     auto output = player->Run(input);
-    first_node->IncorporateResults(0.0, output.policy, output.value,
-                                   player->root());
+    tree->IncorporateResults(tree->SelectLeaf(), output.policy, output.value);
     return player;
   }
 
@@ -166,46 +182,15 @@ TEST_F(MctsPlayerTest, TimeRecommendation) {
   EXPECT_GT(0.0001, TimeRecommendation(1000, 5, 100, 0.98));
 }
 
-TEST_F(MctsPlayerTest, InjectNoise) {
-  MctsPlayer::Options options;
-  auto player = CreateBasicPlayer(options);
-  auto* root = player->root();
-
-  // FakeDualNet should return normalized priors.
-  float sum_P = 0;
-  for (int i = 0; i < kNumMoves; ++i) {
-    sum_P += root->child_P(i);
-  }
-  EXPECT_NEAR(1, sum_P, 0.000001);
-  for (int i = 0; i < kNumMoves; ++i) {
-    EXPECT_EQ(root->child_U(0), root->child_U(i));
-  }
-
-  Random rnd(456943875, 1);
-  std::array<float, kNumMoves> noise;
-  rnd.Dirichlet(kDirichletAlpha, &noise);
-  root->InjectNoise(noise, 0.25);
-
-  // Priors should still be normalized after injecting noise.
-  sum_P = 0;
-  for (int i = 0; i < kNumMoves; ++i) {
-    sum_P += root->child_P(i);
-  }
-  EXPECT_NEAR(1, sum_P, 0.000001);
-
-  // With Dirichelet noise, majority of density should be in one node.
-  int i = ArgMax(root->edges, MctsNode::CmpP);
-  float max_P = root->child_P(i);
-  EXPECT_GT(max_P, 3.0 / kNumMoves);
-}
-
 // Verify that with soft pick disabled, the player will always choose the best
 // move.
 TEST_F(MctsPlayerTest, PickMoveArgMax) {
   MctsPlayer::Options options;
   options.soft_pick = false;
-  auto player = CreateBasicPlayer(options);
-  auto* root = player->root();
+  TestablePlayer player(game_.get(), options);
+
+  auto* root = player.mutable_tree()->SelectLeaf();
+  ASSERT_EQ(player.tree().root(), root);
 
   std::vector<std::pair<Coord, int>> child_visits = {
       {{2, 0}, 10},
@@ -218,7 +203,7 @@ TEST_F(MctsPlayerTest, PickMoveArgMax) {
   }
 
   for (int i = 0; i < 100; ++i) {
-    EXPECT_EQ(Coord(2, 0), player->PickMove());
+    EXPECT_EQ(Coord(2, 0), player.PickMove());
   }
 }
 
@@ -227,8 +212,10 @@ TEST_F(MctsPlayerTest, PickMoveArgMax) {
 TEST_F(MctsPlayerTest, PickMoveSoft) {
   MctsPlayer::Options options;
   options.soft_pick = true;
-  auto player = CreateBasicPlayer(options);
-  auto* root = player->root();
+  TestablePlayer player(game_.get(), options);
+
+  auto* root = player.mutable_tree()->SelectLeaf();
+  ASSERT_EQ(player.tree().root(), root);
 
   root->edges[Coord(2, 0)].N = 10;
   root->edges[Coord(1, 0)].N = 5;
@@ -238,7 +225,7 @@ TEST_F(MctsPlayerTest, PickMoveSoft) {
   int count_2_0 = 0;
   int count_3_0 = 0;
   for (int i = 0; i < 1600; ++i) {
-    auto move = player->PickMove();
+    auto move = player.PickMove();
     if (move == Coord(1, 0)) {
       ++count_1_0;
     } else if (move == Coord(2, 0)) {
@@ -303,10 +290,10 @@ TEST_F(MctsPlayerTest, ParallelTreeSearch) {
 TEST_F(MctsPlayerTest, DontPassOnEmptyLosingBoard) {
   MctsPlayer::Options options;
   auto player = CreateBasicPlayer(options);
-  auto* root = player->root();
   // Search a board with one black stone, white to play.
   auto board = TestablePosition(kOneStoneBoard, Color::kWhite);
   player->InitializeGame(board);
+  auto* root = player->root();
   for (int i = 0; i < 80; ++i) {
     player->TreeSearch(8, std::numeric_limits<int>::max());
   }
@@ -326,6 +313,7 @@ TEST_F(MctsPlayerTest, DontPassOnEmptyLosingBoard) {
   // Now search an empty board, black to play.
   board = TestablePosition("", Color::kBlack);
   player->InitializeGame(board);
+  root = player->root();
   for (int i = 0; i < 80; ++i) {
     player->TreeSearch(8, std::numeric_limits<int>::max());
   }
@@ -390,7 +378,7 @@ TEST_F(MctsPlayerTest, ColdStartParallelTreeSearch) {
 
   // Test that parallel tree search doesn't trip on an empty tree.
   EXPECT_EQ(0, root->N());
-  EXPECT_EQ(false, root->HasFlag(MctsNode::Flag::kExpanded));
+  EXPECT_EQ(false, root->is_expanded);
   player->TreeSearch(4, std::numeric_limits<int>::max());
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
 

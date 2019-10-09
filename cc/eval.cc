@@ -234,7 +234,7 @@ class Evaluator {
 
       auto move = curr_player->SuggestMove(player_options_.num_readouts);
       if (verbose) {
-        std::cerr << curr_player->root()->Describe() << "\n";
+        std::cerr << curr_player->tree().Describe() << "\n";
       }
       curr_player->PlayMove(move);
       if (!game.game_over()) {
@@ -265,8 +265,8 @@ class Evaluator {
     // Write SGF.
     std::string output_name = "NO_SGF_SAVED";
     if (!FLAGS_sgf_dir.empty()) {
-      output_name = absl::StrCat(GetOutputName(game_id_++), "-",
-                                 black->name(), "-", white->name());
+      output_name = absl::StrCat(GetOutputName(game_id_++), "-", black->name(),
+                                 "-", white->name());
       game.AddComment(
           absl::StrCat("B inferences: ", black->GetModelsUsedForInference()));
       game.AddComment(

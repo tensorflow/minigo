@@ -345,11 +345,11 @@ GtpClient::Response GtpClient::HandleGenmove(CmdArgs args) {
     c = Coord::kPass;
   } else {
     if (!options_.tree_reuse) {
-      player_->ClearChildren();
+      player_->ClearSubtrees();
     }
     c = player_->SuggestMove(player_->options().num_readouts);
   }
-  MG_LOG(INFO) << player_->root()->Describe();
+  MG_LOG(INFO) << player_->tree().Describe();
   MG_CHECK(player_->PlayMove(c));
 
   MaybeStartPondering();
@@ -554,7 +554,7 @@ GtpClient::Response GtpClient::HandleUndo(CmdArgs args) {
     return Response::Error("cannot undo");
   }
   if (!options_.tree_reuse) {
-    player_->root()->ClearChildren();
+    player_->ClearSubtrees();
   }
 
   return Response::Ok();

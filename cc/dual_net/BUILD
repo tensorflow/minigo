@@ -161,6 +161,8 @@ minigo_cc_test_9_only(
         "//cc:symmetries",
         "//cc:test_utils",
         "//cc/model",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

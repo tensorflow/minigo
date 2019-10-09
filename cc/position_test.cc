@@ -310,11 +310,13 @@ TEST(PositionTest, TestSuicidalMovesAreIllegal) {
       .....XOO.)");
   std::vector<std::string> suicidal_moves = {"E9", "H5", "E3"};
   for (const auto& c : suicidal_moves) {
-    EXPECT_EQ(Position::MoveType::kIllegal, board.ClassifyMove(c));
+    EXPECT_EQ(Position::MoveType::kIllegal,
+              board.ClassifyMoveIgnoringSuperko(c));
   }
   std::vector<std::string> nonsuicidal_moves = {"B5", "J1", "A9"};
   for (const auto& c : nonsuicidal_moves) {
-    EXPECT_NE(Position::MoveType::kIllegal, board.ClassifyMove(c));
+    EXPECT_NE(Position::MoveType::kIllegal,
+              board.ClassifyMoveIgnoringSuperko(c));
   }
 }
 

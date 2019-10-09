@@ -79,7 +79,7 @@ Position::UndoState Position::PlayMove(Coord c, Color color,
     } else {
       to_play_ = color;
     }
-    MG_DCHECK(ClassifyMove(c) != MoveType::kIllegal) << c;
+    MG_DCHECK(ClassifyMoveIgnoringSuperko(c) != MoveType::kIllegal) << c;
     undo.captures = AddStoneToBoard(c, color);
   }
 
@@ -466,7 +466,7 @@ Color Position::IsKoish(Coord c) const {
   return ko_color;
 }
 
-Position::MoveType Position::ClassifyMove(Coord c) const {
+Position::MoveType Position::ClassifyMoveIgnoringSuperko(Coord c) const {
   if (c == Coord::kPass || c == Coord::kResign) {
     return MoveType::kNoCapture;
   }
@@ -514,7 +514,7 @@ bool Position::HasNeighboringGroup(Coord c, GroupId group_id) const {
   return false;
 }
 
-float Position::CalculateScore(float komi) {
+float Position::CalculateScore(float komi) const {
   static_assert(static_cast<int>(Color::kEmpty) == 0, "Color::kEmpty != 0");
   static_assert(static_cast<int>(Color::kBlack) == 1, "Color::kBlack != 1");
   static_assert(static_cast<int>(Color::kWhite) == 2, "Color::kWhite != 2");
@@ -958,15 +958,15 @@ void Position::UpdateLegalMoves(ZobristHistory* zobrist_history) {
   legal_moves_[Coord::kPass] = true;
 
   if (zobrist_history == nullptr) {
-    // We're not checking for superko, use the basic result from ClassifyMove to
-    // determine whether each move is legal.
+    // We're not checking for superko, use the basic result from
+    // ClassifyMoveIgnoringSuperko to determine whether each move is legal.
     for (int c = 0; c < kN * kN; ++c) {
-      legal_moves_[c] = ClassifyMove(c) != MoveType::kIllegal;
+      legal_moves_[c] = ClassifyMoveIgnoringSuperko(c) != MoveType::kIllegal;
     }
   } else {
     // We're using superko, things are a bit trickier.
     for (int c = 0; c < kN * kN; ++c) {
-      switch (ClassifyMove(c)) {
+      switch (ClassifyMoveIgnoringSuperko(c)) {
         case Position::MoveType::kIllegal: {
           // The move is trivially not legal.
           legal_moves_[c] = false;

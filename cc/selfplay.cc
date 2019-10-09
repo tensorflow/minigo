@@ -446,7 +446,7 @@ class SelfPlayer {
           // We're using playout count oscillation and doing a slow play.
           // Clear the root's search state so that the injected noise has a
           // more significant effect.
-          player->root()->ClearChildren();
+          player->ClearSubtrees();
         }
 
         // Choose the move to play, optionally adding noise.
@@ -483,14 +483,14 @@ class SelfPlayer {
                                                 stats.num_inferences),
                      absl::ToDoubleMilliseconds(stats.run_many_time /
                                                 stats.num_inferences));
-          MG_LOG(INFO) << root->CalculateTreeStats().ToString();
+          MG_LOG(INFO) << player->tree().CalculateStats().ToString();
 
           if (!fastplay) {
             MG_LOG(INFO) << root->position.ToPrettyString(use_ansi_colors);
             MG_LOG(INFO) << "Move: " << position.n()
                          << " Captures X: " << position.num_captures()[0]
                          << " O: " << position.num_captures()[1];
-            MG_LOG(INFO) << root->Describe();
+            MG_LOG(INFO) << player->tree().Describe();
             if (inference_cache_ != nullptr) {
               MG_LOG(INFO) << "Inference cache stats: "
                            << inference_cache_->GetStats();

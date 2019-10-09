@@ -202,7 +202,7 @@ class Position {
 
   // Calculates the score from B perspective. If W is winning, score is
   // negative.
-  float CalculateScore(float komi);
+  float CalculateScore(float komi) const;
 
   // Calculates all pass-alive region that are enclosed by groups of `color`
   // stones.
@@ -240,7 +240,7 @@ class Position {
     // The move is not necessarily legal because of superko.
     kCapture,
   };
-  MoveType ClassifyMove(Coord c) const;
+  MoveType ClassifyMoveIgnoringSuperko(Coord c) const;
 
   std::string ToSimpleString() const;
   std::string ToPrettyString(bool use_ansi_colors = true) const;

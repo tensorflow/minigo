@@ -156,12 +156,12 @@ cc_library(
 minigo_cc_library(
     name = "mcts",
     srcs = [
-        "mcts_node.cc",
         "mcts_player.cc",
+        "mcts_tree.cc",
     ],
     hdrs = [
-        "mcts_node.h",
         "mcts_player.h",
+        "mcts_tree.h",
     ],
     deps = [
         ":base",
@@ -180,6 +180,7 @@ minigo_cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -305,7 +306,6 @@ minigo_cc_library(
     deps = [
         ":base",
         ":logging",
-        ":mcts",
         ":position",
         ":random",
         "@com_google_absl//absl/strings",
@@ -323,9 +323,9 @@ minigo_cc_test(
 )
 
 minigo_cc_test_9_only(
-    name = "mcts_node_test",
+    name = "mcts_tree_test",
     size = "small",
-    srcs = ["mcts_node_test.cc"],
+    srcs = ["mcts_tree_test.cc"],
     deps = [
         ":mcts",
         ":position",

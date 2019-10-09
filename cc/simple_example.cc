@@ -69,7 +69,7 @@ void SimpleExample() {
     std::cout << "Move: " << position.n()
               << " Captures X: " << position.num_captures()[0]
               << " O: " << position.num_captures()[1] << "\n";
-    std::cout << player.root()->Describe() << "\n";
+    std::cout << player.tree().Describe() << "\n";
 
     MG_CHECK(player.PlayMove(move));
   }
