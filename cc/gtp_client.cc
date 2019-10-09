@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <thread>
 #include <utility>
 
@@ -176,7 +177,8 @@ void GtpClient::Ponder() {
   // Remember the number of reads at the root.
   int n = player_->root()->N();
 
-  player_->TreeSearch(player_->options().virtual_losses);
+  player_->TreeSearch(player_->options().virtual_losses,
+                      std::numeric_limits<int>::max());
 
   // Increment the ponder count by difference new and old reads.
   ponder_read_count_ += player_->root()->N() - n;

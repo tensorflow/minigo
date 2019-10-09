@@ -14,6 +14,7 @@
 
 #include "cc/mcts_player.h"
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -258,7 +259,7 @@ TEST_F(MctsPlayerTest, DontPassIfLosing) {
   EXPECT_EQ(-0.5, root->position.CalculateScore(game_->options().komi));
 
   for (int i = 0; i < 20; ++i) {
-    player->TreeSearch(1);
+    player->TreeSearch(1, std::numeric_limits<int>::max());
   }
 
   // Search should converge on D9 as only winning move.
@@ -279,11 +280,11 @@ TEST_F(MctsPlayerTest, ParallelTreeSearch) {
   auto* root = player->root();
 
   // Initialize the tree so that the root node has populated children.
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   // Virtual losses should enable multiple searches to happen simultaneously
   // without throwing an error...
   for (int i = 0; i < 5; ++i) {
-    player->TreeSearch(5);
+    player->TreeSearch(5, std::numeric_limits<int>::max());
   }
 
   // Search should converge on D9 as only winning move.
@@ -307,7 +308,7 @@ TEST_F(MctsPlayerTest, DontPassOnEmptyLosingBoard) {
   auto board = TestablePosition(kOneStoneBoard, Color::kWhite);
   player->InitializeGame(board);
   for (int i = 0; i < 80; ++i) {
-    player->TreeSearch(8);
+    player->TreeSearch(8, std::numeric_limits<int>::max());
   }
 
   // Expect pass-pass to have been checked.
@@ -326,7 +327,7 @@ TEST_F(MctsPlayerTest, DontPassOnEmptyLosingBoard) {
   board = TestablePosition("", Color::kBlack);
   player->InitializeGame(board);
   for (int i = 0; i < 80; ++i) {
-    player->TreeSearch(8);
+    player->TreeSearch(8, std::numeric_limits<int>::max());
   }
 
   // Expect pass-pass to have been checked.
@@ -349,7 +350,7 @@ TEST_F(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
   for (int i = 0; i < 10; ++i) {
     // Test that an almost complete game will tree search with
     // # parallelism > # legal moves.
-    player->TreeSearch(50);
+    player->TreeSearch(50, std::numeric_limits<int>::max());
   }
 
   // No virtual losses should be pending.
@@ -374,7 +375,7 @@ TEST_F(MctsPlayerTest, LongGameTreeSearch) {
   // Test that MCTS can deduce that B wins because of TT-scoring triggered by
   // move limit.
   for (int i = 0; i < 10; ++i) {
-    player->TreeSearch(8);
+    player->TreeSearch(8, std::numeric_limits<int>::max());
   }
   EXPECT_EQ(0, CountPendingVirtualLosses(player->root()));
   EXPECT_LT(0, player->root()->Q());
@@ -390,7 +391,7 @@ TEST_F(MctsPlayerTest, ColdStartParallelTreeSearch) {
   // Test that parallel tree search doesn't trip on an empty tree.
   EXPECT_EQ(0, root->N());
   EXPECT_EQ(false, root->HasFlag(MctsNode::Flag::kExpanded));
-  player->TreeSearch(4);
+  player->TreeSearch(4, std::numeric_limits<int>::max());
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
 
   // The TreeSearch(4) call will have first expanded the root node so that it
@@ -417,7 +418,7 @@ TEST_F(MctsPlayerTest, TreeSearchFailsafe) {
   auto board = TestablePosition("");
   board.PlayMove("pass");
   player->InitializeGame(board);
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   EXPECT_EQ(0, CountPendingVirtualLosses(player->root()));
 }
 
@@ -441,11 +442,11 @@ TEST_F(MctsPlayerTest, OnlyCheckGameEndOnce) {
   auto* root = player->root();
 
   // Initialize the root
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   // Explore a child - should be a pass move.
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   EXPECT_EQ(1, root->child_N(Coord::kPass));
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
 
   // Check that we didn't visit the pass node any more times.
   EXPECT_EQ(1, root->child_N(Coord::kPass));
@@ -455,9 +456,9 @@ TEST_F(MctsPlayerTest, ExtractDataNormalEnd) {
   auto player =
       absl::make_unique<TestablePlayer>(game_.get(), MctsPlayer::Options());
 
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   player->PlayMove(Coord::kPass);
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   player->PlayMove(Coord::kPass);
 
   auto* root = player->root();
@@ -474,11 +475,11 @@ TEST_F(MctsPlayerTest, ExtractDataNormalEnd) {
 TEST_F(MctsPlayerTest, ExtractDataResignEnd) {
   auto player =
       absl::make_unique<TestablePlayer>(game_.get(), MctsPlayer::Options());
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   player->PlayMove({0, 0});
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   player->PlayMove(Coord::kPass);
-  player->TreeSearch(1);
+  player->TreeSearch(1, std::numeric_limits<int>::max());
   player->PlayMove(Coord::kResign);
 
   auto* root = player->root();

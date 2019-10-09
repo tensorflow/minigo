@@ -565,7 +565,7 @@ void MiniguiGtpClient::WinRateEvaluator::Worker::Run() {
     for (auto c : node->GetVariation()) {
       MG_CHECK(player_->PlayMove(c));
     }
-    player_->TreeSearch(player_->options().virtual_losses);
+    player_->TreeSearch(player_->options().virtual_losses, 1024);
     BatchingModelFactory::EndGame(player_->model(), player_->model());
 
     nlohmann::json j = {
