@@ -90,8 +90,8 @@ DEFINE_double(policy_softmax_temp, 0.98,
               "For soft-picked moves, the probabilities are exponentiated by "
               "policy_softmax_temp to encourage diversity in early play.\n");
 DEFINE_bool(restrict_in_bensons, false,
-              "Prevent play in benson's regions after 5 passes have been "
-              "played.\n");
+            "Prevent play in benson's regions after 5 passes have been "
+            "played.\n");
 
 DEFINE_string(flags_path, "",
               "Optional path to load flags from. Flags specified in this file "
@@ -115,21 +115,12 @@ DEFINE_bool(
     "If true, subtract visits from all moves that weren't the best move until "
     "the uncertainty level compensates.");
 
-// Time control flags.
-DEFINE_double(seconds_per_move, 0,
-              "If non-zero, the number of seconds to spend thinking about each "
-              "move instead of using a fixed number of readouts.");
-DEFINE_double(
-    time_limit, 0,
-    "If non-zero, the maximum amount of time to spend thinking in a game: we "
-    "spend seconds_per_move thinking for each move for as many moves as "
-    "possible before exponentially decaying the amount of time.");
-DEFINE_double(decay_factor, 0.98,
-              "If time_limit is non-zero, the decay factor used to shorten the "
-              "amount of time spent thinking as the game progresses.");
+// Selfplay flags.
 DEFINE_bool(run_forever, false,
             "When running 'selfplay' mode, whether to run forever. "
             "Only one of run_forever and num_games must be set.");
+DEFINE_bool(track_variety, false,
+            "If true, track the variety of positions seen.");
 
 // Inference flags.
 DEFINE_string(model, "",
@@ -167,6 +158,42 @@ DEFINE_string(wtf_trace, "/tmp/minigo.wtf-trace",
 namespace minigo {
 namespace {
 
+// Track the variety of positions played.
+class VarietyTracker {
+ public:
+  struct Stats {
+    uint64_t total_positions;
+    uint64_t num_unique_positions;
+  };
+
+  void Insert(const Position& p, symmetry::Symmetry canonical_sym) {
+    const auto& coord_symmetry = symmetry::kCoords[canonical_sym];
+    const auto& stones = p.stones();
+    zobrist::Hash stone_hash = 0;
+    for (int real_c = 0; real_c < kN * kN; ++real_c) {
+      auto symmetric_c = coord_symmetry[real_c];
+      auto h = zobrist::MoveHash(symmetric_c, stones[real_c].color());
+      stone_hash ^= h;
+    }
+
+    {
+      absl::MutexLock lock(&mutex_);
+      unique_positions_.insert(stone_hash);
+      num_positions_ += 1;
+    }
+  }
+
+  Stats GetStats() const {
+    absl::MutexLock lock(&mutex_);
+    return {num_positions_, unique_positions_.size()};
+  }
+
+ private:
+  mutable absl::Mutex mutex_;
+  uint64_t num_positions_ GUARDED_BY(&mutex_) = 0;
+  absl::flat_hash_set<zobrist::Hash> unique_positions_ GUARDED_BY(&mutex_);
+};
+
 std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
   auto sub_dirs = absl::FormatTime("%Y-%m-%d-%H", now, absl::UTCTimeZone());
   return file::JoinPath(root_dir, sub_dirs);
@@ -184,9 +211,6 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   player_options->random_seed = FLAGS_seed;
   player_options->random_symmetry = FLAGS_random_symmetry;
   player_options->num_readouts = FLAGS_num_readouts;
-  player_options->seconds_per_move = FLAGS_seconds_per_move;
-  player_options->time_limit = FLAGS_time_limit;
-  player_options->decay_factor = FLAGS_decay_factor;
   player_options->fastplay_frequency = FLAGS_fastplay_frequency;
   player_options->fastplay_readouts = FLAGS_fastplay_readouts;
   player_options->target_pruning = FLAGS_target_pruning;
@@ -416,7 +440,7 @@ class SelfPlayer {
 
         fastplay = (rnd_() < thread_options.player_options.fastplay_frequency);
         readouts = (fastplay ? thread_options.player_options.fastplay_readouts
-                      : thread_options.player_options.num_readouts);
+                             : thread_options.player_options.num_readouts);
 
         if (thread_options.player_options.fastplay_frequency > 0 && !fastplay) {
           // We're using playout count oscillation and doing a slow play.
@@ -477,7 +501,12 @@ class SelfPlayer {
         // Play the chosen move.
         {
           WTF_SCOPE0("PlayMove");
-          MG_CHECK(player->PlayMove(move, !fastplay)); // !fastplay == is_trainable
+          MG_CHECK(
+              player->PlayMove(move, !fastplay));  // !fastplay == is_trainable
+          if (FLAGS_track_variety) {
+            variety_tracker_.Insert(player->root()->position,
+                                    player->root()->canonical_symmetry);
+          }
         }
 
         // Log information about the move played.
@@ -503,6 +532,13 @@ class SelfPlayer {
         absl::MutexLock lock(&mutex_);
         LogEndGameInfo(*game, absl::Now() - game_start_time);
         win_stats_.Update(*game);
+        auto stats = variety_tracker_.GetStats();
+        MG_LOG(INFO) << "Total positions played: " << stats.total_positions;
+        MG_LOG(INFO) << "Unique positions played: "
+                     << stats.num_unique_positions << " ("
+                     << (100 * static_cast<double>(stats.num_unique_positions) /
+                         static_cast<double>(stats.total_positions))
+                     << "%)";
       }
 
       // Write the outputs.
@@ -608,6 +644,8 @@ class SelfPlayer {
 
   const std::string engine_;
   const std::string model_;
+
+  VarietyTracker variety_tracker_;
 };
 
 }  // namespace

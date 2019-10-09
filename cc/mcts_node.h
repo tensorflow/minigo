@@ -153,7 +153,7 @@ class MctsNode {
   void ClearChildren();
 
   // Adjust the visit counts via whatever hairbrained scheme.
-  void ReshapeFinalVisits(bool restrict_in_bensons=false);
+  void ReshapeFinalVisits(bool restrict_in_bensons = false);
 
   std::array<float, kNumMoves> CalculateChildActionScore() const;
 
@@ -188,7 +188,7 @@ class MctsNode {
   // inference cache. It would be more generally useful to use the real
   // canonical transform such that the first move is in the top-right corner,
   // etc.
-  uint8_t canonical_symmetry = symmetry::kIdentity;
+  symmetry::Symmetry canonical_symmetry = symmetry::kIdentity;
 
   std::array<EdgeStats, kNumMoves> edges;
 

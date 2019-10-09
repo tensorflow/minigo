@@ -26,7 +26,7 @@
 namespace minigo {
 namespace symmetry {
 
-enum Symmetry {
+enum Symmetry : uint8_t {
   // No transform.
   kIdentity,
 

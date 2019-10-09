@@ -198,7 +198,7 @@ class MctsPlayer {
   // canonical symmetry defined; in these cases, GetCanonicalSymmetry returns
   // symmetry::kIdentity.
   symmetry::Symmetry GetCanonicalSymmetry(const MctsNode* node) const {
-    return static_cast<symmetry::Symmetry>(node->canonical_symmetry);
+    return node->canonical_symmetry;
   }
 
   // Returns the symmetry that should be applied to this node's position when
