@@ -183,8 +183,8 @@ void TpuDualNet::Reserve(size_t capacity) {
   batch_capacity_ = capacity;
 }
 
-TpuDualNetFactory::TpuDualNetFactory(int buffer_count, std::string tpu_name)
-    : tpu_name_(std::move(tpu_name)), buffer_count_(buffer_count) {
+TpuDualNetFactory::TpuDualNetFactory(std::string tpu_name)
+    : tpu_name_(std::move(tpu_name)) {
   // Create a session containing ops for initializing & shutting down a TPU.
   GraphDef graph_def;
   ::tensorflow::protobuf::TextFormat::ParseFromString(kTpuOpsGraphDef,
@@ -234,12 +234,6 @@ std::unique_ptr<Model> TpuDualNetFactory::NewModel(
   MG_LOG(INFO) << "Found " << num_replicas << " model replicas in graph "
                << descriptor;
   MG_CHECK(num_replicas > 0);
-
-  std::vector<std::unique_ptr<Model>> models;
-  for (int i = 0; i < buffer_count_; ++i) {
-    models.push_back(absl::make_unique<TpuDualNet>(tpu_name_, descriptor,
-                                                   graph_def, num_replicas));
-  }
 
   return absl::make_unique<BufferedModel>(std::move(models));
 }

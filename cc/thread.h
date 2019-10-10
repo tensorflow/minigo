@@ -21,6 +21,12 @@ class Thread {
  public:
   virtual ~Thread();
 
+  Thread() = default;
+  Thread(Thread&&) = default;
+  Thread& operator=(Thread&&) = default;
+
+  std::thread::native_handle_type handle() { return impl_.native_handle(); }
+
   void Start();
   void Join();
 
@@ -34,6 +40,9 @@ class LambdaThread : public Thread {
  public:
   template <typename T>
   explicit LambdaThread(T closure) : closure_(std::move(closure)) {}
+
+  LambdaThread(LambdaThread&&) = default;
+  LambdaThread& operator=(LambdaThread&&) = default;
 
  private:
   void Run() override;

@@ -66,6 +66,7 @@ minigo_cc_library(
         ":sgf",
         "//cc/file",
         "//cc/platform",
+        "@com_google_absl//absl/time",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
     ],
@@ -430,6 +431,36 @@ minigo_cc_test(
 )
 
 minigo_cc_binary(
+    name = "concurrent_selfplay",
+    srcs = ["concurrent_selfplay.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base",
+        ":game",
+        ":game_utils",
+        ":init",
+        ":logging",
+        ":mcts",
+        ":random",
+        ":tf_utils",
+        ":thread",
+        ":thread_safe_queue",
+        ":zobrist",
+        "//cc/dual_net:factory",
+        "//cc/file",
+        "//cc/model:inference_cache",
+        "//cc/model:reloading_model",
+        "//cc/platform",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@wtf",
+    ],
+)
+
+minigo_cc_binary(
     name = "eval",
     srcs = ["eval.cc"],
     visibility = ["//visibility:public"],
@@ -471,30 +502,6 @@ minigo_cc_binary(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
-    ],
-)
-
-minigo_cc_binary(
-    name = "puzzle",
-    srcs = ["puzzle.cc"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":base",
-        ":init",
-        ":logging",
-        ":mcts",
-        ":sgf",
-        ":zobrist",
-        "//cc/dual_net:factory",
-        "//cc/file",
-        "//cc/model:batching_model",
-        "//cc/platform",
-        "@com_github_gflags_gflags//:gflags",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
     ],
 )

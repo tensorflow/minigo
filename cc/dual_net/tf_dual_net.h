@@ -25,12 +25,12 @@ namespace minigo {
 
 class TfDualNetFactory : public ModelFactory {
  public:
-  explicit TfDualNetFactory(std::vector<int> devices);
+  explicit TfDualNetFactory(int device);
 
   std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 
  private:
-  std::vector<int> devices_;
+  const int device_;
 };
 
 }  // namespace minigo

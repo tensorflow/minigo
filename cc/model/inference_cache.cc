@@ -72,6 +72,21 @@ std::ostream& operator<<(std::ostream& os, const InferenceCache::Stats& stats) {
             << " hit_rate:" << (100 * hit_rate) << "%";
 }
 
+void NullInferenceCache::Clear() {}
+
+void NullInferenceCache::Merge(Key key, symmetry::Symmetry canonical_sym,
+                               symmetry::Symmetry inference_sym,
+                               ModelOutput* output) {}
+
+bool NullInferenceCache::TryGet(Key key, symmetry::Symmetry canonical_sym,
+                                symmetry::Symmetry inference_sym,
+                                ModelOutput* output) {
+  stats_.num_complete_misses += 1;
+  return false;
+}
+
+InferenceCache::Stats NullInferenceCache::GetStats() const { return stats_; }
+
 size_t BasicInferenceCache::CalculateCapacity(size_t size_mb) {
   // Minimum load factory of an absl::node_hash_map at the time of writing,
   // taken from https://abseil.io/docs/cpp/guides/container.

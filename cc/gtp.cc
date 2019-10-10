@@ -63,9 +63,14 @@ DEFINE_double(decay_factor, 0.98,
               "amount of time spent thinking as the game progresses.");
 
 // Inference flags.
-DEFINE_string(model, "",
-              "Path to a minigo model. The format of the model depends on the "
-              "inference engine.");
+DEFINE_string(engine, "tf",
+              "Name of the inference engine to use, e.g. \"tf\", \"tpu\", "
+              "\"lite\"");
+DEFINE_string(device, "",
+              "Device to run on. For inference on a machine with N GPUs, "
+              "devices have IDs in the range [0, N). For TPUs, the device ID "
+              "is the gRPC address");
+DEFINE_string(model, "", "Path to a minigo model.");
 DEFINE_int32(cache_size_mb, 1024,
              "Size of the inference cache in MB. Tree reuse in GTP mode is "
              "disabled, so cache_size_mb should be non-zero for reasonable "
@@ -80,8 +85,8 @@ void Gtp() {
 
   MctsPlayer::Options player_options;
   player_options.inject_noise = false;
-  player_options.soft_pick = false;
-  player_options.value_init_penalty = FLAGS_value_init_penalty;
+  player_options.tree.soft_pick_enabled = false;
+  player_options.tree.value_init_penalty = FLAGS_value_init_penalty;
   player_options.virtual_losses = FLAGS_virtual_losses;
   player_options.num_readouts = FLAGS_num_readouts;
   player_options.seconds_per_move = FLAGS_seconds_per_move;
@@ -97,8 +102,7 @@ void Gtp() {
 
   MG_LOG(INFO) << game_options << " " << player_options;
 
-  auto model_desc = minigo::ParseModelDescriptor(FLAGS_model);
-  auto model_factory = NewModelFactory(model_desc.engine);
+  auto model_factory = NewModelFactory(FLAGS_engine, FLAGS_device);
 
   std::shared_ptr<ThreadSafeInferenceCache> inference_cache;
   if (FLAGS_cache_size_mb > 0) {
@@ -115,11 +119,11 @@ void Gtp() {
   std::unique_ptr<GtpClient> client;
   if (FLAGS_minigui) {
     client = absl::make_unique<MiniguiGtpClient>(
-        std::move(model_factory), std::move(inference_cache), model_desc.model,
+        std::move(model_factory), std::move(inference_cache), FLAGS_model,
         game_options, player_options, client_options);
   } else {
     client = absl::make_unique<GtpClient>(
-        std::move(model_factory), std::move(inference_cache), model_desc.model,
+        std::move(model_factory), std::move(inference_cache), FLAGS_model,
         game_options, player_options, client_options);
   }
   client->Run();

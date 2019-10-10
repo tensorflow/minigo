@@ -56,8 +56,7 @@ void Game::AddComment(const std::string& comment) {
 
 void Game::AddMove(Color color, Coord c, const Position& position,
                    std::string comment, float Q,
-                   const std::array<float, kNumMoves>& search_pi,
-                   std::vector<std::string> models) {
+                   const std::array<float, kNumMoves>& search_pi) {
   if (!moves_.empty() && moves_.back()->color == color &&
       moves_.back()->c == c) {
     MG_CHECK(options_.ignore_repeated_moves)
@@ -73,7 +72,6 @@ void Game::AddMove(Color color, Coord c, const Position& position,
   move->c = c;
   move->Q = Q;
   move->comment = std::move(comment);
-  move->models = std::move(models);
   move->search_pi = search_pi;
 }
 

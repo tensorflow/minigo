@@ -22,12 +22,10 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 #include "absl/synchronization/notification.h"
 #include "cc/constants.h"
 #include "cc/file/path.h"
 #include "cc/logging.h"
-#include "cc/model/buffered_model.h"
 #include "cc/thread_safe_queue.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"
@@ -36,11 +34,6 @@
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/public/session.h"
 #include "wtf/macros.h"
-
-#if MINIGO_ENABLE_GPU
-#include "tensorflow/core/common_runtime/gpu/gpu_init.h"
-#include "tensorflow/stream_executor/platform.h"
-#endif
 
 namespace minigo {
 namespace {
@@ -62,8 +55,7 @@ class TfDualNet : public Model {
  public:
   TfDualNet(const std::string& graph_path,
             const FeatureDescriptor& feature_desc,
-            const tensorflow::GraphDef& graph_def,
-            const std::vector<int>& devices);
+            const tensorflow::GraphDef& graph_def, int device);
   ~TfDualNet() override;
 
   void RunMany(const std::vector<const ModelInput*>& inputs,
@@ -83,16 +75,14 @@ class TfDualNet : public Model {
 
 TfDualNet::TfDualNet(const std::string& graph_path,
                      const FeatureDescriptor& feature_desc,
-                     const tensorflow::GraphDef& graph_def,
-                     const std::vector<int>& devices)
-    : Model(std::string(file::Stem(file::Basename(graph_path))), feature_desc,
-            1),
+                     const tensorflow::GraphDef& graph_def, int device)
+    : Model(std::string(file::Stem(file::Basename(graph_path))), feature_desc),
       graph_path_(graph_path) {
   tensorflow::SessionOptions options;
   options.config.mutable_gpu_options()->set_allow_growth(true);
-  if (!devices.empty()) {
+  if (device >= 0) {
     options.config.mutable_gpu_options()->set_visible_device_list(
-        absl::StrJoin(devices, ","));
+        absl::StrCat(device));
   }
   session_.reset(tensorflow::NewSession(options));
   TF_CHECK_OK(session_->Create(graph_def));
@@ -118,7 +108,10 @@ void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
   Tensor<float> features(batch_capacity_, kN, kN,
                          feature_descriptor().num_planes,
                          inputs_[0].second.flat<float>().data());
-  feature_descriptor().set_floats(inputs, &features);
+  {
+    WTF_SCOPE("Features::Set", int)(batch_capacity_);
+    feature_descriptor().set_floats(inputs, &features);
+  }
 
   // Run the model.
   {
@@ -130,7 +123,10 @@ void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                        outputs_[0].flat<float>().data());
   Tensor<float> value(batch_capacity_, 1, 1, 1,
                       outputs_[1].flat<float>().data());
-  Model::GetOutputs(inputs, policy, value, outputs);
+  {
+    WTF_SCOPE("Model::GetOutputs", int)(batch_capacity_);
+    Model::GetOutputs(inputs, policy, value, outputs);
+  }
 
   if (model_name != nullptr) {
     *model_name = graph_path_;
@@ -152,17 +148,7 @@ void TfDualNet::Reserve(int capacity) {
 
 }  // namespace
 
-TfDualNetFactory::TfDualNetFactory(std::vector<int> devices)
-    : devices_(std::move(devices)) {
-#if MINIGO_ENABLE_GPU
-  if (devices_.empty() && tensorflow::ValidateGPUMachineManager().ok()) {
-    int num_devices = tensorflow::GPUMachineManager()->VisibleDeviceCount();
-    for (int i = 0; i < num_devices; ++i) {
-      devices_.push_back(i);
-    }
-  }
-#endif
-}
+TfDualNetFactory::TfDualNetFactory(int device) : device_(device) {}
 
 std::unique_ptr<Model> TfDualNetFactory::NewModel(
     const std::string& descriptor) {
@@ -190,6 +176,7 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
       MG_CHECK(it->second.has_shape());
       MG_CHECK(it->second.shape().dim().size() == 4);
       num_feature_planes = it->second.shape().dim(3).size();
+      break;
     }
   }
   MG_CHECK(num_feature_planes != 0)
@@ -197,10 +184,10 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
 
   FeatureDescriptor feature_desc;
   switch (num_feature_planes) {
-    case 17:
+    case AgzFeatures::kNumPlanes:
       feature_desc = FeatureDescriptor::Create<AgzFeatures>();
       break;
-    case 20:
+    case ExtraFeatures::kNumPlanes:
       feature_desc = FeatureDescriptor::Create<ExtraFeatures>();
       break;
     default:
@@ -209,20 +196,12 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
       return nullptr;
   }
 
-  std::vector<std::unique_ptr<Model>> models;
-  // Create two worker models per device (or two threads for CPU inference if
-  // there are no accelerator devices present).
-  for (size_t i = 0; i < std::max<size_t>(devices_.size(), 1); ++i) {
-    if (!devices_.empty()) {
-      PlaceOnDevice(&graph_def, absl::StrCat("/gpu:", i));
-    }
-    models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, feature_desc, graph_def, std::move(devices_)));
-    models.push_back(absl::make_unique<TfDualNet>(
-        descriptor, feature_desc, graph_def, std::move(devices_)));
+  // TODO(tommadams): support running on multiple GPUs
+  if (device_ >= 0) {
+    PlaceOnDevice(&graph_def, "/gpu:0");
   }
-
-  return absl::make_unique<BufferedModel>(std::move(models));
+  return absl::make_unique<TfDualNet>(descriptor, feature_desc, graph_def,
+                                      device_);
 }
 
 }  // namespace minigo

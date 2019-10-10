@@ -65,12 +65,18 @@ DEFINE_double(value_init_penalty, 2.0,
               "This behaves similiarly to Leela's FPU \"First Play Urgency\".");
 
 // Inference flags.
-DEFINE_string(model, "",
-              "Path to a minigo model. The format of the model depends on the "
-              "inference engine. If parallel_games=1, this model is used for "
-              "black. For engine=tf, the model should be a GraphDef proto. For "
-              "engine=lite, the model should be .tflite flatbuffer.");
-DEFINE_string(model_two, "", "Descriptor for the second model");
+DEFINE_string(eval_model, "",
+              "Path to a minigo model to evaluate against a target.");
+DEFINE_string(eval_engine, "tf", "Inference engine to use for the eval model.");
+DEFINE_string(eval_device, "", "Device to run eval inference on.");
+
+DEFINE_string(target_model, "",
+              "Path to a target minigo model that eval_model is evaluated "
+              "against.");
+DEFINE_string(target_engine, "tf",
+              "Inference engine to use for the eval model.");
+DEFINE_string(target_device, "", "Device to run target inference on.");
+
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 
 // Output flags.
@@ -93,9 +99,9 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   game_options->ignore_repeated_moves = true;
   player_options->virtual_losses = FLAGS_virtual_losses;
   player_options->num_readouts = FLAGS_num_readouts;
-  player_options->value_init_penalty = FLAGS_value_init_penalty;
   player_options->inject_noise = false;
-  player_options->soft_pick = false;
+  player_options->tree.value_init_penalty = FLAGS_value_init_penalty;
+  player_options->tree.soft_pick_enabled = false;
 }
 
 class Evaluator {
@@ -147,38 +153,35 @@ class Evaluator {
   };
 
  public:
-  Evaluator(ModelDescriptor desc_a, ModelDescriptor desc_b)
-      : desc_a_(std::move(desc_a)), desc_b_(std::move(desc_b)) {
-    // Create a batcher for the first model.
+  Evaluator() {
+    // Create a batcher for the eval model.
     batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-        NewModelFactory(desc_a_.engine)));
+        NewModelFactory(FLAGS_eval_engine, FLAGS_eval_device), 2));
 
-    // If the second model requires a different factory, create one & a second
+    // If the target model requires a different factory, create one & a second
     // batcher too.
-    if (desc_b_.engine != desc_a_.engine) {
+    if (FLAGS_target_engine != FLAGS_eval_engine ||
+        FLAGS_target_device != FLAGS_eval_device) {
       batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-          NewModelFactory(desc_b_.engine)));
+          NewModelFactory(FLAGS_target_engine, FLAGS_target_device), 2));
     }
   }
 
   void Run() {
     auto start_time = absl::Now();
 
-    EvaluatedModel model_a(batchers_.front().get(), desc_a_.model);
-    EvaluatedModel model_b(batchers_.back().get(), desc_b_.model);
-
-    MG_LOG(INFO) << "Model factories created from " << desc_a_ << "\n  and "
-                 << desc_b_ << " in "
-                 << absl::ToDoubleSeconds(absl::Now() - start_time) << " sec.";
+    EvaluatedModel eval_model(batchers_.front().get(), FLAGS_eval_model);
+    EvaluatedModel target_model(batchers_.back().get(), FLAGS_target_model);
 
     ParseOptionsFromFlags(&game_options_, &player_options_);
 
     int num_games = FLAGS_parallel_games;
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
-      threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
-                                      swap_models ? &model_b : &model_a,
-                                      swap_models ? &model_a : &model_b));
+      threads_.emplace_back(
+          std::bind(&Evaluator::ThreadRun, this, thread_id,
+                    swap_models ? &target_model : &eval_model,
+                    swap_models ? &eval_model : &target_model));
     }
     for (auto& t : threads_) {
       t.join();
@@ -188,8 +191,8 @@ class Evaluator {
                  << (absl::Now() - start_time);
 
     MG_LOG(INFO) << FormatWinStatsTable(
-        {{model_a.name(), model_a.GetWinStats()},
-         {model_b.name(), model_b.GetWinStats()}});
+        {{eval_model.name(), eval_model.GetWinStats()},
+         {target_model.name(), target_model.GetWinStats()}});
   }
 
  private:
@@ -290,9 +293,6 @@ class Evaluator {
   MctsPlayer::Options player_options_;
   std::vector<std::thread> threads_;
   std::atomic<size_t> game_id_{0};
-
-  const ModelDescriptor desc_a_;
-  const ModelDescriptor desc_b_;
   std::vector<std::unique_ptr<BatchingModelFactory>> batchers_;
 };
 
@@ -302,8 +302,7 @@ class Evaluator {
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
   minigo::zobrist::Init(FLAGS_seed);
-  minigo::Evaluator evaluator(minigo::ParseModelDescriptor(FLAGS_model),
-                              minigo::ParseModelDescriptor(FLAGS_model_two));
+  minigo::Evaluator evaluator;
   evaluator.Run();
   return 0;
 }

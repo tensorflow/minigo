@@ -19,14 +19,15 @@
 #include "absl/memory/memory.h"
 #include "absl/time/clock.h"
 #include "cc/logging.h"
+#include "cc/model/buffered_model.h"
 #include "wtf/macros.h"
 
 namespace minigo {
 
 namespace internal {
 
-ModelBatcher::ModelBatcher(std::unique_ptr<Model> model_impl)
-    : model_impl_(std::move(model_impl)), stats_(model_impl_->buffer_count()) {}
+ModelBatcher::ModelBatcher(std::unique_ptr<Model> model_impl, int buffer_count)
+    : model_impl_(std::move(model_impl)), stats_(buffer_count) {}
 
 ModelBatcher::~ModelBatcher() {
   MG_LOG(INFO) << "Ran " << num_batches_ << " batches with an average size of "
@@ -72,13 +73,13 @@ void ModelBatcher::RunMany(ModelBatcher* other_batcher,
 BatchingModelStats ModelBatcher::FlushStats() {
   mutex_.Lock();
   auto result = stats_;
-  stats_ = BatchingModelStats(model_impl_->buffer_count());
+  stats_ = BatchingModelStats(stats_.buffer_count);
   mutex_.Unlock();
   return result;
 }
 
 size_t ModelBatcher::GetBatchSize() const {
-  return std::max<size_t>(1, num_active_clients_ / model_impl_->buffer_count());
+  return std::max<size_t>(1, num_active_clients_ / stats_.buffer_count);
 }
 
 void ModelBatcher::MaybeRunBatchesLocked() {
@@ -101,7 +102,7 @@ void ModelBatcher::MaybeRunBatchesLocked() {
       // inference requests. This has the effect of forcing those clients
       // to run their batches in lock-step.
       bool can_run_small_batch =
-          queue_size >= num_active_clients_ / 2 &&
+          queue_size >= num_active_clients_ / stats_.buffer_count &&
           queue_size + num_waiting_ >= num_active_clients_;
       if (!can_run_small_batch) {
         break;
@@ -171,15 +172,15 @@ void ModelBatcher::RunBatch() {
   mutex_.Lock();
 
   stats_.run_batch_time +=
-      (absl::Now() - run_batch_start_time) / model_impl_->buffer_count();
-  stats_.run_many_time += (run_many_time) / model_impl_->buffer_count();
+      (absl::Now() - run_batch_start_time) / stats_.buffer_count;
+  stats_.run_many_time += (run_many_time) / stats_.buffer_count;
   stats_.num_inferences += num_inferences_in_batch;
 }
 
 }  // namespace internal
 
 BatchingModel::BatchingModel(std::shared_ptr<internal::ModelBatcher> batcher)
-    : Model(batcher->name(), batcher->feature_descriptor(), 1),
+    : Model(batcher->name(), batcher->feature_descriptor()),
       batcher_(std::move(batcher)) {}
 
 void BatchingModel::RunMany(const std::vector<const ModelInput*>& inputs,
@@ -203,8 +204,10 @@ void BatchingModel::SetOther(BatchingModel* other) {
 }
 
 BatchingModelFactory::BatchingModelFactory(
-    std::unique_ptr<ModelFactory> factory_impl)
-    : factory_impl_(std::move(factory_impl)) {}
+    std::unique_ptr<ModelFactory> factory_impl,
+    int buffer_count)
+    : factory_impl_(std::move(factory_impl)),
+      buffer_count_(buffer_count) {}
 
 std::unique_ptr<Model> BatchingModelFactory::NewModel(
     const std::string& descriptor) {
@@ -213,8 +216,14 @@ std::unique_ptr<Model> BatchingModelFactory::NewModel(
   // Find or create a service for the requested model.
   auto it = batchers_.find(descriptor);
   if (it == batchers_.end()) {
+    std::vector<std::unique_ptr<Model>> models;
+    for (int i =0 ; i < buffer_count_; ++i) {
+      models.push_back(
+          factory_impl_->NewModel(descriptor));
+    }
     auto batcher = std::make_shared<internal::ModelBatcher>(
-        factory_impl_->NewModel(descriptor));
+        absl::make_unique<BufferedModel>(std::move(models)),
+        buffer_count_);
     it = batchers_.emplace(descriptor, std::move(batcher)).first;
   }
 

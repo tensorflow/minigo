@@ -18,11 +18,9 @@
 
 namespace minigo {
 
-Model::Model(std::string name, const FeatureDescriptor& feature_desc,
-             int buffer_count)
+Model::Model(std::string name, const FeatureDescriptor& feature_desc)
     : name_(std::move(name)),
-      feature_desc_(feature_desc),
-      buffer_count_(buffer_count) {}
+      feature_desc_(feature_desc) {}
 Model::~Model() = default;
 
 void Model::GetOutputs(const std::vector<const ModelInput*>& inputs,

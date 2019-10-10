@@ -19,7 +19,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-
+#include "absl/time/time.h"
 #include "cc/game.h"
 
 namespace minigo {
@@ -67,6 +67,9 @@ std::string GetOutputName(size_t game_id);
 // Writes an SGF of the given game.
 void WriteSgf(const std::string& output_dir, const std::string& output_name,
               const Game& game, bool write_comments);
+
+// Log game result & stats.
+void LogEndGameInfo(const Game& game, absl::Duration game_time);
 
 }  // namespace minigo
 

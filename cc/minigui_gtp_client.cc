@@ -57,7 +57,7 @@ MiniguiGtpClient::MiniguiGtpClient(
   int num_workers = 16;
   int num_win_rate_evals = 8;
   model_factory_ =
-      absl::make_unique<BatchingModelFactory>(std::move(model_factory_));
+      absl::make_unique<BatchingModelFactory>(std::move(model_factory_), 2);
   auto worker_options = player_options;
   worker_options.virtual_losses = 1;
   win_rate_evaluator_ = absl::make_unique<WinRateEvaluator>(

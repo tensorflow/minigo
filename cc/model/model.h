@@ -47,17 +47,11 @@ class Model {
   static void ApplySymmetry(symmetry::Symmetry sym, const ModelOutput& src,
                             ModelOutput* dst);
 
-  // TODO(tommadams): is there some way to avoid having buffer_count in the base
-  // class? All subclasses except BufferedModel set this to 1.
-  Model(std::string name, const FeatureDescriptor& feature_desc,
-        int buffer_count);
+  Model(std::string name, const FeatureDescriptor& feature_desc);
   virtual ~Model();
 
   const std::string& name() const { return name_; }
   const FeatureDescriptor& feature_descriptor() const { return feature_desc_; }
-
-  // Returns the ideal number of inference requests in flight for this model.
-  int buffer_count() const { return buffer_count_; }
 
   virtual void RunMany(const std::vector<const ModelInput*>& inputs,
                        std::vector<ModelOutput*>* outputs,
@@ -66,7 +60,6 @@ class Model {
  private:
   const std::string name_;
   const FeatureDescriptor feature_desc_;
-  const int buffer_count_;
 };
 
 // Factory that creates Model instances.

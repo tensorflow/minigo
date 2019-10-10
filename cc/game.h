@@ -65,9 +65,6 @@ class Game {
     // Comments associated with the move.
     std::string comment;
 
-    // Models evaluated when performing tree search.
-    std::vector<std::string> models;
-
     std::array<float, kNumMoves> search_pi;
 
     // This is used to build training features after a selfplay game has
@@ -93,8 +90,7 @@ class Game {
 
   void AddMove(Color color, Coord c, const Position& position,
                std::string comment, float Q,
-               const std::array<float, kNumMoves>& search_pi,
-               std::vector<std::string> models);
+               const std::array<float, kNumMoves>& search_pi);
 
   void UndoMove();
 

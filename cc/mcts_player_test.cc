@@ -96,7 +96,6 @@ class TestablePlayer : public MctsPlayer {
                    nullptr, game, options) {}
 
   using MctsPlayer::mutable_tree;
-  using MctsPlayer::PickMove;
   using MctsPlayer::PlayMove;
   using MctsPlayer::TreeSearch;
   using MctsPlayer::UndoMove;
@@ -180,64 +179,6 @@ TEST_F(MctsPlayerTest, TimeRecommendation) {
   // If we're later into the game than should really be possible, time
   // recommendation should be almost zero.
   EXPECT_GT(0.0001, TimeRecommendation(1000, 5, 100, 0.98));
-}
-
-// Verify that with soft pick disabled, the player will always choose the best
-// move.
-TEST_F(MctsPlayerTest, PickMoveArgMax) {
-  MctsPlayer::Options options;
-  options.soft_pick = false;
-  TestablePlayer player(game_.get(), options);
-
-  auto* root = player.mutable_tree()->SelectLeaf();
-  ASSERT_EQ(player.tree().root(), root);
-
-  std::vector<std::pair<Coord, int>> child_visits = {
-      {{2, 0}, 10},
-      {{1, 0}, 5},
-      {{3, 0}, 1},
-  };
-  for (const auto& p : child_visits) {
-    root->MaybeAddChild(p.first);
-    root->edges[p.first].N = p.second;
-  }
-
-  for (int i = 0; i < 100; ++i) {
-    EXPECT_EQ(Coord(2, 0), player.PickMove());
-  }
-}
-
-// Verify that with soft pick enabled, the player will choose moves early in the
-// game proportionally to their visit count.
-TEST_F(MctsPlayerTest, PickMoveSoft) {
-  MctsPlayer::Options options;
-  options.soft_pick = true;
-  TestablePlayer player(game_.get(), options);
-
-  auto* root = player.mutable_tree()->SelectLeaf();
-  ASSERT_EQ(player.tree().root(), root);
-
-  root->edges[Coord(2, 0)].N = 10;
-  root->edges[Coord(1, 0)].N = 5;
-  root->edges[Coord(3, 0)].N = 1;
-
-  int count_1_0 = 0;
-  int count_2_0 = 0;
-  int count_3_0 = 0;
-  for (int i = 0; i < 1600; ++i) {
-    auto move = player.PickMove();
-    if (move == Coord(1, 0)) {
-      ++count_1_0;
-    } else if (move == Coord(2, 0)) {
-      ++count_2_0;
-    } else {
-      ASSERT_EQ(Coord(3, 0), move);
-      ++count_3_0;
-    }
-  }
-  EXPECT_NEAR(1000, count_2_0, 50);
-  EXPECT_NEAR(500, count_1_0, 50);
-  EXPECT_NEAR(100, count_3_0, 50);
 }
 
 TEST_F(MctsPlayerTest, DontPassIfLosing) {
@@ -509,9 +450,10 @@ TEST_F(MctsPlayerTest, UndoMove) {
 // visited (for example, if a model puts all its reads into pass). This is the
 // only case where soft pick should return kPass.
 TEST_F(MctsPlayerTest, SoftPickWithNoVisits) {
+  Random rnd(25323, 1);
   auto player =
       absl::make_unique<TestablePlayer>(game_.get(), MctsPlayer::Options());
-  EXPECT_EQ(Coord::kPass, player->PickMove());
+  EXPECT_EQ(Coord::kPass, player->mutable_tree()->PickMove(&rnd));
 }
 
 }  // namespace

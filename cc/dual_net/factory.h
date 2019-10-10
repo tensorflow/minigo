@@ -24,16 +24,8 @@
 
 namespace minigo {
 
-struct ModelDescriptor {
-  std::string engine;
-  std::string model;
-};
-
-std::ostream& operator<<(std::ostream& os, const ModelDescriptor& desc);
-
-ModelDescriptor ParseModelDescriptor(absl::string_view descriptor);
-
-std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine_desc);
+std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine,
+                                              absl::string_view device);
 
 }  // namespace minigo
 

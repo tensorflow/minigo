@@ -71,8 +71,7 @@ class Semaphore {
 // WaitingModel also records each RunMany call with its factory.
 class WaitingModel : public Model {
  public:
-  WaitingModel(WaitingModelFactory* factory, std::string model,
-               int buffer_count);
+  WaitingModel(WaitingModelFactory* factory, std::string model);
 
   // Blocks until Notify is called.
   // Each call pushes an EvaluatedBatch instance onto the factory's queue
@@ -116,9 +115,8 @@ class WaitingModelFactory : public ModelFactory {
   std::queue<EvaluatedBatch> batches_ GUARDED_BY(&mutex_);
 };
 
-WaitingModel::WaitingModel(WaitingModelFactory* factory, std::string model_name,
-                           int buffer_count)
-    : Model("Waiting", FeatureDescriptor::Create<AgzFeatures>(), buffer_count),
+WaitingModel::WaitingModel(WaitingModelFactory* factory, std::string model_name)
+    : Model("Waiting", FeatureDescriptor::Create<AgzFeatures>()),
       factory_(factory),
       model_name_(std::move(model_name)) {}
 
@@ -145,7 +143,7 @@ std::unique_ptr<Model> WaitingModelFactory::NewModel(
     const std::string& descriptor) {
   absl::MutexLock lock(&mutex_);
 
-  auto model = absl::make_unique<WaitingModel>(this, descriptor, buffer_count_);
+  auto model = absl::make_unique<WaitingModel>(this, descriptor);
   MG_CHECK(models_.emplace(descriptor, model.get()).second);
   return model;
 }
@@ -190,7 +188,8 @@ class BatchingModelTest : public ::testing::Test {
   void InitFactory(int buffer_count) {
     auto impl = absl::make_unique<WaitingModelFactory>(buffer_count);
     model_factory_ = impl.get();
-    batcher_ = absl::make_unique<BatchingModelFactory>(std::move(impl));
+    batcher_ = absl::make_unique<BatchingModelFactory>(std::move(impl),
+                                                       buffer_count);
   }
 
   std::unique_ptr<Model> NewModel(const std::string& descriptor) {

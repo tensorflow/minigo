@@ -39,6 +39,7 @@ minigo_cc_library(
     srcs = ["batching_model.cc"],
     hdrs = ["batching_model.h"],
     deps = [
+        ":buffered_model",
         "//cc:base",
         "//cc:logging",
         "//cc/model",
@@ -92,22 +93,6 @@ minigo_cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
-    ],
-)
-
-minigo_cc_test(
-    name = "batching_model_test",
-    size = "small",
-    srcs = ["batching_model_test.cc"],
-    deps = [
-        ":batching_model",
-        ":buffered_model",
-        ":model",
-        "//cc/tensorflow",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 

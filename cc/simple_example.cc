@@ -27,9 +27,14 @@
 #include "gflags/gflags.h"
 
 // Inference flags.
-DEFINE_string(model, "",
-              "Path to a minigo model. The format of the model depends on the "
-              "inference engine.");
+DEFINE_string(engine, "tf",
+              "Name of the inference engine to use, e.g. \"tf\", \"tpu\", "
+              "\"lite\"");
+DEFINE_string(device, "",
+              "Device to run on. For inference on a machine with N GPUs, "
+              "devices have IDs in the range [0, N). For TPUs, the device ID "
+              "is the gRPC address");
+DEFINE_string(model, "", "Path to a minigo model.");
 DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
 
@@ -44,9 +49,8 @@ void SimpleExample() {
   const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
 
   // Load the model specified by the command line arguments.
-  auto descriptor = ParseModelDescriptor(FLAGS_model);
-  auto model_factory = NewModelFactory(descriptor.engine);
-  auto model = model_factory->NewModel(descriptor.model);
+  auto model_factory = NewModelFactory(FLAGS_engine, FLAGS_device);
+  auto model = model_factory->NewModel(FLAGS_model);
 
   // Create a game object that tracks the move history & final score.
   Game::Options game_options;
@@ -55,8 +59,8 @@ void SimpleExample() {
   // Create the player.
   MctsPlayer::Options player_options;
   player_options.inject_noise = false;
-  player_options.soft_pick = false;
   player_options.num_readouts = FLAGS_num_readouts;
+  player_options.tree.soft_pick_enabled = false;
   MctsPlayer player(std::move(model), nullptr, &game, player_options);
 
   // Play the game.

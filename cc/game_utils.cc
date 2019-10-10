@@ -14,6 +14,7 @@
 
 #include "cc/game_utils.h"
 
+#include <iostream>
 #include <cstring>
 #include <utility>
 #include <vector>
@@ -105,6 +106,45 @@ void WriteSgf(const std::string& output_dir, const std::string& output_name,
   auto sgf_str = sgf::CreateSgfString(moves, options);
   auto output_path = file::JoinPath(output_dir, output_name + ".sgf");
   MG_CHECK(file::WriteFile(output_path, sgf_str));
+}
+
+void LogEndGameInfo(const Game& game, absl::Duration game_time) {
+  std::cout << game.result_string() << std::endl;
+  std::cout << "Playing game: " << absl::ToDoubleSeconds(game_time)
+            << std::endl;
+  std::cout << "Played moves: " << game.moves().size() << std::endl;
+
+  if (game.moves().empty()) {
+    return;
+  }
+
+  int bleakest_move = 0;
+  float q = 0.0;
+  if (game.FindBleakestMove(&bleakest_move, &q)) {
+    std::cout << "Bleakest eval: move=" << bleakest_move << " Q=" << q
+              << std::endl;
+  }
+
+  // If resignation is disabled, check to see if the first time Q_perspective
+  // crossed the resign_threshold the eventual winner of the game would have
+  // resigned. Note that we only check for the first resignation: if the
+  // winner would have incorrectly resigned AFTER the loser would have
+  // resigned on an earlier move, this is not counted as a bad resignation for
+  // the winner (since the game would have ended after the loser's initial
+  // resignation).
+  if (!game.options().resign_enabled) {
+    for (size_t i = 0; i < game.moves().size(); ++i) {
+      const auto* move = game.moves()[i].get();
+      float Q_perspective = move->color == Color::kBlack ? move->Q : -move->Q;
+      if (Q_perspective < game.options().resign_threshold) {
+        if ((move->Q < 0) != (game.result() < 0)) {
+          std::cout << "Bad resign: move=" << i << " Q=" << move->Q
+                    << std::endl;
+        }
+        break;
+      }
+    }
+  }
 }
 
 }  // namespace minigo

@@ -80,7 +80,6 @@ minigo_cc_library(
         "//cc:logging",
         "//cc:random",
         "//cc/model",
-        "//cc/model:buffered_model",
         "//cc/platform",
         "@com_google_absl//absl/memory",
     ],
@@ -90,10 +89,6 @@ minigo_cc_library(
     name = "tf_dual_net",
     srcs = ["tf_dual_net.cc"],
     hdrs = ["tf_dual_net.h"],
-    copts = select({
-        "//cc/config:enable_gpu": ["-DMINIGO_ENABLE_GPU=1"],
-        "//conditions:default": [],
-    }),
     tags = ["manual"],
     deps = [
         "//cc:base",

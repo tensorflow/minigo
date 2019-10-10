@@ -20,7 +20,7 @@
 namespace minigo {
 
 FakeDualNet::FakeDualNet(absl::Span<const float> priors, float value)
-    : Model("fake", FeatureDescriptor::Create<AgzFeatures>(), 1),
+    : Model("fake", FeatureDescriptor::Create<AgzFeatures>()),
       value_(value) {
   if (!priors.empty()) {
     MG_CHECK(priors.size() == kNumMoves);

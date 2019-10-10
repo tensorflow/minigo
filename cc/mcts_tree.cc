@@ -278,9 +278,16 @@ std::string MctsTree::Stats::ToString() const {
       1.0f * depth_sum / num_nodes, max_depth);
 }
 
-MctsTree::MctsTree(const Position& position, float value_init_penalty)
-    : game_root_(&game_root_stats_, position),
-      value_init_penalty_(value_init_penalty) {
+std::ostream& operator<<(std::ostream& os, const MctsTree::Options& options) {
+  return os << "value_init_penalty:" << options.value_init_penalty
+            << " policy_softmax_temp:" << options.policy_softmax_temp
+            << " soft_pick_enabled:" << options.soft_pick_enabled
+            << " soft_pick_cutoff:" << options.soft_pick_cutoff
+            << " restrict_in_bensons:" << options.restrict_in_bensons;
+}
+
+MctsTree::MctsTree(const Position& position, const Options& options)
+    : game_root_(&game_root_stats_, position), options_(options) {
   root_ = &game_root_;
 }
 
@@ -304,8 +311,18 @@ MctsNode* MctsTree::SelectLeaf() {
   }
 }
 
+Coord MctsTree::PickMove(Random* rnd) const {
+  if (options_.soft_pick_enabled &&
+      root_->position.n() < options_.soft_pick_cutoff) {
+    return SoftPickMove(rnd);
+  } else {
+    return PickMostVisitedMove();
+  }
+}
+
 void MctsTree::PlayMove(Coord c) {
-  MG_CHECK(!is_game_over() && is_legal_move(c));
+  MG_CHECK(!is_game_over() && is_legal_move(c))
+      << c << " " << is_game_over() << " " << is_legal_move(c);
   root_ = root_->MaybeAddChild(c);
   // Don't need to keep the parent's children around anymore because we'll
   // never revisit them during normal play.
@@ -387,7 +404,7 @@ void MctsTree::IncorporateResults(MctsNode* leaf,
   //      Init all children to losing.
   //      We think of this as saying "Only a small number of moves work don't
   //      get distracted"
-  float reduction = value_init_penalty_ *
+  float reduction = options_.value_init_penalty *
                     (leaf->position.to_play() == Color::kBlack ? 1 : -1);
   float reduced_value = std::min(1.0f, std::max(-1.0f, value - reduction));
 
@@ -456,7 +473,7 @@ void MctsTree::InjectNoise(const std::array<float, kNumMoves>& noise,
   }
 }
 
-void MctsTree::ReshapeFinalVisits(bool restrict_in_bensons) {
+void MctsTree::ReshapeFinalVisits() {
   // Since we aren't actually disallowing *reads* of bensons moves, only their
   // selection, we get the most visited move regardless of bensons status and
   // reshape based on its action score.
@@ -476,7 +493,7 @@ void MctsTree::ReshapeFinalVisits(bool restrict_in_bensons) {
   // best move.
   for (int i = 0; i < kNumMoves; ++i) {
     // Remove visits in pass alive areas.
-    if (restrict_in_bensons && (i != Coord::kPass) &&
+    if (options_.restrict_in_bensons && (i != Coord::kPass) &&
         (pass_alive_regions[i] != Color::kEmpty)) {
       root_->edges[i].N = 0;
       continue;
@@ -510,6 +527,30 @@ void MctsTree::ReshapeFinalVisits(bool restrict_in_bensons) {
   if (!any) {
     root_->edges[Coord::kPass].N = 1;
   }
+}
+
+std::array<float, kNumMoves> MctsTree::CalculateSearchPi() const {
+  std::array<float, kNumMoves> search_pi;
+  if (options_.soft_pick_enabled &&
+      root_->position.n() < options_.soft_pick_cutoff) {
+    // Squash counts before normalizing to match softpick behavior in PickMove.
+    for (int i = 0; i < kNumMoves; ++i) {
+      search_pi[i] = std::pow(root_->child_N(i), options_.policy_softmax_temp);
+    }
+  } else {
+    for (int i = 0; i < kNumMoves; ++i) {
+      search_pi[i] = root_->child_N(i);
+    }
+  }
+  // Normalize counts.
+  float sum = 0;
+  for (int i = 0; i < kNumMoves; ++i) {
+    sum += search_pi[i];
+  }
+  for (int i = 0; i < kNumMoves; ++i) {
+    search_pi[i] /= sum;
+  }
+  return search_pi;
 }
 
 MctsTree::Stats MctsTree::CalculateStats() const {
@@ -588,6 +629,41 @@ bool MctsTree::UndoMove() {
   }
   root_ = root_->parent;
   return true;
+}
+
+Coord MctsTree::PickMostVisitedMove() const {
+  auto c = root_->GetMostVisitedMove(options_.restrict_in_bensons);
+  if (!root_->position.legal_move(c)) {
+    c = Coord::kPass;
+  }
+  return c;
+}
+
+Coord MctsTree::SoftPickMove(Random* rnd) const {
+  // Select from the first kN * kN moves (instead of kNumMoves) to avoid
+  // randomly choosing to pass early on in the game.
+  std::array<float, kN * kN> cdf;
+
+  // For moves before the temperature cutoff, exponentiate the probabilities by
+  // a temperature slightly larger than unity to encourage diversity in early
+  // play and hopefully to move away from 3-3s.
+  for (size_t i = 0; i < cdf.size(); ++i) {
+    cdf[i] = std::pow(root_->child_N(i), options_.policy_softmax_temp);
+  }
+  for (size_t i = 1; i < cdf.size(); ++i) {
+    cdf[i] += cdf[i - 1];
+  }
+
+  if (cdf.back() == 0) {
+    // It's actually possible for an early model to put all its reads into pass,
+    // in which case the SearchSorted call below will always return 0. In this
+    // case, we'll just let the model have its way and allow a pass.
+    return Coord::kPass;
+  }
+
+  Coord c = rnd->SampleCdf(absl::MakeSpan(cdf));
+  MG_DCHECK(root_->child_N(c) != 0);
+  return c;
 }
 
 }  // namespace minigo

@@ -50,6 +50,14 @@ class Random {
     Dirichlet(alpha, {array_like->data(), array_like->size()});
   }
 
+  // Draw samples from a Dirichlet distribution.
+  template <int N>
+  std::array<float, N> Dirichlet(float alpha) {
+    std::array<float, N> samples;
+    Dirichlet(alpha, &samples);
+    return samples;
+  }
+
   // Draw multiple unform random samples in the half-open range [mn, mx).
   void Uniform(float mn, float mx, absl::Span<float> samples);
 
@@ -98,6 +106,7 @@ class Random {
     return std::uniform_real_distribution<float>(0, 1)(impl_);
   }
 
+  uint64_t state() const { return impl_.state; }
   uint64_t seed() const { return seed_; }
   int stream() const { return static_cast<int>(impl_.inc >> 1); }
 

@@ -18,6 +18,7 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -29,6 +30,7 @@
 #include "cc/constants.h"
 #include "cc/inline_vector.h"
 #include "cc/position.h"
+#include "cc/random.h"
 #include "cc/symmetries.h"
 #include "cc/zobrist.h"
 
@@ -175,7 +177,31 @@ class MctsTree {
     float action_score;
   };
 
-  MctsTree(const Position& position, float value_init_penalty);
+  struct Options {
+    // See mcts_node.cc for details.
+    // Default (0.0) is init-to-parent.
+    float value_init_penalty = 0.0;
+
+    // For soft-picked moves, the probabilities are exponentiated by
+    // policy_softmax_temp to encourage diversity in early play.
+    float policy_softmax_temp = 0.98;
+
+    bool soft_pick_enabled = true;
+
+    // When to do deterministic move selection: after 30 moves on a 19x19, 6 on
+    // 9x9. The divide 2, multiply 2 guarentees that white and black do the same
+    // number of softpicks.
+    int soft_pick_cutoff = ((kN * kN / 12) / 2) * 2;
+
+    // If true, this will prevent play in benson's pass-alive regions after 5
+    // passes have been played (by anyone).  It will also zero out any visits
+    // the pass-alive points may have gotten.
+    bool restrict_in_bensons = false;
+
+    friend std::ostream& operator<<(std::ostream& ios, const Options& options);
+  };
+
+  MctsTree(const Position& position, const Options& options);
 
   const MctsNode* root() const { return root_; }
 
@@ -189,6 +215,10 @@ class MctsTree {
   // already been added to the batch (IncorporateResults has not yet been
   // called), then SelectLeaf will return that same node.
   MctsNode* SelectLeaf();
+
+  // Performs a soft-pick using `rnd` if the number of moves played is
+  // < `soft_pick_cutoff`. Picks the most visited legal move otherwise.
+  Coord PickMove(Random* rnd) const;
 
   void PlayMove(Coord c);
 
@@ -210,7 +240,10 @@ class MctsTree {
   void InjectNoise(const std::array<float, kNumMoves>& noise, float mix);
 
   // Adjust the visit counts via whatever hairbrained scheme.
-  void ReshapeFinalVisits(bool restrict_in_bensons = false);
+  void ReshapeFinalVisits();
+
+  // Converts child visit counts to a probability distribution, pi.
+  std::array<float, kNumMoves> CalculateSearchPi() const;
 
   // Calculate and print statistics about the tree.
   Stats CalculateStats() const;
@@ -232,10 +265,13 @@ class MctsTree {
   }
 
  private:
+  Coord PickMostVisitedMove() const;
+  Coord SoftPickMove(Random* rnd) const;
+
   MctsNode* root_;
   MctsNode game_root_;
   MctsNode::EdgeStats game_root_stats_;
-  float value_init_penalty_;
+  Options options_;
 };
 
 }  // namespace minigo

@@ -45,7 +45,7 @@ commands. This may vary on a different operating system or graphics card.
     sudo ldconfig
     ./cc/configure_tensorflow.sh
 
-    # Compile and run C++ self-play and evaluation binaries
+    # Compile the required Minigo C++ binaries
     bazel build  -c opt  --define=tf=1  --define=board_size=9  cc:sample_records  cc:selfplay  cc:eval
 
     # Download required files from Google Cloud Storage

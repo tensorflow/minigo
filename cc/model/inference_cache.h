@@ -130,6 +130,23 @@ class InferenceCache {
 std::ostream& operator<<(std::ostream& os, const InferenceCache::Stats& stats);
 
 // Not thread safe.
+class NullInferenceCache final : public InferenceCache {
+ public:
+  void Clear() override;
+
+  void Merge(Key key, symmetry::Symmetry canonical_sym,
+             symmetry::Symmetry inference_sym, ModelOutput* output) override;
+
+  bool TryGet(Key key, symmetry::Symmetry canonical_sym,
+              symmetry::Symmetry inference_sym, ModelOutput* output) override;
+
+  Stats GetStats() const override;
+
+ private:
+  Stats stats_;
+};
+
+// Not thread safe.
 class BasicInferenceCache : public InferenceCache {
  public:
   // Calculates a reasonable approximation for how many elements can fit in

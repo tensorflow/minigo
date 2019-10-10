@@ -212,8 +212,7 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
   std::map<std::string, Test> tests;
 #if MG_ENABLE_TF_DUAL_NET
   tests.emplace("TfDualNet",
-                Test(absl::make_unique<TfDualNetFactory>(std::vector<int>()),
-                     "test_model.pb"));
+                Test(absl::make_unique<TfDualNetFactory>(-1), "test_model.pb"));
 #endif
 #if MG_ENABLE_LITE_DUAL_NET
   tests.emplace("LiteDualNet", Test(absl::make_unique<LiteDualNetFactory>(),

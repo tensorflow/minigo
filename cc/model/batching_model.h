@@ -58,7 +58,7 @@ class ModelBatcher {
   };
 
   // model_impl: the model that will evaluate the batched inferences.
-  explicit ModelBatcher(std::unique_ptr<Model> model_impl);
+  ModelBatcher(std::unique_ptr<Model> model_impl, int buffer_count);
   ~ModelBatcher();
 
   const std::string& name() const { return model_impl_->name(); }
@@ -138,7 +138,8 @@ class BatchingModel : public Model {
 // models are of the correct type.
 class BatchingModelFactory : public ModelFactory {
  public:
-  BatchingModelFactory(std::unique_ptr<ModelFactory> factory_impl);
+  BatchingModelFactory(std::unique_ptr<ModelFactory> factory_impl,
+                       int buffer_count);
 
   std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
 
@@ -154,6 +155,8 @@ class BatchingModelFactory : public ModelFactory {
   // Map from model to BatchingService for that model.
   absl::flat_hash_map<std::string, std::shared_ptr<internal::ModelBatcher>>
       batchers_ GUARDED_BY(&mutex_);
+
+  const int buffer_count_;
 };
 
 }  // namespace minigo

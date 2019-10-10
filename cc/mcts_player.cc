@@ -30,10 +30,7 @@
 namespace minigo {
 
 std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
-  os << " inject_noise:" << options.inject_noise
-     << " soft_pick:" << options.soft_pick
-     << " value_init_penalty:" << options.value_init_penalty
-     << " policy_softmax_temp:" << options.policy_softmax_temp
+  os << options.tree << " inject_noise:" << options.inject_noise
      << " virtual_losses:" << options.virtual_losses
      << " num_readouts:" << options.num_readouts
      << " seconds_per_move:" << options.seconds_per_move
@@ -42,7 +39,6 @@ std::ostream& operator<<(std::ostream& os, const MctsPlayer::Options& options) {
      << " fastplay_frequency:" << options.fastplay_frequency
      << " fastplay_readouts:" << options.fastplay_readouts
      << " target_pruning:" << options.target_pruning
-     << " restrict_in_bensons:" << options.restrict_in_bensons
      << " random_seed:" << options.random_seed << std::flush;
   return os;
 }
@@ -81,16 +77,13 @@ MctsPlayer::MctsPlayer(std::unique_ptr<Model> model,
       options_(options),
       inference_cache_(std::move(inference_cache)),
       inference_mix_(rnd_.UniformUint64()) {
-  // When to do deterministic move selection: 30 moves on a 19x19, 6 on 9x9.
-  // divide 2, multiply 2 guarentees that white and black do even number.
-  temperature_cutoff_ = !options_.soft_pick ? -1 : (((kN * kN / 12) / 2) * 2);
   NewGame();
 }
 
 MctsPlayer::~MctsPlayer() = default;
 
 void MctsPlayer::InitializeGame(const Position& position) {
-  tree_ = absl::make_unique<MctsTree>(position, options_.value_init_penalty);
+  tree_ = absl::make_unique<MctsTree>(position, options_.tree);
   game_->NewGame();
 }
 
@@ -136,43 +129,7 @@ Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise,
     return Coord::kResign;
   }
 
-  return PickMove(restrict_in_bensons);
-}
-
-Coord MctsPlayer::PickMove(bool restrict_in_bensons) {
-  const auto* root = tree_->root();
-  if (root->position.n() >= temperature_cutoff_) {
-    auto c = root->GetMostVisitedMove(restrict_in_bensons);
-    if (!root->position.legal_move(c)) {
-      c = Coord::kPass;
-    }
-    return c;
-  }
-
-  // Select from the first kN * kN moves (instead of kNumMoves) to avoid
-  // randomly choosing to pass early on in the game.
-  std::array<float, kN * kN> cdf;
-
-  // For moves before the temperature cutoff, exponentiate the probabilities by
-  // a temperature slightly larger than unity to encourage diversity in early
-  // play and hopefully to move away from 3-3s.
-  for (size_t i = 0; i < cdf.size(); ++i) {
-    cdf[i] = std::pow(root->child_N(i), options_.policy_softmax_temp);
-  }
-  for (size_t i = 1; i < cdf.size(); ++i) {
-    cdf[i] += cdf[i - 1];
-  }
-
-  if (cdf.back() == 0) {
-    // It's actually possible for an early model to put all its reads into pass,
-    // in which case the SearchSorted call below will always return 0. In this
-    // case, we'll just let the model have its way and allow a pass.
-    return Coord::kPass;
-  }
-
-  Coord c = rnd_.SampleCdf(absl::MakeSpan(cdf));
-  MG_DCHECK(root->child_N(c) != 0);
-  return c;
+  return tree_->PickMove(&rnd_);
 }
 
 void MctsPlayer::TreeSearch(int num_leaves, int max_num_reads) {
@@ -183,9 +140,8 @@ void MctsPlayer::TreeSearch(int num_leaves, int max_num_reads) {
 
 void MctsPlayer::InjectNoise(float dirichlet_alpha) {
   MaybeExpandRoot();
-  std::array<float, kNumMoves> noise;
-  rnd_.Dirichlet(kDirichletAlpha, &noise);
-  tree_->InjectNoise(noise, options_.noise_mix);
+  tree_->InjectNoise(rnd_.Dirichlet<kNumMoves>(kDirichletAlpha),
+                     options_.noise_mix);
 }
 
 void MctsPlayer::MaybeExpandRoot() {
@@ -307,7 +263,7 @@ bool MctsPlayer::PlayMove(Coord c, bool is_trainable) {
 
   // Adjust the visits before adding the move's search_pi to the Game.
   if (is_trainable && options_.target_pruning) {
-    tree_->ReshapeFinalVisits(options_.restrict_in_bensons);
+    tree_->ReshapeFinalVisits();
   }
 
   UpdateGame(c);
@@ -352,30 +308,11 @@ void MctsPlayer::UpdateGame(Coord c) {
         absl::StrCat("models:", absl::StrJoin(models, ","), "\n", comment);
   }
 
-  // Convert child visit counts to a probability distribution, pi.
-  std::array<float, kNumMoves> search_pi;
-  if (root->position.n() < temperature_cutoff_) {
-    // Squash counts before normalizing to match softpick behavior in PickMove.
-    for (int i = 0; i < kNumMoves; ++i) {
-      search_pi[i] = std::pow(root->child_N(i), options_.policy_softmax_temp);
-    }
-  } else {
-    for (int i = 0; i < kNumMoves; ++i) {
-      search_pi[i] = root->child_N(i);
-    }
-  }
-  // Normalize counts.
-  float sum = 0;
-  for (int i = 0; i < kNumMoves; ++i) {
-    sum += search_pi[i];
-  }
-  for (int i = 0; i < kNumMoves; ++i) {
-    search_pi[i] /= sum;
-  }
+  auto search_pi = tree_->CalculateSearchPi();
 
   // Update the game history.
   game_->AddMove(tree_->to_play(), c, root->position, std::move(comment),
-                 root->Q(), search_pi, std::move(models));
+                 root->Q(), search_pi);
 }
 
 // TODO(tommadams): move this up to below SelectLeaves.

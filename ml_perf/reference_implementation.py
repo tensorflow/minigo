@@ -72,19 +72,15 @@ flags.DEFINE_boolean('parallel_post_train', False,
                      '& selfplay) in parallel.')
 
 flags.DEFINE_list('train_devices', None, '')
-flags.DEFINE_list('eval_devices', None, '')
+flags.DEFINE_string('eval_device', None, '')
 flags.DEFINE_list('selfplay_devices', None, '')
 
 flags.DEFINE_integer('bootstrap_num_models', 8,
                      'Number of random models to use for bootstrapping.')
 flags.DEFINE_integer('selfplay_num_games', 4096,
                      'Number of selfplay games to play.')
-flags.DEFINE_integer('selfplay_num_games_per_thread', 3,
-                     'Number of games to play on each thread.')
 flags.DEFINE_integer('eval_num_games', 100,
                      'Number of selfplay games to play.')
-
-flags.DEFINE_string('engine', 'tf', 'The engine to use for selfplay.')
 
 flags.DEFINE_boolean('bootstrap', False, '')
 
@@ -336,12 +332,11 @@ async def bootstrap_selfplay(state):
 
     features = 'extra' if FLAGS.use_extra_features else 'agz'
     lines = await run(
-        'bazel-bin/cc/selfplay',
+        'bazel-bin/cc/concurrent_selfplay',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                             'bootstrap.flags')),
         '--num_games={}'.format(FLAGS.selfplay_num_games),
-        '--parallel_games=32',
-        '--model=random:0,{}:0.4:0.4'.format(features),
+        '--model={}:0.4:0.4'.format(features),
         '--output_dir={}/0'.format(output_dir),
         '--holdout_dir={}/0'.format(holdout_dir),
         '--sgf_dir={}'.format(sgf_dir))
@@ -370,36 +365,21 @@ async def selfplay(state):
 
     commands = []
     num_selfplay_processes = len(FLAGS.selfplay_devices)
-    if num_selfplay_processes == 1:
+    n = max(num_selfplay_processes, 1)
+    for i, device in enumerate(FLAGS.selfplay_devices):
+        a = (i * FLAGS.selfplay_num_games) // n
+        b = ((i + 1) * FLAGS.selfplay_num_games) // n
+        num_games = b - a
+
         commands.append([
-            'bazel-bin/cc/selfplay',
+            'bazel-bin/cc/concurrent_selfplay',
             '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                                 'selfplay.flags')),
-            '--num_games={}'.format(FLAGS.selfplay_num_games),
-            '--parallel_games={}'.format(FLAGS.selfplay_num_games_per_thread),
-            '--model={}:0,{}'.format(FLAGS.engine,
-                                      state.best_model_path),
-            '--output_dir={}/{}'.format(output_dir, 0),
-            '--holdout_dir={}/{}'.format(holdout_dir, 0)])
-    else:
-        for i, device in enumerate(FLAGS.selfplay_devices):
-            a = ((i - 1) * FLAGS.selfplay_num_games) // (num_selfplay_processes - 1)
-            b = (i * FLAGS.selfplay_num_games) // (num_selfplay_processes - 1)
-            num_games = b - a
-            parallel_games = (
-                (num_games + FLAGS.selfplay_num_games_per_thread - 1) //
-                FLAGS.selfplay_num_games_per_thread)
-
-            commands.append([
-                'bazel-bin/cc/selfplay',
-                '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-                                                    'selfplay.flags')),
-                '--num_games={}'.format(num_games),
-                '--parallel_games={}'.format(parallel_games),
-                '--model={}:{},{}'.format(FLAGS.engine, device,
-                                          state.best_model_path),
-                '--output_dir={}/{}'.format(output_dir, i),
-                '--holdout_dir={}/{}'.format(holdout_dir, i)])
+            '--num_games={}'.format(num_games),
+            '--devices={}'.format(device),
+            '--model={}'.format(state.best_model_path),
+            '--output_dir={}/{}'.format(output_dir, i),
+            '--holdout_dir={}/{}'.format(holdout_dir, i)])
 
     all_lines = await run_commands(commands)
 
@@ -489,10 +469,10 @@ async def evaluate_model(eval_model_path, target_model_path, sgf_dir):
     lines = await run(
         'bazel-bin/cc/eval',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'eval.flags')),
-        '--model={}:{},{}'.format(FLAGS.engine, FLAGS.eval_devices[0],
-                                  eval_model_path),
-        '--model_two={}:{},{}'.format(FLAGS.engine, FLAGS.eval_devices[0],
-                                      target_model_path),
+        '--eval_device={}'.format(FLAGS.eval_device),
+        '--target_device={}'.format(FLAGS.eval_device),
+        '--eval_model={}'.format(eval_model_path),
+        '--target_model={}'.format(target_model_path),
         '--parallel_games={}'.format(FLAGS.eval_num_games),
         '--sgf_dir={}'.format(sgf_dir))
     result = '\n'.join(lines[-7:])

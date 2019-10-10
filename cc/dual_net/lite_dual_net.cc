@@ -74,7 +74,7 @@ class LiteDualNet : public Model {
 
 LiteDualNet::LiteDualNet(std::string graph_path,
                          const FeatureDescriptor& feature_desc)
-    : Model(std::string(file::Stem(graph_path)), feature_desc, 1),
+    : Model(std::string(file::Stem(graph_path)), feature_desc),
       graph_path_(std::move(graph_path)),
       batch_capacity_(0) {
   model_ = FlatBufferModel::BuildFromFile(graph_path_.c_str());

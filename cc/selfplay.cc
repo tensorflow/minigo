@@ -15,7 +15,6 @@
 #include <stdio.h>
 
 #include <atomic>
-#include <iostream>
 #include <memory>
 #include <string>
 #include <thread>
@@ -123,11 +122,14 @@ DEFINE_bool(track_variety, false,
             "If true, track the variety of positions seen.");
 
 // Inference flags.
-DEFINE_string(model, "",
-              "Path to a minigo model. The format of the model depends on the "
-              "inference engine. For engine=tf, the model should be a GraphDef "
-              "proto. For engine=lite, the model should be .tflite "
-              "flatbuffer.");
+DEFINE_string(engine, "tf",
+              "Name of the inference engine to use, e.g. \"tf\", \"tpu\", "
+              "\"lite\"");
+DEFINE_string(device, "",
+              "Device to run on. For inference on a machine with N GPUs, "
+              "devices have IDs in the range [0, N). For TPUs, the device ID "
+              "is the gRPC address");
+DEFINE_string(model, "", "Path to a minigo model.");
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 DEFINE_int32(num_games, 0,
              "Total number of games to play. Defaults to parallel_games. "
@@ -204,9 +206,10 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
   player_options->noise_mix = FLAGS_noise_mix;
   player_options->inject_noise = FLAGS_inject_noise;
-  player_options->soft_pick = FLAGS_soft_pick;
-  player_options->value_init_penalty = FLAGS_value_init_penalty;
-  player_options->policy_softmax_temp = FLAGS_policy_softmax_temp;
+  player_options->tree.value_init_penalty = FLAGS_value_init_penalty;
+  player_options->tree.policy_softmax_temp = FLAGS_policy_softmax_temp;
+  player_options->tree.soft_pick_enabled = FLAGS_soft_pick;
+  player_options->tree.restrict_in_bensons = FLAGS_restrict_in_bensons;
   player_options->virtual_losses = FLAGS_virtual_losses;
   player_options->random_seed = FLAGS_seed;
   player_options->random_symmetry = FLAGS_random_symmetry;
@@ -216,51 +219,10 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   player_options->target_pruning = FLAGS_target_pruning;
 }
 
-void LogEndGameInfo(const Game& game, absl::Duration game_time) {
-  std::cout << game.result_string() << std::endl;
-  std::cout << "Playing game: " << absl::ToDoubleSeconds(game_time)
-            << std::endl;
-  std::cout << "Played moves: " << game.moves().size() << std::endl;
-
-  if (game.moves().empty()) {
-    return;
-  }
-
-  int bleakest_move = 0;
-  float q = 0.0;
-  if (game.FindBleakestMove(&bleakest_move, &q)) {
-    std::cout << "Bleakest eval: move=" << bleakest_move << " Q=" << q
-              << std::endl;
-  }
-
-  // If resignation is disabled, check to see if the first time Q_perspective
-  // crossed the resign_threshold the eventual winner of the game would have
-  // resigned. Note that we only check for the first resignation: if the
-  // winner would have incorrectly resigned AFTER the loser would have
-  // resigned on an earlier move, this is not counted as a bad resignation for
-  // the winner (since the game would have ended after the loser's initial
-  // resignation).
-  if (!game.options().resign_enabled) {
-    for (size_t i = 0; i < game.moves().size(); ++i) {
-      const auto* move = game.moves()[i].get();
-      float Q_perspective = move->color == Color::kBlack ? move->Q : -move->Q;
-      if (Q_perspective < game.options().resign_threshold) {
-        if ((move->Q < 0) != (game.result() < 0)) {
-          std::cout << "Bad resign: move=" << i << " Q=" << move->Q
-                    << std::endl;
-        }
-        break;
-      }
-    }
-  }
-}
-
 class SelfPlayer {
  public:
-  explicit SelfPlayer(ModelDescriptor desc)
-      : rnd_(FLAGS_seed, Random::kUniqueStream),
-        engine_(std::move(desc.engine)),
-        model_(std::move(desc.model)) {}
+  SelfPlayer()
+      : rnd_(FLAGS_seed, Random::kUniqueStream) {}
 
   void Run() {
     auto player_start_time = absl::Now();
@@ -298,21 +260,29 @@ class SelfPlayer {
 
     {
       absl::MutexLock lock(&mutex_);
-      auto model_factory = NewModelFactory(engine_);
+      auto model_factory = NewModelFactory(FLAGS_engine, FLAGS_device);
       // If the model path contains a pattern, wrap the implementation factory
       // in a ReloadingModelFactory to automatically reload the latest model
       // that matches the pattern.
-      if (model_.find("%d") != std::string::npos) {
+      if (FLAGS_model.find("%d") != std::string::npos) {
         model_factory = absl::make_unique<ReloadingModelFactory>(
             std::move(model_factory), absl::Seconds(3));
       }
+
+      int buffer_count;
+      if (FLAGS_engine == "random") {
+        buffer_count = GetNumLogicalCpus();
+      } else {
+        buffer_count = 2;
+      }
+
       // Note: it's more efficient to perform the reload wrapping before the
       // batch wrapping because this way, we only need to reload the single
       // implementation Model when a new model is found. If we performed batch
       // wrapping before reload wrapping, the reload code would need to update
       // all the BatchingModel wrappers.
-      batcher_ =
-          absl::make_unique<BatchingModelFactory>(std::move(model_factory));
+      batcher_ = absl::make_unique<BatchingModelFactory>(
+          std::move(model_factory), buffer_count);
     }
     for (int i = 0; i < FLAGS_parallel_games; ++i) {
       threads_.emplace_back(std::bind(&SelfPlayer::ThreadRun, this, i));
@@ -395,9 +365,9 @@ class SelfPlayer {
         MG_CHECK(old_model == FLAGS_model)
             << "Manually changing the model during selfplay is not supported.";
         thread_options.Init(thread_id, &rnd_);
-        game = absl::make_unique<Game>(model_, model_,
+        game = absl::make_unique<Game>(FLAGS_model, FLAGS_model,
                                        thread_options.game_options);
-        player = absl::make_unique<MctsPlayer>(batcher_->NewModel(model_),
+        player = absl::make_unique<MctsPlayer>(batcher_->NewModel(FLAGS_model),
                                                inference_cache_, game.get(),
                                                thread_options.player_options);
         if (model_name_.empty()) {
@@ -438,7 +408,9 @@ class SelfPlayer {
           search_start_time = absl::Now();
         }
 
-        fastplay = (rnd_() < thread_options.player_options.fastplay_frequency);
+        fastplay = (
+            thread_options.player_options.fastplay_frequency > 0 &&
+            rnd_() < thread_options.player_options.fastplay_frequency);
         readouts = (fastplay ? thread_options.player_options.fastplay_readouts
                              : thread_options.player_options.num_readouts);
 
@@ -532,13 +504,15 @@ class SelfPlayer {
         absl::MutexLock lock(&mutex_);
         LogEndGameInfo(*game, absl::Now() - game_start_time);
         win_stats_.Update(*game);
-        auto stats = variety_tracker_.GetStats();
-        MG_LOG(INFO) << "Total positions played: " << stats.total_positions;
-        MG_LOG(INFO) << "Unique positions played: "
-                     << stats.num_unique_positions << " ("
-                     << (100 * static_cast<double>(stats.num_unique_positions) /
-                         static_cast<double>(stats.total_positions))
-                     << "%)";
+        if (FLAGS_track_variety) {
+          auto stats = variety_tracker_.GetStats();
+          MG_LOG(INFO) << "Total positions played: " << stats.total_positions;
+          MG_LOG(INFO) << "Unique positions played: "
+                       << stats.num_unique_positions << " ("
+                       << (100 * static_cast<double>(stats.num_unique_positions) /
+                           static_cast<double>(stats.total_positions))
+                       << "%)";
+        }
       }
 
       // Write the outputs.
@@ -642,9 +616,6 @@ class SelfPlayer {
 
   std::atomic<size_t> game_id_{0};
 
-  const std::string engine_;
-  const std::string model_;
-
   VarietyTracker variety_tracker_;
 };
 
@@ -658,7 +629,7 @@ int main(int argc, char* argv[]) {
   WTF_THREAD_ENABLE("Main");
   {
     WTF_SCOPE0("Selfplay");
-    minigo::SelfPlayer player(minigo::ParseModelDescriptor(FLAGS_model));
+    minigo::SelfPlayer player;
     player.Run();
   }
 

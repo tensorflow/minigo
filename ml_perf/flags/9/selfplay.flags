@@ -3,17 +3,20 @@
 # This flagfile also serves as the base for the boostrap & eval stages of
 # the RL loop.
 
+--engine=tf
 --num_readouts=240
---fastplay_frequency=0.7
+--fastplay_frequency=0
 --fastplay_readouts=40
 --value_init_penalty=0.2
---holdout_pct=0.00
+--holdout_pct=0.0
 --disable_resign_pct=1.0
 --resign_threshold=-0.99
 --virtual_losses=2
---dirichlet_alpha=0.03
+--threads_per_device=4
+--concurrent_games_per_thread=128
+
+--dirichlet_alpha=0.135
 --noise_mix=0.25
 ### --target_pruning=1
 
-# Device-specific selfplay flags.
-### --cache_size_mb=10240
+--cache_size_mb=2048

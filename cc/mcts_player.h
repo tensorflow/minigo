@@ -43,18 +43,11 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
 class MctsPlayer {
  public:
   struct Options {
+    MctsTree::Options tree;
+
     // If inject_noise is true, the amount of noise to mix into the root.
     float noise_mix = 0.25;
     bool inject_noise = true;
-    bool soft_pick = true;
-
-    // See mcts_node.cc for details.
-    // Default (0.0) is init-to-parent.
-    float value_init_penalty = 0.0;
-
-    // For soft-picked moves, the probabilities are exponentiated by
-    // policy_softmax_temp to encourage diversity in early play.
-    float policy_softmax_temp = 0.98;
 
     int virtual_losses = 8;
 
@@ -104,10 +97,6 @@ class MctsPlayer {
     // reward distribution.  "False" == no pruning will be applied.
     bool target_pruning = false;
 
-    // If true, this will prevent play in benson's pass-alive regions after 5
-    // passes have been played (by anyone).  It will also zero out any visits
-    // the pass-alive points may have gotten.
-    bool restrict_in_bensons = false;
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 
@@ -168,7 +157,6 @@ class MctsPlayer {
 
   // Protected methods that get exposed for testing.
  protected:
-  Coord PickMove(bool restrict_in_bensons = false);
   MctsTree* mutable_tree() { return tree_.get(); }
 
  private:
@@ -249,7 +237,6 @@ class MctsPlayer {
   void UpdateGame(Coord c);
 
   std::unique_ptr<Model> model_;
-  int temperature_cutoff_;
 
   std::unique_ptr<MctsTree> tree_;
 

@@ -69,7 +69,7 @@ TEST(MctsTreeTest, UpperConfidenceBound) {
     prob = 0.02;
   }
 
-  MctsTree tree(TestablePosition("", Color::kBlack), 0);
+  MctsTree tree(TestablePosition("", Color::kBlack), {});
   auto* leaf = tree.SelectLeaf();
   EXPECT_EQ(tree.root(), leaf);
   tree.IncorporateResults(leaf, probs, 0.5);
@@ -122,8 +122,8 @@ TEST(MctsTreeTest, ActionFlipping) {
   std::array<float, kNumMoves> probs;
   rnd.Uniform(0.02, 0.021, &probs);
 
-  MctsTree black_tree(TestablePosition("", Color::kBlack), 0);
-  MctsTree white_tree(TestablePosition("", Color::kWhite), 0);
+  MctsTree black_tree(TestablePosition("", Color::kBlack), {});
+  MctsTree white_tree(TestablePosition("", Color::kWhite), {});
 
   black_tree.IncorporateResults(black_tree.SelectLeaf(), probs, 0);
   white_tree.IncorporateResults(white_tree.SelectLeaf(), probs, 0);
@@ -144,7 +144,7 @@ TEST(MctsTreeTest, SelectLeaf) {
   probs[c] = 0.4;
 
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
 
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
@@ -161,7 +161,7 @@ TEST(MctsTreeTest, BackupIncorporateResults) {
   }
 
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
   auto* leaf = tree.SelectLeaf();
@@ -213,10 +213,12 @@ TEST(MctsTreeTest, ExpandChildValueInit) {
   }
 
   // Any child will do.
+  MctsTree::Options options;
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
   {
     // 0.0 is init-to-parent
-    MctsTree tree(board, 0);
+    options.value_init_penalty = 0;
+    MctsTree tree(board, options);
     auto* root = tree.SelectLeaf();
     ASSERT_EQ(tree.root(), root);
     tree.IncorporateResults(root, probs, 0.1);
@@ -234,7 +236,8 @@ TEST(MctsTreeTest, ExpandChildValueInit) {
 
   {
     // -2.0 is init-to-loss
-    MctsTree tree(board, -2);
+    options.value_init_penalty = -2;
+    MctsTree tree(board, options);
     auto* root = tree.SelectLeaf();
     ASSERT_EQ(tree.root(), root);
     tree.IncorporateResults(root, probs, 0.1);
@@ -246,7 +249,8 @@ TEST(MctsTreeTest, ExpandChildValueInit) {
 
   {
     // 2.0 is init-to-win (this is silly don't do this)
-    MctsTree tree(board, 2);
+    options.value_init_penalty = 2;
+    MctsTree tree(board, options);
     auto* root = tree.SelectLeaf();
     ASSERT_EQ(tree.root(), root);
     tree.IncorporateResults(root, probs, 0.1);
@@ -258,7 +262,8 @@ TEST(MctsTreeTest, ExpandChildValueInit) {
 
   {
     // 0.25 slightly prefers to explore already visited children.
-    MctsTree tree(board, -0.25);
+    options.value_init_penalty = -0.25;
+    MctsTree tree(board, options);
     auto* root = tree.SelectLeaf();
     ASSERT_EQ(tree.root(), root);
     tree.IncorporateResults(root, probs, 0.1);
@@ -277,7 +282,7 @@ TEST(MctsTreeTest, DoNotExplorePastFinish) {
   probs[Coord::kPass] = 1;
 
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
   auto* first_pass = tree.SelectLeaf();
@@ -298,7 +303,7 @@ TEST(MctsTreeTest, DoNotExplorePastFinish) {
 }
 
 TEST(MctsTreeTest, AddChild) {
-  MctsTree tree(Position(Color::kBlack), 0);
+  MctsTree tree(Position(Color::kBlack), {});
   auto* root = tree.SelectLeaf();
 
   Coord c = Coord::FromGtp("B9");
@@ -309,7 +314,7 @@ TEST(MctsTreeTest, AddChild) {
 }
 
 TEST(MctsTreeTest, AddChildIdempotency) {
-  MctsTree tree(Position(Color::kBlack), 0);
+  MctsTree tree(Position(Color::kBlack), {});
   auto* root = tree.SelectLeaf();
 
   Coord c = Coord::FromGtp("B9");
@@ -332,7 +337,7 @@ TEST(MctsTreeTest, NeverSelectIllegalMoves) {
   probs[1] = 0.99;
 
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   auto* root = tree.SelectLeaf();
   ASSERT_EQ(tree.root(), root);
   tree.IncorporateResults(root, probs, 0);
@@ -373,7 +378,7 @@ TEST(MctsTreeTest, DontTraverseUnexpandedChild) {
   probs[17] = 0.99;
 
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
   auto* leaf1 = tree.SelectLeaf();
@@ -399,7 +404,7 @@ TEST(MctsTreeTest, GetMostVisitedPath) {
   probs[16] = 0.6;
 
   auto board = TestablePosition("", Color::kBlack);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
   // We should select the highest probabilty first.
@@ -426,7 +431,7 @@ TEST(MctsTreeTest, GetMostVisitedBensonRestriction) {
   }
   probs[0] = 0.002;  // A9, a bensons point, has higher prior.
   auto board = TestablePosition(kSomeBensonsBoard, Color::kBlack);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   for (int i = 0; i < 10; i++) {
     tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
   }
@@ -438,7 +443,7 @@ TEST(MctsTreeTest, GetMostVisitedBensonRestriction) {
 // Pass is still a valid choice, with or without removing pass-alive areas.
 TEST(MctsTreeTest, BensonRestrictionStillPasses) {
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
 
   auto* root = tree.SelectLeaf();
   ASSERT_EQ(tree.root(), root);
@@ -462,20 +467,23 @@ TEST(MctsTreeTest, ReshapePrunesBensonsVisits) {
   probs[0] = 0.002;  // A9, a bensons point, has higher prior.
 
   auto board = TestablePosition(kSomeBensonsBoard, Color::kBlack);
-  MctsTree tree(board, 0);
-  MctsTree tree2(board, 0);
+  MctsTree::Options options;
+  options.restrict_in_bensons = true;
+  MctsTree tree(board, options);
+  options.restrict_in_bensons = false;
+  MctsTree tree2(board, options);
   for (int i = 0; i < 10; i++) {
     tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
     tree2.IncorporateResults(tree2.SelectLeaf(), probs, 0);
   }
 
   EXPECT_NE(tree.root()->edges[0].N, 0);  // A9 should've had visits.
-  tree.ReshapeFinalVisits(true);
+  tree.ReshapeFinalVisits();
   EXPECT_EQ(tree.root()->edges[0].N, 0);  // Reshape should've removed them.
 
   EXPECT_NE(tree2.root()->edges[0].N, 0);    // A9 should've had visits.
   auto original = tree2.root()->edges[0].N;  // Store them.
-  tree2.ReshapeFinalVisits(false);
+  tree2.ReshapeFinalVisits();
   EXPECT_NE(tree2.root()->edges[0].N, 0);  // Reshape shouldn't've removed them.
   EXPECT_EQ(original,
             tree2.root()->edges[0].N);  // And they should be the same.
@@ -490,8 +498,11 @@ TEST(MctsTreeTest, ReshapeWhenOnlyBensons) {
   probs[Coord::kPass] = 0;
 
   auto board = TestablePosition(kOnlyBensonsBoard, Color::kBlack);
-  MctsTree tree(board, 0);
-  MctsTree tree2(board, 0);
+  MctsTree::Options options;
+  options.restrict_in_bensons = true;
+  MctsTree tree(board, options);
+  options.restrict_in_bensons = false;
+  MctsTree tree2(board, options);
   for (int i = 0; i < 10; i++) {
     tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
     tree2.IncorporateResults(tree2.SelectLeaf(), probs, 0);
@@ -502,11 +513,11 @@ TEST(MctsTreeTest, ReshapeWhenOnlyBensons) {
   EXPECT_EQ(tree2.root()->edges[Coord::kPass].N, 0);
 
   // Reshape with bensons restricted should add one.
-  tree.ReshapeFinalVisits(true);
+  tree.ReshapeFinalVisits();
   EXPECT_EQ(tree.root()->edges[Coord::kPass].N, 1);
 
   // Reshape with bensons not restricted should NOT add one.
-  tree2.ReshapeFinalVisits(false);
+  tree2.ReshapeFinalVisits();
   EXPECT_EQ(tree2.root()->edges[Coord::kPass].N, 0);
 }
 
@@ -521,7 +532,7 @@ TEST(MctsTreeTest, TestSelectLeaf) {
   probs[17] = 0.99;
 
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
   std::set<MctsNode*> leaves;
@@ -554,7 +565,7 @@ class ReshapeTargetTest : public ::testing::Test {
     }
     probs[17] = 0.99;
 
-    tree_ = absl::make_unique<MctsTree>(p, 0);
+    tree_ = absl::make_unique<MctsTree>(p, MctsTree::Options());
     tree_->IncorporateResults(tree_->SelectLeaf(), probs, 0);
     const auto* root = tree_->root();
 
@@ -652,7 +663,7 @@ TEST(MctsTreeTest, NormalizeTest) {
   probs[18] = 0;
 
   auto board = TestablePosition("");
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
   // Adjust for the one value that is five times larger and one missing value.
@@ -669,7 +680,7 @@ TEST(MctsTreeTest, NormalizeTest) {
 }
 
 TEST(MctsTreeTest, InjectNoise) {
-  MctsTree tree(Position(Color::kBlack), 0);
+  MctsTree tree(Position(Color::kBlack), {});
 
   Random rnd(456943875, 1);
 
@@ -718,7 +729,7 @@ TEST(MctsTreeTest, InjectNoiseOnlyLegalMoves) {
   }
 
   auto board = TestablePosition(kAlmostDoneBoard, Color::kWhite);
-  MctsTree tree(board, 0);
+  MctsTree tree(board, {});
   tree.IncorporateResults(tree.SelectLeaf(), probs, 0);
 
   // kAlmostDoneBoard has 6 legal moves including pass.
@@ -778,7 +789,7 @@ TEST(MctsTreeTest, TestSuperko) {
   // superko test multiple times, with a different number of moves played at
   // the start each time.
   for (size_t iteration = 0; iteration < non_ko_moves.size(); ++iteration) {
-    MctsTree tree(Position(Color::kBlack), 0);
+    MctsTree tree(Position(Color::kBlack), {});
     for (size_t move_idx = 0; move_idx < iteration; ++move_idx) {
       tree.PlayMove(Coord::FromGtp(non_ko_moves[move_idx]));
     }
@@ -797,6 +808,67 @@ TEST(MctsTreeTest, TestSuperko) {
     // repeats a position.
     EXPECT_FALSE(tree.is_legal_move(c1));
   }
+}
+
+// Verify that with soft pick disabled, the player will always choose the best
+// move.
+TEST(MctsTreeTest, PickMoveArgMax) {
+  MctsTree::Options options;
+  options.soft_pick_enabled = false;
+  MctsTree tree(Position(Color::kBlack), options);
+
+  auto* root = tree.SelectLeaf();
+  ASSERT_EQ(tree.root(), root);
+
+  std::vector<std::pair<Coord, int>> child_visits = {
+      {{2, 0}, 10},
+      {{1, 0}, 5},
+      {{3, 0}, 1},
+  };
+  for (const auto& p : child_visits) {
+    root->MaybeAddChild(p.first);
+    root->edges[p.first].N = p.second;
+  }
+
+  Random rnd(888, 1);
+  for (int i = 0; i < 100; ++i) {
+    EXPECT_EQ(Coord(2, 0), tree.PickMove(&rnd));
+  }
+}
+
+// Verify that with soft pick enabled, the player will choose moves early in the
+// game proportionally to their visit count.
+TEST(MctsTreeTest, PickMoveSoft) {
+  MctsTree::Options options;
+  options.soft_pick_enabled = true;
+  MctsTree tree(Position(Color::kBlack), options);
+
+  auto* root = tree.SelectLeaf();
+  ASSERT_EQ(tree.root(), root);
+
+  root->edges[Coord(2, 0)].N = 10;
+  root->edges[Coord(1, 0)].N = 5;
+  root->edges[Coord(3, 0)].N = 1;
+
+  int count_1_0 = 0;
+  int count_2_0 = 0;
+  int count_3_0 = 0;
+
+  Random rnd(888, 1);
+  for (int i = 0; i < 1600; ++i) {
+    auto move = tree.PickMove(&rnd);
+    if (move == Coord(1, 0)) {
+      ++count_1_0;
+    } else if (move == Coord(2, 0)) {
+      ++count_2_0;
+    } else {
+      ASSERT_EQ(Coord(3, 0), move);
+      ++count_3_0;
+    }
+  }
+  EXPECT_NEAR(1000, count_2_0, 50);
+  EXPECT_NEAR(500, count_1_0, 50);
+  EXPECT_NEAR(100, count_3_0, 50);
 }
 
 }  // namespace
