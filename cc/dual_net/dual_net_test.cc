@@ -271,9 +271,7 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
   }
 }
 
-TEST(WouldCaptureTest, WouldCapture) {
-  // Fill the board with black stones except for the top-left corner,
-  // leaving the board with white to play.
+TEST(WouldCaptureTest, WouldCaptureBlack) {
   TestablePosition board(R"(
       OOOX.XOOX
       OXX....X.
@@ -293,6 +291,34 @@ TEST(WouldCaptureTest, WouldCapture) {
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
   std::vector<float> g8 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
+  a7.insert(a7.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+  g8.insert(g8.end(), {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0});
+  EXPECT_EQ(a7, GetStoneFeatures(features, Coord::FromString("A7")));
+  EXPECT_EQ(g8, GetStoneFeatures(features, Coord::FromString("G8")));
+}
+
+TEST(WouldCaptureTest, WouldCaptureWhite) {
+  TestablePosition board(R"(
+      XXXO.OXXO
+      XOO....O.
+      .XXO.....
+      XXXXO....
+      OOOOO....)",
+                         Color::kWhite);
+
+  ModelInput input;
+  input.sym = symmetry::kIdentity;
+  input.position_history.push_back(&board);
+
+  BoardFeatureBuffer<float> buffer;
+  Tensor<float> features = {1, kN, kN, ExtraFeatures::kNumPlanes,
+                            buffer.data()};
+  ExtraFeatures::Set({&input}, &features);
+
+  //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
+  std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+  std::vector<float> g8 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
   a7.insert(a7.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
   g8.insert(g8.end(), {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0});
