@@ -73,8 +73,7 @@ DEFINE_string(eval_device, "", "Device to run eval inference on.");
 DEFINE_string(target_model, "",
               "Path to a target minigo model that eval_model is evaluated "
               "against.");
-DEFINE_string(target_engine, "tf",
-              "Inference engine to use for the eval model.");
+DEFINE_string(target_engine, "tf", "Inference engine to use for the eval model.");
 DEFINE_string(target_device, "", "Device to run target inference on.");
 
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
@@ -178,10 +177,9 @@ class Evaluator {
     int num_games = FLAGS_parallel_games;
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
-      threads_.emplace_back(
-          std::bind(&Evaluator::ThreadRun, this, thread_id,
-                    swap_models ? &target_model : &eval_model,
-                    swap_models ? &eval_model : &target_model));
+      threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
+                                      swap_models ? &target_model : &eval_model,
+                                      swap_models ? &eval_model : &target_model));
     }
     for (auto& t : threads_) {
       t.join();

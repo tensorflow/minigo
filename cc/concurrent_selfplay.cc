@@ -20,8 +20,10 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "cc/async/sharded_executor.h"
 #include "cc/dual_net/factory.h"
 #include "cc/file/path.h"
 #include "cc/game.h"
@@ -47,7 +49,9 @@
 //    results back up the tree, and playing moves.
 //  - `SelfplayThread` : owns multiple `SelfplayGame` instances and uses them
 //    to play games concurrently. See SelfplayThread::Run for the sequence of
-//    operations performed when playing games.
+//    operations performed when playing games. Tree search is carried out in
+//    batches by `TreeSearcher` instances, which allows the tree search to be
+//    run in parallel.
 //  - `Selfplayer` : owns multiple `SelfplayThread` instances, which lets the
 //    binary perform tree search on multiple threads.
 //  - `OutputThread` : responsible for writing SGF & training examples to
@@ -59,10 +63,11 @@
 DEFINE_string(engine, "tf",
               "Name of the inference engine to use, e.g. \"tf\", \"tpu\", "
               "\"lite\"");
-DEFINE_string(devices, "",
-              "Comma-separated list of devices to run inference on. "
-              "For inference on a machine with N GPUs, devices have IDs in "
-              "the range [0, N). For TPUs, the device ID is the gRPC address");
+DEFINE_string(device, "",
+              "ID of the device to run inference on. Can be left empty for "
+              "single GPU machines. For a machine with N GPUs, a device ID "
+              "should be specified in the range [0, N). For TPUs, pass the "
+              "gRPC address for the device ID.");
 DEFINE_string(model, "", "Path to a minigo model.");
 DEFINE_int32(cache_size_mb, 0, "Size of the inference cache in MB.");
 DEFINE_int32(cache_shards, 8,
@@ -103,12 +108,16 @@ DEFINE_bool(restrict_in_bensons, false,
             "played.\n");
 
 // Threading flags.
-DEFINE_int32(threads_per_device, 2,
-             "Number threads to run on for each device.");
+DEFINE_int32(selfplay_threads, 3,
+             "Number of threads to run batches of selfplay games on.");
+DEFINE_int32(parallel_search, 3,
+             "Number of threads to run tree search on.");
+DEFINE_int32(parallel_inference, 2,
+             "Number of threads to run inference on.");
 DEFINE_int32(concurrent_games_per_thread, 1,
-             "Number of games to play concurrently on each thread. Inferences "
-             "from a thread's concurrent games are batched up and evaluated at "
-             "the same time. Increasing concurrent_games_per_thread can "
+             "Number of games to play concurrently on each selfplay thread. "
+             "Inferences from a thread's concurrent games are batched up and "
+             "evaluated together. Increasing concurrent_games_per_thread can "
              "help improve GPU or TPU utilization, especially for small "
              "models.");
 
@@ -181,15 +190,6 @@ class SelfplayGame {
     // Noise is not injected for "fast" plays.
     float noise_mix;
 
-    // If the predicted winrate falls below the `resign_threshold`, the current
-    // player will resign the game if `resign_enabled` is true.
-    float resign_threshold;
-
-    // True if players are allowed to resign.
-    // False if they must play to the bitter end (i.e. when the whole board is
-    // pass-alive).
-    bool resign_enabled;
-
     // True if this game's data should be written to the `holdout_dir` instead
     // of the `output_dir`.
     bool is_holdout;
@@ -261,13 +261,154 @@ class SelfplayGame {
   std::vector<std::string> models_used_;
   Random rnd_;
   const uint64_t inference_symmetry_mix_;
-  bool inject_noise_before_next_read_;
+
+  // We need to wait until the root is expanded by the first call to
+  // SelectLeaves in the game before injecting noise.
+  bool inject_noise_before_next_read_ = false;
 };
+
+// The main application class.
+// Manages multiple SelfplayThread objects.
+// Each SelfplayThread plays multiple games concurrently, each one is
+// represented by a SelfplayGame.
+// The Selfplayer also has a OutputThread, which writes the results of completed
+// games to disk.
+class Selfplayer {
+ public:
+  Selfplayer();
+
+  void Run() LOCKS_EXCLUDED(&mutex_);
+
+  std::unique_ptr<SelfplayGame> StartNewGame(bool verbose)
+      LOCKS_EXCLUDED(&mutex_);
+
+  void EndGame(std::unique_ptr<SelfplayGame> selfplay_game)
+      LOCKS_EXCLUDED(&mutex_);
+
+  // Exectutes `fn` on `parallel_search` threads in parallel on a shared
+  // `ShardedExecutor`.
+  // Concurrent calls to `ExecuteSharded` are executed sequentially, unless
+  // `parallel_search == 1`. This blocking property can be used to pipeline
+  // CPU tree search and GPU inference.
+  void ExecuteSharded(std::function<void(int, int)> fn);
+
+  // Grabs a model from a pool. If `selfplay_threads > parallel_inference`,
+  // `AcquireModel` may block if a model isn't immediately available.
+  std::unique_ptr<Model> AcquireModel();
+
+  // Gives a previously acquired model back to the pool.
+  void ReleaseModel(std::unique_ptr<Model> model);
+
+ private:
+  void ParseFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
+
+  mutable absl::Mutex mutex_;
+  Game::Options game_options_ GUARDED_BY(&mutex_);
+  MctsTree::Options tree_options_ GUARDED_BY(&mutex_);
+  int num_games_remaining_ GUARDED_BY(&mutex_) = 0;
+  Random rnd_ GUARDED_BY(&mutex_);
+  WinStats win_stats_ GUARDED_BY(&mutex_);
+  std::string model_name_ GUARDED_BY(&mutex_);
+  ThreadSafeQueue<std::unique_ptr<SelfplayGame>> output_queue_;
+  ShardedExecutor executor_;
+  ThreadSafeQueue<std::unique_ptr<Model>> models_;
+};
+
+// Runs tree search on a batch of `SelfplayGame` instances.
+class TreeSearcher {
+ public:
+  // Holds the span of inferences requested for a single `SelfplayGame`: `pos`
+  // and `len` index into the `inferences` array.
+  struct InferenceSpan {
+    SelfplayGame* selfplay_game;
+    size_t pos;
+    size_t len;
+  };
+
+  explicit TreeSearcher(std::shared_ptr<InferenceCache> cache)
+      : cache_(std::move(cache)) {}
+
+  // Runs tree search on `selfplay_games`, storing the leaves that require
+  // need evaluating in `inferences` and `inference_spans`.
+  void Search(absl::Span<std::unique_ptr<SelfplayGame>> selfplay_games);
+
+  // Populated by `Search`. Valid until the next call to `Search`.
+  std::vector<Inference>& inferences() { return inferences_; }
+  std::vector<InferenceSpan>& inference_spans() { return inference_spans_; }
+
+ private:
+  std::shared_ptr<InferenceCache> cache_;
+  std::vector<Inference> inferences_;
+  std::vector<InferenceSpan> inference_spans_;
+};
+
+// Plays multiple games concurrently using `SelfplayGame` instances.
+class SelfplayThread : public Thread{
+ public:
+  SelfplayThread(int thread_id, Selfplayer* selfplayer,
+                 std::shared_ptr<InferenceCache> cache);
+
+ private:
+  void Run() override;
+
+  // Starts new games playing.
+  void StartNewGames();
+
+  // Selects leaves to perform inference on for all currently playing games.
+  // The selected leaves are stored in `inferences_` and `inference_spans_`
+  // maps contents of `inferences_` back to the `SelfplayGames` that they
+  // came from.
+  void SelectLeaves();
+
+  // Runs inference on the leaves selected by `SelectLeaves`.
+  // Runs the name of the model that ran the inferences.
+  std::string RunInferences();
+
+  // Calls `SelfplayGame::ProcessInferences` for all inferences performed.
+  void ProcessInferences(const std::string& model);
+
+  // Plays moves on all games that have performed sufficient reads.
+  void PlayMoves();
+
+  Selfplayer* selfplayer_;
+  int num_virtual_losses_ = 8;
+  std::vector<std::unique_ptr<SelfplayGame>> selfplay_games_;
+  std::unique_ptr<Model> model_;
+  std::shared_ptr<InferenceCache> cache_;
+  std::vector<TreeSearcher> searchers_;
+  const int thread_id_;
+};
+
+// Writes SGFs and training examples for completed games to disk.
+class OutputThread : public Thread {
+ public:
+  explicit OutputThread(
+      ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue)
+      : output_queue_(output_queue),
+        output_dir_(FLAGS_output_dir),
+        holdout_dir_(FLAGS_holdout_dir),
+        sgf_dir_(FLAGS_sgf_dir) {}
+
+ private:
+  void Run() override;
+  void WriteOutputs(int game_id, std::unique_ptr<SelfplayGame> selfplay_game);
+
+  ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue_;
+  const std::string output_dir_;
+  const std::string holdout_dir_;
+  const std::string sgf_dir_;
+};
+
+Selfplayer::Selfplayer()
+    : rnd_(FLAGS_seed, Random::kUniqueStream),
+      executor_(FLAGS_parallel_search) {
+  absl::MutexLock lock(&mutex_);
+  ParseFlags();
+}
 
 SelfplayGame::SelfplayGame(const Options& options, std::unique_ptr<Game> game,
                            std::unique_ptr<MctsTree> tree)
     : options_(options),
-      target_readouts_(options.num_readouts),
       game_(std::move(game)),
       tree_(std::move(tree)),
       use_ansi_colors_(FdSupportsAnsiColors(fileno(stderr))),
@@ -275,7 +416,8 @@ SelfplayGame::SelfplayGame(const Options& options, std::unique_ptr<Game> game,
       rnd_(FLAGS_seed, Random::kUniqueStream),
       inference_symmetry_mix_(rnd_.UniformUint64()) {
   fastplay_ = ShouldFastplay();
-  inject_noise_before_next_read_ = !fastplay_;
+  target_readouts_ = fastplay_ ? options_.fastplay_readouts
+                               : options_.num_readouts;
 }
 
 int SelfplayGame::SelectLeaves(InferenceCache* cache,
@@ -303,6 +445,9 @@ int SelfplayGame::SelectLeaves(InferenceCache* cache,
       num_queued += 1;
     }
     if (leaf == tree_->root()) {
+      if (!fastplay_) {
+        inject_noise_before_next_read_ = true;
+      }
       break;
     }
   } while (num_queued < options_.num_virtual_losses &&
@@ -354,11 +499,10 @@ bool SelfplayGame::MaybePlayMove() {
     if (!models_used_.empty()) {
       model_str = absl::StrCat("model: ", models_used_.back(), "\n");
     }
-    auto comment = absl::StrCat(model_str, tree_->Describe());
 
     auto search_pi = tree_->CalculateSearchPi();
     game_->AddMove(tree_->to_play(), c, tree_->root()->position,
-                   std::move(comment), tree_->root()->Q(), search_pi);
+                   std::move(model_str), tree_->root()->Q(), search_pi);
 
     tree_->PlayMove(c);
 
@@ -405,8 +549,8 @@ bool SelfplayGame::ShouldFastplay() {
 }
 
 bool SelfplayGame::ShouldResign() const {
-  return options_.resign_enabled &&
-         tree_->root()->Q_perspective() < options_.resign_threshold;
+  return game_->options().resign_enabled &&
+         tree_->root()->Q_perspective() < game_->options().resign_threshold;
 }
 
 void SelfplayGame::InjectNoise() {
@@ -456,110 +600,6 @@ bool SelfplayGame::MaybeQueueInference(MctsNode* leaf, InferenceCache* cache,
   return true;
 }
 
-// The main application class.
-// Manages multiple SelfplayThread objects.
-// Each SelfplayThread plays multiple games concurrently, each one is
-// represented by a SelfplayGame.
-// The Selfplayer also has a OutputThread, which writes the results of completed
-// games to disk.
-class Selfplayer {
- public:
-  Selfplayer();
-
-  void Run() LOCKS_EXCLUDED(&mutex_);
-
-  std::unique_ptr<SelfplayGame> StartNewGame(const std::string& model_name,
-                                             bool verbose)
-      LOCKS_EXCLUDED(&mutex_);
-
-  void EndGame(std::unique_ptr<SelfplayGame> selfplay_game)
-      LOCKS_EXCLUDED(&mutex_);
-
- private:
-  // Plays multiple games concurrently using `SelfplayGame` instances.
-  class SelfplayThread : public Thread {
-   public:
-    SelfplayThread(int thread_id, std::unique_ptr<Model> model,
-                   Selfplayer* selfplayer,
-                   std::shared_ptr<InferenceCache> cache);
-
-   private:
-    // Holds the span of inferences requested for a single SelfplayGame: `pos`
-    // and `len` index into `inferences_`.
-    struct InferenceSpan {
-      SelfplayGame* selfplay_game;
-      size_t pos;
-      size_t len;
-    };
-
-    void Run() override;
-
-    // Starts new games playing.
-    void StartNewGames();
-
-    // Selects leaves to perform inference on for all currently playing games.
-    // The selected leaves are stored in `inferences_` and `inference_spans_`
-    // maps contents of `inferences_` back to the `SelfplayGames` that they
-    // came from.
-    void SelectLeaves();
-
-    // Runs inference on the leaves selected by `SelectLeaves`.
-    // Runs the name of the model that ran the inferences.
-    std::string RunInferences();
-
-    // Calls `SelfplayGame::ProcessInferences` for all inferences performed.
-    void ProcessInferences(const std::string& model);
-
-    // Plays moves on all games that have performed sufficient reads.
-    void PlayMoves();
-
-    Selfplayer* selfplayer_;
-    int num_virtual_losses_ = 8;
-    std::vector<std::unique_ptr<SelfplayGame>> selfplay_games_;
-    std::unique_ptr<Model> model_;
-    std::shared_ptr<InferenceCache> cache_;
-    std::vector<Inference> inferences_;
-    std::vector<InferenceSpan> inference_spans_;
-    const int thread_id_;
-  };
-
-  // Writes SGFs and training examples for completed games to disk.
-  class OutputThread : public Thread {
-   public:
-    explicit OutputThread(
-        ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue)
-        : output_queue_(output_queue),
-          output_dir_(FLAGS_output_dir),
-          holdout_dir_(FLAGS_holdout_dir),
-          sgf_dir_(FLAGS_sgf_dir) {}
-
-   private:
-    void Run() override;
-    void WriteOutputs(int game_id, std::unique_ptr<SelfplayGame> selfplay_game);
-
-    ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue_;
-    const std::string output_dir_;
-    const std::string holdout_dir_;
-    const std::string sgf_dir_;
-  };
-
-  void ParseFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
-
-  mutable absl::Mutex mutex_;
-  Game::Options game_options_ GUARDED_BY(&mutex_);
-  MctsTree::Options tree_options_ GUARDED_BY(&mutex_);
-  int num_games_remaining_ GUARDED_BY(&mutex_) = 0;
-  std::vector<std::string> devices_ GUARDED_BY(&mutex_);
-  Random rnd_ GUARDED_BY(&mutex_);
-  WinStats win_stats_ GUARDED_BY(&mutex_);
-  ThreadSafeQueue<std::unique_ptr<SelfplayGame>> output_queue_;
-};
-
-Selfplayer::Selfplayer() : rnd_(FLAGS_seed, Random::kUniqueStream) {
-  absl::MutexLock lock(&mutex_);
-  ParseFlags();
-}
-
 void Selfplayer::Run() {
   // Create the inference cache.
   std::shared_ptr<InferenceCache> inference_cache;
@@ -575,26 +615,24 @@ void Selfplayer::Run() {
   }
 
   // Initialize the selfplay threads.
-  std::vector<SelfplayThread> selfplay_threads;
-  std::vector<std::unique_ptr<ModelFactory>> model_factories;
-  std::string model_name;
+  std::unique_ptr<ModelFactory> model_factory;
+  std::vector<std::unique_ptr<SelfplayThread>> selfplay_threads;
   {
     absl::MutexLock lock(&mutex_);
-    auto num_threads = devices_.size() * FLAGS_threads_per_device;
-    selfplay_threads.reserve(num_threads);
-    int thread_id = 0;
-    for (const auto& device : devices_) {
-      model_factories.push_back(NewModelFactory(FLAGS_engine, device));
-      for (int i = 0; i < FLAGS_threads_per_device; ++i) {
-        // TODO(tommadams): add a method to the model factory to create multiple
-        // model instances from the same file.
-        auto model = model_factories.back()->NewModel(FLAGS_model);
-        if (model_name.empty()) {
-          model_name = model->name();
-        }
-        selfplay_threads.emplace_back(thread_id++, std::move(model), this,
-                                      inference_cache);
+    selfplay_threads.reserve(FLAGS_selfplay_threads);
+    model_factory = NewModelFactory(FLAGS_engine, FLAGS_device);
+    for (int i = 0; i < FLAGS_parallel_inference; ++i) {
+      // TODO(tommadams): add a method to the model factory to create multiple
+      // model instances from the same file.
+      auto model = model_factory->NewModel(FLAGS_model);
+      if (model_name.empty()) {
+        model_name_ = model->name();
       }
+      models_.Push(std::move(model));
+    }
+    for (int i = 0; i < FLAGS_selfplay_threads; ++i) {
+      selfplay_threads.push_back(absl::make_unique<SelfplayThread>(
+          i, this, inference_cache));
     }
   }
 
@@ -602,14 +640,12 @@ void Selfplayer::Run() {
   OutputThread output_thread(&output_queue_);
   output_thread.Start();
 
-  // Start the selfplay threads.
+  // Run the selfplay threads.
   for (auto& t : selfplay_threads) {
-    t.Start();
+    t->Start();
   }
-
-  // Wait for the selfplay threads to finish.
   for (auto& t : selfplay_threads) {
-    t.Join();
+    t->Join();
   }
 
   // Stop the output thread.
@@ -619,12 +655,11 @@ void Selfplayer::Run() {
 
   {
     absl::MutexLock lock(&mutex_);
-    MG_LOG(INFO) << FormatWinStatsTable({{model_name, win_stats_}});
+    MG_LOG(INFO) << FormatWinStatsTable({{model_name_, win_stats_}});
   }
 }
 
-std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(
-    const std::string& model_name, bool verbose) {
+std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
   WTF_SCOPE0("StartNewGame");
 
   Game::Options game_options;
@@ -656,7 +691,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(
     selfplay_options.verbose = verbose;
   }
 
-  auto game = absl::make_unique<Game>(model_name, model_name, game_options);
+  auto game = absl::make_unique<Game>(model_name_, model_name_, game_options);
   auto tree =
       absl::make_unique<MctsTree>(Position(Color::kBlack), tree_options);
 
@@ -672,6 +707,18 @@ void Selfplayer::EndGame(std::unique_ptr<SelfplayGame> selfplay_game) {
   output_queue_.Push(std::move(selfplay_game));
 }
 
+void Selfplayer::ExecuteSharded(std::function<void(int, int)> fn) {
+  executor_.Execute(std::move(fn));
+}
+
+std::unique_ptr<Model> Selfplayer::AcquireModel() {
+  return models_.Pop();
+}
+
+void Selfplayer::ReleaseModel(std::unique_ptr<Model> model) {
+  models_.Push(std::move(model));
+}
+
 void Selfplayer::ParseFlags() {
   // Check that exactly one of (run_forever and num_games) is set.
   if (FLAGS_run_forever) {
@@ -683,17 +730,11 @@ void Selfplayer::ParseFlags() {
   }
   MG_CHECK(!FLAGS_model.empty());
 
-  devices_ = absl::StrSplit(FLAGS_devices, ",");
-  // Even if the devices flag is left empty, `devices_` should contain one empty
-  // string that corresponds to the engine's default device (if applicable).
-  MG_CHECK(devices_.size() > 0);
-
   // Clamp num_concurrent_games_per_thread to avoid a situation where a single
   // thread ends up playing considerably more games than the others.
   if (!FLAGS_run_forever) {
-    int num_threads = devices_.size() * FLAGS_threads_per_device;
     auto max_concurrent_games_per_thread =
-        (FLAGS_num_games + num_threads - 1) / num_threads;
+        (FLAGS_num_games + FLAGS_selfplay_threads - 1) / FLAGS_selfplay_threads;
     FLAGS_concurrent_games_per_thread = std::min(
         max_concurrent_games_per_thread, FLAGS_concurrent_games_per_thread);
   }
@@ -707,18 +748,22 @@ void Selfplayer::ParseFlags() {
   num_games_remaining_ = FLAGS_num_games;
 }
 
-Selfplayer::SelfplayThread::SelfplayThread(
-    int thread_id, std::unique_ptr<Model> model, Selfplayer* selfplayer,
-    std::shared_ptr<InferenceCache> cache)
+SelfplayThread::SelfplayThread(int thread_id, Selfplayer* selfplayer,
+                               std::shared_ptr<InferenceCache> cache)
     : selfplayer_(selfplayer),
-      model_(std::move(model)),
       cache_(std::move(cache)),
       thread_id_(thread_id) {
   selfplay_games_.resize(FLAGS_concurrent_games_per_thread);
 }
 
-void Selfplayer::SelfplayThread::Run() {
+void SelfplayThread::Run() {
   WTF_THREAD_ENABLE("SelfplayThread");
+
+  searchers_.reserve(FLAGS_parallel_search);
+  for (int i = 0; i < FLAGS_parallel_search; ++i) {
+    searchers_.emplace_back(cache_);
+  }
+
   while (!selfplay_games_.empty()) {
     StartNewGames();
     SelectLeaves();
@@ -728,14 +773,14 @@ void Selfplayer::SelfplayThread::Run() {
   }
 }
 
-void Selfplayer::SelfplayThread::StartNewGames() {
+void SelfplayThread::StartNewGames() {
   WTF_SCOPE0("StartNewGames");
   for (size_t i = 0; i < selfplay_games_.size();) {
     if (selfplay_games_[i] == nullptr) {
       // The i'th element is null, either start a new game, or remove the
       // element from the `selfplay_games_` array.
       bool verbose = FLAGS_verbose && thread_id_ == 0 && i == 0;
-      auto selfplay_game = selfplayer_->StartNewGame(model_->name(), verbose);
+      auto selfplay_game = selfplayer_->StartNewGame(verbose);
       if (selfplay_game == nullptr) {
         // There are no more games to play remove the empty i'th slot from the
         // array. To do this without having to shuffle all the elements down,
@@ -745,68 +790,68 @@ void Selfplayer::SelfplayThread::StartNewGames() {
         selfplay_games_[i] = std::move(selfplay_games_.back());
         selfplay_games_.pop_back();
         continue;
+      } else {
+        selfplay_games_[i] = std::move(selfplay_game);
       }
-      selfplay_games_[i] = std::move(selfplay_game);
     }
     // We didn't remove an element from the array, iterate as normal.
     i += 1;
   }
 }
 
-void Selfplayer::SelfplayThread::SelectLeaves() {
+void SelfplayThread::SelectLeaves() {
   WTF_SCOPE("SelectLeaves", size_t)(selfplay_games_.size());
 
-  for (auto& selfplay_game : selfplay_games_) {
-    InferenceSpan span;
-    span.selfplay_game = selfplay_game.get();
-    span.pos = inferences_.size();
-    span.len = selfplay_game->SelectLeaves(cache_.get(), &inferences_);
-    if (span.len > 0) {
-      inference_spans_.push_back(span);
-    }
-  }
+  selfplayer_->ExecuteSharded([this](int i, int n) {
+    auto range = ShardedExecutor::GetShardRange(i, n, selfplay_games_.size());
+    // WTF_SCOPE("SelectLeaves", int, int)(range.begin, range.end);
+    searchers_[i].Search(
+        absl::MakeSpan(selfplay_games_).subspan(range.begin,
+                                                range.end - range.begin));
+  });
 }
 
-std::string Selfplayer::SelfplayThread::RunInferences() {
+std::string SelfplayThread::RunInferences() {
   WTF_SCOPE0("RunInferences");
-  if (inferences_.empty()) {
-    return {};
-  }
 
   // TODO(tommadams): stop allocating theses temporary vectors.
   std::vector<const ModelInput*> input_ptrs;
   std::vector<ModelOutput*> output_ptrs;
-  for (auto& x : inferences_) {
-    input_ptrs.push_back(&x.input);
-    output_ptrs.push_back(&x.output);
+  for (auto& s : searchers_) {
+    for (auto& x : s.inferences()) {
+      input_ptrs.push_back(&x.input);
+      output_ptrs.push_back(&x.output);
+    }
   }
+
+  if (input_ptrs.empty()) {
+    return {};
+  }
+
   std::string model_name;
-  model_->RunMany(input_ptrs, &output_ptrs, &model_name);
+  auto model = selfplayer_->AcquireModel();
+  model->RunMany(input_ptrs, &output_ptrs, &model_name);
+  selfplayer_->ReleaseModel(std::move(model));
   return model_name;
 }
 
-void Selfplayer::SelfplayThread::ProcessInferences(
-    const std::string& model_name) {
+void SelfplayThread::ProcessInferences(const std::string& model_name) {
+  // Process inferences
   WTF_SCOPE0("ProcessInferences");
-
-  // Merge the inferences into the cache, possible updating the inference
-  // output if the cache already contain a different symmetry of the position.
-  for (auto& inference : inferences_) {
-    cache_->Merge(inference.cache_key, inference.leaf->canonical_symmetry,
-                  inference.input.sym, &inference.output);
+  for (auto& s : searchers_) {
+    for (auto& inference : s.inferences()) {
+      cache_->Merge(inference.cache_key, inference.leaf->canonical_symmetry,
+                    inference.input.sym, &inference.output);
+    }
+    for (const auto& span : s.inference_spans()) {
+      span.selfplay_game->ProcessInferences(
+          model_name,
+          absl::MakeSpan(s.inferences()).subspan(span.pos, span.len));
+    }
   }
-
-  // Update each game.
-  for (const auto& span : inference_spans_) {
-    span.selfplay_game->ProcessInferences(
-        model_name, absl::MakeSpan(inferences_).subspan(span.pos, span.len));
-  }
-
-  inferences_.clear();
-  inference_spans_.clear();
 }
 
-void Selfplayer::SelfplayThread::PlayMoves() {
+void SelfplayThread::PlayMoves() {
   WTF_SCOPE0("PlayMoves");
 
   for (auto& selfplay_game : selfplay_games_) {
@@ -823,7 +868,22 @@ void Selfplayer::SelfplayThread::PlayMoves() {
   }
 }
 
-void Selfplayer::OutputThread::Run() {
+void TreeSearcher::Search(absl::Span<std::unique_ptr<SelfplayGame>> selfplay_games) {
+  WTF_SCOPE("TreeSearch", size_t)(selfplay_games.size());
+  inferences_.clear();
+  inference_spans_.clear();
+  for (auto& selfplay_game : selfplay_games) {
+    InferenceSpan span;
+    span.selfplay_game = selfplay_game.get();
+    span.pos = inferences_.size();
+    span.len = selfplay_game->SelectLeaves(cache_.get(), &inferences_);
+    if (span.len > 0) {
+      inference_spans_.push_back(span);
+    }
+  }
+}
+
+void OutputThread::Run() {
   for (int game_id = 0;; ++game_id) {
     auto selfplay_game = output_queue_->Pop();
     if (selfplay_game == nullptr) {
@@ -833,8 +893,8 @@ void Selfplayer::OutputThread::Run() {
   }
 }
 
-void Selfplayer::OutputThread::WriteOutputs(
-    int game_id, std::unique_ptr<SelfplayGame> selfplay_game) {
+void OutputThread::WriteOutputs(int game_id,
+                                std::unique_ptr<SelfplayGame> selfplay_game) {
   auto output_name = GetOutputName(game_id);
   auto now = absl::Now();
   auto* game = selfplay_game->game();
