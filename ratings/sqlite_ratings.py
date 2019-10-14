@@ -23,6 +23,7 @@ import sqlite3
 import os
 import re
 from rl_loop import fsdb
+from ratings import math_ratings
 import random
 import subprocess
 import math
@@ -165,41 +166,8 @@ def compute_ratings(data=None):
     if data is None:
         with sqlite3.connect("ratings.db") as db:
             data = db.execute("select model_winner, model_loser from wins").fetchall()
-    model_ids = set([d[0] for d in data]).union(set([d[1] for d in data]))
 
-    # Map model_ids to a contiguous range.
-    ordered = sorted(model_ids)
-    new_id = {}
-    for i, m in enumerate(ordered):
-        new_id[m] = i
-
-    # A function to rewrite the model_ids in our pairs
-    def ilsr_data(d):
-        p1, p2 = d
-        p1 = new_id[p1]
-        p2 = new_id[p2]
-        return (p1, p2)
-
-    pairs = list(map(ilsr_data, data))
-    ilsr_param = choix.ilsr_pairwise(
-        len(ordered),
-        pairs,
-        alpha=0.0001,
-        max_iter=800)
-
-    hessian = choix.opt.PairwiseFcts(pairs, penalty=.1).hessian(ilsr_param)
-    std_err = np.sqrt(np.diagonal(np.linalg.inv(hessian)))
-
-    # Elo conversion
-    elo_mult = 400 / math.log(10)
-
-    min_rating = min(ilsr_param)
-    ratings = {}
-
-    for model_id, param, err in zip(ordered, ilsr_param, std_err):
-        ratings[model_id] = (elo_mult * (param - min_rating), elo_mult * err)
-
-    return ratings
+    return math_ratings.compute_ratings(data)
 
 
 def top_n(n=10):

@@ -35,6 +35,7 @@ import random
 import re
 import sqlite3
 from collections import defaultdict, Counter
+from ratings import math_ratings
 
 import choix
 import numpy as np
@@ -379,45 +380,14 @@ def compute_ratings(model_ids, data=None):
             query = "select model_winner, model_loser from wins"
             data = db.execute(query).fetchall()
 
-    data_ids = sorted(set(np.array(data).flatten()))
-
-    # Map data_ids to a contiguous range.
-    new_id = {}
-    for i, m in enumerate(data_ids):
-        new_id[m] = i
+    ratings = math_ratings.compute_ratings(data)
 
     # Create inverse model_ids lookup
     model_names = {v: k for k, v in model_ids.items()}
 
-    # A function to rewrite the data_ids in our pairs
-    def ilsr_data(d):
-        p1, p2 = d
-        p1 = new_id[p1]
-        p2 = new_id[p2]
-        return (p1, p2)
+    ratings_by_name = {model_names[m_id]: ratings[m_id] for m_id in ratings.keys()}
+    return ratings_by_name
 
-    pairs = list(map(ilsr_data, data))
-    ilsr_param = choix.ilsr_pairwise(
-        len(data_ids),
-        pairs,
-        alpha=0.0001,
-        max_iter=800)
-
-    hessian = choix.opt.PairwiseFcts(pairs, penalty=.1).hessian(ilsr_param)
-    std_err = np.sqrt(np.diagonal(np.linalg.inv(hessian)))
-
-    # Elo conversion
-    elo_mult = 400 / math.log(10)
-
-    # Used to make all ratings positive.
-    min_rating = min(ilsr_param)
-
-    ratings = {}
-    for m_id, param, err in zip(data_ids, ilsr_param, std_err):
-        model_rating = (elo_mult * (param - min_rating), elo_mult * err)
-        ratings[model_names[m_id]] = model_rating
-
-    return ratings
 
 
 def top_n(n=10):

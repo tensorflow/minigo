@@ -621,11 +621,18 @@ def main(unused_argv):
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
 
+    
     with logged_timer('Total time'):
         try:
             rl_loop()
+            final_ratings = wait(run('python',
+                'ratings/rate_subdir.py', 
+                fsdb.eval_dir()))
         finally:
             asyncio.get_event_loop().close()
+
+    for line in final_ratings:
+        print(line)
 
 
 if __name__ == '__main__':
