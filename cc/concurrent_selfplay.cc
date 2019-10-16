@@ -279,7 +279,8 @@ class Selfplayer {
 
   void Run() LOCKS_EXCLUDED(&mutex_);
 
-  std::unique_ptr<SelfplayGame> StartNewGame(bool verbose)
+  std::unique_ptr<SelfplayGame> StartNewGame(const std::string& model_name,
+                                             bool verbose)
       LOCKS_EXCLUDED(&mutex_);
 
   void EndGame(std::unique_ptr<SelfplayGame> selfplay_game)
@@ -383,11 +384,13 @@ class SelfplayThread : public Thread{
 class OutputThread : public Thread {
  public:
   explicit OutputThread(
+      FeatureDescriptor feature_descriptor,
       ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue)
       : output_queue_(output_queue),
         output_dir_(FLAGS_output_dir),
         holdout_dir_(FLAGS_holdout_dir),
-        sgf_dir_(FLAGS_sgf_dir) {}
+        sgf_dir_(FLAGS_sgf_dir),
+        feature_descriptor(std::move(feature_descriptor)) {}
 
  private:
   void Run() override;
@@ -397,6 +400,7 @@ class OutputThread : public Thread {
   const std::string output_dir_;
   const std::string holdout_dir_;
   const std::string sgf_dir_;
+  const FeatureDescriptor feature_descriptor_;
 };
 
 Selfplayer::Selfplayer()
@@ -625,7 +629,7 @@ void Selfplayer::Run() {
       // TODO(tommadams): add a method to the model factory to create multiple
       // model instances from the same file.
       auto model = model_factory->NewModel(FLAGS_model);
-      if (model_name.empty()) {
+      if (model_name_.empty()) {
         model_name_ = model->name();
       }
       models_.Push(std::move(model));
@@ -655,11 +659,12 @@ void Selfplayer::Run() {
 
   {
     absl::MutexLock lock(&mutex_);
-    MG_LOG(INFO) << FormatWinStatsTable({{model_name_, win_stats_}});
+    MG_LOG(INFO) << FormatWinStatsTable({{model_name, win_stats_}});
   }
 }
 
-std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
+std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(
+    const std::string& model_name, bool verbose) {
   WTF_SCOPE0("StartNewGame");
 
   Game::Options game_options;
@@ -691,7 +696,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
     selfplay_options.verbose = verbose;
   }
 
-  auto game = absl::make_unique<Game>(model_name_, model_name_, game_options);
+  auto game = absl::make_unique<Game>(model_name, model_name, game_options);
   auto tree =
       absl::make_unique<MctsTree>(Position(Color::kBlack), tree_options);
 
@@ -780,7 +785,7 @@ void SelfplayThread::StartNewGames() {
       // The i'th element is null, either start a new game, or remove the
       // element from the `selfplay_games_` array.
       bool verbose = FLAGS_verbose && thread_id_ == 0 && i == 0;
-      auto selfplay_game = selfplayer_->StartNewGame(verbose);
+      auto selfplay_game = selfplayer_->StartNewGame(model_name_, verbose);
       if (selfplay_game == nullptr) {
         // There are no more games to play remove the empty i'th slot from the
         // array. To do this without having to shuffle all the elements down,
@@ -912,10 +917,8 @@ void OutputThread::WriteOutputs(int game_id,
   const auto& example_dir =
       selfplay_game->options().is_holdout ? holdout_dir_ : output_dir_;
   if (!example_dir.empty()) {
-    // TODO(tommadams): pass the type of input features on the command line.
     tf_utils::WriteGameExamples(GetOutputDir(now, example_dir), output_name,
-                                FeatureDescriptor::Create<ExtraFeatures>(),
-                                *game);
+                                feature_descriptor_, *game);
   }
 }
 
