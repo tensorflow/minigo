@@ -1,5 +1,6 @@
 absl-py
 autopep8>=1.3
+choix>=0.3.3
 fire
 google.cloud.logging
 google.cloud.bigtable
