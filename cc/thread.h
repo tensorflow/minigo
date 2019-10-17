@@ -12,8 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CC_THREAD_H_
+#define CC_THREAD_H_
+
 #include <functional>
 #include <thread>
+
+#include "absl/synchronization/mutex.h"
 
 namespace minigo {
 
@@ -27,8 +32,8 @@ class Thread {
 
   std::thread::native_handle_type handle() { return impl_.native_handle(); }
 
-  void Start();
-  void Join();
+  virtual void Start();
+  virtual void Join();
 
  private:
   virtual void Run() = 0;
@@ -50,4 +55,32 @@ class LambdaThread : public Thread {
   std::function<void()> closure_;
 };
 
+// A thread whose `Start` method blocks until the thread is running and has
+// called `SignalStarted` at least once.
+// This can be useful to serialize the order in which threads start.
+class BlockingStartThread : public Thread {
+ public:
+  void Start() override {
+    Thread::Start();
+    absl::MutexLock lock(&mutex_);
+    while (!started_) {
+      cond_var_.Wait(&mutex_);
+    }
+  }
+
+ protected:
+  void SignalStarted() {
+    absl::MutexLock lock(&mutex_);
+    started_ = true;
+    cond_var_.Signal();
+  }
+
+ private:
+  absl::Mutex mutex_;
+  absl::CondVar cond_var_;
+  bool started_ = false;
+};
+
 }  // namespace minigo
+
+#endif  // CC_THREAD_H_

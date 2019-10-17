@@ -66,9 +66,9 @@ minigo_cc_library(
         ":sgf",
         "//cc/file",
         "//cc/platform",
-        "@com_google_absl//absl/time",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -240,6 +240,7 @@ cc_library(
     hdrs = ["thread.h"],
     deps = [
         ":logging",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -446,6 +447,7 @@ minigo_cc_binary(
         ":thread",
         ":thread_safe_queue",
         ":zobrist",
+        "//cc/async:sharded_executor",
         "//cc/dual_net:factory",
         "//cc/file",
         "//cc/model:inference_cache",

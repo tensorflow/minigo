@@ -264,7 +264,7 @@ class SelfplayGame {
 
   // We need to wait until the root is expanded by the first call to
   // SelectLeaves in the game before injecting noise.
-  bool inject_noise_before_next_read_ = false;
+  bool inject_noise_before_next_read_;
 };
 
 // The main application class.
@@ -279,8 +279,7 @@ class Selfplayer {
 
   void Run() LOCKS_EXCLUDED(&mutex_);
 
-  std::unique_ptr<SelfplayGame> StartNewGame(const std::string& model_name,
-                                             bool verbose)
+  std::unique_ptr<SelfplayGame> StartNewGame(bool verbose)
       LOCKS_EXCLUDED(&mutex_);
 
   void EndGame(std::unique_ptr<SelfplayGame> selfplay_game)
@@ -390,7 +389,7 @@ class OutputThread : public Thread {
         output_dir_(FLAGS_output_dir),
         holdout_dir_(FLAGS_holdout_dir),
         sgf_dir_(FLAGS_sgf_dir),
-        feature_descriptor(std::move(feature_descriptor)) {}
+        feature_descriptor_(std::move(feature_descriptor)) {}
 
  private:
   void Run() override;
@@ -419,9 +418,12 @@ SelfplayGame::SelfplayGame(const Options& options, std::unique_ptr<Game> game,
       start_time_(absl::Now()),
       rnd_(FLAGS_seed, Random::kUniqueStream),
       inference_symmetry_mix_(rnd_.UniformUint64()) {
-  fastplay_ = ShouldFastplay();
-  target_readouts_ = fastplay_ ? options_.fastplay_readouts
-                               : options_.num_readouts;
+  // We don't allow fast play for the opening move: fast play relies to some
+  // degree on tree reuse from earlier reads but the tree is empty at the start
+  // of the game.
+  fastplay_ = false;
+  inject_noise_before_next_read_ = true;
+  target_readouts_ = options_.num_readouts;
 }
 
 int SelfplayGame::SelectLeaves(InferenceCache* cache,
@@ -589,8 +591,8 @@ bool SelfplayGame::MaybeQueueInference(MctsNode* leaf, InferenceCache* cache,
   inference.input.sym = inference_sym;
   inference.leaf = leaf;
 
-  // TODO(tommadams): add a method to Model that returns the required position
-  // history size.
+  // TODO(tommadams): add a method to FeatureDescriptor that returns the
+  // required position history size.
   auto* node = leaf;
   for (int i = 0; i < inference.input.position_history.capacity(); ++i) {
     inference.input.position_history.push_back(&node->position);
@@ -621,6 +623,7 @@ void Selfplayer::Run() {
   // Initialize the selfplay threads.
   std::unique_ptr<ModelFactory> model_factory;
   std::vector<std::unique_ptr<SelfplayThread>> selfplay_threads;
+  FeatureDescriptor feature_descriptor{};
   {
     absl::MutexLock lock(&mutex_);
     selfplay_threads.reserve(FLAGS_selfplay_threads);
@@ -631,6 +634,7 @@ void Selfplayer::Run() {
       auto model = model_factory->NewModel(FLAGS_model);
       if (model_name_.empty()) {
         model_name_ = model->name();
+        feature_descriptor = model->feature_descriptor();
       }
       models_.Push(std::move(model));
     }
@@ -641,7 +645,7 @@ void Selfplayer::Run() {
   }
 
   // Start the output thread.
-  OutputThread output_thread(&output_queue_);
+  OutputThread output_thread(feature_descriptor, &output_queue_);
   output_thread.Start();
 
   // Run the selfplay threads.
@@ -659,12 +663,11 @@ void Selfplayer::Run() {
 
   {
     absl::MutexLock lock(&mutex_);
-    MG_LOG(INFO) << FormatWinStatsTable({{model_name, win_stats_}});
+    MG_LOG(INFO) << FormatWinStatsTable({{model_name_, win_stats_}});
   }
 }
 
-std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(
-    const std::string& model_name, bool verbose) {
+std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
   WTF_SCOPE0("StartNewGame");
 
   Game::Options game_options;
@@ -696,7 +699,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(
     selfplay_options.verbose = verbose;
   }
 
-  auto game = absl::make_unique<Game>(model_name, model_name, game_options);
+  auto game = absl::make_unique<Game>(model_name_, model_name_, game_options);
   auto tree =
       absl::make_unique<MctsTree>(Position(Color::kBlack), tree_options);
 
@@ -785,7 +788,7 @@ void SelfplayThread::StartNewGames() {
       // The i'th element is null, either start a new game, or remove the
       // element from the `selfplay_games_` array.
       bool verbose = FLAGS_verbose && thread_id_ == 0 && i == 0;
-      auto selfplay_game = selfplayer_->StartNewGame(model_name_, verbose);
+      auto selfplay_game = selfplayer_->StartNewGame(verbose);
       if (selfplay_game == nullptr) {
         // There are no more games to play remove the empty i'th slot from the
         // array. To do this without having to shuffle all the elements down,
@@ -809,7 +812,6 @@ void SelfplayThread::SelectLeaves() {
 
   selfplayer_->ExecuteSharded([this](int i, int n) {
     auto range = ShardedExecutor::GetShardRange(i, n, selfplay_games_.size());
-    // WTF_SCOPE("SelectLeaves", int, int)(range.begin, range.end);
     searchers_[i].Search(
         absl::MakeSpan(selfplay_games_).subspan(range.begin,
                                                 range.end - range.begin));
@@ -841,7 +843,6 @@ std::string SelfplayThread::RunInferences() {
 }
 
 void SelfplayThread::ProcessInferences(const std::string& model_name) {
-  // Process inferences
   WTF_SCOPE0("ProcessInferences");
   for (auto& s : searchers_) {
     for (auto& inference : s.inferences()) {

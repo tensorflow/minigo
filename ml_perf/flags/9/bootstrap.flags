@@ -5,7 +5,10 @@
 
 --holdout_pct=0
 --engine=random
---devices=0
---threads_per_device=48
---concurrent_games_per_thread=1
+--device=0
 --cache_size_mb=0
+
+--selfplay_threads=48
+--parallel_search=1
+--parallel_inference=48
+--concurrent_games_per_thread=1

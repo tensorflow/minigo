@@ -376,7 +376,7 @@ async def selfplay(state):
             '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                                 'selfplay.flags')),
             '--num_games={}'.format(num_games),
-            '--devices={}'.format(device),
+            '--device={}'.format(device),
             '--model={}'.format(state.best_model_path),
             '--output_dir={}/{}'.format(output_dir, i),
             '--holdout_dir={}/{}'.format(holdout_dir, i)])
@@ -551,7 +551,7 @@ def rl_loop():
 
         # If we're bootstrapping a checkpoint, evaluate the newly trained model
         # against the target.
-        if FLAGS.bootstrap:
+        if FLAGS.bootstrap and state.iter_num > 15:
             target_model_path = os.path.join(fsdb.models_dir(), 'target.pb')
             sgf_dir = os.path.join(
                 fsdb.eval_dir(),

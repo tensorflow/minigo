@@ -100,10 +100,10 @@ TfDualNet::~TfDualNet() {
 void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                         std::vector<ModelOutput*>* outputs,
                         std::string* model_name) {
-  WTF_SCOPE("TfDualNet::Run", size_t)(inputs.size());
-  MG_CHECK(inputs.size() == outputs->size());
-
   Reserve(inputs.size());
+
+  WTF_SCOPE("TfDualNet::Run", size_t, int)(inputs.size(), batch_capacity_);
+  MG_CHECK(inputs.size() == outputs->size());
 
   Tensor<float> features(batch_capacity_, kN, kN,
                          feature_descriptor().num_planes,

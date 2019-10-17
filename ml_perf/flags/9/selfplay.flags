@@ -12,11 +12,15 @@
 --disable_resign_pct=1.0
 --resign_threshold=-0.99
 --virtual_losses=2
---threads_per_device=4
---concurrent_games_per_thread=128
 
 --dirichlet_alpha=0.135
 --noise_mix=0.25
 ### --target_pruning=1
 
 --cache_size_mb=2048
+--verbose=false
+
+--selfplay_threads=3
+--parallel_search=2
+--parallel_inference=3
+--concurrent_games_per_thread=128

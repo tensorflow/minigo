@@ -264,6 +264,9 @@ std::array<float, kNumMoves> MctsNode::CalculateChildActionScore() const {
 MctsNode* MctsNode::MaybeAddChild(Coord c) {
   auto it = children.find(c);
   if (it == children.end()) {
+    // TODO(tommadams): Allocate children out of a custom block allocator: we
+    // spend about 5% of our runtme inside MctsNode::PruneChildren freeing
+    // nodes.
     it = children.emplace(c, absl::make_unique<MctsNode>(this, c)).first;
   }
   return it->second.get();
