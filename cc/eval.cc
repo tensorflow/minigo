@@ -93,6 +93,7 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   game_options->ignore_repeated_moves = true;
   player_options->virtual_losses = FLAGS_virtual_losses;
   player_options->num_readouts = FLAGS_num_readouts;
+  player_options->value_init_penalty = FLAGS_value_init_penalty;
   player_options->inject_noise = false;
   player_options->soft_pick = false;
 }
