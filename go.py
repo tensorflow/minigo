@@ -342,7 +342,7 @@ class Position():
             place_stones(board, KO, [self.ko])
         raw_board_contents = []
         for i in range(N):
-            row = []
+            row = [' ']
             for j in range(N):
                 appended = '<' if (self.recent and (i, j) ==
                                    self.recent[-1].move) else ' '
@@ -352,7 +352,7 @@ class Position():
 
             raw_board_contents.append(''.join(row))
 
-        row_labels = ['%2d ' % i for i in range(N, 0, -1)]
+        row_labels = ['%2d' % i for i in range(N, 0, -1)]
         annotated_board_contents = [''.join(r) for r in zip(
             row_labels, raw_board_contents, row_labels)]
         header_footer_rows = [
