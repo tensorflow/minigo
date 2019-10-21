@@ -34,17 +34,19 @@ following commands:
 import sys
 sys.path.insert(0, '.')  # nopep8
 
-import features as features_lib
+from absl import app, flags
 import numpy as np
-import go
-import coords
 import tensorflow as tf
 
-tf.app.flags.DEFINE_string("path", "", "Path to a TF example file.")
-tf.app.flags.DEFINE_integer("to_play_feature", 16,
-                            "Index of the 'to play' feature.")
+import coords
+import features as features_lib
+import go
 
-FLAGS = tf.app.flags.FLAGS
+flags.DEFINE_string("path", "", "Path to a TF example file.")
+flags.DEFINE_integer("to_play_feature", 16,
+                     "Index of the 'to play' feature.")
+
+FLAGS = flags.FLAGS
 
 TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
     tf.python_io.TFRecordCompressionType.ZLIB)
@@ -116,7 +118,8 @@ def parse_board(example):
 
 def format_pi(pi, mean, mx):
     GREEN = '\x1b[0;32m'
-    YELLOW = '\x1b[0;33m'
+    BRIGHT_YELLOW = '\x1b[0;33;1m'
+    BRIGHT_WHITE = '\x1b[0;37;1m'
     BLUE = '\x1b[0;34m'
     NORMAL = '\x1b[0m'
 
@@ -126,11 +129,14 @@ def format_pi(pi, mean, mx):
         s = '%.2f' % pi
 
     if s == '.000':
-        s = '%s%s%s' % (BLUE, s, NORMAL)
+        col = BLUE
     elif pi < mean:
-        s = '%s%s%s' % (GREEN, s, NORMAL)
+        col = GREEN
     elif pi < mx:
-        s = '%s%s%s' % (YELLOW, s, NORMAL)
+        col = BRIGHT_YELLOW
+    else:
+        col = BRIGHT_WHITE
+    s = '%s%s%s' % (col, s, NORMAL)
     return s
 
 
@@ -142,7 +148,7 @@ def print_board_and_pi(examples, i):
         'Black' if example.value > 0 else 'White'))
     board_lines = str(p).split('\n')[:-2]
 
-    mean = np.mean(example.pi)
+    mean = np.mean(example.pi[example.pi > 0])
     mx = np.max(example.pi)
 
     pi_lines = ['PI']
@@ -208,4 +214,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-    tf.app.run(main)
+    app.run(main)

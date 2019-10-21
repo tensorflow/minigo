@@ -13,17 +13,20 @@
 # limitations under the License.
 
 import sys
-sys.path.insert(0, '.')
+sys.path.insert(0, '.')  # nopep8
 
-import tensorflow as tf
-import go
+from absl import app, flags
 import numpy as np
+import tensorflow as tf
+
 import features as features_lib
+import go
 
-tf.app.flags.DEFINE_string("a", "", "Path to first example")
-tf.app.flags.DEFINE_string("b", "", "Path to second example")
 
-FLAGS = tf.app.flags.FLAGS
+flags.DEFINE_string("a", "", "Path to first example")
+flags.DEFINE_string("b", "", "Path to second example")
+
+FLAGS = flags.FLAGS
 
 TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
     tf.python_io.TFRecordCompressionType.ZLIB)
@@ -80,4 +83,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-    tf.app.run(main)
+    app.run(main)
