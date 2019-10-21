@@ -34,6 +34,10 @@ following commands:
 import sys
 sys.path.insert(0, '.')  # nopep8
 
+# Hide the GPUs from TF. This makes startup 2x quicker on some machines.
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""  # nopep8
+
 from absl import app, flags
 import numpy as np
 import tensorflow as tf
@@ -41,6 +45,7 @@ import tensorflow as tf
 import coords
 import features as features_lib
 import go
+
 
 flags.DEFINE_string("path", "", "Path to a TF example file.")
 flags.DEFINE_integer("to_play_feature", 16,
@@ -116,12 +121,18 @@ def parse_board(example):
     return go.Position(board=board, to_play=to_play)
 
 
-def format_pi(pi, mean, mx):
+def format_pi(pi, stone, mean, mx):
     GREEN = '\x1b[0;32m'
     BRIGHT_YELLOW = '\x1b[0;33;1m'
     BRIGHT_WHITE = '\x1b[0;37;1m'
     BLUE = '\x1b[0;34m'
+    RED = '\x1b[0;31m'
     NORMAL = '\x1b[0m'
+
+    if stone == go.BLACK:
+        return '%s  X %s' % (RED, NORMAL)
+    elif stone == go.WHITE:
+        return '%s  O %s' % (RED, NORMAL)
 
     if pi < 1:
         s = ('%.3f' % pi)[1:]
@@ -153,10 +164,13 @@ def print_board_and_pi(examples, i):
 
     pi_lines = ['PI']
     for row in range(go.N):
-        pi_lines.append(
-            ' '.join([format_pi(x, mean, mx)
-                      for x in example.pi[row * go.N: (row + 1) * go.N]]))
-    pi_lines.append(format_pi(example.pi[-1], mean, mx))
+        pi = []
+        for col in range(go.N):
+            stone = p.board[row, col]
+            idx = row * go.N + col
+            pi.append(format_pi(example.pi[idx], stone, mean, mx))
+        pi_lines.append(' '.join(pi))
+    pi_lines.append(format_pi(example.pi[-1], go.EMPTY, mean, mx))
 
     for b, p in zip(board_lines, pi_lines):
         print('%s  |  %s' % (b, p))
