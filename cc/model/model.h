@@ -53,6 +53,8 @@ class Model {
   const std::string& name() const { return name_; }
   const FeatureDescriptor& feature_descriptor() const { return feature_desc_; }
 
+  // TODO(tommadams): remove the model_name out parameter: it's no longer needed
+  // with the new concurrent_selfplay implementation.
   virtual void RunMany(const std::vector<const ModelInput*>& inputs,
                        std::vector<ModelOutput*>* outputs,
                        std::string* model_name) = 0;

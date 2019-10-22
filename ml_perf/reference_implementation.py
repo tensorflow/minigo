@@ -24,6 +24,7 @@ import numpy as np
 import os
 import random
 import re
+import signal
 import shutil
 import subprocess
 import tensorflow as tf
@@ -77,8 +78,6 @@ flags.DEFINE_list('selfplay_devices', None, '')
 
 flags.DEFINE_integer('bootstrap_num_models', 8,
                      'Number of random models to use for bootstrapping.')
-flags.DEFINE_integer('selfplay_num_games', 4096,
-                     'Number of selfplay games to play.')
 flags.DEFINE_integer('eval_num_games', 100,
                      'Number of selfplay games to play.')
 
@@ -86,42 +85,24 @@ flags.DEFINE_boolean('bootstrap', False, '')
 
 flags.DEFINE_boolean('validate', False, 'Run validation on holdout games')
 
-flags.DEFINE_boolean('use_extra_features', False, 'Use non-Zero input features')
+flags.DEFINE_boolean('use_extra_features', False,
+                     'Use non-Zero input features')
+
+flags.DEFINE_integer('num_games_per_iteration', 4096,
+                     'Minimum number of games to play for each training '
+                     'iteration.')
 
 FLAGS = flags.FLAGS
 
 
 class State:
-    """State data used in each iteration of the RL loop.
-
-    Models are named with the current reinforcement learning loop iteration number
-    and the model generation (how many models have passed gating). For example, a
-    model named "000015-000007" was trained on the 15th iteration of the loop and
-    is the 7th models that passed gating.
-    Note that we rely on the iteration number being the first part of the model
-    name so that the training chunks sort correctly.
-    """
-
     def __init__(self):
         self.start_time = time.time()
-
         self.iter_num = 0
-        self.gen_num = 0
-
-        self.best_model_name = None
-
-    @property
-    def output_model_name(self):
-        return '%06d-%06d' % (self.iter_num, self.gen_num)
 
     @property
     def train_model_name(self):
-        return '%06d-%06d' % (self.iter_num, self.gen_num + 1)
-
-    @property
-    def best_model_path(self):
-        return '{}.pb'.format(
-            os.path.join(fsdb.models_dir(), self.best_model_name))
+        return '%06d' % self.iter_num
 
     @property
     def train_model_path(self):
@@ -157,79 +138,79 @@ class WinStats:
         self.total_wins = self.black_wins.total + self.white_wins.total
 
 
-def initialize_from_checkpoint(state):
-    """Initialize the reinforcement learning loop from a checkpoint."""
+### def initialize_from_checkpoint(state):
+###     """Initialize the reinforcement learning loop from a checkpoint."""
+###
+###     # The checkpoint's work_dir should contain the most recently trained model.
+###     model_paths = glob.glob(os.path.join(FLAGS.checkpoint_dir,
+###                                          'work_dir/model.ckpt-*.pb'))
+###     if len(model_paths) != 1:
+###         raise RuntimeError('Expected exactly one model in the checkpoint '
+###                            'work_dir, got [{}]'.format(', '.join(model_paths)))
+###     start_model_path = model_paths[0]
+###
+###     # Copy the latest trained model into the models directory and use it on the
+###     # first round of selfplay.
+###     state.best_model_name = 'checkpoint'
+###     shutil.copy(start_model_path,
+###                 os.path.join(fsdb.models_dir(), state.best_model_name + '.pb'))
+###
+###     # Copy the training chunks.
+###     golden_chunks_dir = os.path.join(FLAGS.checkpoint_dir, 'golden_chunks')
+###     for basename in os.listdir(golden_chunks_dir):
+###         path = os.path.join(golden_chunks_dir, basename)
+###         shutil.copy(path, fsdb.golden_chunk_dir())
+###
+###     # Copy the training files.
+###     work_dir = os.path.join(FLAGS.checkpoint_dir, 'work_dir')
+###     for basename in os.listdir(work_dir):
+###         path = os.path.join(work_dir, basename)
+###         shutil.copy(path, fsdb.working_dir())
 
-    # The checkpoint's work_dir should contain the most recently trained model.
-    model_paths = glob.glob(os.path.join(FLAGS.checkpoint_dir,
-                                         'work_dir/model.ckpt-*.pb'))
-    if len(model_paths) != 1:
-        raise RuntimeError('Expected exactly one model in the checkpoint '
-                           'work_dir, got [{}]'.format(', '.join(model_paths)))
-    start_model_path = model_paths[0]
 
-    # Copy the latest trained model into the models directory and use it on the
-    # first round of selfplay.
-    state.best_model_name = 'checkpoint'
-    shutil.copy(start_model_path,
-                os.path.join(fsdb.models_dir(), state.best_model_name + '.pb'))
-
-    # Copy the training chunks.
-    golden_chunks_dir = os.path.join(FLAGS.checkpoint_dir, 'golden_chunks')
-    for basename in os.listdir(golden_chunks_dir):
-        path = os.path.join(golden_chunks_dir, basename)
-        shutil.copy(path, fsdb.golden_chunk_dir())
-
-    # Copy the training files.
-    work_dir = os.path.join(FLAGS.checkpoint_dir, 'work_dir')
-    for basename in os.listdir(work_dir):
-        path = os.path.join(work_dir, basename)
-        shutil.copy(path, fsdb.working_dir())
-
-
-def create_checkpoint():
-    for sub_dir in ['work_dir', 'golden_chunks']:
-        ensure_dir_exists(os.path.join(FLAGS.checkpoint_dir, sub_dir))
-
-    # List all the training checkpoints.
-    pattern = os.path.join(FLAGS.base_dir, 'work_dir', 'model.ckpt-*.index')
-    model_paths = glob.glob(pattern)
-
-    # Sort the checkpoints by step number.
-    def extract_step(path):
-        name = os.path.splitext(os.path.basename(path))[0]
-        return int(re.match('model.ckpt-(\d+)', name).group(1))
-    model_paths.sort(key=lambda x: extract_step(x))
-
-    # Get the name of the latest checkpoint.
-    step = extract_step(model_paths[-1])
-    name = 'model.ckpt-{}'.format(step)
-
-    # Copy the model to the checkpoint directory.
-    for ext in ['.data-00000-of-00001', '.index', '.meta']:
-        basename = name + ext
-        src_path = os.path.join(FLAGS.base_dir, 'work_dir', basename)
-        dst_path = os.path.join(FLAGS.checkpoint_dir, 'work_dir', basename)
-        print('Copying {} {}'.format(src_path, dst_path))
-        shutil.copy(src_path, dst_path)
-
-    # Write the checkpoint state proto.
-    checkpoint_path = os.path.join(
-        FLAGS.checkpoint_dir, 'work_dir', 'checkpoint')
-    print('Writing {}'.format(checkpoint_path))
-    with gfile.GFile(checkpoint_path, 'w') as f:
-        f.write('model_checkpoint_path: "{}"\n'.format(name))
-        f.write('all_model_checkpoint_paths: "{}"\n'.format(name))
-
-    # Copy the most recent golden chunks.
-    pattern = os.path.join(FLAGS.base_dir, 'data',
-                           'golden_chunks', '*.tfrecord.zz')
-    src_paths = sorted(glob.glob(pattern))[-FLAGS.window_size:]
-    for i, src_path in enumerate(src_paths):
-        dst_path = os.path.join(FLAGS.checkpoint_dir, 'golden_chunks',
-                                '000000-{:06}.tfrecord.zz'.format(i))
-        print('Copying {} {}'.format(src_path, dst_path))
-        shutil.copy(src_path, dst_path)
+### def create_checkpoint():
+###     for sub_dir in ['work_dir', 'golden_chunks']:
+###         ensure_dir_exists(os.path.join(FLAGS.checkpoint_dir, sub_dir))
+###
+###     # List all the training checkpoints.
+###     pattern = os.path.join(FLAGS.base_dir, 'work_dir', 'model.ckpt-*.index')
+###     model_paths = glob.glob(pattern)
+###
+###     # Sort the checkpoints by step number.
+###     def extract_step(path):
+###         name = os.path.splitext(os.path.basename(path))[0]
+###         return int(re.match('model.ckpt-(\d+)', name).group(1))
+###     model_paths.sort(key=lambda x: extract_step(x))
+###
+###     # Get the name of the latest checkpoint.
+###     step = extract_step(model_paths[-1])
+###     name = 'model.ckpt-{}'.format(step)
+###
+###     # Copy the model to the checkpoint directory.
+###     for ext in ['.data-00000-of-00001', '.index', '.meta']:
+###         basename = name + ext
+###         src_path = os.path.join(FLAGS.base_dir, 'work_dir', basename)
+###         dst_path = os.path.join(FLAGS.checkpoint_dir, 'work_dir', basename)
+###         print('Copying {} {}'.format(src_path, dst_path))
+###         shutil.copy(src_path, dst_path)
+###
+###     # Write the checkpoint state proto.
+###     checkpoint_path = os.path.join(
+###         FLAGS.checkpoint_dir, 'work_dir', 'checkpoint')
+###     print('Writing {}'.format(checkpoint_path))
+###     with gfile.GFile(checkpoint_path, 'w') as f:
+###         f.write('model_checkpoint_path: "{}"\n'.format(name))
+###         f.write('all_model_checkpoint_paths: "{}"\n'.format(name))
+###
+###     # Copy the most recent golden chunks.
+###     pattern = os.path.join(FLAGS.base_dir, 'data',
+###                            'golden_chunks', '*.tfrecord.zz')
+###     src_paths = sorted(glob.glob(pattern))[-FLAGS.window_size:]
+###     for i, src_path in enumerate(src_paths):
+###         dst_path = os.path.join(FLAGS.checkpoint_dir, 'golden_chunks',
+###                                 '000000-{:06}.tfrecord.zz'.format(i))
+###         print('Copying {} {}'.format(src_path, dst_path))
+###         shutil.copy(src_path, dst_path)
 
 
 def parse_win_stats_table(stats_str, num_lines):
@@ -276,6 +257,28 @@ async def run(*cmd):
     return stdout.split('\n')
 
 
+def wait_for_training_examples(state, num_games):
+    """Wait for training examples to be generated by the latest model.
+
+    Args:
+        state: the RL loop State instance.
+        num_games: number of games to wait for.
+    """
+
+    first_time_around = True
+    while True:
+        model_dirs = list(os.scandir(fsdb.selfplay_dir()))
+        if len(model_dirs) == state.iter_num:
+            pattern = os.path.join(model_dirs[-1], '*', '*', '*.tfrecord.zz')
+            paths = sorted(tf.gfile.Glob(pattern))
+            if len(paths) >= num_games:
+                break
+        if first_time_around:
+            logging.info('Waiting for %d games', num_games)
+            first_time_around = False
+        time.sleep(1)
+
+
 async def sample_training_examples(state):
     """Sample training examples from recent selfplay games.
 
@@ -286,10 +289,21 @@ async def sample_training_examples(state):
         A list of golden chunks up to num_records in length, sorted by path.
     """
 
-    dirs = [x.path for x in os.scandir(fsdb.selfplay_dir()) if x.is_dir()]
+    # Training examples are written out to the following directory hierarchy:
+    #   selfplay_dir/device_id/model_name/timestamp/
+    # Read examples from the most recent `window_size` models.
+    device_dirs = [x.path
+                   for x in os.scandir(fsdb.selfplay_dir())
+                   if x.is_dir()]
+    models = set()
+    for d in device_dirs:
+        models.update([x.name for x in os.scandir(d) if x.is_dir()])
+    models = sorted(models, reverse=True)[:FLAGS.window_size]
+
     src_patterns = []
-    for d in sorted(dirs, reverse=True)[:FLAGS.window_size]:
-        src_patterns.append(os.path.join(d, '*', '*', '*.tfrecord.zz'))
+    for d in device_dirs:
+        for model in models:
+            src_patterns.append(os.path.join(d, model, '*', '*.tfrecord.zz'))
 
     dst_path = os.path.join(fsdb.golden_chunk_dir(),
                             '{}.tfrecord.zz'.format(state.train_model_name))
@@ -325,86 +339,79 @@ async def run_commands(commands):
 
 
 async def bootstrap_selfplay(state):
-    output_name = '000000-000000'
-    output_dir = os.path.join(fsdb.selfplay_dir(), output_name)
-    holdout_dir = os.path.join(fsdb.holdout_dir(), output_name)
-    sgf_dir = os.path.join(fsdb.sgf_dir(), output_name)
+    output_dir = os.path.join(fsdb.selfplay_dir(), state.train_model_name)
+    holdout_dir = os.path.join(fsdb.holdout_dir(), state.train_model_name)
 
     features = 'extra' if FLAGS.use_extra_features else 'agz'
     lines = await run(
         'bazel-bin/cc/concurrent_selfplay',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                             'bootstrap.flags')),
-        '--num_games={}'.format(FLAGS.selfplay_num_games),
         '--model={}:0.4:0.4'.format(features),
+        '--num_games={}'.format(FLAGS.num_games_per_iteration),
         '--output_dir={}/0'.format(output_dir),
         '--holdout_dir={}/0'.format(holdout_dir))
     logging.info('\n'.join(lines[-6:]))
 
-    ### Write examples to a single record.
-    ### src_pattern = os.path.join(output_dir, '*', '*.zz')
-    ### dst_path = os.path.join(fsdb.golden_chunk_dir(),
-    ###                         output_name + '.tfrecord.zz')
-    ### logging.info('Writing golden chunk "{}" from "{}"'.format(dst_path,
-    ###                                                           src_pattern))
-    ### lines = await sample_records(src_pattern, dst_path)
-    ### logging.info('\n'.join(lines))
-
 
 # Self-play a number of games.
-async def selfplay(state):
-    """Run selfplay and write a training chunk to the fsdb golden_chunk_dir.
+### async def selfplay(state):
+###     """Run selfplay and write a training chunk to the fsdb golden_chunk_dir.
+###
+###     Args:
+###         state: the RL loop State instance.
+###     """
+###
+###     output_dir = os.path.join(fsdb.selfplay_dir(), state.output_model_name)
+###     holdout_dir = os.path.join(fsdb.holdout_dir(), state.output_model_name)
+###
+###     commands = []
+###     num_selfplay_processes = len(FLAGS.selfplay_devices)
+###     n = max(num_selfplay_processes, 1)
+###     for i, device in enumerate(FLAGS.selfplay_devices):
+###         a = (i * FLAGS.selfplay_num_games) // n
+###         b = ((i + 1) * FLAGS.selfplay_num_games) // n
+###         num_games = b - a
+###
+###         commands.append([
+###             'bazel-bin/cc/concurrent_selfplay',
+###             '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
+###                                                 'selfplay.flags')),
+###             '--num_games={}'.format(num_games),
+###             '--device={}'.format(device),
+###             '--model={}'.format(state.best_model_path),
+###             '--output_dir={}/{}'.format(output_dir, i),
+###             '--holdout_dir={}/{}'.format(holdout_dir, i)])
+###
+###     all_lines = await run_commands(commands)
+###
+###     black_wins_total = white_wins_total = num_games = 0
+###     for lines in all_lines:
+###         result = '\n'.join(lines[-6:])
+###         logging.info(result)
+###         stats = parse_win_stats_table(result, 1)[0]
+###         num_games += stats.total_wins
+###         black_wins_total += stats.black_wins.total
+###         white_wins_total += stats.white_wins.total
+###
+###     logging.info('Black won %0.3f, white won %0.3f',
+###                  black_wins_total / num_games,
+###                  white_wins_total / num_games)
+###
+###     ### # Write examples to a single record.
+###     ### src_pattern = os.path.join(output_dir, '*/*', '*.tfrecord.zz')
+###     ### dst_path = os.path.join(
+###     ###     output_dir, state.output_model_name + '.tfrecord.zz')
+###     ### logging.info('Writing selfplay records to "{}" from "{}"'.format(
+###     ###     dst_path, src_pattern))
+###     ### lines = await sample_records(src_pattern, dst_path,
+###     ###                              num_read_threads=len(FLAGS.selfplay_devices),
+###     ###                              num_write_threads=4, sample_frac=1)
+###     ### logging.info('\n'.join(lines))
 
-    Args:
-        state: the RL loop State instance.
-    """
 
-    output_dir = os.path.join(fsdb.selfplay_dir(), state.output_model_name)
-    holdout_dir = os.path.join(fsdb.holdout_dir(), state.output_model_name)
-
-    commands = []
-    num_selfplay_processes = len(FLAGS.selfplay_devices)
-    n = max(num_selfplay_processes, 1)
-    for i, device in enumerate(FLAGS.selfplay_devices):
-        a = (i * FLAGS.selfplay_num_games) // n
-        b = ((i + 1) * FLAGS.selfplay_num_games) // n
-        num_games = b - a
-
-        commands.append([
-            'bazel-bin/cc/concurrent_selfplay',
-            '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-                                                'selfplay.flags')),
-            '--num_games={}'.format(num_games),
-            '--device={}'.format(device),
-            '--model={}'.format(state.best_model_path),
-            '--output_dir={}/{}'.format(output_dir, i),
-            '--holdout_dir={}/{}'.format(holdout_dir, i)])
-
-    all_lines = await run_commands(commands)
-
-    black_wins_total = white_wins_total = num_games = 0
-    for lines in all_lines:
-        result = '\n'.join(lines[-6:])
-        logging.info(result)
-        stats = parse_win_stats_table(result, 1)[0]
-        num_games += stats.total_wins
-        black_wins_total += stats.black_wins.total
-        white_wins_total += stats.white_wins.total
-
-    logging.info('Black won %0.3f, white won %0.3f',
-                 black_wins_total / num_games,
-                 white_wins_total / num_games)
-
-    ### # Write examples to a single record.
-    ### src_pattern = os.path.join(output_dir, '*/*', '*.tfrecord.zz')
-    ### dst_path = os.path.join(
-    ###     output_dir, state.output_model_name + '.tfrecord.zz')
-    ### logging.info('Writing selfplay records to "{}" from "{}"'.format(
-    ###     dst_path, src_pattern))
-    ### lines = await sample_records(src_pattern, dst_path,
-    ###                              num_read_threads=len(FLAGS.selfplay_devices),
-    ###                              num_write_threads=4, sample_frac=1)
-    ### logging.info('\n'.join(lines))
+def model_name(it):
+    return '%06d' % it
 
 
 async def train(state, tf_records):
@@ -414,8 +421,8 @@ async def train(state, tf_records):
         state: the RL loop State instance.
         tf_records: a list of paths to TensorFlow records to train on.
     """
-
     model_path = os.path.join(fsdb.models_dir(), state.train_model_name)
+
     await run(
         'python3', 'train.py',
         '--gpu_device_list={}'.format(','.join(FLAGS.train_devices)),
@@ -433,12 +440,8 @@ async def train(state, tf_records):
     with gfile.Open(timestamps_path, 'a') as f:
         print('{:.3f} {}'.format(elapsed, state.train_model_name), file=f)
 
-
-async def train_eval(state, tf_records):
-    await train(state, tf_records)
     if FLAGS.validate:
       await validate(state)
-    return await evaluate_trained_model(state)
 
 
 async def validate(state):
@@ -446,10 +449,11 @@ async def validate(state):
     src_dirs = sorted(dirs, reverse=True)[:FLAGS.window_size]
 
     await run('python3', 'validate.py',
-        '--gpu_device_list={}'.format(','.join(FLAGS.train_devices)),
-        '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'validate.flags')),
-        '--work_dir={}'.format(fsdb.working_dir()),
-        '--expand_validation_dirs',
+              '--gpu_device_list={}'.format(','.join(FLAGS.train_devices)),
+              '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
+                                                  'validate.flags')),
+              '--work_dir={}'.format(fsdb.working_dir()),
+              '--expand_validation_dirs',
               *src_dirs)
 
 
@@ -484,18 +488,6 @@ async def evaluate_model(eval_model_path, target_model_path, sgf_dir):
     return win_rate
 
 
-async def evaluate_trained_model(state):
-    """Evaluate the most recently trained model against the current best model.
-
-    Args:
-        state: the RL loop State instance.
-    """
-
-    return await evaluate_model(
-        state.train_model_path, state.best_model_path,
-        os.path.join(fsdb.eval_dir(), state.train_model_name))
-
-
 async def sample_records(src_patterns, dst_path, num_read_threads,
                          num_write_threads, sample_frac=0, num_records=0):
     return await run(
@@ -510,67 +502,97 @@ async def sample_records(src_patterns, dst_path, num_read_threads,
         *src_patterns)
 
 
+async def start_selfplay():
+    output_dir = os.path.join(fsdb.selfplay_dir(), "$MODEL")
+    holdout_dir = os.path.join(fsdb.holdout_dir(), "$MODEL")
+    model_pattern = os.path.join(fsdb.models_dir(), '%d.pb')
+
+    logs = []
+    processes = []
+    loop = asyncio.get_event_loop()
+    for i, device in enumerate(FLAGS.selfplay_devices):
+        cmd = [
+            'bazel-bin/cc/concurrent_selfplay',
+            '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
+                                                'selfplay.flags')),
+            '--run_forever=1',
+            '--device={}'.format(device),
+            '--model={}'.format(model_pattern),
+            '--output_dir={}/{}'.format(output_dir, i),
+            '--holdout_dir={}/{}'.format(holdout_dir, i)]
+
+        cmd_str = await expand_cmd_str(cmd)
+        f = open(os.path.join(FLAGS.base_dir, 'selfplay_%d.log' % i), 'w')
+        f.write(cmd_str + '\n\n')
+        f.flush()
+        logging.info('Running: %s', cmd_str)
+
+        processes.append(await asyncio.create_subprocess_exec(
+            *cmd, stdout=f, stderr=asyncio.subprocess.STDOUT))
+        logs.append(f)
+
+    return (processes, logs)
+
+
+async def end_selfplay(processes, logs):
+    logging.info('Sending SIGINT to selfplay processes')
+    for p in processes:
+        p.send_signal(signal.SIGINT)
+    logging.info('Waiting for selfplay processes')
+    for p in processes:
+        await p.wait()
+    logging.info('Closing selfplay logs')
+    for f in logs:
+        f.close()
+
+
 def rl_loop():
     """The main reinforcement learning (RL) loop."""
 
     state = State()
-
-    if FLAGS.bootstrap:
-        # Play the first round of selfplay games with a fake model that returns
-        # random noise. We do this instead of playing multiple games using a
-        # single model bootstrapped with random noise to avoid any initial bias.
-        wait(bootstrap_selfplay(state))
-
-        # Train a real model from the random selfplay games.
-        tf_records = wait(sample_training_examples(state))
-        state.iter_num += 1
-        wait(train(state, tf_records))
-
-        # Select the newly trained model as the best.
-        state.best_model_name = state.train_model_name
-        state.gen_num += 1
-
-        # Run selfplay using the new model.
-        wait(selfplay(state))
-    else:
-        # Start from a partially trained model.
-        initialize_from_checkpoint(state)
-
     prev_win_rate_vs_target = 0
 
-    # Now start the full training loop.
-    while state.iter_num <= FLAGS.iterations:
-        tf_records = wait(sample_training_examples(state))
-        state.iter_num += 1
+    if FLAGS.bootstrap:
+        wait(bootstrap_selfplay(state))
+    else:
+        initialize_from_checkpoint(state)
 
-        # Run selfplay in parallel with sequential (train, eval).
-        model_win_rate, _ = wait([
-            train_eval(state, tf_records),
-            selfplay(state)])
+    # Start the selfplay workers. They will wait for a model to become available
+    # in the training directory before starting to play.
+    selfplay_processes, selfplay_logs = wait(start_selfplay())
 
-        # If we're bootstrapping a checkpoint, evaluate the newly trained model
-        # against the target.
-        if FLAGS.bootstrap and state.iter_num > 15:
-            target_model_path = os.path.join(fsdb.models_dir(), 'target.pb')
-            sgf_dir = os.path.join(
-                fsdb.eval_dir(),
-                '{}-vs-target'.format(state.train_model_name))
-            win_rate_vs_target = wait(evaluate_model(
-                state.train_model_path, target_model_path, sgf_dir))
-            if (win_rate_vs_target >= FLAGS.bootstrap_target_win_rate and
-                    prev_win_rate_vs_target > 0):
-                # The tranined model won a sufficient number of games against
-                # the target. Create the checkpoint that will be used to start
-                # the real benchmark and exit.
-                create_checkpoint()
-                break
-            prev_win_rate_vs_target = win_rate_vs_target
+    try:
+        # Now start the full training loop.
+        while state.iter_num < FLAGS.iterations:
+            state.iter_num += 1
 
-        if model_win_rate >= FLAGS.gating_win_rate:
-            # Promote the trained model to the best model and increment the
-            # generation number.
-            state.best_model_name = state.train_model_name
-            state.gen_num += 1
+            wait_for_training_examples(state, FLAGS.num_games_per_iteration)
+            tf_records = wait(sample_training_examples(state))
+
+            wait(train(state, tf_records))
+
+            # If we're bootstrapping a checkpoint, evaluate the newly trained model
+            # against the target.
+            # TODO(tommadams): evaluate the previously trained model against the
+            # target in parallel with training the next model.
+            if FLAGS.bootstrap and state.iter_num > 15:
+                target_model_path = os.path.join(
+                    fsdb.models_dir(), 'target.pb')
+                sgf_dir = os.path.join(
+                    fsdb.eval_dir(),
+                    '{}-vs-target'.format(state.train_model_name))
+                win_rate_vs_target = wait(evaluate_model(
+                    state.train_model_path, target_model_path, sgf_dir))
+                if (win_rate_vs_target >= FLAGS.bootstrap_target_win_rate and
+                        prev_win_rate_vs_target > 0):
+                    # The tranined model won a sufficient number of games against
+                    # the target. Create the checkpoint that will be used to start
+                    # the real benchmark and exit.
+                    create_checkpoint()
+                    break
+                prev_win_rate_vs_target = win_rate_vs_target
+    finally:
+        wait(end_selfplay(selfplay_processes, selfplay_logs))
 
 
 def main(unused_argv):
@@ -600,13 +622,12 @@ def main(unused_argv):
     for handler in logging.getLogger().handlers:
         handler.setFormatter(formatter)
 
-    
     with logged_timer('Total time'):
         try:
             rl_loop()
             final_ratings = wait(run('python',
-                'ratings/rate_subdir.py', 
-                fsdb.eval_dir()))
+                                     'ratings/rate_subdir.py',
+                                     fsdb.eval_dir()))
         finally:
             asyncio.get_event_loop().close()
 

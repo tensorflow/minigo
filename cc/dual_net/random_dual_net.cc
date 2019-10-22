@@ -33,8 +33,7 @@ RandomDualNet::RandomDualNet(std::string name,
     : Model(std::move(name), feature_desc),
       rnd_(seed, Random::kUniqueStream),
       policy_stddev_(policy_stddev),
-      value_stddev_(value_stddev) {
-      }
+      value_stddev_(value_stddev) {}
 
 void RandomDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                             std::vector<ModelOutput*>* outputs,

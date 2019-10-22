@@ -22,6 +22,7 @@ from absl import flags
 import functools
 import logging
 import os.path
+import tempfile
 import time
 import numpy as np
 import random
@@ -147,7 +148,8 @@ flags.DEFINE_bool(
 flags.DEFINE_bool('bool_features', False,
                   help=('Use bool input features instead of float'))
 
-flags.DEFINE_bool('use_extra_features', False, help='Use extra input features.')
+flags.DEFINE_bool('use_extra_features', False,
+                  help='Use extra input features.')
 
 # TODO(seth): Verify if this is still required.
 flags.register_multi_flags_validator(
@@ -659,19 +661,25 @@ def freeze_graph(model_path, use_trt=False, trt_max_batch_size=8,
     out_graph = tf.graph_util.convert_variables_to_constants(
         n.sess, n.sess.graph.as_graph_def(), output_names)
 
-    if use_trt:
-        import tensorflow.contrib.tensorrt as trt
-        out_graph = trt.create_inference_graph(
-            input_graph_def=out_graph,
-            outputs=output_names,
-            max_batch_size=trt_max_batch_size,
-            max_workspace_size_bytes=1 << 29,
-            precision_mode=trt_precision)
-        with tf.gfile.GFile(model_path + '.trt.pb', 'wb') as f:
+    # Write to temporary location & rename to prevent users from seeing
+    # partially written files: depending on the wind, TensorFlow will sometimes
+    # happily read a truncated GraphDef without reporting an error.
+    with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
+        if use_trt:
+            dst_path = model_path + '.trt.pb'
+            import tensorflow.contrib.tensorrt as trt
+            out_graph = trt.create_inference_graph(
+                input_graph_def=out_graph,
+                outputs=output_names,
+                max_batch_size=trt_max_batch_size,
+                max_workspace_size_bytes=1 << 29,
+                precision_mode=trt_precision)
             f.write(out_graph.SerializeToString())
-    else:
-        with tf.gfile.GFile(model_path + '.pb', 'wb') as f:
+        else:
+            dst_path = model_path + '.pb'
             f.write(out_graph.SerializeToString())
+        tmp_path = f.name
+    tf.gfile.Rename(tmp_path, dst_path)
 
 
 def freeze_graph_tpu(model_path):
@@ -714,5 +722,7 @@ def freeze_graph_tpu(model_path):
     # Freeze the graph.
     model_def = tf.graph_util.convert_variables_to_constants(
         sess, sess.graph.as_graph_def(), output_names)
-    with tf.gfile.GFile(model_path + '.pb', 'wb') as f:
+    with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
         f.write(model_def.SerializeToString())
+        tmp_path = f.name
+    tf.gfile.GFile.Rename(tmp_path, model_path + '.pb')

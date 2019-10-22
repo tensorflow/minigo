@@ -465,7 +465,7 @@ void MctsTree::BackupValue(MctsNode* leaf, float value) {
 
 void MctsTree::InjectNoise(const std::array<float, kNumMoves>& noise,
                            float mix) {
-  MG_DCHECK(root_->is_expanded);
+  MG_CHECK(root_->is_expanded);
 
   // NOTE: our interpretation is to only add dirichlet noise to legal moves.
   // Because dirichlet entries are independent we can simply zero and rescale.

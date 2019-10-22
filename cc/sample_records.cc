@@ -311,6 +311,7 @@ int main(int argc, char* argv[]) {
     const auto& pattern = argv[i];
     std::vector<std::string> paths;
     TF_CHECK_OK(tensorflow::Env::Default()->GetMatchingPaths(pattern, &paths));
+    MG_LOG(INFO) << pattern << " matched " << paths.size() << " files";
     for (auto& path : paths) {
       src_paths.push_back(std::move(path));
     }

@@ -450,6 +450,7 @@ minigo_cc_binary(
         "//cc/async:sharded_executor",
         "//cc/dual_net:factory",
         "//cc/file",
+        "//cc/file:directory_watcher",
         "//cc/model:inference_cache",
         "//cc/model:reloading_model",
         "//cc/platform",

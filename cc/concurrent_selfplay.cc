@@ -13,18 +13,21 @@
 // limitations under the License.
 
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <vector>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "cc/async/sharded_executor.h"
 #include "cc/dual_net/factory.h"
+#include "cc/file/directory_watcher.h"
 #include "cc/file/path.h"
 #include "cc/game.h"
 #include "cc/game_utils.h"
@@ -50,8 +53,7 @@
 //  - `SelfplayThread` : owns multiple `SelfplayGame` instances and uses them
 //    to play games concurrently. See SelfplayThread::Run for the sequence of
 //    operations performed when playing games. Tree search is carried out in
-//    batches by `TreeSearcher` instances, which allows the tree search to be
-//    run in parallel.
+//    batches on multiple threads in parallel.
 //  - `Selfplayer` : owns multiple `SelfplayThread` instances, which lets the
 //    binary perform tree search on multiple threads.
 //  - `OutputThread` : responsible for writing SGF & training examples to
@@ -141,12 +143,15 @@ DEFINE_bool(run_forever, false,
 DEFINE_double(holdout_pct, 0.03,
               "Fraction of games to hold out for validation.");
 DEFINE_string(output_dir, "",
-              "Output directory. If empty, no examples are written.");
+              "Output directory. If empty, no examples are written. If "
+              "output_dir contains the substring \"$MODEL\", the name of "
+              "the last models used for inference when playing a game will "
+              "be substituded in the path.");
 DEFINE_string(holdout_dir, "",
-              "Holdout directory. If empty, no examples are written.");
-DEFINE_string(sgf_dir, "",
-              "SGF directory for selfplay and puzzles. If empty in selfplay "
-              "mode, no SGF is written.");
+              "Holdout directory. If empty, no examples are written. If "
+              "holdout_dir contains the substring \"$MODEL\", the name of "
+              "the last models used for inference when playing a game will "
+              "be substituded in the path.");
 DEFINE_string(wtf_trace, "/tmp/minigo.wtf-trace",
               "Output path for WTF traces.");
 DEFINE_bool(verbose, true, "Whether to log progress.");
@@ -154,9 +159,14 @@ DEFINE_bool(verbose, true, "Whether to log progress.");
 namespace minigo {
 namespace {
 
-std::string GetOutputDir(absl::Time now, const std::string& root_dir) {
+std::string GetOutputDir(absl::Time now, const std::string& model_name,
+                         const std::string& root_dir) {
   auto sub_dirs = absl::FormatTime("%Y-%m-%d-%H", now, absl::UTCTimeZone());
-  return file::JoinPath(root_dir, sub_dirs);
+  auto clean_model_name =
+      absl::StrReplaceAll(model_name, {{":", "_"}, {"/", "_"}, {".", "_"}});
+  std::string processed_root_dir =
+      absl::StrReplaceAll(root_dir, {{"$MODEL", clean_model_name}});
+  return file::JoinPath(processed_root_dir, sub_dirs);
 }
 
 // Information required to run a single inference.
@@ -312,6 +322,8 @@ class Selfplayer {
 
  private:
   void ParseFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
+  FeatureDescriptor InitializeModels();
+  void CreateModels(const std::string& path);
 
   mutable absl::Mutex mutex_;
   Game::Options game_options_ GUARDED_BY(&mutex_);
@@ -319,38 +331,16 @@ class Selfplayer {
   int num_games_remaining_ GUARDED_BY(&mutex_) = 0;
   Random rnd_ GUARDED_BY(&mutex_);
   WinStats win_stats_ GUARDED_BY(&mutex_);
-  std::string model_name_ GUARDED_BY(&mutex_);
   ThreadSafeQueue<std::unique_ptr<SelfplayGame>> output_queue_;
   ShardedExecutor executor_;
+
+  std::unique_ptr<ModelFactory> model_factory_;
   ThreadSafeQueue<std::unique_ptr<Model>> models_;
-};
 
-// Runs tree search on a batch of `SelfplayGame` instances.
-class TreeSearcher {
- public:
-  // Holds the span of inferences requested for a single `SelfplayGame`: `pos`
-  // and `len` index into the `inferences` array.
-  struct InferenceSpan {
-    SelfplayGame* selfplay_game;
-    size_t pos;
-    size_t len;
-  };
+  // The latest path that matches the model pattern.
+  std::string latest_model_name_ GUARDED_BY(&mutex_);
 
-  explicit TreeSearcher(std::shared_ptr<InferenceCache> cache)
-      : cache_(std::move(cache)) {}
-
-  // Runs tree search on `selfplay_games`, storing the leaves that require
-  // need evaluating in `inferences` and `inference_spans`.
-  void Search(absl::Span<std::unique_ptr<SelfplayGame>> selfplay_games);
-
-  // Populated by `Search`. Valid until the next call to `Search`.
-  std::vector<Inference>& inferences() { return inferences_; }
-  std::vector<InferenceSpan>& inference_spans() { return inference_spans_; }
-
- private:
-  std::shared_ptr<InferenceCache> cache_;
-  std::vector<Inference> inferences_;
-  std::vector<InferenceSpan> inference_spans_;
+  std::unique_ptr<DirectoryWatcher> directory_watcher_;
 };
 
 // Plays multiple games concurrently using `SelfplayGame` instances.
@@ -381,12 +371,25 @@ class SelfplayThread : public Thread {
   // Plays moves on all games that have performed sufficient reads.
   void PlayMoves();
 
+  struct TreeSearch {
+    // Holds the span of inferences requested for a single `SelfplayGame`:
+    // `pos` and `len` index into the `inferences` array.
+    struct InferenceSpan {
+      SelfplayGame* selfplay_game;
+      size_t pos;
+      size_t len;
+    };
+
+    std::vector<Inference> inferences;
+    std::vector<InferenceSpan> inference_spans;
+  };
+
   Selfplayer* selfplayer_;
   int num_virtual_losses_ = 8;
   std::vector<std::unique_ptr<SelfplayGame>> selfplay_games_;
   std::unique_ptr<Model> model_;
   std::shared_ptr<InferenceCache> cache_;
-  std::vector<TreeSearcher> searchers_;
+  std::vector<TreeSearch> searches_;
   const int thread_id_;
 };
 
@@ -399,7 +402,6 @@ class OutputThread : public Thread {
       : output_queue_(output_queue),
         output_dir_(FLAGS_output_dir),
         holdout_dir_(FLAGS_holdout_dir),
-        sgf_dir_(FLAGS_sgf_dir),
         feature_descriptor_(std::move(feature_descriptor)) {}
 
  private:
@@ -409,7 +411,6 @@ class OutputThread : public Thread {
   ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue_;
   const std::string output_dir_;
   const std::string holdout_dir_;
-  const std::string sgf_dir_;
   const FeatureDescriptor feature_descriptor_;
 };
 
@@ -625,24 +626,15 @@ void Selfplayer::Run() {
     inference_cache = std::make_shared<NullInferenceCache>();
   }
 
+  // Load the models.
+  auto feature_descriptor = InitializeModels();
+
   // Initialize the selfplay threads.
-  std::unique_ptr<ModelFactory> model_factory;
   std::vector<std::unique_ptr<SelfplayThread>> selfplay_threads;
-  FeatureDescriptor feature_descriptor{};
+
   {
     absl::MutexLock lock(&mutex_);
     selfplay_threads.reserve(FLAGS_selfplay_threads);
-    model_factory = NewModelFactory(FLAGS_engine, FLAGS_device);
-    for (int i = 0; i < FLAGS_parallel_inference; ++i) {
-      // TODO(tommadams): add a method to the model factory to create multiple
-      // model instances from the same file.
-      auto model = model_factory->NewModel(FLAGS_model);
-      if (model_name_.empty()) {
-        model_name_ = model->name();
-        feature_descriptor = model->feature_descriptor();
-      }
-      models_.Push(std::move(model));
-    }
     for (int i = 0; i < FLAGS_selfplay_threads; ++i) {
       selfplay_threads.push_back(
           absl::make_unique<SelfplayThread>(i, this, inference_cache));
@@ -668,7 +660,7 @@ void Selfplayer::Run() {
 
   {
     absl::MutexLock lock(&mutex_);
-    MG_LOG(INFO) << FormatWinStatsTable({{model_name_, win_stats_}});
+    MG_LOG(INFO) << FormatWinStatsTable({{latest_model_name_, win_stats_}});
   }
 }
 
@@ -679,6 +671,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
   MctsTree::Options tree_options;
   SelfplayGame::Options selfplay_options;
 
+  std::string player_name;
   {
     absl::MutexLock lock(&mutex_);
     if (!FLAGS_run_forever && num_games_remaining_ == 0) {
@@ -687,6 +680,8 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
     if (!FLAGS_run_forever) {
       num_games_remaining_ -= 1;
     }
+
+    player_name = latest_model_name_;
 
     game_options = game_options_;
     game_options.resign_enabled = rnd_() >= FLAGS_disable_resign_pct;
@@ -705,7 +700,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
     selfplay_options.allow_pass = FLAGS_allow_pass;
   }
 
-  auto game = absl::make_unique<Game>(model_name_, model_name_, game_options);
+  auto game = absl::make_unique<Game>(player_name, player_name, game_options);
   auto tree =
       absl::make_unique<MctsTree>(Position(Color::kBlack), tree_options);
 
@@ -725,13 +720,12 @@ void Selfplayer::ExecuteSharded(std::function<void(int, int)> fn) {
   executor_.Execute(std::move(fn));
 }
 
-std::unique_ptr<Model> Selfplayer::AcquireModel() {
-  WTF_SCOPE0("AcquireModel");
-  return models_.Pop();
-}
+std::unique_ptr<Model> Selfplayer::AcquireModel() { return models_.Pop(); }
 
 void Selfplayer::ReleaseModel(std::unique_ptr<Model> model) {
-  models_.Push(std::move(model));
+  if (model->name() == latest_model_name_) {
+    models_.Push(std::move(model));
+  }
 }
 
 void Selfplayer::ParseFlags() {
@@ -763,6 +757,46 @@ void Selfplayer::ParseFlags() {
   num_games_remaining_ = FLAGS_num_games;
 }
 
+FeatureDescriptor Selfplayer::InitializeModels() {
+  model_factory_ = NewModelFactory(FLAGS_engine, FLAGS_device);
+
+  if (FLAGS_model.find("%d") != std::string::npos) {
+    using namespace std::placeholders;
+    directory_watcher_ = absl::make_unique<DirectoryWatcher>(
+        FLAGS_model, absl::Seconds(1),
+        std::bind(&Selfplayer::CreateModels, this, _1));
+    MG_LOG(INFO) << "Waiting for model to match pattern " << FLAGS_model;
+  } else {
+    CreateModels(FLAGS_model);
+  }
+
+  // Get the feature descriptor from the first model loaded.
+  // TODO(tommadams): instead of this, specify the model features explicitly on
+  // the command line and pass them in to ModelFactory::NewModel, checking that
+  // the models input shape matches the expected number of features.
+  auto model = models_.Pop();
+  auto feature_descriptor = model->feature_descriptor();
+  models_.Push(std::move(model));
+
+  return feature_descriptor;
+}
+
+void Selfplayer::CreateModels(const std::string& path) {
+  MG_LOG(INFO) << "Loading model " << path;
+
+  // TODO(tommadams): add a method to the model factory to create multiple
+  // model instances from the same file.
+  auto model = model_factory_->NewModel(path);
+  {
+    absl::MutexLock lock(&mutex_);
+    latest_model_name_ = model->name();
+  }
+  models_.Push(std::move(model));
+  for (int i = 1; i < FLAGS_parallel_inference; ++i) {
+    models_.Push(model_factory_->NewModel(path));
+  }
+}
+
 SelfplayThread::SelfplayThread(int thread_id, Selfplayer* selfplayer,
                                std::shared_ptr<InferenceCache> cache)
     : selfplayer_(selfplayer), cache_(std::move(cache)), thread_id_(thread_id) {
@@ -772,11 +806,7 @@ SelfplayThread::SelfplayThread(int thread_id, Selfplayer* selfplayer,
 void SelfplayThread::Run() {
   WTF_THREAD_ENABLE("SelfplayThread");
 
-  searchers_.reserve(FLAGS_parallel_search);
-  for (int i = 0; i < FLAGS_parallel_search; ++i) {
-    searchers_.emplace_back(cache_);
-  }
-
+  searches_.resize(FLAGS_parallel_search);
   while (!selfplay_games_.empty()) {
     StartNewGames();
     SelectLeaves();
@@ -815,10 +845,26 @@ void SelfplayThread::StartNewGames() {
 void SelfplayThread::SelectLeaves() {
   WTF_SCOPE("SelectLeaves", size_t)(selfplay_games_.size());
 
-  selfplayer_->ExecuteSharded([this](int i, int n) {
-    auto range = ShardedExecutor::GetShardRange(i, n, selfplay_games_.size());
-    searchers_[i].Search(absl::MakeSpan(selfplay_games_)
-                             .subspan(range.begin, range.end - range.begin));
+  selfplayer_->ExecuteSharded([this](int shard_idx, int num_shards) {
+    MG_CHECK(static_cast<size_t>(num_shards) == searches_.size());
+
+    auto& search = searches_[shard_idx];
+    search.inferences.clear();
+    search.inference_spans.clear();
+
+    auto range = ShardedExecutor::GetShardRange(shard_idx, num_shards,
+                                                selfplay_games_.size());
+    for (int i = range.begin; i < range.end; ++i) {
+      auto* selfplay_game = selfplay_games_[i].get();
+
+      TreeSearch::InferenceSpan span;
+      span.selfplay_game = selfplay_games_[i].get();
+      span.pos = search.inferences.size();
+      span.len = selfplay_game->SelectLeaves(cache_.get(), &search.inferences);
+      if (span.len > 0) {
+        search.inference_spans.push_back(span);
+      }
+    }
   });
 }
 
@@ -828,8 +874,8 @@ std::string SelfplayThread::RunInferences() {
   // TODO(tommadams): stop allocating theses temporary vectors.
   std::vector<const ModelInput*> input_ptrs;
   std::vector<ModelOutput*> output_ptrs;
-  for (auto& s : searchers_) {
-    for (auto& x : s.inferences()) {
+  for (auto& s : searches_) {
+    for (auto& x : s.inferences) {
       input_ptrs.push_back(&x.input);
       output_ptrs.push_back(&x.output);
     }
@@ -841,22 +887,22 @@ std::string SelfplayThread::RunInferences() {
 
   std::string model_name;
   auto model = selfplayer_->AcquireModel();
-  model->RunMany(input_ptrs, &output_ptrs, &model_name);
+  model->RunMany(input_ptrs, &output_ptrs, nullptr);
+  model_name = model->name();
   selfplayer_->ReleaseModel(std::move(model));
   return model_name;
 }
 
 void SelfplayThread::ProcessInferences(const std::string& model_name) {
   WTF_SCOPE0("ProcessInferences");
-  for (auto& s : searchers_) {
-    for (auto& inference : s.inferences()) {
+  for (auto& s : searches_) {
+    for (auto& inference : s.inferences) {
       cache_->Merge(inference.cache_key, inference.leaf->canonical_symmetry,
                     inference.input.sym, &inference.output);
     }
-    for (const auto& span : s.inference_spans()) {
+    for (const auto& span : s.inference_spans) {
       span.selfplay_game->ProcessInferences(
-          model_name,
-          absl::MakeSpan(s.inferences()).subspan(span.pos, span.len));
+          model_name, absl::MakeSpan(s.inferences).subspan(span.pos, span.len));
     }
   }
 }
@@ -878,22 +924,6 @@ void SelfplayThread::PlayMoves() {
   }
 }
 
-void TreeSearcher::Search(
-    absl::Span<std::unique_ptr<SelfplayGame>> selfplay_games) {
-  WTF_SCOPE("TreeSearch", size_t)(selfplay_games.size());
-  inferences_.clear();
-  inference_spans_.clear();
-  for (auto& selfplay_game : selfplay_games) {
-    InferenceSpan span;
-    span.selfplay_game = selfplay_game.get();
-    span.pos = inferences_.size();
-    span.len = selfplay_game->SelectLeaves(cache_.get(), &inferences_);
-    if (span.len > 0) {
-      inference_spans_.push_back(span);
-    }
-  }
-}
-
 void OutputThread::Run() {
   for (int game_id = 0;; ++game_id) {
     auto selfplay_game = output_queue_->Pop();
@@ -906,25 +936,25 @@ void OutputThread::Run() {
 
 void OutputThread::WriteOutputs(int game_id,
                                 std::unique_ptr<SelfplayGame> selfplay_game) {
-  auto output_name = GetOutputName(game_id);
   auto now = absl::Now();
+  auto output_name = GetOutputName(game_id);
   auto* game = selfplay_game->game();
-  game->AddComment(absl::StrCat(
-      "Inferences: [", absl::StrJoin(selfplay_game->models_used(), ", "), "]"));
+  const auto& models_used = selfplay_game->models_used();
   if (FLAGS_verbose) {
     LogEndGameInfo(*game, selfplay_game->duration());
-  }
-  if (!sgf_dir_.empty()) {
-    WriteSgf(GetOutputDir(now, file::JoinPath(sgf_dir_, "clean")), output_name,
-             *game, false);
-    WriteSgf(GetOutputDir(now, file::JoinPath(sgf_dir_, "full")), output_name,
-             *game, true);
   }
   const auto& example_dir =
       selfplay_game->options().is_holdout ? holdout_dir_ : output_dir_;
   if (!example_dir.empty()) {
-    tf_utils::WriteGameExamples(GetOutputDir(now, example_dir), output_name,
-                                feature_descriptor_, *game);
+    // Take the player name from the last model used to play a move. This is
+    // done because the ml_perf RL loop waits for a certain number of games to
+    // be played by a model before training a new one. By assigned a game to
+    // the last model used to play a move rather than the first, training waits
+    // for less time and so we produce new models more quickly.
+    const auto& player_name =
+        !models_used.empty() ? models_used.back() : game->black_name();
+    tf_utils::WriteGameExamples(GetOutputDir(now, player_name, example_dir),
+                                output_name, feature_descriptor_, *game);
   }
 }
 
