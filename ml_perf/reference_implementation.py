@@ -267,7 +267,7 @@ async def run(*cmd):
 
     log_path = os.path.join(FLAGS.base_dir, get_cmd_name(cmd) + '.log')
     with gfile.Open(log_path, 'a') as f:
-        f.write(expand_cmd_str(cmd))
+        f.write(await expand_cmd_str(cmd))
         f.write('\n')
         f.write(stdout)
         f.write('\n')
@@ -338,8 +338,7 @@ async def bootstrap_selfplay(state):
         '--num_games={}'.format(FLAGS.selfplay_num_games),
         '--model={}:0.4:0.4'.format(features),
         '--output_dir={}/0'.format(output_dir),
-        '--holdout_dir={}/0'.format(holdout_dir),
-        '--sgf_dir={}'.format(sgf_dir))
+        '--holdout_dir={}/0'.format(holdout_dir))
     logging.info('\n'.join(lines[-6:]))
 
     ### Write examples to a single record.

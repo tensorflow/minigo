@@ -128,17 +128,16 @@ def few_liberties_feature(position):
     return onehot_features
 
 
-@planes(P)
+@planes(1)
 def would_capture_feature(position):
-    features = np.zeros([go.N, go.N], dtype=np.uint8)
+    features = np.zeros([go.N, go.N, 1], dtype=np.uint8)
     for g in position.lib_tracker.groups.values():
         if g.color == position.to_play:
             continue
         if len(g.liberties) == 1:
-            last_lib = list(g.liberties)[0]
-            # += because the same spot may capture more than 1 group.
-            features[last_lib] += len(g.stones)
-    return make_onehot(features, P)
+            lib = next(iter(g.liberties))
+            features[lib + (0,)] = 1
+    return features
 
 
 DEFAULT_FEATURES = [

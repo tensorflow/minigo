@@ -137,16 +137,16 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
   std::vector<float> b1 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
 
   if (std::is_same<FeatureType, ExtraFeatures>::value) {
-    //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
-    b9.insert(b9.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
-    h9.insert(h9.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
-    a8.insert(a8.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
-    j9.insert(j9.end(), {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
-    d5.insert(d5.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-    a1.insert(a1.end(), {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-    a2.insert(a2.end(), {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-    j1.insert(j1.end(), {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-    b1.insert(b1.end(), {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0});
+    //                   L1 L2 L3 WC
+    b9.insert(b9.end(), {0, 0, 1, 0});
+    h9.insert(h9.end(), {0, 0, 1, 0});
+    a8.insert(a8.end(), {0, 0, 1, 0});
+    j9.insert(j9.end(), {0, 0, 1, 0});
+    d5.insert(d5.end(), {0, 0, 1, 0});
+    a1.insert(a1.end(), {1, 0, 0, 0});
+    a2.insert(a2.end(), {0, 1, 0, 0});
+    j1.insert(j1.end(), {0, 1, 0, 0});
+    b1.insert(b1.end(), {0, 0, 0, 1});
   }
 
   EXPECT_EQ(b9, GetStoneFeatures(features, Coord::FromString("B9")));
@@ -187,8 +187,8 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> j2 = {{0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   if (std::is_same<FeatureType, ExtraFeatures>::value) {
-    //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
-    j2.insert(j2.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    //                   L1 L2 L3 WC
+    j2.insert(j2.end(), {0, 0, 1, 0});
   }
   EXPECT_EQ(j2, GetStoneFeatures(features, Coord::FromString("J2")));
 }
@@ -292,9 +292,9 @@ TEST(WouldCaptureTest, WouldCaptureBlack) {
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
   std::vector<float> g8 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
-  //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
-  a7.insert(a7.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
-  g8.insert(g8.end(), {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0});
+  //                   L1 L2 L3 WC
+  a7.insert(a7.end(), {0, 0, 0, 1});
+  g8.insert(g8.end(), {0, 0, 0, 1});
   EXPECT_EQ(a7, GetStoneFeatures(features, Coord::FromString("A7")));
   EXPECT_EQ(g8, GetStoneFeatures(features, Coord::FromString("G8")));
 }
@@ -320,9 +320,9 @@ TEST(WouldCaptureTest, WouldCaptureWhite) {
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   std::vector<float> g8 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
-  //                   L1 L2 L3 C1 C2 C3 C4 C5 C6 C7 C8
-  a7.insert(a7.end(), {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
-  g8.insert(g8.end(), {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0});
+  //                   L1 L2 L3 WC
+  a7.insert(a7.end(), {0, 0, 0, 1});
+  g8.insert(g8.end(), {0, 0, 0, 1});
   EXPECT_EQ(a7, GetStoneFeatures(features, Coord::FromString("A7")));
   EXPECT_EQ(g8, GetStoneFeatures(features, Coord::FromString("G8")));
 }

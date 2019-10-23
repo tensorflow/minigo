@@ -26,7 +26,6 @@
 #include "cc/model/types.h"
 #include "cc/platform/utils.h"
 #include "cc/position.h"
-#include "cc/tiny_set.h"
 
 // This header contains the different kinds of input features that we pass to
 // models. Each set of input features (the stones on the board, whose turn
@@ -105,14 +104,14 @@ struct LibertyFeatures {
       auto num_liberties = position.num_chain_liberties(i);
       dst[0] = num_liberties == 1 ? 1 : 0;
       dst[1] = num_liberties == 2 ? 1 : 0;
-      dst[2] = num_liberties == 3 ? 1 : 0;
+      dst[2] = num_liberties >= 3 ? 1 : 0;
       dst += num_planes;
     }
   }
 };
 
-struct WouldCaptureFeatures {
-  static constexpr int kNumPlanes = 8;
+struct WouldCaptureFeature {
+  static constexpr int kNumPlanes = 1;
 
   template <typename T>
   MG_ALWAYS_INLINE static void Set(const ModelInput& input, int num_planes,
@@ -124,22 +123,16 @@ struct WouldCaptureFeatures {
 
     for (int i = 0; i < kN * kN; ++i) {
       int f = 0;
-      if (stones[i].color() == Color::kEmpty) {
-        tiny_set<GroupId, 4> neighbor_groups;
+      if (position.legal_move(i)) {
         for (auto nc : kNeighborCoords[i]) {
           if (stones[nc].color() == their_color &&
-              neighbor_groups.insert(stones[nc].group_id()) &&
               position.num_chain_liberties(nc) == 1) {
-            f += position.chain_size(nc);
+            f = 1;
+            break;
           }
         }
       }
-      // One-hot encode the size of the chain.
-      f -= 1;
-      for (int i = 0; i < kNumPlanes - 1; ++i) {
-        dst[i] = f == i ? 1 : 0;
-      }
-      dst[kNumPlanes - 1] = f >= kNumPlanes - 1 ? 1 : 0;
+      dst[0] = f;
       dst += num_planes;
     }
   }
@@ -221,7 +214,7 @@ struct FeatureDescriptor {
 
 using AgzFeatures = Features<StoneFeatures, ToPlayFeature>;
 using ExtraFeatures = Features<StoneFeatures, ToPlayFeature, LibertyFeatures,
-                               WouldCaptureFeatures>;
+                               WouldCaptureFeature>;
 
 // Maximum number of feature planes used by these features.
 constexpr int kMaxNumFeaturePlanes =

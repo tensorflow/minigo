@@ -164,9 +164,8 @@ class TestFeatureExtraction(test_utils.MinigoUnitTest):
         self.assertEqual(
             (9, 9, features.would_capture_feature.planes), f.shape)
         # move at (1, 2) would capture 2 stones
-        self.assertEqual(1, f[1, 2, 1])
+        self.assertEqualNPArray([1], f[1, 2])
         # move at (0, 0) should not capture stones because it's B's move.
-        self.assertEqual(0, f[0, 0, 0])
+        self.assertEqualNPArray([0], f[0, 0])
         # move at (0, 7) would capture 3 stones
-        self.assertEqual(1, f[0, 7, 2])
-        self.assertEqual(0, f[0, 7, 1])
+        self.assertEqualNPArray([1], f[0, 7])

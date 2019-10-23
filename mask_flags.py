@@ -47,6 +47,26 @@ FLAG_HELP_RE_CC = re.compile(r'-((\[no\])?)([\w_-]+) \(')
 FLAG_RE = re.compile(r'--[\w_-]+')
 
 
+def extract_valid_flags(subprocess_cmd):
+    """Extracts the valid flags from a command by running it with --helpfull.
+    Args:
+        subprocess_cmd: List[str], what would be passed into subprocess.call()
+            i.e. ['python', 'train.py', '--flagfile=flags']
+
+    Returns:
+        ['--foo=blah', '--more_flags']
+    """
+
+    help_cmd = subprocess_cmd + ['--helpfull']
+    help_output = subprocess.run(help_cmd, stdout=subprocess.PIPE).stdout
+    help_output = help_output.decode('ascii')
+    if 'python' in subprocess_cmd[0]:
+        valid_flags = parse_helpfull_output(help_output)
+    else:
+        valid_flags = parse_helpfull_output(help_output, regex=FLAG_HELP_RE_CC)
+    return valid_flags
+
+
 def parse_helpfull_output(help_output, regex=FLAG_HELP_RE_PY):
     """Parses the output of --helpfull.
 
@@ -87,15 +107,8 @@ def prepare_subprocess_cmd(subprocess_cmd):
     Returns:
         ['python', 'train.py', '--train_flag=blah', '--more_flags']
     """
-    help_cmd = subprocess_cmd + ['--helpfull']
-    help_output = subprocess.run(help_cmd, stdout=subprocess.PIPE).stdout
-    help_output = help_output.decode('ascii')
-    if 'python' in subprocess_cmd[0]:
-        valid_flags = parse_helpfull_output(help_output)
-    else:
-        valid_flags = parse_helpfull_output(help_output, regex=FLAG_HELP_RE_CC)
+    valid_flags = extract_valid_flags(subprocess_cmd)
     parsed_flags = flags.FlagValues().read_flags_from_files(subprocess_cmd[1:])
-
     filtered_flags = filter_flags(parsed_flags, valid_flags)
     return [subprocess_cmd[0]] + filtered_flags
 

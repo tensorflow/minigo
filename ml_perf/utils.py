@@ -21,20 +21,59 @@ import asyncio
 import logging
 import os
 
+import mask_flags
 from absl import flags
 from utils import *
 
 
-def expand_cmd_str(cmd):
-    return '  '.join(flags.FlagValues().read_flags_from_files(cmd))
+flag_cache = {}
+flag_cache_lock = asyncio.Lock()
+
+
+def is_python_cmd(cmd):
+    return cmd[0] == 'python' or cmd[0] == 'python3'
 
 
 def get_cmd_name(cmd):
-    if cmd[0] == 'python' or cmd[0] == 'python3':
-        path = cmd[1]
-    else:
-        path = cmd[0]
+    path = cmd[1] if is_python_cmd(cmd) else cmd[0]
     return os.path.splitext(os.path.basename(path))[0]
+
+
+async def expand_cmd_str(cmd):
+    n = 2 if is_python_cmd(cmd) else 1
+    cmd = list(cmd)
+    args = cmd[n:]
+    process = cmd[:n]
+    key = ' '.join(process)
+
+    async with flag_cache_lock:
+        valid_flags = flag_cache.get(key)
+        if valid_flags is None:
+            valid_flags = mask_flags.extract_valid_flags(cmd)
+            flag_cache[key] = valid_flags
+
+    parsed_args = flags.FlagValues().read_flags_from_files(args)
+    flag_args = {}
+    position_args = []
+    for arg in parsed_args:
+        if arg.startswith('--'):
+            if '=' not in arg:
+                flag_args[arg] = None
+            else:
+                flag, value = arg.split('=', 1)
+                flag_args[flag] = value
+        else:
+            position_args.append(arg)
+
+    flag_list = []
+    for flag, value in flag_args.items():
+        if value is None:
+            flag_list.append(flag)
+        else:
+            flag_list.append('%s=%s' % (flag, value))
+
+    flag_list = sorted(mask_flags.filter_flags(flag_list, valid_flags))
+    return '  '.join(process + flag_list + position_args)
 
 
 async def checked_run(*cmd):
@@ -51,7 +90,7 @@ async def checked_run(*cmd):
     """
 
     # Start the subprocess.
-    logging.info('Running: %s', expand_cmd_str(cmd))
+    logging.info('Running: %s', await expand_cmd_str(cmd))
     with logged_timer('{} finished'.format(get_cmd_name(cmd))):
         p = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE,
@@ -70,7 +109,7 @@ async def checked_run(*cmd):
         stdout = b''.join(chunks).decode()[:-1]
         if p.returncode:
             raise RuntimeError('Return code {} from process: {}\n{}'.format(
-                p.returncode, expand_cmd_str(cmd), stdout))
+                p.returncode, await expand_cmd_str(cmd), stdout))
 
         return stdout
 

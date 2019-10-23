@@ -12,3 +12,7 @@
 --parallel_search=1
 --parallel_inference=48
 --concurrent_games_per_thread=1
+
+--allow_pass=0
+--target_pruning=0
+--restrict_in_bensons=0

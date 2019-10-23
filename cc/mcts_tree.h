@@ -214,7 +214,7 @@ class MctsTree {
   // If inference is being batched and SelectLeaf chooses a node that has
   // already been added to the batch (IncorporateResults has not yet been
   // called), then SelectLeaf will return that same node.
-  MctsNode* SelectLeaf();
+  MctsNode* SelectLeaf(bool allow_pass);
 
   // Performs a soft-pick using `rnd` if the number of moves played is
   // < `soft_pick_cutoff`. Picks the most visited legal move otherwise.

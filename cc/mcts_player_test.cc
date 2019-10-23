@@ -128,7 +128,8 @@ class MctsPlayerTest : public ::testing::Test {
     ModelInput input;
     input.position_history.push_back(&player->root()->position);
     auto output = player->Run(input);
-    tree->IncorporateResults(tree->SelectLeaf(), output.policy, output.value);
+    tree->IncorporateResults(tree->SelectLeaf(true), output.policy,
+                             output.value);
     return player;
   }
 

@@ -160,7 +160,7 @@ void MctsPlayer::SelectLeaves(int num_leaves, int max_num_reads) {
   int num_cache_misses = 0;
   while (num_cache_misses < max_cache_misses &&
          tree_->root()->N() < max_num_reads) {
-    auto* leaf = tree_->SelectLeaf();
+    auto* leaf = tree_->SelectLeaf(true);
 
     if (leaf->game_over() || leaf->at_move_limit()) {
       float value =

@@ -294,13 +294,14 @@ MctsTree::MctsTree(const Position& position, const Options& options)
   root_ = &game_root_;
 }
 
-MctsNode* MctsTree::SelectLeaf() {
+MctsNode* MctsTree::SelectLeaf(bool allow_pass) {
   auto* node = root_;
   for (;;) {
     // If a node has never been evaluated, we have no basis to select a child.
     if (!node->is_expanded) {
       return node;
     }
+
     // HACK: if last move was a pass, always investigate double-pass first
     // to avoid situations where we auto-lose by passing too early.
     if (node->move == Coord::kPass && node->child_N(Coord::kPass) == 0) {
@@ -309,7 +310,16 @@ MctsNode* MctsTree::SelectLeaf() {
     }
 
     auto child_action_score = node->CalculateChildActionScore();
+    absl::Span<const float> allowed_moves(child_action_score);
+    if (!allow_pass) {
+      allowed_moves = allowed_moves.subspan(0, kN * kN);
+    }
+
     auto best_move = ArgMax(child_action_score);
+    if (!node->position.legal_move(best_move)) {
+      best_move = Coord::kPass;
+    }
+
     node = node->MaybeAddChild(best_move);
   }
 }

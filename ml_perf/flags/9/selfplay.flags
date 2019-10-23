@@ -14,8 +14,7 @@
 --virtual_losses=2
 
 --dirichlet_alpha=0.135
---noise_mix=0.25
-### --target_pruning=1
+--noise_mix=0.3
 
 --cache_size_mb=2048
 --verbose=false
@@ -24,3 +23,6 @@
 --parallel_search=2
 --parallel_inference=3
 --concurrent_games_per_thread=128
+
+--target_pruning=1
+--restrict_in_bensons=1

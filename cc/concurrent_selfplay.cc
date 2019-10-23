@@ -105,15 +105,16 @@ DEFINE_double(policy_softmax_temp, 0.98,
               "policy_softmax_temp to encourage diversity in early play.\n");
 DEFINE_bool(restrict_in_bensons, false,
             "Prevent play in benson's regions after 5 passes have been "
-            "played.\n");
+            "played.");
+DEFINE_bool(allow_pass, true,
+            "If false, pass moves will only be read and played if there is no "
+            "other legal alternative.");
 
 // Threading flags.
 DEFINE_int32(selfplay_threads, 3,
              "Number of threads to run batches of selfplay games on.");
-DEFINE_int32(parallel_search, 3,
-             "Number of threads to run tree search on.");
-DEFINE_int32(parallel_inference, 2,
-             "Number of threads to run inference on.");
+DEFINE_int32(parallel_search, 3, "Number of threads to run tree search on.");
+DEFINE_int32(parallel_inference, 2, "Number of threads to run inference on.");
 DEFINE_int32(concurrent_games_per_thread, 1,
              "Number of games to play concurrently on each selfplay thread. "
              "Inferences from a thread's concurrent games are batched up and "
@@ -129,7 +130,9 @@ DEFINE_uint64(seed, 0,
 DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
 DEFINE_double(disable_resign_pct, 0.1,
               "Fraction of games to disable resignation for.");
-DEFINE_int32(num_games, 1, "Total number of games to play.");
+DEFINE_int32(num_games, 0,
+             "Total number of games to play. Only one of run_forever and "
+             "num_games must be set.");
 DEFINE_bool(run_forever, false,
             "Whether to run forever. Only one of run_forever and num_games "
             "must be set.");
@@ -201,6 +204,10 @@ class SelfplayGame {
     // If true, perform verbose logging. Usually restricted to just the first
     // `SelfplayGame` of the first `SelfplayThread`.
     bool verbose;
+
+    // If false, pass is only read and played if there are no other legal
+    // alternatives.
+    bool allow_pass;
   };
 
   SelfplayGame(const Options& options, std::unique_ptr<Game> game,
@@ -251,7 +258,6 @@ class SelfplayGame {
                            std::vector<Inference>* inferences);
 
   const Options options_;
-  bool fastplay_;
   int target_readouts_;
   std::unique_ptr<Game> game_;
   std::unique_ptr<MctsTree> tree_;
@@ -264,7 +270,12 @@ class SelfplayGame {
 
   // We need to wait until the root is expanded by the first call to
   // SelectLeaves in the game before injecting noise.
-  bool inject_noise_before_next_read_;
+  bool inject_noise_before_next_read_ = false;
+
+  // We don't allow fast play for the opening move: fast play relies to some
+  // degree on tree reuse from earlier reads but the tree is empty at the start
+  // of the game.
+  bool fastplay_ = false;
 };
 
 // The main application class.
@@ -343,7 +354,7 @@ class TreeSearcher {
 };
 
 // Plays multiple games concurrently using `SelfplayGame` instances.
-class SelfplayThread : public Thread{
+class SelfplayThread : public Thread {
  public:
   SelfplayThread(int thread_id, Selfplayer* selfplayer,
                  std::shared_ptr<InferenceCache> cache);
@@ -418,11 +429,6 @@ SelfplayGame::SelfplayGame(const Options& options, std::unique_ptr<Game> game,
       start_time_(absl::Now()),
       rnd_(FLAGS_seed, Random::kUniqueStream),
       inference_symmetry_mix_(rnd_.UniformUint64()) {
-  // We don't allow fast play for the opening move: fast play relies to some
-  // degree on tree reuse from earlier reads but the tree is empty at the start
-  // of the game.
-  fastplay_ = false;
-  inject_noise_before_next_read_ = true;
   target_readouts_ = options_.num_readouts;
 }
 
@@ -436,7 +442,7 @@ int SelfplayGame::SelectLeaves(InferenceCache* cache,
   int num_queued = 0;
   do {
     MctsNode* leaf;
-    leaf = tree_->SelectLeaf();
+    leaf = tree_->SelectLeaf(options_.allow_pass);
     if (leaf == nullptr) {
       break;
     }
@@ -510,15 +516,14 @@ bool SelfplayGame::MaybePlayMove() {
     game_->AddMove(tree_->to_play(), c, tree_->root()->position,
                    std::move(model_str), tree_->root()->Q(), search_pi);
 
+    if (options_.target_pruning && !fastplay_) {
+      tree_->ReshapeFinalVisits();
+    }
+
     tree_->PlayMove(c);
 
-    if (!fastplay_) {
-      if (options_.target_pruning) {
-        tree_->ReshapeFinalVisits();
-      }
-      if (c != Coord::kResign) {
-        game_->MarkLastMoveAsTrainable();
-      }
+    if (c != Coord::kResign && !fastplay_) {
+      game_->MarkLastMoveAsTrainable();
     }
 
     // TODO(tommadams): move game over logic out of MctsTree and into Game.
@@ -639,8 +644,8 @@ void Selfplayer::Run() {
       models_.Push(std::move(model));
     }
     for (int i = 0; i < FLAGS_selfplay_threads; ++i) {
-      selfplay_threads.push_back(absl::make_unique<SelfplayThread>(
-          i, this, inference_cache));
+      selfplay_threads.push_back(
+          absl::make_unique<SelfplayThread>(i, this, inference_cache));
     }
   }
 
@@ -697,6 +702,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
     selfplay_options.is_holdout = rnd_() < FLAGS_holdout_pct;
     selfplay_options.target_pruning = FLAGS_target_pruning;
     selfplay_options.verbose = verbose;
+    selfplay_options.allow_pass = FLAGS_allow_pass;
   }
 
   auto game = absl::make_unique<Game>(model_name_, model_name_, game_options);
@@ -720,6 +726,7 @@ void Selfplayer::ExecuteSharded(std::function<void(int, int)> fn) {
 }
 
 std::unique_ptr<Model> Selfplayer::AcquireModel() {
+  WTF_SCOPE0("AcquireModel");
   return models_.Pop();
 }
 
@@ -758,9 +765,7 @@ void Selfplayer::ParseFlags() {
 
 SelfplayThread::SelfplayThread(int thread_id, Selfplayer* selfplayer,
                                std::shared_ptr<InferenceCache> cache)
-    : selfplayer_(selfplayer),
-      cache_(std::move(cache)),
-      thread_id_(thread_id) {
+    : selfplayer_(selfplayer), cache_(std::move(cache)), thread_id_(thread_id) {
   selfplay_games_.resize(FLAGS_concurrent_games_per_thread);
 }
 
@@ -812,9 +817,8 @@ void SelfplayThread::SelectLeaves() {
 
   selfplayer_->ExecuteSharded([this](int i, int n) {
     auto range = ShardedExecutor::GetShardRange(i, n, selfplay_games_.size());
-    searchers_[i].Search(
-        absl::MakeSpan(selfplay_games_).subspan(range.begin,
-                                                range.end - range.begin));
+    searchers_[i].Search(absl::MakeSpan(selfplay_games_)
+                             .subspan(range.begin, range.end - range.begin));
   });
 }
 
@@ -874,7 +878,8 @@ void SelfplayThread::PlayMoves() {
   }
 }
 
-void TreeSearcher::Search(absl::Span<std::unique_ptr<SelfplayGame>> selfplay_games) {
+void TreeSearcher::Search(
+    absl::Span<std::unique_ptr<SelfplayGame>> selfplay_games) {
   WTF_SCOPE("TreeSearch", size_t)(selfplay_games.size());
   inferences_.clear();
   inference_spans_.clear();
