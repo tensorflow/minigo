@@ -37,7 +37,7 @@ from google.cloud.bigtable import row_filters
 from tensorflow import gfile
 from tqdm import tqdm
 
-from bigtable_input import METADATA, TABLE_STATE
+from bigtable_input import METADATA
 
 
 flags.DEFINE_string(

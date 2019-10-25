@@ -73,7 +73,7 @@ function create_gcs_bucket() {
 }
 
 
-# Creates a Cloud Bigtable instance and table for storing games.
+# Creates a Cloud Bigtable instance.
 # Globals:
 #   PROJECT: The cloud project
 #   CBT_INSTANCE: The Cloud Bigtable instance to create within PROJECT
@@ -100,8 +100,9 @@ function create_cbt_instance() {
 # Globals:
 #   PROJECT: The cloud project
 #   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
-# Params
-#   $1: family
+# Params:
+#   $1: table name
+#   $2: column family name
 function create_cbt_family() {
   check_cbt_exists
   table="$1"
@@ -118,10 +119,12 @@ function create_cbt_family() {
 }
 
 
-# Creates a Cloud Bigtable table for storing games.
+# Creates a Cloud Bigtable table.
 # Globals:
 #   PROJECT: The cloud project
 #   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
+# Params:
+#   $1: table name
 function create_cbt_table() {
   check_cbt_exists
   table="$1"
@@ -139,6 +142,23 @@ function create_cbt_table() {
 }
 
 
+# Creates a Cloud Bigtable table with metadata column family
+# Globals:
+#   PROJECT: The cloud project
+#   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
+# Params:
+#   $1: table name
+function create_cbt_table_and_metadata() {
+  table="$1"
+  check_cbt_exists
+  if ! (create_cbt_table ${table} ); then
+    return 1
+  fi
+  if ! (create_cbt_family ${table} metadata ); then
+    return 1
+  fi
+}
+
 # Creates a Cloud Bigtable table for storing games.
 # Globals:
 #   PROJECT: The cloud project
@@ -146,11 +166,10 @@ function create_cbt_table() {
 #   CBT_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
 function create_cbt_game_table() {
   check_cbt_exists
-  if ! (create_cbt_table ${CBT_TABLE} ); then
+  if ! (create_cbt_table_and_metadata ${CBT_TABLE} ); then
     return 1
   fi
-  if ! (create_cbt_family ${CBT_TABLE} tfexample &&
-        create_cbt_family ${CBT_TABLE} metadata ); then
+  if ! (create_cbt_family ${CBT_TABLE} tfexample ); then
     return 1
   fi
 }
@@ -163,10 +182,7 @@ function create_cbt_game_table() {
 #   CBT_EVAL_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
 function create_cbt_eval_game_table() {
   check_cbt_exists
-  if ! (create_cbt_table ${CBT_EVAL_TABLE} ); then
-    return 1
-  fi
-  if ! (create_cbt_family ${CBT_EVAL_TABLE} metadata ); then
+  if ! (create_cbt_table_and_metadata ${CBT_EVAL_TABLE} ); then
     return 1
   fi
 }
@@ -179,14 +195,22 @@ function create_cbt_eval_game_table() {
 #   CBT_MODEL_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
 function create_cbt_model_table() {
   check_cbt_exists
-  if ! (create_cbt_table ${CBT_MODEL_TABLE} ); then
-    return 1
-  fi
-  if ! (create_cbt_family ${CBT_MODEL_TABLE} metadata ); then
+  if ! (create_cbt_table_and_metadata ${CBT_MODEL_TABLE} ); then
     return 1
   fi
 }
 
+# Creates a Cloud Bigtable table for storing and evaluating one-off models.
+# Globals:
+#   PROJECT: The cloud project
+#   CBT_INSTANCE: The Cloud Bigtable instance within PROJECT (create if absent)
+#   CBT_MODEL_EVAL_TABLE:  The name of the Cloud Bigtable table to create in CBT_INSTANCE
+function create_cbt_model_eval_table() {
+  check_cbt_exists
+  if ! (create_cbt_table_and_metadata ${CBT_MODEL_EVAL_TABLE} ); then
+    return 1
+  fi
+}
 
 
 # Creates a cluster service account if it doesn't exist.
