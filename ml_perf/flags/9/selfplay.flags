@@ -4,7 +4,7 @@
 # the RL loop.
 
 --engine=tf
---num_readouts=240
+--num_readouts=24
 --fastplay_frequency=0
 --fastplay_readouts=40
 --value_init_penalty=0.2

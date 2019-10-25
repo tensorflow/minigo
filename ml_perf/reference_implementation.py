@@ -88,7 +88,7 @@ flags.DEFINE_boolean('validate', False, 'Run validation on holdout games')
 flags.DEFINE_boolean('use_extra_features', False,
                      'Use non-Zero input features')
 
-flags.DEFINE_integer('num_games_per_iteration', 4096,
+flags.DEFINE_integer('min_games_per_iteration', 4096,
                      'Minimum number of games to play for each training '
                      'iteration.')
 
@@ -348,7 +348,7 @@ async def bootstrap_selfplay(state):
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                             'bootstrap.flags')),
         '--model={}:0.4:0.4'.format(features),
-        '--num_games={}'.format(FLAGS.num_games_per_iteration),
+        '--num_games={}'.format(FLAGS.min_games_per_iteration),
         '--output_dir={}/0'.format(output_dir),
         '--holdout_dir={}/0'.format(holdout_dir))
     logging.info('\n'.join(lines[-6:]))
@@ -566,7 +566,7 @@ def rl_loop():
         while state.iter_num < FLAGS.iterations:
             state.iter_num += 1
 
-            wait_for_training_examples(state, FLAGS.num_games_per_iteration)
+            wait_for_training_examples(state, FLAGS.min_games_per_iteration)
             tf_records = wait(sample_training_examples(state))
 
             wait(train(state, tf_records))

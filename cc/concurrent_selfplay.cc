@@ -152,6 +152,11 @@ DEFINE_string(holdout_dir, "",
               "holdout_dir contains the substring \"$MODEL\", the name of "
               "the last models used for inference when playing a game will "
               "be substituded in the path.");
+DEFINE_string(sgf_dir, "",
+              "Directory to write output SGFs to. If sgf_dir contains the "
+              "substring \"$MODEL\", the name of the last models used for "
+              "inference when playing a game will be substituded in the "
+              "path.");
 DEFINE_string(wtf_trace, "/tmp/minigo.wtf-trace",
               "Output path for WTF traces.");
 DEFINE_bool(verbose, true, "Whether to log progress.");
@@ -402,6 +407,7 @@ class OutputThread : public Thread {
       : output_queue_(output_queue),
         output_dir_(FLAGS_output_dir),
         holdout_dir_(FLAGS_holdout_dir),
+        sgf_dir_(FLAGS_sgf_dir),
         feature_descriptor_(std::move(feature_descriptor)) {}
 
  private:
@@ -411,6 +417,7 @@ class OutputThread : public Thread {
   ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue_;
   const std::string output_dir_;
   const std::string holdout_dir_;
+  const std::string sgf_dir_;
   const FeatureDescriptor feature_descriptor_;
 };
 
@@ -937,12 +944,23 @@ void OutputThread::Run() {
 void OutputThread::WriteOutputs(int game_id,
                                 std::unique_ptr<SelfplayGame> selfplay_game) {
   auto now = absl::Now();
-  auto output_name = GetOutputName(game_id);
   auto* game = selfplay_game->game();
-  const auto& models_used = selfplay_game->models_used();
   if (FLAGS_verbose) {
     LogEndGameInfo(*game, selfplay_game->duration());
   }
+
+  auto output_name = GetOutputName(game_id);
+  const auto& models_used = selfplay_game->models_used();
+  const auto& player_name =
+      !models_used.empty() ? models_used.back() : game->black_name();
+
+  if (!sgf_dir_.empty()) {
+    WriteSgf(GetOutputDir(now, player_name, file::JoinPath(sgf_dir_, "clean")),
+             output_name, *game, false);
+    WriteSgf(GetOutputDir(now, player_name, file::JoinPath(sgf_dir_, "full")),
+             output_name, *game, true);
+  }
+
   const auto& example_dir =
       selfplay_game->options().is_holdout ? holdout_dir_ : output_dir_;
   if (!example_dir.empty()) {
@@ -951,8 +969,6 @@ void OutputThread::WriteOutputs(int game_id,
     // be played by a model before training a new one. By assigned a game to
     // the last model used to play a move rather than the first, training waits
     // for less time and so we produce new models more quickly.
-    const auto& player_name =
-        !models_used.empty() ? models_used.back() : game->black_name();
     tf_utils::WriteGameExamples(GetOutputDir(now, player_name, example_dir),
                                 output_name, feature_descriptor_, *game);
   }
