@@ -42,9 +42,8 @@ from google.cloud.bigtable import row_filters
 from tqdm import tqdm
 from tensorflow import gfile
 
-import sgf_wrapper
+import bigtable_output
 from bigtable_input import METADATA, TABLE_STATE
-
 
 flags.DEFINE_string(
     'sgf_glob', None,
@@ -118,41 +117,6 @@ def canonical_name(sgf_name):
     return os.path.basename(sgf_name)
 
 
-def process_game(path):
-    with open(path) as f:
-        sgf_contents = f.read()
-
-    root_node = sgf_wrapper.get_sgf_root_node(sgf_contents)
-    assert root_node.properties['FF'] == ['4'], ("Bad game record", path)
-
-    result = root_node.properties['RE'][0]
-    assert result.lower()[0] in 'bw', result
-    assert result.lower()[1] == '+', result
-    black_won = result.lower()[0] == 'b'
-
-    length = 0
-    node = root_node.next
-    while node:
-        props = node.properties
-        length += 1 if props.get('B') or props.get('W') else 0
-        node = node.next
-
-    sgf_path = canonical_name(path)
-
-    return (
-        (b"black", root_node.properties['PB'][0]),
-        (b"white", root_node.properties['PW'][0]),
-        # All values are strings, "1" for true and "0" for false here
-        (b"black_won", '1' if black_won else '0'),
-        (b"white_won", '0' if black_won else '1'),
-        (b"result", result),
-        (b"length", str(length)),
-        (b"sgf", sgf_path),
-        (b"tag", ""),
-        (b"tool", "eval_sgf_to_cbt"),
-    )
-
-
 def read_games(glob, existing_paths):
     """Read all SGFs that match glob
 
@@ -176,7 +140,7 @@ def read_games(glob, existing_paths):
 
     game_data = []
     with multiprocessing.Pool() as pool:
-        game_data = pool.map(process_game, tqdm(to_parse), 100)
+        game_data = pool.map(bigtable_output.process_game, tqdm(to_parse), 100)
 
     print("Read {} SGFs, {} new, {} existing".format(
         len(globbed), len(game_data), skipped))
@@ -205,9 +169,12 @@ def write_eval_records(bt_table, game_data, last_game):
         rows = []
         for i, metadata in enumerate(games):
             eval_num += 1
+            metadata["path"] = canonical_name(metadata["path"])
+            metadata["tool"] = "eval_sgf_to_cbt"
+
             row_name = EVAL_PREFIX.format(eval_num)
             row = bt_table.row(row_name)
-            for column, value in metadata:
+            for column, value in metadata.items():
                 row.set_cell(METADATA, column, value)
             rows.append(row)
             # For each batch of games print a couple of the rows being added.
@@ -228,7 +195,7 @@ def write_eval_records(bt_table, game_data, last_game):
 
         response = bt_table.mutate_rows(rows)
 
-        # validate that all rows written successfully
+        # validate that all rows were written successfully
         any_bad = False
         for i, status in enumerate(response):
             if status.code is not 0:

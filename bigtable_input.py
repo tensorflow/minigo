@@ -57,6 +57,11 @@ FLAGS = flags.FLAGS
 ROW_PREFIX = 'g_{:0>10}_'
 ROWCOUNT_PREFIX = 'ct_{:0>10}_'
 
+# Model tabels (models, models_for_eval) row key
+MODEL_PREFIX = "m_{run}_{num:0>10}"
+# Name of model
+MODEL_NAME = b'model'
+
 # Maximum number of concurrent processes to use when issuing requests against
 # Bigtable.  Value taken from default in the load-testing tool described here:
 #

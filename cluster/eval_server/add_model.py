@@ -27,6 +27,7 @@ Usage:
         bazel-bin/cc/gtp
 
     cbt -project "$PROJECT" -instance "$CBT_INSTANCE" read "$CBT_MODEL_EVAL_TABLE"
+    gsutil ls gs://minigo-pub/eval_server/models/
 """
 
 import sys
@@ -41,9 +42,8 @@ import shutil
 from absl import app, flags
 from google.cloud import bigtable
 from tensorflow import gfile
-import fire
 
-from bigtable_input import METADATA
+from bigtable_input import METADATA, MODEL_PREFIX
 
 
 flags.mark_flags_as_required([
@@ -52,9 +52,6 @@ flags.mark_flags_as_required([
 
 FLAGS = flags.FLAGS
 
-
-# TODO(sethtroisi): Unify with oneoffs
-MODEL_ROW = "m_eval_{:0>10}"
 
 PLAYER_FOLDER = "gs://minigo-pub/eval_server/models/"
 
@@ -121,9 +118,9 @@ def add_model(argv):
 
     hash_params = model_path.encode()
     hash_params += model_flags.replace(' ', '').replace('=', '').encode()
-    # [:10] to match MODEL_ROW format
+    # [:10] to match MODEL_PREFIX format
     player_hash = hashlib.md5(hash_params).hexdigest()[:10]
-    player_name = MODEL_ROW.format(player_hash)
+    player_name = MODEL_PREFIX.format(run="eval", num=player_hash)
 
     # Check that table exists
     print(f"CBT: {FLAGS.cbt_project}:{FLAGS.cbt_instance}:{FLAGS.cbt_table}")
@@ -152,6 +149,7 @@ def add_model(argv):
         copy_to_gcs(os.path.join(binary_base, bin_file),
                     os.path.join(new_binary_base, bin_file))
 
+    metadata["player_name"] = player_name
     metadata["model_path"] = new_model_path
 
     # Add model metadata to bigtable

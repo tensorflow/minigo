@@ -30,6 +30,16 @@ cc-image:
 cc-push: cc-image
 	    gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-cc-evaluator:$(VERSION_TAG)"
 
+ringmaster-image:
+		cp evaluator_ringmaster_wrapper.py staging/
+	  docker build -f Dockerfile-ringmaster --build-arg project=$(PROJECT) -t "gcr.io/$(PROJECT)/minigo-ringmaster-evaluator:$(VERSION_TAG)" .
+		rm -rfd staging/
+
+ringmaster-push: cc-image
+		mkdir -p staging
+		cp ../../bigtable_input.py staging/
+	    gcloud docker --verbosity=error -- push "gcr.io/$(PROJECT)/minigo-ringmaster-evaluator:$(VERSION_TAG)"
+
 clean:
 		rm -rfd staging/
-.PHONY: py-image py-push cc-image cc-push clean
+.PHONY: py-image py-push cc-image cc-push ringmaster-image ringmaster-push clean

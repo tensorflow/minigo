@@ -37,7 +37,7 @@ from google.cloud.bigtable import row_filters
 from tensorflow import gfile
 from tqdm import tqdm
 
-from bigtable_input import METADATA
+from bigtable_input import METADATA, MODEL_PREFIX, MODEL_NAME
 
 
 flags.DEFINE_string(
@@ -51,10 +51,6 @@ flags.mark_flags_as_required([
 FLAGS = flags.FLAGS
 
 # Constants
-
-# TODO(sethtroisi): Move to cluster or somewhere.
-MODEL_ROW = "m_{}_{:0>10}"
-MODEL_NAME = b"model"
 
 MODEL_RUN_NAME_RE = re.compile(
     r"^gs://.*(v[1-9][0-9]?)-(19|9)/models/(([0-9]{6})-([a-z-]*)).meta$")
@@ -91,7 +87,7 @@ def get_model_data(glob, existing):
     for model_path in tqdm(globbed):
         assert model_path.lower().endswith(".meta"), model_path
         model_run, model_num, model_name = parse_model_components(model_path)
-        row_name = MODEL_ROW.format(model_run, model_name)
+        row_name = MODEL_PREFIX.format(run=model_run, num=model_name)
 
         if row_name in existing:
             skipped += 1
@@ -138,7 +134,7 @@ def write_records(bt_table, model_data):
 
     response = bt_table.mutate_rows(rows)
 
-    # validate that all rows written successfully
+    # validate that all rows were written successfully
     for i, status in enumerate(response):
         if status.code is not 0:
             print("Row number {} failed to write {}".format(i, status))
