@@ -1,9 +1,18 @@
+# bootstrap.flags
 # Flags for the first bootstrap round of selfplay.
 
 --flagfile=ml_perf/flags/19/selfplay.flags
 
-# Don't perform holdout for the first bootstrap round.
 --holdout_pct=0
+--engine=random
+--device=0
+--cache_size_mb=0
 
-# No need to peer deeply into randomness.
---num_readouts=10
+--selfplay_threads=48
+--parallel_search=1
+--parallel_inference=48
+--concurrent_games_per_thread=1
+
+--allow_pass=0
+--target_pruning=0
+--restrict_in_bensons=0

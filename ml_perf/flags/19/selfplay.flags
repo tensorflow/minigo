@@ -1,13 +1,28 @@
-# Flags for selfplay.
+# selfplay.flags: Flags for selfplay.
 
 # This flagfile also serves as the base for the boostrap & eval stages of
 # the RL loop.
 
---num_games=2048
---parallel_games=256
+--engine=tf
 --num_readouts=400
---virtual_losses=16
---value_init_penalty=2
---holdout_pct=0.03
---disable_resign_pct=0.1
---resign_threshold=-0.999
+--fastplay_frequency=0
+--fastplay_readouts=40
+--value_init_penalty=0.2
+--holdout_pct=0.025
+--disable_resign_pct=0.0
+--resign_threshold=-0.98
+--virtual_losses=2
+
+--dirichlet_alpha=0.03
+--noise_mix=0.3
+
+--cache_size_mb=8192
+--verbose=false
+
+--selfplay_threads=3
+--parallel_search=2
+--parallel_inference=3
+--concurrent_games_per_thread=32
+
+--target_pruning=1
+--restrict_in_bensons=1

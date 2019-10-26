@@ -76,7 +76,7 @@ async def expand_cmd_str(cmd):
     return '  '.join(process + flag_list + position_args)
 
 
-async def checked_run(*cmd):
+async def checked_run(*cmd, **kwargs):
     """Run the given subprocess command in a coroutine.
 
     Args:
@@ -93,7 +93,8 @@ async def checked_run(*cmd):
     logging.info('Running: %s', await expand_cmd_str(cmd))
     with logged_timer('{} finished'.format(get_cmd_name(cmd))):
         p = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.PIPE,
+            *cmd, **kwargs,
+            stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT)
 
         # Stream output from the process stdout.

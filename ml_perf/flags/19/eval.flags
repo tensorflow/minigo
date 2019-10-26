@@ -1,7 +1,7 @@
-# Flags for playing eval games.
+# eval.flags: Flags for playing eval games.
 
 --flagfile=ml_perf/flags/19/selfplay.flags
 
-# Play fewer games for eval than selfplay.
---num_games=100
---parallel_games=100
+# --num_readouts=240
+--fastplay_frequency=0
+--resign_enabled=false

@@ -1,7 +1,19 @@
-# Flags for the reinforcement learning loop.
-
 --flags_dir=ml_perf/flags/19/
+--checkpoint_dir=ml_perf/checkpoint/19/
 
 --iterations=200
 --gating_win_rate=0.49
---window_size=25
+--window_size=5
+
+--train_devices=0
+--eval_device=1
+--selfplay_devices=0,1,2,3,4,5,6,7
+
+--train_filter=0.3
+
+--bootstrap_target_win_rate=0.05
+
+--eval_num_games=100
+
+--min_games_per_iteration=4096
+--validate=1

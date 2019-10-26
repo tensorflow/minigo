@@ -243,7 +243,7 @@ def parse_win_stats_table(stats_str, num_lines):
     return result
 
 
-async def run(*cmd):
+async def run(*cmd, **kwargs):
     """Run the given subprocess command in a coroutine.
 
     Args:
@@ -257,7 +257,7 @@ async def run(*cmd):
         RuntimeError: if the command returns a non-zero result.
     """
 
-    stdout = await checked_run(*cmd)
+    stdout = await checked_run(*cmd, **kwargs)
 
     log_path = os.path.join(FLAGS.base_dir, get_cmd_name(cmd) + '.log')
     with gfile.Open(log_path, 'a') as f:
@@ -528,13 +528,14 @@ async def start_selfplay():
     logs = []
     processes = []
     loop = asyncio.get_event_loop()
+    env = os.environ.copy()
     for i, device in enumerate(FLAGS.selfplay_devices):
         cmd = [
             'bazel-bin/cc/concurrent_selfplay',
             '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                                 'selfplay.flags')),
             '--run_forever=1',
-            '--device={}'.format(device),
+            '--device=0',
             '--model={}'.format(model_pattern),
             '--output_dir={}/{}'.format(output_dir, i),
             '--holdout_dir={}/{}'.format(holdout_dir, i)]
@@ -545,8 +546,9 @@ async def start_selfplay():
         f.flush()
         logging.info('Running: %s', cmd_str)
 
+        env['CUDA_VISIBLE_DEVICES'] = str(device)
         processes.append(await asyncio.create_subprocess_exec(
-            *cmd, stdout=f, stderr=asyncio.subprocess.STDOUT))
+            *cmd, env=env, stdout=f, stderr=asyncio.subprocess.STDOUT))
         logs.append(f)
 
     return (processes, logs)
@@ -608,17 +610,19 @@ def rl_loop():
         while state.iter_num <= FLAGS.iterations:
             state.iter_num += 1
 
-            _, win_rate_vs_target = wait([train(state, selfplay_processes),
-                                          eval_vs_target(state)])
-            if (win_rate_vs_target is not None and
-                win_rate_vs_target >= FLAGS.bootstrap_target_win_rate and
-                prev_win_rate_vs_target > 0):
-                # The tranined model won a sufficient number of games against
-                # the target. Create the checkpoint that will be used to start
-                # the real benchmark and exit.
-                create_checkpoint()
-                break
-            prev_win_rate_vs_target = win_rate_vs_target
+            wait(train(state, selfplay_processes))
+
+            ### _, win_rate_vs_target = wait([train(state, selfplay_processes),
+            ###                               eval_vs_target(state)])
+            ### if (win_rate_vs_target is not None and
+            ###     win_rate_vs_target >= FLAGS.bootstrap_target_win_rate and
+            ###     prev_win_rate_vs_target > 0):
+            ###     # The tranined model won a sufficient number of games against
+            ###     # the target. Create the checkpoint that will be used to start
+            ###     # the real benchmark and exit.
+            ###     create_checkpoint()
+            ###     break
+            ### prev_win_rate_vs_target = win_rate_vs_target
     finally:
         wait(end_selfplay(selfplay_processes, selfplay_logs))
 
@@ -640,8 +644,8 @@ def main(unused_argv):
     FLAGS.flags_dir = flags_dir
 
     # Copy the target model to the models directory so we can find it easily.
-    shutil.copy(FLAGS.target_path, os.path.join(
-        fsdb.models_dir(), 'target.pb'))
+    ### shutil.copy(FLAGS.target_path, os.path.join(
+    ###     fsdb.models_dir(), 'target.pb'))
 
     logging.getLogger().addHandler(
         logging.FileHandler(os.path.join(FLAGS.base_dir, 'rl_loop.log')))

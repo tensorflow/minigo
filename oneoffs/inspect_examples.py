@@ -71,25 +71,23 @@ def ReadExamples(path):
         'outcome': tf.FixedLenFeature([], tf.float32),
     }
 
-    result = []
-    for record in tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG):
-        example = tf.train.Example()
-        example.ParseFromString(record)
+    records = list(tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG))
+    num_records = len(records)
+    parsed = tf.parse_example(records, features)
 
-        parsed = tf.parse_example([record], features)
+    x = tf.decode_raw(parsed['x'], tf.uint8)
+    x = tf.cast(x, tf.float32)
+    x = tf.reshape(x, [num_records, go.N, go.N, -1])
+    x = x.eval()
 
-        x = tf.decode_raw(parsed['x'], tf.uint8)
-        x = tf.cast(x, tf.float32)
-        x = tf.reshape(x, [go.N, go.N, -1])
+    pi = tf.decode_raw(parsed['pi'], tf.float32)
+    pi = tf.reshape(pi, [num_records, go.N * go.N + 1])
+    pi = pi.eval()
 
-        pi = tf.decode_raw(parsed['pi'], tf.float32)
-        pi = tf.reshape(pi, [go.N * go.N + 1])
+    outcome = parsed['outcome']
+    outcome = outcome.eval()
 
-        outcome = parsed['outcome']
-        assert outcome.shape == (1,)
-
-        result.append(ParsedExample(x.eval(), pi.eval(), outcome.eval()))
-    return result
+    return [ParsedExample(*args) for args in zip(x, pi, outcome)]
 
 
 def parse_board(example):
