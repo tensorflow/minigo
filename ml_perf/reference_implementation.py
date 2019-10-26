@@ -109,6 +109,11 @@ class State:
         return model_name(self.iter_num - 1)
 
     @property
+    def selfplay_model_path(self):
+        return '{}.pb'.format(
+            os.path.join(fsdb.models_dir(), self.selfplay_model_name))
+
+    @property
     def train_model_name(self):
         return model_name(self.iter_num)
 
@@ -419,13 +424,17 @@ def model_name(it):
     return '%06d' % it
 
 
-async def train(state, tf_records):
+async def train(state, selfplay_processes):
     """Run training and write a new model to the fsdb models_dir.
 
     Args:
         state: the RL loop State instance.
         tf_records: a list of paths to TensorFlow records to train on.
     """
+
+    wait_for_training_examples(state, selfplay_processes, FLAGS.min_games_per_iteration)
+    tf_records = await sample_training_examples(state)
+
     model_path = os.path.join(fsdb.models_dir(), state.train_model_name)
 
     await run(
@@ -445,8 +454,11 @@ async def train(state, tf_records):
     with gfile.Open(timestamps_path, 'a') as f:
         print('{:.3f} {}'.format(elapsed, state.train_model_name), file=f)
 
-    if FLAGS.validate:
-      await validate(state)
+    if FLAGS.validate and state.iter_num > 1:
+        try:
+            await validate(state)
+        except Exception as e:
+            logging.error(e)
 
 
 async def validate(state):
@@ -458,6 +470,7 @@ async def validate(state):
               '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                                   'validate.flags')),
               '--work_dir={}'.format(fsdb.working_dir()),
+              '--use_extra_features={}'.format(FLAGS.use_extra_features),
               '--expand_validation_dirs',
               *src_dirs)
 
@@ -558,6 +571,23 @@ def check_on_selfplay(processes):
                 'Selfplay process exited with return code %d' % p.returncode)
 
 
+async def eval_vs_target(state):
+    # If we're bootstrapping a checkpoint, evaluate the newly trained model
+    # against the target.
+    # TODO(tommadams): evaluate the previously trained model against the
+    # target in parallel with training the next model.
+    if FLAGS.bootstrap and state.iter_num > 2:
+        target_model_path = os.path.join(
+            fsdb.models_dir(), 'target.pb')
+        sgf_dir = os.path.join(
+            fsdb.eval_dir(),
+            '{}-vs-target'.format(state.train_model_name))
+        win_rate_vs_target = await evaluate_model(
+            state.selfplay_model_path, target_model_path, sgf_dir)
+        return win_rate_vs_target
+    return None
+
+
 def rl_loop():
     """The main reinforcement learning (RL) loop."""
 
@@ -575,34 +605,20 @@ def rl_loop():
 
     try:
         # Now start the full training loop.
-        while state.iter_num < FLAGS.iterations:
+        while state.iter_num <= FLAGS.iterations:
             state.iter_num += 1
 
-            wait_for_training_examples(state, selfplay_processes, FLAGS.min_games_per_iteration)
-            tf_records = wait(sample_training_examples(state))
-
-            wait(train(state, tf_records))
-
-            # If we're bootstrapping a checkpoint, evaluate the newly trained model
-            # against the target.
-            # TODO(tommadams): evaluate the previously trained model against the
-            # target in parallel with training the next model.
-            if FLAGS.bootstrap and state.iter_num > 15:
-                target_model_path = os.path.join(
-                    fsdb.models_dir(), 'target.pb')
-                sgf_dir = os.path.join(
-                    fsdb.eval_dir(),
-                    '{}-vs-target'.format(state.train_model_name))
-                win_rate_vs_target = wait(evaluate_model(
-                    state.train_model_path, target_model_path, sgf_dir))
-                if (win_rate_vs_target >= FLAGS.bootstrap_target_win_rate and
-                        prev_win_rate_vs_target > 0):
-                    # The tranined model won a sufficient number of games against
-                    # the target. Create the checkpoint that will be used to start
-                    # the real benchmark and exit.
-                    create_checkpoint()
-                    break
-                prev_win_rate_vs_target = win_rate_vs_target
+            _, win_rate_vs_target = wait([train(state, selfplay_processes),
+                                          eval_vs_target(state)])
+            if (win_rate_vs_target is not None and
+                win_rate_vs_target >= FLAGS.bootstrap_target_win_rate and
+                prev_win_rate_vs_target > 0):
+                # The tranined model won a sufficient number of games against
+                # the target. Create the checkpoint that will be used to start
+                # the real benchmark and exit.
+                create_checkpoint()
+                break
+            prev_win_rate_vs_target = win_rate_vs_target
     finally:
         wait(end_selfplay(selfplay_processes, selfplay_logs))
 

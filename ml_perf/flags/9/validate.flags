@@ -2,6 +2,7 @@
 
 --flagfile=ml_perf/flags/9/architecture.flags
 
---examples_to_validate=256
+--examples_to_validate=512
 --train_batch_size=64
 --summary_steps=8
+--l2_strength=0.0001

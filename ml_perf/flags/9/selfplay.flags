@@ -4,11 +4,11 @@
 # the RL loop.
 
 --engine=tf
---num_readouts=240
+--num_readouts=150
 --fastplay_frequency=0
 --fastplay_readouts=40
 --value_init_penalty=0.2
---holdout_pct=0.0
+--holdout_pct=0.025
 --disable_resign_pct=1.0
 --resign_threshold=-0.99
 --virtual_losses=2

@@ -86,7 +86,10 @@ void ShardedExecutor::WorkerThread::Run() {
     if (!running_) {
       break;
     }
-    (*fn_)(shard_, num_shards_);
+    {
+      WTF_SCOPE0("ShardedExecutor::Run");
+      (*fn_)(shard_, num_shards_);
+    }
     done_sem_.Post();
   }
 }

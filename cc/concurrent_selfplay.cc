@@ -407,6 +407,7 @@ class OutputThread : public Thread {
       : output_queue_(output_queue),
         output_dir_(FLAGS_output_dir),
         holdout_dir_(FLAGS_holdout_dir),
+        sgf_dir_(FLAGS_sgf_dir),
         feature_descriptor_(std::move(feature_descriptor)) {}
 
  private:
@@ -416,6 +417,7 @@ class OutputThread : public Thread {
   ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue_;
   const std::string output_dir_;
   const std::string holdout_dir_;
+  const std::string sgf_dir_;
   const FeatureDescriptor feature_descriptor_;
 };
 
@@ -666,6 +668,10 @@ void Selfplayer::Run() {
   output_queue_.Push(nullptr);
   output_thread.Join();
   MG_CHECK(output_queue_.empty());
+
+  if (FLAGS_cache_size_mb > 0) {
+    MG_LOG(INFO) << "Inference cache stats: " << inference_cache->GetStats();
+  }
 
   {
     absl::MutexLock lock(&mutex_);
@@ -952,14 +958,12 @@ void OutputThread::WriteOutputs(int game_id,
     LogEndGameInfo(*game, selfplay_game->duration());
   }
 
-  auto output_name = GetOutputName(game_id);
-  const auto& models_used = selfplay_game->models_used();
-
   // Take the player name from the last model used to play a move. This is
   // done because the ml_perf RL loop waits for a certain number of games to
   // be played by a model before training a new one. By assigned a game to
   // the last model used to play a move rather than the first, training waits
   // for less time and so we produce new models more quickly.
+  const auto& models_used = selfplay_game->models_used();
   const auto& player_name =
       !models_used.empty() ? models_used.back() : game->black_name();
 
