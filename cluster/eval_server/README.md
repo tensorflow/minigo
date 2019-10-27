@@ -3,6 +3,30 @@
 
 A set of tools to record the conditions (code, parameters, ...) and agregate the results of many evaluation runs.
 
+## add_model.py and evaluator
+
+Used to add Player(model weights + flags) to models_to_eval CBT.
+
+#TODO(amj): test this code snippit
+```bash
+# From minigo/
+source cluster/common.sh
+export PROJECT=that one thing
+export SGF_BUCKET_NAME=minigo-pub
+
+mkdir -p temp && cd temp
+
+# Alphabetical for gsutil ls to work below
+export MODEL_A=369a0424c4
+export MODEL_B=52eb46008a
+export CBT_TABLE=$CBT_MODEL_EVAL_TABLE
+
+../cluster/evaluator/evaluator_ringmaster_wrapper.sh
+
+ls
+gsutil ls gs://minigo-pub/eval_server/models/games/${MODEL_A}_vs_${MODEL_B}
+cbt -project "$PROJECT" -instance "$CBT_INSTANCE" read "$CBT_TABLE"
+```
 
 ## Goals
 1. Reproducability (see https://github.com/tensorflow/minigo/issues/591)
@@ -11,11 +35,11 @@ A set of tools to record the conditions (code, parameters, ...) and agregate the
 3. Store all data in a common repository with common naming scheme
 4. Be easy to extend piecewise as needed
     1. Be backwards compatible as often as possible
-5. Guide us towards gating (see https://github.com/tensorflow/minigo/issues/570_
+5. Guide us towards gating (see https://github.com/tensorflow/minigo/issues/570)
 
 ## Methodology
 
-* Results table / Evaluation (https://github.com/tensorflow/minigo/issues/591)
+* Results table / Evaluation [#591](https://github.com/tensorflow/minigo/issues/591)
   -   Uses bigtable tag  [#590](https://github.com/tensorflow/minigo/pull/590)  to name a comparison
   -   Use  [launch_eval.py](https://github.com/tensorflow/minigo/blob/master/cluster/evaluator/launch_eval.py)  and record command (somewhere)
   -  Directory structure
@@ -28,6 +52,6 @@ A set of tools to record the conditions (code, parameters, ...) and agregate the
 			  - Command line invocation of `launch_eval.py`
 		  - metadata (json?, contents TBD)
 		  - [optional] command_flags
-		  - [future] \<shorttag>_ringmaster.ctl (see https://github.com/tensorflow/minigo/issues/544)
+		  - [future] \<shorttag>_ringmaster.ctl (see [#544](https://github.com/tensorflow/minigo/issues/544))
 		  - [future] branch (github branch where code can be found)
 		  - [future] diff.patch
