@@ -538,6 +538,14 @@ bool SelfplayGame::MaybePlayMove() {
       game_->MarkLastMoveAsTrainable();
     }
 
+    // If the whole board is pass-alive, play pass moves to end the game.
+    if (tree_->root()->position.n() >= kMinPassAliveMoves &&
+        tree_->root()->position.CalculateWholeBoardPassAlive()) {
+      while (!tree_->is_game_over()) {
+        tree_->PlayMove(Coord::kPass);
+      }
+    }
+
     // TODO(tommadams): move game over logic out of MctsTree and into Game.
     if (tree_->at_move_limit()) {
       game_->SetGameOverBecauseMoveLimitReached(
