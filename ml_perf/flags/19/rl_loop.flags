@@ -15,5 +15,5 @@
 
 --eval_num_games=100
 
---min_games_per_iteration=4096
+--min_games_per_iteration=8192
 --validate=1

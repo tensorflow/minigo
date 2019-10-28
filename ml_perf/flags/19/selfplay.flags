@@ -5,8 +5,8 @@
 
 --engine=tf
 --num_readouts=400
---fastplay_frequency=0
---fastplay_readouts=40
+--fastplay_frequency=0.5
+--fastplay_readouts=80
 --value_init_penalty=0.2
 --holdout_pct=0.025
 --disable_resign_pct=0.0
@@ -22,7 +22,7 @@
 --selfplay_threads=3
 --parallel_search=2
 --parallel_inference=3
---concurrent_games_per_thread=32
+--concurrent_games_per_thread=16
 
 --target_pruning=1
 --restrict_in_bensons=1

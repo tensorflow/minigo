@@ -3,6 +3,9 @@
 
 --flagfile=ml_perf/flags/19/selfplay.flags
 
+--num_readouts=160
+--fastplay_frequency=0
+
 --holdout_pct=0
 --engine=random
 --device=0
