@@ -229,50 +229,6 @@ TEST_F(MctsPlayerTest, ParallelTreeSearch) {
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
 }
 
-TEST_F(MctsPlayerTest, DontPassOnEmptyLosingBoard) {
-  MctsPlayer::Options options;
-  auto player = CreateBasicPlayer(options);
-  // Search a board with one black stone, white to play.
-  auto board = TestablePosition(kOneStoneBoard, Color::kWhite);
-  player->InitializeGame(board);
-  auto* root = player->root();
-  for (int i = 0; i < 80; ++i) {
-    player->TreeSearch(8, std::numeric_limits<int>::max());
-  }
-
-  // Expect pass-pass to have been checked.
-  auto it = root->children.find(Coord::kPass);
-  EXPECT_NE(it, root->children.end());
-  auto pass = it->second.get();
-  EXPECT_GT(pass->child_N(Coord::kPass), 0);
-
-  // Expect the first pass to be bad.
-  EXPECT_GT(root->child_Q(Coord::kPass), 0);
-  EXPECT_GT(root->child_N(Coord::kPass), 0);
-  auto best_move = ArgMax(root->edges, MctsNode::CmpN);
-  EXPECT_NE(Coord::kPass, best_move);
-
-  // Now search an empty board, black to play.
-  board = TestablePosition("", Color::kBlack);
-  player->InitializeGame(board);
-  root = player->root();
-  for (int i = 0; i < 80; ++i) {
-    player->TreeSearch(8, std::numeric_limits<int>::max());
-  }
-
-  // Expect pass-pass to have been checked.
-  it = root->children.find(Coord::kPass);
-  EXPECT_NE(it, root->children.end());
-  pass = it->second.get();
-  EXPECT_GT(pass->child_N(Coord::kPass), 0);
-
-  // Expect the first pass to be bad.
-  EXPECT_LT(root->child_Q(Coord::kPass), 0);
-  EXPECT_GT(root->child_N(Coord::kPass), 0);
-  best_move = ArgMax(root->edges, MctsNode::CmpN);
-  EXPECT_NE(Coord::kPass, best_move);
-}
-
 TEST_F(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
   auto player = CreateAlmostDonePlayer();
   auto* root = player->root();
@@ -350,36 +306,6 @@ TEST_F(MctsPlayerTest, TreeSearchFailsafe) {
   player->InitializeGame(board);
   player->TreeSearch(1, std::numeric_limits<int>::max());
   EXPECT_EQ(0, CountPendingVirtualLosses(player->root()));
-}
-
-// When presented with a situation where the last move was a pass, and we have
-// to decide whether to pass, it should be the first thing we check, but not
-// more than that.
-TEST_F(MctsPlayerTest, OnlyCheckGameEndOnce) {
-  Position position(Color::kBlack);
-
-  auto player =
-      absl::make_unique<TestablePlayer>(game_.get(), MctsPlayer::Options());
-  player->InitializeGame(position);
-
-  MG_CHECK(player->PlayMove({3, 3}));  // B plays.
-  MG_CHECK(player->PlayMove({3, 4}));  // W plays.
-  MG_CHECK(player->PlayMove({4, 3}));  // B plays.
-
-  // W passes. If B passes too, B would lose by komi..
-  MG_CHECK(player->PlayMove(Coord::kPass));
-
-  auto* root = player->root();
-
-  // Initialize the root
-  player->TreeSearch(1, std::numeric_limits<int>::max());
-  // Explore a child - should be a pass move.
-  player->TreeSearch(1, std::numeric_limits<int>::max());
-  EXPECT_EQ(1, root->child_N(Coord::kPass));
-  player->TreeSearch(1, std::numeric_limits<int>::max());
-
-  // Check that we didn't visit the pass node any more times.
-  EXPECT_EQ(1, root->child_N(Coord::kPass));
 }
 
 TEST_F(MctsPlayerTest, ExtractDataNormalEnd) {

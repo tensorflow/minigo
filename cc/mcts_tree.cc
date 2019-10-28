@@ -302,13 +302,6 @@ MctsNode* MctsTree::SelectLeaf(bool allow_pass) {
       return node;
     }
 
-    // HACK: if last move was a pass, always investigate double-pass first
-    // to avoid situations where we auto-lose by passing too early.
-    // if (node->move == Coord::kPass && node->child_N(Coord::kPass) == 0) {
-    //   node = node->MaybeAddChild(Coord::kPass);
-    //   continue;
-    // }
-
     auto child_action_score = node->CalculateChildActionScore();
     absl::Span<const float> allowed_moves(child_action_score);
     if (!allow_pass) {
