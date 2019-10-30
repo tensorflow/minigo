@@ -16,6 +16,7 @@ load(
 minigo_cc_library(
     name = "base",
     srcs = [
+        "algorithm.cc",
         "color.cc",
         "coord.cc",
         "group.cc",
@@ -28,6 +29,7 @@ minigo_cc_library(
         "coord.h",
         "group.h",
         "move.h",
+        "padded_array.h",
         "stone.h",
     ],
     linkopts = select({
@@ -39,6 +41,7 @@ minigo_cc_library(
         ":logging",
         "//cc/platform",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -169,6 +172,7 @@ minigo_cc_library(
         ":game",
         ":inline_vector",
         ":logging",
+        ":padded_array",
         ":position",
         ":random",
         ":symmetries",
@@ -183,6 +187,11 @@ minigo_cc_library(
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
     ],
+)
+
+minigo_cc_library(
+    name = "padded_array",
+    hdrs = ["padded_array.h"],
 )
 
 minigo_cc_library(
@@ -311,6 +320,17 @@ minigo_cc_library(
         ":position",
         ":random",
         "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "algorithm_test",
+    size = "small",
+    srcs = ["algorithm_test.cc"],
+    deps = [
+        ":base",
+        ":random",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

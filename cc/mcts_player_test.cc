@@ -192,7 +192,7 @@ TEST_F(MctsPlayerTest, DontPassIfLosing) {
   }
 
   // Search should converge on D9 as only winning move.
-  auto best_move = ArgMax(root->edges, MctsNode::CmpN);
+  auto best_move = ArgMax(root->edges.N);
   ASSERT_EQ(Coord::FromGtp("D9"), best_move);
   // D9 should have a positive value.
   EXPECT_LT(0, root->child_Q(best_move));
@@ -217,7 +217,7 @@ TEST_F(MctsPlayerTest, ParallelTreeSearch) {
   }
 
   // Search should converge on D9 as only winning move.
-  auto best_move = ArgMax(root->edges, MctsNode::CmpN);
+  auto best_move = ArgMax(root->edges.N);
   EXPECT_EQ(Coord::FromString("D9"), best_move);
   // D9 should have a positive value.
   EXPECT_LT(0, root->child_Q(best_move));

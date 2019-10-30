@@ -344,11 +344,11 @@ TEST(MctsTreeTest, NeverSelectIllegalMoves) {
 
   // and let's say the root were visited a lot of times, which pumps up the
   // action score for unvisited moves...
-  root->stats->N = 100000;
+  root->stats->N[root->stats_idx] = 100000;
   for (int i = 0; i < kNumMoves; ++i) {
     if (root->position.ClassifyMoveIgnoringSuperko(i) !=
         Position::MoveType::kIllegal) {
-      root->edges[i].N = 10000;
+      root->edges.N[i] = 10000;
     }
   }
   // this should not throw an error...
@@ -450,10 +450,10 @@ TEST(MctsTreeTest, BensonRestrictionStillPasses) {
   for (int i = 0; i < kNumMoves; ++i) {
     if (root->position.ClassifyMoveIgnoringSuperko(i) !=
         Position::MoveType::kIllegal) {
-      root->edges[i].N = 10;
+      root->edges.N[i] = 10;
     }
   }
-  root->edges[Coord::kPass].N = 100;
+  root->edges.N[Coord::kPass] = 100;
 
   EXPECT_EQ(Coord::kPass, root->GetMostVisitedMove(false));
   EXPECT_EQ(Coord::kPass, root->GetMostVisitedMove(true));
@@ -477,16 +477,16 @@ TEST(MctsTreeTest, ReshapePrunesBensonsVisits) {
     tree2.IncorporateResults(tree2.SelectLeaf(true), probs, 0);
   }
 
-  EXPECT_NE(tree.root()->edges[0].N, 0);  // A9 should've had visits.
+  EXPECT_NE(tree.root()->edges.N[0], 0);  // A9 should've had visits.
   tree.ReshapeFinalVisits();
-  EXPECT_EQ(tree.root()->edges[0].N, 0);  // Reshape should've removed them.
+  EXPECT_EQ(tree.root()->edges.N[0], 0);  // Reshape should've removed them.
 
-  EXPECT_NE(tree2.root()->edges[0].N, 0);    // A9 should've had visits.
-  auto original = tree2.root()->edges[0].N;  // Store them.
+  EXPECT_NE(tree2.root()->edges.N[0], 0);    // A9 should've had visits.
+  auto original = tree2.root()->edges.N[0];  // Store them.
   tree2.ReshapeFinalVisits();
-  EXPECT_NE(tree2.root()->edges[0].N, 0);  // Reshape shouldn't've removed them.
+  EXPECT_NE(tree2.root()->edges.N[0], 0);  // Reshape shouldn't've removed them.
   EXPECT_EQ(original,
-            tree2.root()->edges[0].N);  // And they should be the same.
+            tree2.root()->edges.N[0]);  // And they should be the same.
 }
 
 TEST(MctsTreeTest, ReshapeWhenOnlyBensons) {
@@ -508,17 +508,17 @@ TEST(MctsTreeTest, ReshapeWhenOnlyBensons) {
     tree2.IncorporateResults(tree2.SelectLeaf(true), probs, 0);
   }
 
-  EXPECT_EQ(tree.root()->edges[Coord::kPass].N,
+  EXPECT_EQ(tree.root()->edges.N[Coord::kPass],
             0);  // Pass should no visits.
-  EXPECT_EQ(tree2.root()->edges[Coord::kPass].N, 0);
+  EXPECT_EQ(tree2.root()->edges.N[Coord::kPass], 0);
 
   // Reshape with bensons restricted should add one.
   tree.ReshapeFinalVisits();
-  EXPECT_EQ(tree.root()->edges[Coord::kPass].N, 1);
+  EXPECT_EQ(tree.root()->edges.N[Coord::kPass], 1);
 
   // Reshape with bensons not restricted should NOT add one.
   tree2.ReshapeFinalVisits();
-  EXPECT_EQ(tree2.root()->edges[Coord::kPass].N, 0);
+  EXPECT_EQ(tree2.root()->edges.N[Coord::kPass], 0);
 }
 
 // Verifies that even when one move is hugely more likely than all the others,
@@ -686,7 +686,6 @@ TEST(MctsTreeTest, InjectNoise) {
 
   // Generate some uniform priors.
   std::array<float, kNumMoves> policy;
-  rnd.Uniform(&policy);
   for (auto& x : policy) {
     x = 1.0 / kNumMoves;
   }
@@ -716,7 +715,7 @@ TEST(MctsTreeTest, InjectNoise) {
   EXPECT_NEAR(1, sum_P, 0.000001);
 
   // With Dirichelet noise, majority of density should be in one node.
-  int i = ArgMax(tree.root()->edges, MctsNode::CmpP);
+  int i = ArgMax(tree.root()->edges.P);
   float max_P = tree.root()->child_P(i);
   EXPECT_GT(max_P, 3.0 / kNumMoves);
 }
@@ -737,9 +736,9 @@ TEST(MctsTreeTest, InjectNoiseOnlyLegalMoves) {
 
   for (int i = 0; i < kNumMoves; ++i) {
     if (tree.is_legal_move(i)) {
-      EXPECT_FLOAT_EQ(uniform_policy, tree.root()->edges[i].P);
+      EXPECT_FLOAT_EQ(uniform_policy, tree.root()->edges.P[i]);
     } else {
-      EXPECT_FLOAT_EQ(0, tree.root()->edges[i].P);
+      EXPECT_FLOAT_EQ(0, tree.root()->edges.P[i]);
     }
   }
 
@@ -752,10 +751,10 @@ TEST(MctsTreeTest, InjectNoiseOnlyLegalMoves) {
 
   for (int i = 0; i < kNumMoves; ++i) {
     if (tree.is_legal_move(i)) {
-      EXPECT_LT(0.75 * uniform_policy, tree.root()->edges[i].P);
-      EXPECT_GT(0.75 * uniform_policy + 0.25, tree.root()->edges[i].P);
+      EXPECT_LT(0.75 * uniform_policy, tree.root()->edges.P[i]);
+      EXPECT_GT(0.75 * uniform_policy + 0.25, tree.root()->edges.P[i]);
     } else {
-      EXPECT_FLOAT_EQ(0, tree.root()->edges[i].P);
+      EXPECT_FLOAT_EQ(0, tree.root()->edges.P[i]);
     }
   }
 }
@@ -827,7 +826,7 @@ TEST(MctsTreeTest, PickMoveArgMax) {
   };
   for (const auto& p : child_visits) {
     root->MaybeAddChild(p.first);
-    root->edges[p.first].N = p.second;
+    root->edges.N[p.first] = p.second;
   }
 
   Random rnd(888, 1);
@@ -846,9 +845,9 @@ TEST(MctsTreeTest, PickMoveSoft) {
   auto* root = tree.SelectLeaf(true);
   ASSERT_EQ(tree.root(), root);
 
-  root->edges[Coord(2, 0)].N = 10;
-  root->edges[Coord(1, 0)].N = 5;
-  root->edges[Coord(3, 0)].N = 1;
+  root->edges.N[Coord(2, 0)] = 10;
+  root->edges.N[Coord(1, 0)] = 5;
+  root->edges.N[Coord(3, 0)] = 1;
 
   int count_1_0 = 0;
   int count_2_0 = 0;
@@ -869,6 +868,45 @@ TEST(MctsTreeTest, PickMoveSoft) {
   EXPECT_NEAR(1000, count_2_0, 50);
   EXPECT_NEAR(500, count_1_0, 50);
   EXPECT_NEAR(100, count_3_0, 50);
+}
+
+TEST(MctsTreeTest, CalculateChildActionScore) {
+  MctsTree::Options options;
+  MctsTree tree(Position(Color::kBlack), options);
+
+  Random rnd(456943875, 1);
+
+  // Generate some uniform priors.
+  std::array<float, kNumMoves> policy;
+  for (int i = 0; i < 1000; ++i) {
+    auto* leaf = tree.SelectLeaf(true);
+    ASSERT_NE(leaf, nullptr);
+    if (leaf->game_over() || leaf->at_move_limit()) {
+      float value = leaf->position.CalculateScore(kDefaultKomi) > 0 ? 1 : -1;
+      tree.IncorporateEndGameResult(leaf, value);
+    } else {
+      float value = rnd();
+      rnd.Uniform(&policy);
+      float sum = 0;
+      for (auto x : policy) {
+        sum += x;
+      }
+      for (auto& x : policy) {
+        x /= sum;
+      }
+
+      tree.IncorporateResults(leaf, policy, value);
+    }
+  }
+
+  auto c_action_score = tree.root()->CalculateChildActionScore();
+
+  PaddedArray<float, kNumMoves> sse_action_score;
+  tree.root()->CalculateChildActionScoreSse(sse_action_score);
+
+  for (int i = 0; i < kNumMoves; ++i) {
+    EXPECT_NEAR(c_action_score[i], sse_action_score[i], 0.001) << Coord(i);
+  }
 }
 
 }  // namespace

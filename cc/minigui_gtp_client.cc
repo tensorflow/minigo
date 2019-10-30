@@ -290,8 +290,8 @@ void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
 
   // Child N.
   auto& child_N = j["childN"];
-  for (const auto& edge : root->edges) {
-    child_N.push_back(static_cast<int>(edge.N));
+  for (auto N : root->edges.N) {
+    child_N.push_back(static_cast<int>(N));
   }
 
   // Child Q.

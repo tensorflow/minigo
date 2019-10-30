@@ -17,6 +17,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -29,6 +30,7 @@
 #include "absl/types/span.h"
 #include "cc/constants.h"
 #include "cc/inline_vector.h"
+#include "cc/padded_array.h"
 #include "cc/position.h"
 #include "cc/random.h"
 #include "cc/symmetries.h"
@@ -40,16 +42,14 @@ class MctsNode {
   friend class MctsTree;
 
  public:
+  // MctsNode::CalculateChildActionScoreSse requires that the arrays in
+  // EdgeStats are padded to a multiple of 16 bytes.
   struct EdgeStats {
-    int N = 0;
-    float W = 0;
-    float P = 0;
-    float original_P = 0;
+    PaddedArray<int32_t, kNumMoves> N{};
+    PaddedArray<float, kNumMoves> W{};
+    PaddedArray<float, kNumMoves> P{};
+    PaddedArray<float, kNumMoves> original_P{};
   };
-
-  static bool CmpN(const EdgeStats& a, const EdgeStats& b) { return a.N < b.N; }
-  static bool CmpW(const EdgeStats& a, const EdgeStats& b) { return a.W < b.W; }
-  static bool CmpP(const EdgeStats& a, const EdgeStats& b) { return a.P < b.P; }
 
   // Constructor for root node in the tree.
   MctsNode(EdgeStats* stats, const Position& position);
@@ -57,10 +57,10 @@ class MctsNode {
   // Constructor for child nodes.
   MctsNode(MctsNode* parent, Coord move);
 
-  int N() const { return stats->N; }
-  float W() const { return stats->W; }
-  float P() const { return stats->P; }
-  float original_P() const { return stats->original_P; }
+  int N() const { return stats->N[stats_idx]; }
+  float W() const { return stats->W[stats_idx]; }
+  float P() const { return stats->P[stats_idx]; }
+  float original_P() const { return stats->original_P[stats_idx]; }
   float Q() const { return W() / (1 + N()); }
   float Q_perspective() const {
     return position.to_play() == Color::kBlack ? Q() : -Q();
@@ -69,10 +69,10 @@ class MctsNode {
     return 2.0 * (std::log((1.0f + N() + kUct_base) / kUct_base) + kUct_init);
   }
 
-  int child_N(int i) const { return edges[i].N; }
-  float child_W(int i) const { return edges[i].W; }
-  float child_P(int i) const { return edges[i].P; }
-  float child_original_P(int i) const { return edges[i].original_P; }
+  int child_N(int i) const { return edges.N[i]; }
+  float child_W(int i) const { return edges.W[i]; }
+  float child_P(int i) const { return edges.P[i]; }
+  float child_original_P(int i) const { return edges.original_P[i]; }
   float child_Q(int i) const { return child_W(i) / (1 + child_N(i)); }
   float child_U(int i) const {
     return U_scale() * std::sqrt(std::max<float>(1, N() - 1)) * child_P(i) /
@@ -100,6 +100,8 @@ class MctsNode {
 
   std::array<float, kNumMoves> CalculateChildActionScore() const;
 
+  void CalculateChildActionScoreSse(PaddedSpan<float> result) const;
+
   float CalculateSingleMoveChildActionScore(float to_play, float U_common,
                                             int i) const {
     float Q = child_Q(i);
@@ -114,6 +116,12 @@ class MctsNode {
 
   // Stats for the edge from parent to this.
   EdgeStats* stats;
+
+  // Index into `stats` for this node's stats.
+  // This is the same as `move` for all nodes except the game root node; the
+  // game root's `stats_idx` is initiliazed to 0 because its `move` is
+  // `Coord::kInvalid`.
+  Coord stats_idx;
 
   // Move that led to this position.
   Coord move;
@@ -131,7 +139,7 @@ class MctsNode {
   // etc.
   symmetry::Symmetry canonical_symmetry = symmetry::kIdentity;
 
-  std::array<EdgeStats, kNumMoves> edges;
+  EdgeStats edges;
 
   // Map from move to resulting MctsNode.
   absl::flat_hash_map<Coord, std::unique_ptr<MctsNode>> children;

@@ -453,8 +453,7 @@ int SelfplayGame::SelectLeaves(InferenceCache* cache,
 
   int num_queued = 0;
   do {
-    MctsNode* leaf;
-    leaf = tree_->SelectLeaf(options_.allow_pass);
+    auto* leaf = tree_->SelectLeaf(options_.allow_pass);
     if (leaf == nullptr) {
       break;
     }
@@ -539,8 +538,9 @@ bool SelfplayGame::MaybePlayMove() {
     }
 
     // If the whole board is pass-alive, play pass moves to end the game.
-    if (tree_->root()->position.n() >= kMinPassAliveMoves &&
-        tree_->root()->position.CalculateWholeBoardPassAlive()) {
+    if (tree_->root()->position.n() >= 16) {
+      // if (tree_->root()->position.n() >= kMinPassAliveMoves &&
+      //     tree_->root()->position.CalculateWholeBoardPassAlive()) {
       while (!tree_->is_game_over()) {
         tree_->PlayMove(Coord::kPass);
       }

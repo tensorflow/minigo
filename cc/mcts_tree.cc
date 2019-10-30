@@ -14,6 +14,8 @@
 
 #include "cc/mcts_tree.h"
 
+#include <emmintrin.h>
+
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -91,6 +93,7 @@ constexpr int kSuperKoCacheStride = 8;
 MctsNode::MctsNode(EdgeStats* stats, const Position& position)
     : parent(nullptr),
       stats(stats),
+      stats_idx(0),
       move(Coord::kInvalid),
       is_expanded(false),
       has_canonical_symmetry(false),
@@ -98,7 +101,8 @@ MctsNode::MctsNode(EdgeStats* stats, const Position& position)
 
 MctsNode::MctsNode(MctsNode* parent, Coord move)
     : parent(parent),
-      stats(&parent->edges[move]),
+      stats(&parent->edges),
+      stats_idx(move),
       move(move),
       is_expanded(false),
       has_canonical_symmetry(parent->has_canonical_symmetry),
@@ -250,6 +254,51 @@ void MctsNode::ClearChildren() {
   is_expanded = false;
 }
 
+// Vectorized version of CalculateChildActionScore.
+void MctsNode::CalculateChildActionScoreSse(PaddedSpan<float> result) const {
+  __m128 to_play = _mm_set_ps1(position.to_play() == Color::kBlack ? 1 : -1);
+  __m128 U_common =
+      _mm_set_ps1(U_scale() * std::sqrt(std::max<float>(1, N() - 1)));
+
+  // A couple of useful constants.
+  __m128i one = _mm_set1_epi32(1);
+  __m128 one_thousand = _mm_set_ps1(1000);
+
+  for (int i = 0; i < kNumMoves; i += 4) {
+    // `rcp_N_one = 1 / (1 + child_N(i))`
+    // The division is performed using an approximate reciprocal instruction
+    // that has a maximum relative error of 1.5 * 2^-12.
+    __m128i N =
+        _mm_loadu_si128(reinterpret_cast<const __m128i*>(edges.N.data() + i));
+    __m128 rcp_N_one = _mm_rcp_ps(_mm_cvtepi32_ps(_mm_add_epi32(one, N)));
+
+    // `Q = child_W(i) / (1 + child_N(i))`
+    __m128 W = _mm_loadu_ps(edges.W.data() + i);
+    __m128 Q = _mm_mul_ps(W, rcp_N_one);
+
+    // `U = U_common * child_P(i) / (1 + child_N(i))`
+    __m128 P = _mm_loadu_ps(edges.P.data() + i);
+    __m128 U = _mm_mul_ps(_mm_mul_ps(U_common, P), rcp_N_one);
+
+    // `legal_bits = position.legal_move(i)`
+    // This requires a few instructions to load the legal move bytes and
+    // shuffle them into each of the four vector slots.
+    __m128i legal_bits = _mm_loadu_si128(
+        reinterpret_cast<const __m128i*>(position.legal_moves().data() + i));
+    legal_bits = _mm_unpacklo_epi8(legal_bits, _mm_setzero_si128());
+    legal_bits = _mm_unpacklo_epi16(legal_bits, _mm_setzero_si128());
+
+    // `legal = legal_bits == 0 ? 1000 : 0`
+    __m128 legal =
+        _mm_castsi128_ps(_mm_cmpeq_epi32(legal_bits, _mm_setzero_si128()));
+    legal = _mm_and_ps(legal, one_thousand);
+
+    // `child_action_score[i] = Q * to_play + U - legal`
+    __m128 cas = _mm_sub_ps(_mm_add_ps(_mm_mul_ps(Q, to_play), U), legal);
+    _mm_storeu_ps(result.data() + i, cas);
+  }
+}
+
 std::array<float, kNumMoves> MctsNode::CalculateChildActionScore() const {
   float to_play = position.to_play() == Color::kBlack ? 1 : -1;
   float U_common = U_scale() * std::sqrt(std::max<float>(1, N() - 1));
@@ -302,13 +351,13 @@ MctsNode* MctsTree::SelectLeaf(bool allow_pass) {
       return node;
     }
 
-    auto child_action_score = node->CalculateChildActionScore();
-    absl::Span<const float> allowed_moves(child_action_score);
+    PaddedArray<float, kNumMoves> child_action_score;
+    node->CalculateChildActionScoreSse(child_action_score);
     if (!allow_pass) {
-      allowed_moves = allowed_moves.subspan(0, kN * kN);
+      child_action_score[Coord::kPass] = -100000;
     }
 
-    auto best_move = ArgMax(child_action_score);
+    Coord best_move = ArgMaxSse(child_action_score);
     if (!node->position.legal_move(best_move)) {
       best_move = Coord::kPass;
     }
@@ -341,7 +390,8 @@ void MctsTree::AddVirtualLoss(MctsNode* leaf) {
   auto* node = leaf;
   for (;;) {
     ++node->num_virtual_losses_applied;
-    node->stats->W += node->position.to_play() == Color::kBlack ? 1 : -1;
+    node->stats->W[node->stats_idx] +=
+        node->position.to_play() == Color::kBlack ? 1 : -1;
     if (node == root_) {
       return;
     }
@@ -353,7 +403,8 @@ void MctsTree::RevertVirtualLoss(MctsNode* leaf) {
   auto* node = leaf;
   for (;;) {
     --node->num_virtual_losses_applied;
-    node->stats->W -= node->position.to_play() == Color::kBlack ? 1 : -1;
+    node->stats->W[node->stats_idx] -=
+        node->position.to_play() == Color::kBlack ? 1 : -1;
     if (node == root_) {
       return;
     }
@@ -421,7 +472,7 @@ void MctsTree::IncorporateResults(MctsNode* leaf,
                           ? policy_scalar * move_probabilities[i]
                           : 0;
 
-    leaf->edges[i].original_P = leaf->edges[i].P = move_prob;
+    leaf->edges.original_P[i] = leaf->edges.P[i] = move_prob;
 
     // Note that we accumulate W here, rather than assigning.
     // When performing tree search normally, we could just assign the value to W
@@ -433,7 +484,7 @@ void MctsTree::IncorporateResults(MctsNode* leaf,
     // for the node from the value head.
     // TODO(tommadams): Minigui doesn't work this way any more so we can just
     // assign.
-    leaf->edges[i].W += reduced_value;
+    leaf->edges.W[i] += reduced_value;
   }
   BackupValue(leaf, value);
 }
@@ -447,8 +498,8 @@ void MctsTree::IncorporateEndGameResult(MctsNode* leaf, float value) {
 void MctsTree::BackupValue(MctsNode* leaf, float value) {
   auto* node = leaf;
   for (;;) {
-    node->stats->W += value;
-    ++node->stats->N;
+    node->stats->W[node->stats_idx] += value;
+    node->stats->N[node->stats_idx] += 1;
     if (node == root_) {
       return;
     }
@@ -477,7 +528,7 @@ void MctsTree::InjectNoise(const std::array<float, kNumMoves>& noise,
   for (int i = 0; i < kNumMoves; ++i) {
     float scaled_noise =
         scalar * (root_->position.legal_move(i) ? noise[i] : 0);
-    root_->edges[i].P = (1 - mix) * root_->edges[i].P + mix * scaled_noise;
+    root_->edges.P[i] = (1 - mix) * root_->edges.P[i] + mix * scaled_noise;
   }
 }
 
@@ -486,7 +537,7 @@ void MctsTree::ReshapeFinalVisits() {
   // selection, we get the most visited move regardless of bensons status and
   // reshape based on its action score.
   Coord best = root_->GetMostVisitedMove(false);
-  MG_CHECK(root_->edges[best].N > 0);
+  MG_CHECK(root_->edges.N[best] > 0);
   auto pass_alive_regions = root_->position.CalculatePassAliveRegions();
   float U_common = root_->U_scale() * std::sqrt(1.0f + root_->N());
   float to_play = root_->position.to_play() == Color::kBlack ? 1 : -1;
@@ -503,13 +554,13 @@ void MctsTree::ReshapeFinalVisits() {
     // Remove visits in pass alive areas.
     if (options_.restrict_in_bensons && (i != Coord::kPass) &&
         (pass_alive_regions[i] != Color::kEmpty)) {
-      root_->edges[i].N = 0;
+      root_->edges.N[i] = 0;
       continue;
     }
 
     // Skip the best move; it has the highest action score.
     if (i == uint16_t(best)) {
-      if (root_->edges[i].N > 0) {
+      if (root_->edges.N[i] > 0) {
         any = true;
       }
       continue;
@@ -524,16 +575,16 @@ void MctsTree::ReshapeFinalVisits() {
                              (root_->U_scale() * root_->child_P(i) *
                               std::sqrt(root_->N())) /
                              ((root_->child_Q(i) * to_play) - best_cas)));
-    root_->edges[i].N = new_N;
+    root_->edges.N[i] = new_N;
 
-    if (root_->edges[i].N > 0) {
+    if (root_->edges.N[i] > 0) {
       any = true;
     }
   }
 
   // If all visits were in bensons regions, put a visit on pass.
   if (!any) {
-    root_->edges[Coord::kPass].N = 1;
+    root_->edges.N[Coord::kPass] = 1;
   }
 }
 
@@ -590,8 +641,8 @@ std::string MctsTree::Describe() const {
       root_->Q(), root_->GetMostVisitedPathString());
 
   float child_N_sum = 0;
-  for (const auto& e : root_->edges) {
-    child_N_sum += e.N;
+  for (const auto& N : root_->edges.N) {
+    child_N_sum += N;
   }
   for (int rank = 0; rank < 15; ++rank) {
     Coord c = sorted_child_info[rank].c;

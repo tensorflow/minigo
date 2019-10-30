@@ -26,6 +26,7 @@
 #include "cc/group.h"
 #include "cc/inline_vector.h"
 #include "cc/logging.h"
+#include "cc/padded_array.h"
 #include "cc/stone.h"
 #include "cc/zobrist.h"
 
@@ -250,10 +251,14 @@ class Position {
   int n() const { return n_; }
   Coord ko() const { return ko_; }
   zobrist::Hash stone_hash() const { return stone_hash_; }
-  bool legal_move(Coord c) const {
+  uint8_t legal_move(Coord c) const {
     MG_DCHECK(c < kNumMoves);
     return legal_moves_[c];
   }
+  const PaddedArray<uint8_t, kNumMoves>& legal_moves() const {
+    return legal_moves_;
+  }
+
   // Returns the number of liberties the chain at c has.
   int num_chain_liberties(Coord c) const {
     MG_DCHECK(c <= kN * kN);
@@ -332,11 +337,15 @@ class Position {
   Coord ko_ = Coord::kInvalid;
 
   // Number of captures for (B, W).
+  // TODO(tommadams): remove this from the Position class and track it in the
+  // game instead.
   std::array<int, 2> num_captures_{{0, 0}};
 
   int n_ = 0;
 
-  std::array<bool, kNumMoves> legal_moves_;
+  // MctsNode::CalculateChildActionScoreSse requires that `legal_moves_` is
+  // padded to a multiple of 16 bytes.
+  PaddedArray<uint8_t, kNumMoves> legal_moves_;
 
   // Zobrist hash of the stones. It can be used for positional superko.
   // This has does not include number of consecutive passes or ko, so should not
