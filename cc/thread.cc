@@ -14,14 +14,26 @@
 
 #include "cc/thread.h"
 
+#include <algorithm>
+
 #include "cc/logging.h"
 
 namespace minigo {
+
+Thread::Thread(std::string name) : name_(std::move(name)) {
+  constexpr size_t kMaxLen = 15;
+  if (name_.size() > kMaxLen) {
+    name_.resize(kMaxLen);
+  }
+}
 
 Thread::~Thread() = default;
 
 void Thread::Start() {
   impl_ = std::thread([this] { Run(); });
+  if (!name_.empty()) {
+    pthread_setname_np(handle(), name_.c_str());
+  }
 }
 
 void Thread::Join() {

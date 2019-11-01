@@ -160,6 +160,8 @@ DEFINE_string(sgf_dir, "",
 DEFINE_string(wtf_trace, "/tmp/minigo.wtf-trace",
               "Output path for WTF traces.");
 DEFINE_bool(verbose, true, "Whether to log progress.");
+DEFINE_int32(output_threads, 1,
+             "Number of threads write training examples on.");
 
 namespace minigo {
 namespace {
@@ -225,9 +227,10 @@ class SelfplayGame {
     bool allow_pass;
   };
 
-  SelfplayGame(const Options& options, std::unique_ptr<Game> game,
+  SelfplayGame(int game_id, const Options& options, std::unique_ptr<Game> game,
                std::unique_ptr<MctsTree> tree);
 
+  int game_id() const { return game_id_; }
   Game* game() { return game_.get(); }
   const Game* game() const { return game_.get(); }
   absl::Duration duration() const { return duration_; }
@@ -291,6 +294,8 @@ class SelfplayGame {
   // degree on tree reuse from earlier reads but the tree is empty at the start
   // of the game.
   bool fastplay_ = false;
+
+  const int game_id_;
 };
 
 // The main application class.
@@ -345,6 +350,8 @@ class Selfplayer {
   // The latest path that matches the model pattern.
   std::string latest_model_name_ GUARDED_BY(&mutex_);
 
+  int next_game_id_ GUARDED_BY(&mutex_) = 1;
+
   std::unique_ptr<DirectoryWatcher> directory_watcher_;
 };
 
@@ -395,24 +402,20 @@ class SelfplayThread : public Thread {
   std::unique_ptr<Model> model_;
   std::shared_ptr<InferenceCache> cache_;
   std::vector<TreeSearch> searches_;
+  int num_games_finished_ = 0;
   const int thread_id_;
 };
 
 // Writes SGFs and training examples for completed games to disk.
 class OutputThread : public Thread {
  public:
-  explicit OutputThread(
-      FeatureDescriptor feature_descriptor,
-      ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue)
-      : output_queue_(output_queue),
-        output_dir_(FLAGS_output_dir),
-        holdout_dir_(FLAGS_holdout_dir),
-        sgf_dir_(FLAGS_sgf_dir),
-        feature_descriptor_(std::move(feature_descriptor)) {}
+  OutputThread(
+      int thread_id, FeatureDescriptor feature_descriptor,
+      ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue);
 
  private:
   void Run() override;
-  void WriteOutputs(int game_id, std::unique_ptr<SelfplayGame> selfplay_game);
+  void WriteOutputs(std::unique_ptr<SelfplayGame> selfplay_game);
 
   ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue_;
   const std::string output_dir_;
@@ -428,7 +431,8 @@ Selfplayer::Selfplayer()
   ParseFlags();
 }
 
-SelfplayGame::SelfplayGame(const Options& options, std::unique_ptr<Game> game,
+SelfplayGame::SelfplayGame(int game_id, const Options& options,
+                           std::unique_ptr<Game> game,
                            std::unique_ptr<MctsTree> tree)
     : options_(options),
       game_(std::move(game)),
@@ -436,7 +440,8 @@ SelfplayGame::SelfplayGame(const Options& options, std::unique_ptr<Game> game,
       use_ansi_colors_(FdSupportsAnsiColors(fileno(stderr))),
       start_time_(absl::Now()),
       rnd_(FLAGS_seed, Random::kUniqueStream),
-      inference_symmetry_mix_(rnd_.UniformUint64()) {
+      inference_symmetry_mix_(rnd_.UniformUint64()),
+      game_id_(game_id) {
   target_readouts_ = options_.num_readouts;
 }
 
@@ -538,9 +543,9 @@ bool SelfplayGame::MaybePlayMove() {
     }
 
     // If the whole board is pass-alive, play pass moves to end the game.
-    if (tree_->root()->position.n() >= 16) {
-      // if (tree_->root()->position.n() >= kMinPassAliveMoves &&
-      //     tree_->root()->position.CalculateWholeBoardPassAlive()) {
+    /// if (tree_->root()->position.n() >= 16) {
+    if (tree_->root()->position.n() >= kMinPassAliveMoves &&
+        tree_->root()->position.CalculateWholeBoardPassAlive()) {
       while (!tree_->is_game_over()) {
         tree_->PlayMove(Coord::kPass);
       }
@@ -660,9 +665,15 @@ void Selfplayer::Run() {
     }
   }
 
-  // Start the output thread.
-  OutputThread output_thread(feature_descriptor, &output_queue_);
-  output_thread.Start();
+  // Start the output threads.
+  std::vector<std::unique_ptr<OutputThread>> output_threads;
+  for (int i = 0; i < FLAGS_output_threads; ++i) {
+    output_threads.push_back(
+        absl::make_unique<OutputThread>(i, feature_descriptor, &output_queue_));
+  }
+  for (auto& t : output_threads) {
+    t->Start();
+  }
 
   // Run the selfplay threads.
   for (auto& t : selfplay_threads) {
@@ -672,9 +683,14 @@ void Selfplayer::Run() {
     t->Join();
   }
 
-  // Stop the output thread.
-  output_queue_.Push(nullptr);
-  output_thread.Join();
+  // Stop the output threads by pushing one null game onto the output queue
+  // for each thread, causing the treads to exit when the pop them off.
+  for (size_t i = 0; i < output_threads.size(); ++i) {
+    output_queue_.Push(nullptr);
+  }
+  for (auto& t : output_threads) {
+    t->Join();
+  }
   MG_CHECK(output_queue_.empty());
 
   if (FLAGS_cache_size_mb > 0) {
@@ -695,6 +711,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
   SelfplayGame::Options selfplay_options;
 
   std::string player_name;
+  int game_id;
   {
     absl::MutexLock lock(&mutex_);
     if (!FLAGS_run_forever && num_games_remaining_ == 0) {
@@ -705,6 +722,7 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
     }
 
     player_name = latest_model_name_;
+    game_id = next_game_id_++;
 
     game_options = game_options_;
     game_options.resign_enabled = rnd_() >= FLAGS_disable_resign_pct;
@@ -727,8 +745,8 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
   auto tree =
       absl::make_unique<MctsTree>(Position(Color::kBlack), tree_options);
 
-  return absl::make_unique<SelfplayGame>(selfplay_options, std::move(game),
-                                         std::move(tree));
+  return absl::make_unique<SelfplayGame>(game_id, selfplay_options,
+                                         std::move(game), std::move(tree));
 }
 
 void Selfplayer::EndGame(std::unique_ptr<SelfplayGame> selfplay_game) {
@@ -822,7 +840,10 @@ void Selfplayer::CreateModels(const std::string& path) {
 
 SelfplayThread::SelfplayThread(int thread_id, Selfplayer* selfplayer,
                                std::shared_ptr<InferenceCache> cache)
-    : selfplayer_(selfplayer), cache_(std::move(cache)), thread_id_(thread_id) {
+      : Thread(absl::StrCat("Selfplay:", thread_id_)),
+        selfplayer_(selfplayer),
+        cache_(std::move(cache)),
+        thread_id_(thread_id) {
   selfplay_games_.resize(FLAGS_concurrent_games_per_thread);
 }
 
@@ -837,6 +858,9 @@ void SelfplayThread::Run() {
     ProcessInferences(model_name);
     PlayMoves();
   }
+
+  MG_LOG(INFO) << "SelfplayThread " << thread_id_ << " played "
+               << num_games_finished_ << " games";
 }
 
 void SelfplayThread::StartNewGames() {
@@ -866,15 +890,18 @@ void SelfplayThread::StartNewGames() {
 }
 
 void SelfplayThread::SelectLeaves() {
-  WTF_SCOPE("SelectLeaves", size_t)(selfplay_games_.size());
+  WTF_SCOPE("SelectLeaves: games", size_t)(selfplay_games_.size());
 
   selfplayer_->ExecuteSharded([this](int shard_idx, int num_shards) {
+    WTF_SCOPE0("SelectLeaf");
     MG_CHECK(static_cast<size_t>(num_shards) == searches_.size());
 
     auto& search = searches_[shard_idx];
     search.inferences.clear();
     search.inference_spans.clear();
 
+    int num_leaves_selected = 0;
+    int num_nodes_visited = 0;
     auto range = ShardedExecutor::GetShardRange(shard_idx, num_shards,
                                                 selfplay_games_.size());
     for (int i = range.begin; i < range.end; ++i) {
@@ -887,7 +914,17 @@ void SelfplayThread::SelectLeaves() {
       if (span.len > 0) {
         search.inference_spans.push_back(span);
       }
+
+      if (kWtfEnabledForNamespace) {
+        for (size_t j = 0; j < span.len; ++j) {
+          const auto& position = search.inferences[span.pos + j].leaf->position;
+          num_nodes_visited += position.n() + 1;
+        }
+        num_leaves_selected += span.len;
+      }
     }
+
+    WTF_APPEND_SCOPE("leaves, nodes", int, int)(num_leaves_selected, num_nodes_visited);
   });
 }
 
@@ -942,25 +979,36 @@ void SelfplayThread::PlayMoves() {
     }
     if (selfplay_game->game()->game_over()) {
       selfplayer_->EndGame(std::move(selfplay_game));
+      num_games_finished_ += 1;
       selfplay_game = nullptr;
     }
   }
 }
 
+OutputThread::OutputThread(
+    int thread_id, FeatureDescriptor feature_descriptor,
+    ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue)
+    : Thread(absl::StrCat("Output:", thread_id)),
+      output_queue_(output_queue),
+      output_dir_(FLAGS_output_dir),
+      holdout_dir_(FLAGS_holdout_dir),
+      sgf_dir_(FLAGS_sgf_dir),
+      feature_descriptor_(std::move(feature_descriptor)) {
+}
+
 void OutputThread::Run() {
-  for (int game_id = 0;; ++game_id) {
+  for (;;) {
     auto selfplay_game = output_queue_->Pop();
     if (selfplay_game == nullptr) {
       break;
     }
-    WriteOutputs(game_id, std::move(selfplay_game));
+    WriteOutputs(std::move(selfplay_game));
   }
 }
 
-void OutputThread::WriteOutputs(int game_id,
-                                std::unique_ptr<SelfplayGame> selfplay_game) {
+void OutputThread::WriteOutputs(std::unique_ptr<SelfplayGame> selfplay_game) {
   auto now = absl::Now();
-  auto output_name = GetOutputName(game_id);
+  auto output_name = GetOutputName(selfplay_game->game_id());
   auto* game = selfplay_game->game();
   if (FLAGS_verbose) {
     LogEndGameInfo(*game, selfplay_game->duration());

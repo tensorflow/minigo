@@ -86,7 +86,10 @@ flags.DEFINE_boolean('bootstrap', False, '')
 flags.DEFINE_boolean('validate', False, 'Run validation on holdout games')
 
 flags.DEFINE_boolean('use_extra_features', False,
-                     'Use non-Zero input features')
+                     'Use non-Zero input features.')
+
+flags.DEFINE_boolean('use_bool_features', False,
+                     'Use boolean input features instead of float.')
 
 flags.DEFINE_integer('min_games_per_iteration', 4096,
                      'Minimum number of games to play for each training '
@@ -444,6 +447,7 @@ async def train(state, selfplay_processes):
         '--work_dir={}'.format(fsdb.working_dir()),
         '--export_path={}'.format(model_path),
         '--use_extra_features={}'.format(FLAGS.use_extra_features),
+        '--bool_features={}'.format(FLAGS.use_bool_features),
         '--freeze=true',
         *tf_records)
 

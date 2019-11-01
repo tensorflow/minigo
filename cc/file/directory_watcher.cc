@@ -77,13 +77,15 @@ DirectoryWatcher::DirectoryWatcher(
   basename_and_length_pattern_ = absl::StrCat(basename_pattern_, "%n");
 
   poll_thread_ = absl::make_unique<LambdaThread>(
-      std::bind(&DirectoryWatcher::ThreadRun, this));
+      "DirWatcher", std::bind(&DirectoryWatcher::ThreadRun, this));
   poll_thread_->Start();
 }
 
 DirectoryWatcher::~DirectoryWatcher() {
-  absl::MutexLock lock(&mutex_);
-  is_joining_ = true;
+  {
+    absl::MutexLock lock(&mutex_);
+    is_joining_ = true;
+  }
   poll_thread_->Join();
 }
 

@@ -3,7 +3,7 @@
 
 --flagfile=ml_perf/flags/19/selfplay.flags
 
---num_readouts=160
+--num_readouts=80
 --fastplay_frequency=0
 
 --holdout_pct=0
@@ -11,10 +11,11 @@
 --device=0
 --cache_size_mb=0
 
+--output_threads=4
 --selfplay_threads=48
 --parallel_search=1
 --parallel_inference=48
---concurrent_games_per_thread=1
+--concurrent_games_per_thread=16
 
 --allow_pass=0
 --target_pruning=0

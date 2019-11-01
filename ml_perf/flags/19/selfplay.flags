@@ -20,9 +20,9 @@
 --verbose=false
 
 --selfplay_threads=3
---parallel_search=2
---parallel_inference=3
---concurrent_games_per_thread=16
+--parallel_search=4
+--parallel_inference=2
+--concurrent_games_per_thread=32
 
 --target_pruning=1
 --restrict_in_bensons=1

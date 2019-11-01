@@ -14,6 +14,7 @@
 
 #include "cc/async/sharded_executor.h"
 
+#include "absl/strings/str_cat.h"
 #include "wtf/macros.h"
 
 namespace minigo {
@@ -60,7 +61,9 @@ void ShardedExecutor::Execute(std::function<void(int, int)> fn) {
 }
 
 ShardedExecutor::WorkerThread::WorkerThread(int shard, int num_shards)
-    : shard_(shard), num_shards_(num_shards) {}
+    : Thread(absl::StrCat("ShardExec:", shard)),
+      shard_(shard),
+      num_shards_(num_shards) {}
 
 void ShardedExecutor::WorkerThread::Execute(std::function<void(int, int)>* fn) {
   fn_ = fn;

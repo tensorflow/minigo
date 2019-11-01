@@ -81,6 +81,7 @@ void WriteTfExamples(const std::string& path,
 
   RecordWriterOptions options;
   options.compression_type = RecordWriterOptions::ZLIB_COMPRESSION;
+  options.zlib_options.compression_level = 2;
   RecordWriter writer(file.get(), options);
 
   std::string data;

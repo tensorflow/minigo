@@ -19,6 +19,7 @@ cc_library(
         ":semaphore",
         "//cc:thread",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@wtf",
     ],

@@ -16,6 +16,7 @@
 #define CC_THREAD_H_
 
 #include <functional>
+#include <string>
 #include <thread>
 
 #include "absl/synchronization/mutex.h"
@@ -27,6 +28,8 @@ class Thread {
   virtual ~Thread();
 
   Thread() = default;
+  explicit Thread(std::string name);
+
   Thread(Thread&&) = default;
   Thread& operator=(Thread&&) = default;
 
@@ -38,6 +41,7 @@ class Thread {
  private:
   virtual void Run() = 0;
 
+  std::string name_;
   std::thread impl_;
 };
 
@@ -45,6 +49,10 @@ class LambdaThread : public Thread {
  public:
   template <typename T>
   explicit LambdaThread(T closure) : closure_(std::move(closure)) {}
+
+  template <typename T>
+  LambdaThread(std::string name, T closure)
+      : Thread(std::move(name)), closure_(std::move(closure)) {}
 
   LambdaThread(LambdaThread&&) = default;
   LambdaThread& operator=(LambdaThread&&) = default;
@@ -60,6 +68,9 @@ class LambdaThread : public Thread {
 // This can be useful to serialize the order in which threads start.
 class BlockingStartThread : public Thread {
  public:
+  BlockingStartThread() = default;
+  explicit BlockingStartThread(std::string name) : Thread(std::move(name)) {}
+
   void Start() override {
     Thread::Start();
     absl::MutexLock lock(&mutex_);

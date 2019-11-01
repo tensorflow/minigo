@@ -30,9 +30,9 @@ http_archive(
 http_archive(
     name = "wtf",
     build_file = "//cc:wtf.BUILD",
-    sha256 = "e9434641b5923df85d1fe0082030ce2ac8aad9d95676682aa072ad88421a2bc1",
-    strip_prefix = "tracing-framework-495ced98de99a5895e484b2e09771edb42d3c7ab",
-    urls = ["https://github.com/google/tracing-framework/archive/495ced98de99a5895e484b2e09771edb42d3c7ab.zip"],
+    sha256 = "1837833cd159060f8bd6f6dd87edf854ed3135d07a6937b7e14b0efe70580d74",
+    strip_prefix = "tracing-framework-fb639271fa3d56ed1372a792d74d257d4e0c235c",
+    urls = ["https://github.com/google/tracing-framework/archive/fb639271fa3d56ed1372a792d74d257d4e0c235c.zip"],
 )
 
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_workspace")
