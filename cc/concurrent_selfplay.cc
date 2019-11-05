@@ -233,6 +233,7 @@ class SelfplayGame {
   int game_id() const { return game_id_; }
   Game* game() { return game_.get(); }
   const Game* game() const { return game_.get(); }
+  const MctsTree* tree() const { return tree_.get(); }
   absl::Duration duration() const { return duration_; }
   const Options& options() const { return options_; }
   const std::vector<std::string>& models_used() const { return models_used_; }
@@ -543,7 +544,6 @@ bool SelfplayGame::MaybePlayMove() {
     }
 
     // If the whole board is pass-alive, play pass moves to end the game.
-    /// if (tree_->root()->position.n() >= 16) {
     if (tree_->root()->position.n() >= kMinPassAliveMoves &&
         tree_->root()->position.CalculateWholeBoardPassAlive()) {
       while (!tree_->is_game_over()) {
@@ -916,9 +916,10 @@ void SelfplayThread::SelectLeaves() {
       }
 
       if (kWtfEnabledForNamespace) {
+        auto root_n = selfplay_game->tree()->root()->position.n();
         for (size_t j = 0; j < span.len; ++j) {
           const auto& position = search.inferences[span.pos + j].leaf->position;
-          num_nodes_visited += position.n() + 1;
+          num_nodes_visited += position.n() + 1 - root_n;
         }
         num_leaves_selected += span.len;
       }
