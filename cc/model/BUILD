@@ -17,6 +17,7 @@ minigo_cc_library(
     srcs = [
         "features_internal.h",
         "model.cc",
+        "types.cc",
     ],
     hdrs = [
         "features.h",
@@ -93,6 +94,15 @@ minigo_cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
+    ],
+)
+
+minigo_cc_test(
+    name = "types_test",
+    srcs = ["types_test.cc"],
+    deps = [
+        ":model",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

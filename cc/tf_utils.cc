@@ -37,7 +37,7 @@ namespace tf_utils {
 namespace {
 
 tensorflow::Feature MakeBytesFeature(const Tensor<uint8_t>& src) {
-  int size = src.n * src.h * src.w * src.c;
+  int size = src.shape.num_elements();
   tensorflow::Feature feature;
   feature.mutable_bytes_list()->add_value(
       reinterpret_cast<const void*>(src.data), size);
@@ -103,7 +103,7 @@ std::vector<tensorflow::Example> MakeExamples(
   examples.reserve(game.num_moves());
 
   BoardFeatureBuffer<uint8_t> features_buffer;
-  Tensor<uint8_t> features(1, kN, kN, feature_desc.num_planes,
+  Tensor<uint8_t> features({1, kN, kN, feature_desc.num_planes},
                            features_buffer.data());
 
   for (size_t i = 0; i < game.moves().size(); ++i) {

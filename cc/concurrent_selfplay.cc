@@ -393,6 +393,11 @@ class SelfplayThread : public Thread {
       size_t len;
     };
 
+    void Clear() {
+      inferences.clear();
+      inference_spans.clear();
+    }
+
     std::vector<Inference> inferences;
     std::vector<InferenceSpan> inference_spans;
   };
@@ -410,9 +415,8 @@ class SelfplayThread : public Thread {
 // Writes SGFs and training examples for completed games to disk.
 class OutputThread : public Thread {
  public:
-  OutputThread(
-      int thread_id, FeatureDescriptor feature_descriptor,
-      ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue);
+  OutputThread(int thread_id, FeatureDescriptor feature_descriptor,
+               ThreadSafeQueue<std::unique_ptr<SelfplayGame>>* output_queue);
 
  private:
   void Run() override;
@@ -840,10 +844,10 @@ void Selfplayer::CreateModels(const std::string& path) {
 
 SelfplayThread::SelfplayThread(int thread_id, Selfplayer* selfplayer,
                                std::shared_ptr<InferenceCache> cache)
-      : Thread(absl::StrCat("Selfplay:", thread_id_)),
-        selfplayer_(selfplayer),
-        cache_(std::move(cache)),
-        thread_id_(thread_id) {
+    : Thread(absl::StrCat("Selfplay:", thread_id)),
+      selfplayer_(selfplayer),
+      cache_(std::move(cache)),
+      thread_id_(thread_id) {
   selfplay_games_.resize(FLAGS_concurrent_games_per_thread);
 }
 
@@ -897,8 +901,7 @@ void SelfplayThread::SelectLeaves() {
     MG_CHECK(static_cast<size_t>(num_shards) == searches_.size());
 
     auto& search = searches_[shard_idx];
-    search.inferences.clear();
-    search.inference_spans.clear();
+    search.Clear();
 
     int num_leaves_selected = 0;
     int num_nodes_visited = 0;
@@ -925,7 +928,8 @@ void SelfplayThread::SelectLeaves() {
       }
     }
 
-    WTF_APPEND_SCOPE("leaves, nodes", int, int)(num_leaves_selected, num_nodes_visited);
+    WTF_APPEND_SCOPE("leaves, nodes", int, int)
+    (num_leaves_selected, num_nodes_visited);
   });
 }
 
@@ -994,8 +998,7 @@ OutputThread::OutputThread(
       output_dir_(FLAGS_output_dir),
       holdout_dir_(FLAGS_holdout_dir),
       sgf_dir_(FLAGS_sgf_dir),
-      feature_descriptor_(std::move(feature_descriptor)) {
-}
+      feature_descriptor_(std::move(feature_descriptor)) {}
 
 void OutputThread::Run() {
   for (;;) {

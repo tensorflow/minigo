@@ -146,7 +146,7 @@ void TpuDualNet::RunManyImpl(std::string* model_name) {
 
   // Run the model.
   {
-    WTF_SCOPE("Session::Run", size_t)(batch_capacity_);
+    WTF_SCOPE("Session::Run: capacity", size_t)(batch_capacity_);
     TF_CHECK_OK(session_->Run(inputs_, output_names_, {}, &outputs_));
   }
 

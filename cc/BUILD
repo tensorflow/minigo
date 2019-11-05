@@ -84,7 +84,7 @@ minigo_cc_library(
         ":logging",
         ":mcts",
         ":sgf",
-        "//cc:thread_safe_queue",
+        ":thread_safe_queue",
         "//cc/file",
         "//cc/model",
         "@com_google_absl//absl/container:flat_hash_map",

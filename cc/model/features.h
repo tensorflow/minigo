@@ -159,14 +159,14 @@ struct Features {
   template <typename T>
   static void Set(const std::vector<const ModelInput*>& inputs,
                   Tensor<T>* features) {
-    MG_CHECK(features->h == kN && features->w && kN &&
-             features->c == Impl::kNumPlanes)
-        << features->h << " " << features->w << " " << features->c;
-    int stride = features->h * features->w * features->c;
+    MG_CHECK(features->shape.is({-1, kN, kN, Impl::kNumPlanes}))
+        << features->shape;
+
+    int stride = features->shape[1] * features->shape[2] * features->shape[3];
     auto* data = features->data;
     std::array<T, kN * kN * kNumPlanes> raw_features;
     for (const auto* input : inputs) {
-      Impl::SetAll(*input, features->c, raw_features.data());
+      Impl::SetAll(*input, Impl::kNumPlanes, raw_features.data());
       symmetry::ApplySymmetry<kN, kNumPlanes>(input->sym, raw_features.data(),
                                               data);
       data += stride;

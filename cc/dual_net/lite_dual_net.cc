@@ -35,9 +35,8 @@ namespace {
 
 void Unquantize(const TfLiteQuantizationParams& params,
                 const Tensor<uint8_t>& src, Tensor<float>* dst) {
-  MG_CHECK(src.n == dst->n && src.h == dst->h && src.w == dst->w &&
-           src.c == dst->c);
-  int size = src.n * src.h * src.w * src.c;
+  MG_CHECK(src.shape == dst->shape);
+  int size = src.shape.num_elements();
   for (int i = 0; i < size; ++i) {
     dst->data[i] = (src.data[i] - params.zero_point) * params.scale;
   }
@@ -133,8 +132,8 @@ void LiteDualNet::Reserve(int capacity) {
   policy_ = interpreter_->tensor(policy_idx_);
   value_ = interpreter_->tensor(value_idx_);
 
-  unquantized_policy_.resize(capacity, 1, 1, kNumMoves);
-  unquantized_value_.resize(capacity, 1, 1, 1);
+  unquantized_policy_.resize({capacity, 1, 1, kNumMoves});
+  unquantized_value_.resize({capacity, 1, 1, 1});
 
   batch_capacity_ = capacity;
 }
@@ -150,26 +149,25 @@ void LiteDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
   const auto& dims = input_->dims->data;
   switch (input_->type) {
     case kTfLiteFloat32: {
-      Tensor<float> features(dims[0], dims[1], dims[2], dims[3],
+      Tensor<float> features({dims[0], dims[1], dims[2], dims[3]},
                              input_->data.f);
       feature_descriptor().set_floats(inputs, &features);
 
       MG_CHECK(interpreter_->Invoke() == kTfLiteOk);
 
-      policy = Tensor<float>(batch_capacity_, 1, 1, kNumMoves, policy_->data.f);
-      value = Tensor<float>(batch_capacity_, 1, 1, 1, value_->data.f);
+      policy = Tensor<float>({batch_capacity_, kNumMoves}, policy_->data.f);
+      value = Tensor<float>({batch_capacity_}, value_->data.f);
       break;
     }
     case kTfLiteUInt8: {
-      Tensor<uint8_t> features(dims[0], dims[1], dims[2], dims[3],
+      Tensor<uint8_t> features({dims[0], dims[1], dims[2], dims[3]},
                                input_->data.uint8);
       feature_descriptor().set_bytes(inputs, &features);
       MG_CHECK(interpreter_->Invoke() == kTfLiteOk);
 
-      Tensor<uint8_t> quantized_policy(batch_capacity_, 1, 1, kNumMoves,
+      Tensor<uint8_t> quantized_policy({batch_capacity_, kNumMoves},
                                        policy_->data.uint8);
-      Tensor<uint8_t> quantized_value(batch_capacity_, 1, 1, 1,
-                                      value_->data.uint8);
+      Tensor<uint8_t> quantized_value({batch_capacity_}, value_->data.uint8);
 
       policy = unquantized_policy_.tensor();
       value = unquantized_value_.tensor();

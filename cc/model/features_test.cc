@@ -158,7 +158,7 @@ TEST(FeaturesTest, TestSet) {
 
     // Allocate a feature tensor.
     BackedTensor<int> features;
-    features.resize(kBatchSize, kN, kN, TestFeatures::kNumPlanes);
+    features.resize({kBatchSize, kN, kN, TestFeatures::kNumPlanes});
 
     // Set the test input features.
     TestFeatures::Set(inputs, &features.tensor());

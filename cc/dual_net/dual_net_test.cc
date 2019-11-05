@@ -42,9 +42,9 @@ namespace {
 template <typename T>
 std::vector<T> GetStoneFeatures(const Tensor<T>& features, Coord c) {
   std::vector<T> result;
-  MG_CHECK(features.n == 1);
-  for (int i = 0; i < features.c; ++i) {
-    result.push_back(features.data[c * features.c + i]);
+  MG_CHECK(features.shape.is({1, kN, kN, -1}));
+  for (int i = 0; i < features.shape[3]; ++i) {
+    result.push_back(features.data[c * features.shape[3] + i]);
   }
   return result;
 }
@@ -65,7 +65,8 @@ TYPED_TEST(DualNetTest, TestEmptyBoardBlackToPlay) {
   input.position_history.push_back(&board);
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
+                            buffer.data()};
   FeatureType::Set({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
@@ -90,7 +91,8 @@ TYPED_TEST(DualNetTest, TestEmptyBoardWhiteToPlay) {
   input.position_history.push_back(&board);
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
+                            buffer.data()};
   FeatureType::Set({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
@@ -122,7 +124,8 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
   }
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
+                            buffer.data()};
   FeatureType::Set({&input}, &features);
 
   //                        B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7 C
@@ -181,7 +184,8 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   }
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {1, kN, kN, FeatureType::kNumPlanes, buffer.data()};
+  Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
+                            buffer.data()};
   FeatureType::Set({&input}, &features);
 
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
@@ -285,7 +289,7 @@ TEST(WouldCaptureTest, WouldCaptureBlack) {
   input.position_history.push_back(&board);
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {1, kN, kN, ExtraFeatures::kNumPlanes,
+  Tensor<float> features = {{1, kN, kN, ExtraFeatures::kNumPlanes},
                             buffer.data()};
   ExtraFeatures::Set({&input}, &features);
 
@@ -313,7 +317,7 @@ TEST(WouldCaptureTest, WouldCaptureWhite) {
   input.position_history.push_back(&board);
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {1, kN, kN, ExtraFeatures::kNumPlanes,
+  Tensor<float> features = {{1, kN, kN, ExtraFeatures::kNumPlanes},
                             buffer.data()};
   ExtraFeatures::Set({&input}, &features);
 

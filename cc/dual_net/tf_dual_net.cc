@@ -100,7 +100,6 @@ TfDualNet::TfDualNet(const std::string& graph_path,
 
   TF_CHECK_OK(session_->MakeCallable(callable_options, &handle_));
 
-
   for (const auto& node : graph_def.node()) {
     if (node.name() == "pos_tensor") {
       auto it = node.attr().find("dtype");
@@ -109,12 +108,15 @@ TfDualNet::TfDualNet(const std::string& graph_path,
       break;
     }
   }
-  const auto* desc = google::protobuf::GetEnumDescriptor<tensorflow::DataType>();
+  const auto* desc =
+      google::protobuf::GetEnumDescriptor<tensorflow::DataType>();
   const auto* value = desc->FindValueByNumber(input_type_);
   MG_CHECK(value != nullptr);
-  MG_LOG(INFO) << "Model " << graph_path_ << " has input type " << value->name();
+  MG_LOG(INFO) << "Model " << graph_path_ << " has input type "
+               << value->name();
   MG_CHECK(input_type_ == tensorflow::DT_FLOAT ||
-           input_type_ == tensorflow::DT_BOOL) << input_type_;
+           input_type_ == tensorflow::DT_BOOL)
+      << input_type_;
 
   output_names_.emplace_back("policy_output");
   output_names_.emplace_back("value_output");
@@ -132,38 +134,37 @@ void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                         std::string* model_name) {
   Reserve(inputs.size());
 
-  WTF_SCOPE("TfDualNet::Run", size_t, int)(inputs.size(), batch_capacity_);
+  WTF_SCOPE("TfDualNet::Run: inputs, capacity", size_t, int)
+  (inputs.size(), batch_capacity_);
   MG_CHECK(inputs.size() == outputs->size());
 
   if (input_type_ == tensorflow::DT_FLOAT) {
-    WTF_SCOPE("Features::SetFloat", int)(batch_capacity_);
-    Tensor<float> features(batch_capacity_, kN, kN,
-                           feature_descriptor().num_planes,
-                           inputs_[0].flat<float>().data());
+    WTF_SCOPE("Features::SetFloat: capacity", int)(batch_capacity_);
+    Tensor<float> features(
+        {batch_capacity_, kN, kN, feature_descriptor().num_planes},
+        inputs_[0].flat<float>().data());
     feature_descriptor().set_floats(inputs, &features);
   } else {
-    WTF_SCOPE("Features::SetBool", int)(batch_capacity_);
+    WTF_SCOPE("Features::SetBool: capacity", int)(batch_capacity_);
     static_assert(sizeof(bool) == sizeof(uint8_t), "bool must be 1 byte");
-    Tensor<uint8_t> features(batch_capacity_, kN, kN,
-                           feature_descriptor().num_planes,
-                           reinterpret_cast<uint8_t*>(inputs_[0].flat<bool>().data()));
+    Tensor<uint8_t> features(
+        {batch_capacity_, kN, kN, feature_descriptor().num_planes},
+        reinterpret_cast<uint8_t*>(inputs_[0].flat<bool>().data()));
     feature_descriptor().set_bytes(inputs, &features);
   }
 
   // Run the model.
   {
-    WTF_SCOPE("Session::Run", int)(batch_capacity_);
+    WTF_SCOPE("Session::Run: capacity", int)(batch_capacity_);
     outputs_.clear();
-    TF_CHECK_OK(session_->RunCallable(
-          handle_, inputs_, &outputs_, nullptr));
+    TF_CHECK_OK(session_->RunCallable(handle_, inputs_, &outputs_, nullptr));
   }
 
-  Tensor<float> policy(batch_capacity_, 1, 1, kNumMoves,
+  Tensor<float> policy({batch_capacity_, kNumMoves},
                        outputs_[0].flat<float>().data());
-  Tensor<float> value(batch_capacity_, 1, 1, 1,
-                      outputs_[1].flat<float>().data());
+  Tensor<float> value({batch_capacity_}, outputs_[1].flat<float>().data());
   {
-    WTF_SCOPE("Model::GetOutputs", int)(batch_capacity_);
+    WTF_SCOPE("Model::GetOutputs: capacity", int)(batch_capacity_);
     Model::GetOutputs(inputs, policy, value, outputs);
   }
 
@@ -182,8 +183,8 @@ void TfDualNet::Reserve(int capacity) {
 
   // pos_tensor
   inputs_.emplace_back(
-      input_type_,
-      tensorflow::TensorShape({capacity, kN, kN, feature_descriptor().num_planes}));
+      input_type_, tensorflow::TensorShape(
+                       {capacity, kN, kN, feature_descriptor().num_planes}));
 
   batch_capacity_ = capacity;
 }

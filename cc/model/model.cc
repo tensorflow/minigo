@@ -19,16 +19,16 @@
 namespace minigo {
 
 Model::Model(std::string name, const FeatureDescriptor& feature_desc)
-    : name_(std::move(name)),
-      feature_desc_(feature_desc) {}
+    : name_(std::move(name)), feature_desc_(feature_desc) {}
 Model::~Model() = default;
 
 void Model::GetOutputs(const std::vector<const ModelInput*>& inputs,
                        const Tensor<float>& policy, const Tensor<float>& value,
                        std::vector<ModelOutput*>* outputs) {
   MG_CHECK(outputs->size() == inputs.size());
-  MG_CHECK(policy.n == value.n);
-  MG_CHECK(static_cast<int>(inputs.size()) <= policy.n);
+  MG_CHECK(policy.shape.is({value.shape[0], kNumMoves}));
+  MG_CHECK(value.shape.is({policy.shape[0]}));
+  MG_CHECK(static_cast<int>(inputs.size()) <= policy.shape[0]);
 
   // Copy the policy and value out of the output tensors.
   for (size_t input_idx = 0; input_idx < inputs.size(); ++input_idx) {
