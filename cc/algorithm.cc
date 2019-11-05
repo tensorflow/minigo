@@ -31,7 +31,7 @@ int ArgMaxSse(absl::Span<const float> span) {
     MG_CHECK(!span.empty());
     size_t idx_max = 0;
     for (size_t i = 1; i < span.size(); ++i) {
-      if (span[i] < span[idx_max]) {
+      if (span[i] > span[idx_max]) {
         idx_max = i;
       }
     }

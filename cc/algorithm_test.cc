@@ -43,7 +43,38 @@ TEST(AlgorithmTest, ArgMaxSseTieBreak) {
 
   vals[14] = 1;
   ASSERT_EQ(3, ArgMaxSse(vals));
+
+  vals[14] = 2;
+  ASSERT_EQ(14, ArgMaxSse(vals));
+  vals[13] = 2;
+  ASSERT_EQ(13, ArgMaxSse(vals));
+  vals[12] = 2;
+  ASSERT_EQ(12, ArgMaxSse(vals));
+  vals[11] = 2;
+  ASSERT_EQ(11, ArgMaxSse(vals));
 }
+
+TEST(AlgorithmTest, ArgMax4) {
+  std::array<float, 4> vals{1, 1, 1, 1};
+  ASSERT_EQ(0, ArgMaxSse(vals));
+
+  vals[1] = 3;
+  ASSERT_EQ(1, ArgMaxSse(vals));
+}
+
+TEST(AlgorithmTest, ArgMax3) {
+  std::array<float, 3> vals{1, 1, 1};
+  ASSERT_EQ(0, ArgMaxSse(vals));
+
+  vals[0] = 3;
+  ASSERT_EQ(0, ArgMaxSse(vals));
+  vals[1] = 4;
+  ASSERT_EQ(1, ArgMaxSse(vals));
+  vals[2] = 5;
+  ASSERT_EQ(2, ArgMaxSse(vals));
+}
+
+
 
 }  // namespace
 }  // namespace minigo
