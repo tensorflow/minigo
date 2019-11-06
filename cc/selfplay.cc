@@ -88,9 +88,6 @@ DEFINE_double(value_init_penalty, 2.0,
 DEFINE_double(policy_softmax_temp, 0.98,
               "For soft-picked moves, the probabilities are exponentiated by "
               "policy_softmax_temp to encourage diversity in early play.\n");
-DEFINE_bool(restrict_in_bensons, false,
-            "Prevent play in benson's regions after 5 passes have been "
-            "played.\n");
 
 DEFINE_string(flags_path, "",
               "Optional path to load flags from. Flags specified in this file "
@@ -209,7 +206,6 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   player_options->tree.value_init_penalty = FLAGS_value_init_penalty;
   player_options->tree.policy_softmax_temp = FLAGS_policy_softmax_temp;
   player_options->tree.soft_pick_enabled = FLAGS_soft_pick;
-  player_options->tree.restrict_in_bensons = FLAGS_restrict_in_bensons;
   player_options->virtual_losses = FLAGS_virtual_losses;
   player_options->random_seed = FLAGS_seed;
   player_options->random_symmetry = FLAGS_random_symmetry;
@@ -221,8 +217,7 @@ void ParseOptionsFromFlags(Game::Options* game_options,
 
 class SelfPlayer {
  public:
-  SelfPlayer()
-      : rnd_(FLAGS_seed, Random::kUniqueStream) {}
+  SelfPlayer() : rnd_(FLAGS_seed, Random::kUniqueStream) {}
 
   void Run() {
     auto player_start_time = absl::Now();
@@ -390,9 +385,8 @@ class SelfPlayer {
       int current_readouts = 0;
       bool fastplay;
       int readouts;
-      int num_passes = 0;
       absl::Time search_start_time;
-      while (!game->game_over() && !player->root()->at_move_limit()) {
+      while (!game->game_over()) {
         if (player->root()->position.n() >= kMinPassAliveMoves &&
             player->root()->position.CalculateWholeBoardPassAlive()) {
           // Play pass moves to end the game.
@@ -408,9 +402,8 @@ class SelfPlayer {
           search_start_time = absl::Now();
         }
 
-        fastplay = (
-            thread_options.player_options.fastplay_frequency > 0 &&
-            rnd_() < thread_options.player_options.fastplay_frequency);
+        fastplay = (thread_options.player_options.fastplay_frequency > 0 &&
+                    rnd_() < thread_options.player_options.fastplay_frequency);
         readouts = (fastplay ? thread_options.player_options.fastplay_readouts
                              : thread_options.player_options.num_readouts);
 
@@ -425,7 +418,7 @@ class SelfPlayer {
         Coord move = Coord::kInvalid;
         {
           WTF_SCOPE0("SuggestMove");
-          move = player->SuggestMove(readouts, !fastplay, num_passes > 5);
+          move = player->SuggestMove(readouts, !fastplay);
         }
 
         // Log tree search stats.
@@ -509,7 +502,8 @@ class SelfPlayer {
           MG_LOG(INFO) << "Total positions played: " << stats.total_positions;
           MG_LOG(INFO) << "Unique positions played: "
                        << stats.num_unique_positions << " ("
-                       << (100 * static_cast<double>(stats.num_unique_positions) /
+                       << (100 *
+                           static_cast<double>(stats.num_unique_positions) /
                            static_cast<double>(stats.total_positions))
                        << "%)";
         }

@@ -97,8 +97,7 @@ bool MctsPlayer::UndoMove() {
   return true;
 }
 
-Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise,
-                              bool restrict_in_bensons) {
+Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise) {
   auto start = absl::Now();
 
   if (inject_noise) {
@@ -129,7 +128,7 @@ Coord MctsPlayer::SuggestMove(int new_readouts, bool inject_noise,
     return Coord::kResign;
   }
 
-  return tree_->PickMove(&rnd_);
+  return tree_->PickMove(&rnd_, true);
 }
 
 void MctsPlayer::TreeSearch(int num_leaves, int max_num_reads) {
@@ -162,7 +161,7 @@ void MctsPlayer::SelectLeaves(int num_leaves, int max_num_reads) {
          tree_->root()->N() < max_num_reads) {
     auto* leaf = tree_->SelectLeaf(true);
 
-    if (leaf->game_over() || leaf->at_move_limit()) {
+    if (leaf->game_over()) {
       float value =
           leaf->position.CalculateScore(game_->options().komi) > 0 ? 1 : -1;
       tree_->IncorporateEndGameResult(leaf, value);
@@ -263,22 +262,15 @@ bool MctsPlayer::PlayMove(Coord c, bool is_trainable) {
 
   // Adjust the visits before adding the move's search_pi to the Game.
   if (is_trainable && options_.target_pruning) {
-    tree_->ReshapeFinalVisits();
+    tree_->ReshapeFinalVisits(true);
   }
 
-  UpdateGame(c);
-
-  if (is_trainable && c != Coord::kResign) {
-    game_->MarkLastMoveAsTrainable();
-  }
+  UpdateGame(c, is_trainable);
 
   tree_->PlayMove(c);
 
   // Handle consecutive passing or termination by move limit.
-  if (tree_->at_move_limit()) {
-    game_->SetGameOverBecauseMoveLimitReached(
-        tree_->CalculateScore(game_->options().komi));
-  } else if (tree_->is_game_over()) {
+  if (tree_->is_game_over()) {
     game_->SetGameOverBecauseOfPasses(
         tree_->CalculateScore(game_->options().komi));
   }
@@ -286,7 +278,15 @@ bool MctsPlayer::PlayMove(Coord c, bool is_trainable) {
   return true;
 }
 
-void MctsPlayer::UpdateGame(Coord c) {
+void MctsPlayer::PlayOpponentsMove(Coord c) {
+  if (!tree_->is_game_over()) {
+    MG_CHECK(c != Coord::kResign);
+    MG_CHECK(tree_->is_legal_move(c));
+    tree_->PlayMove(c);
+  }
+}
+
+void MctsPlayer::UpdateGame(Coord c, bool is_trainable) {
   const auto* root = tree_->root();
 
   // Record which model(s) were used when running tree search for this move.
@@ -308,11 +308,15 @@ void MctsPlayer::UpdateGame(Coord c) {
         absl::StrCat("models:", absl::StrJoin(models, ","), "\n", comment);
   }
 
-  auto search_pi = tree_->CalculateSearchPi();
-
   // Update the game history.
-  game_->AddMove(tree_->to_play(), c, root->position, std::move(comment),
-                 root->Q(), search_pi);
+  if (is_trainable && c != Coord::kResign) {
+    auto search_pi = tree_->CalculateSearchPi();
+    game_->AddTrainableMove(tree_->to_play(), c, root->position,
+                            std::move(comment), root->Q(), search_pi);
+  } else {
+    game_->AddNonTrainableMove(tree_->to_play(), c, root->position,
+                               std::move(comment), root->Q());
+  }
 }
 
 // TODO(tommadams): move this up to below SelectLeaves.

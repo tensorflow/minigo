@@ -141,13 +141,13 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
   }
 }
 
-Coord MctsNode::GetMostVisitedMove(bool restrict_in_bensons) const {
+Coord MctsNode::GetMostVisitedMove(bool restrict_pass_alive) const {
   // Find the set of moves with the largest N.
   inline_vector<Coord, kNumMoves> moves;
   // CalculatePassAlive does not include the kPass point.
   std::array<Color, kN * kN> out_of_bounds;
 
-  if (restrict_in_bensons) {
+  if (restrict_pass_alive) {
     out_of_bounds = position.CalculatePassAliveRegions();
   } else {
     for (auto& x : out_of_bounds) {
@@ -334,8 +334,7 @@ std::ostream& operator<<(std::ostream& os, const MctsTree::Options& options) {
   return os << "value_init_penalty:" << options.value_init_penalty
             << " policy_softmax_temp:" << options.policy_softmax_temp
             << " soft_pick_enabled:" << options.soft_pick_enabled
-            << " soft_pick_cutoff:" << options.soft_pick_cutoff
-            << " restrict_in_bensons:" << options.restrict_in_bensons;
+            << " soft_pick_cutoff:" << options.soft_pick_cutoff;
 }
 
 MctsTree::MctsTree(const Position& position, const Options& options)
@@ -366,12 +365,12 @@ MctsNode* MctsTree::SelectLeaf(bool allow_pass) {
   }
 }
 
-Coord MctsTree::PickMove(Random* rnd) const {
+Coord MctsTree::PickMove(Random* rnd, bool restrict_pass_alive) const {
   if (options_.soft_pick_enabled &&
       root_->position.n() < options_.soft_pick_cutoff) {
-    return SoftPickMove(rnd);
+    return SoftPickMove(rnd, restrict_pass_alive);
   } else {
-    return PickMostVisitedMove();
+    return PickMostVisitedMove(restrict_pass_alive);
   }
 }
 
@@ -490,7 +489,7 @@ void MctsTree::IncorporateResults(MctsNode* leaf,
 }
 
 void MctsTree::IncorporateEndGameResult(MctsNode* leaf, float value) {
-  MG_DCHECK(leaf->game_over() || leaf->at_move_limit());
+  MG_DCHECK(leaf->game_over());
   MG_DCHECK(!leaf->is_expanded);
   BackupValue(leaf, value);
 }
@@ -532,7 +531,7 @@ void MctsTree::InjectNoise(const std::array<float, kNumMoves>& noise,
   }
 }
 
-void MctsTree::ReshapeFinalVisits() {
+void MctsTree::ReshapeFinalVisits(bool restrict_pass_alive) {
   // Since we aren't actually disallowing *reads* of bensons moves, only their
   // selection, we get the most visited move regardless of bensons status and
   // reshape based on its action score.
@@ -552,14 +551,14 @@ void MctsTree::ReshapeFinalVisits() {
   // best move.
   for (int i = 0; i < kNumMoves; ++i) {
     // Remove visits in pass alive areas.
-    if (options_.restrict_in_bensons && (i != Coord::kPass) &&
+    if (restrict_pass_alive && (i != Coord::kPass) &&
         (pass_alive_regions[i] != Color::kEmpty)) {
       root_->edges.N[i] = 0;
       continue;
     }
 
     // Skip the best move; it has the highest action score.
-    if (i == uint16_t(best)) {
+    if (i == best) {
       if (root_->edges.N[i] > 0) {
         any = true;
       }
@@ -606,6 +605,7 @@ std::array<float, kNumMoves> MctsTree::CalculateSearchPi() const {
   for (int i = 0; i < kNumMoves; ++i) {
     sum += search_pi[i];
   }
+  MG_CHECK(sum > 0);
   for (int i = 0; i < kNumMoves; ++i) {
     search_pi[i] /= sum;
   }
@@ -690,15 +690,15 @@ bool MctsTree::UndoMove() {
   return true;
 }
 
-Coord MctsTree::PickMostVisitedMove() const {
-  auto c = root_->GetMostVisitedMove(options_.restrict_in_bensons);
+Coord MctsTree::PickMostVisitedMove(bool restrict_pass_alive) const {
+  auto c = root_->GetMostVisitedMove(restrict_pass_alive);
   if (!root_->position.legal_move(c)) {
     c = Coord::kPass;
   }
   return c;
 }
 
-Coord MctsTree::SoftPickMove(Random* rnd) const {
+Coord MctsTree::SoftPickMove(Random* rnd, bool restrict_pass_alive) const {
   // Select from the first kN * kN moves (instead of kNumMoves) to avoid
   // randomly choosing to pass early on in the game.
   std::array<float, kN * kN> cdf;
@@ -709,6 +709,17 @@ Coord MctsTree::SoftPickMove(Random* rnd) const {
   for (size_t i = 0; i < cdf.size(); ++i) {
     cdf[i] = std::pow(root_->child_N(i), options_.policy_softmax_temp);
   }
+
+  // Clear probabilities for moves in pass-alive territory.
+  if (restrict_pass_alive) {
+    auto out_of_bounds = root_->position.CalculatePassAliveRegions();
+    for (size_t i = 0; i < kN * kN; ++i) {
+      if (out_of_bounds[i] != Color::kEmpty) {
+        cdf[i] = 0;
+      }
+    }
+  }
+
   for (size_t i = 1; i < cdf.size(); ++i) {
     cdf[i] += cdf[i - 1];
   }

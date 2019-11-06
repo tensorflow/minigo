@@ -58,13 +58,16 @@ class Random {
     return samples;
   }
 
-  // Draw multiple unform random samples in the half-open range [mn, mx).
-  void Uniform(float mn, float mx, absl::Span<float> samples);
+  // Draw a single unform random samples in the half-open range [a, b).
+  float Uniform(float a, float b);
 
-  // Draw multiple unform random samples in the half-open range [mn, mx).
+  // Draw multiple unform random samples in the half-open range [a, b).
+  void Uniform(float a, float b, absl::Span<float> samples);
+
+  // Draw multiple unform random samples in the half-open range [a, b).
   template <typename T>
-  void Uniform(float mn, float mx, T* array_like) {
-    Uniform(mn, mx, {array_like->data(), array_like->size()});
+  void Uniform(float a, float b, T* array_like) {
+    Uniform(a, b, {array_like->data(), array_like->size()});
   }
 
   // Draw multiple unform random samples in the half-open range [0, 1).
@@ -85,9 +88,9 @@ class Random {
   // Draw a single random sample from a normal distribution.
   float NormalDistribution(float mean, float stddev);
 
-  // Returns a uniform random integer in the closed range [mn, mx].
-  int UniformInt(int mn, int mx) {
-    std::uniform_int_distribution<int> distribution(mn, mx);
+  // Returns a uniform random integer in the closed range [a, b].
+  int UniformInt(int a, int b) {
+    std::uniform_int_distribution<int> distribution(a, b);
     return distribution(impl_);
   }
 

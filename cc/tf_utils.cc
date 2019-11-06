@@ -108,7 +108,7 @@ std::vector<tensorflow::Example> MakeExamples(
 
   for (size_t i = 0; i < game.moves().size(); ++i) {
     const auto* move = game.moves()[i].get();
-    if (!move->trainable) {
+    if (!move->is_trainable()) {
       continue;
     }
 
@@ -117,7 +117,7 @@ std::vector<tensorflow::Example> MakeExamples(
     game.GetPositionHistory(i, kMaxPositionHistory, &input.position_history);
 
     feature_desc.set_bytes({&input}, &features);
-    examples.push_back(MakeTfExample(features, move->search_pi, game.result()));
+    examples.push_back(MakeTfExample(features, move->search_pi.value(), game.result()));
   }
   return examples;
 }

@@ -61,8 +61,13 @@ void Random::Dirichlet(float alpha, absl::Span<float> samples) {
   }
 }
 
-void Random::Uniform(float mn, float mx, absl::Span<float> samples) {
-  std::uniform_real_distribution<float> distribution(mn, mx);
+float Random::Uniform(float a, float b) {
+  std::uniform_real_distribution<float> distribution(a, b);
+  return distribution(impl_);
+}
+
+void Random::Uniform(float a, float b, absl::Span<float> samples) {
+  std::uniform_real_distribution<float> distribution(a, b);
   for (float& sample : samples) {
     sample = distribution(impl_);
   }

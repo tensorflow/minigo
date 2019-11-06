@@ -117,12 +117,18 @@ class MctsPlayer {
 
   void NewGame();
 
-  Coord SuggestMove(int new_readouts, bool inject_noise = false,
-                    bool restrict_in_bensons = false);
+  Coord SuggestMove(int new_readouts, bool inject_noise = false);
+
   // Plays the move at point c.
   // If game is non-null, adds a new move to the game's move history and sets
   // the game over state if appropriate.
   bool PlayMove(Coord c, bool is_trainable = false);
+
+  // Used in eval mode to update this player's tree in response to the
+  // opponent's move.
+  // TODO(tommadams): write a new eval binary similar to concurrent_eval so
+  // we can delete MctsPlayer.
+  void PlayOpponentsMove(Coord c);
 
   // Moves the root_ node up to its parent, popping the last move off the game
   // history but preserving the game tree.
@@ -234,7 +240,7 @@ class MctsPlayer {
   // tree to the root.
   void ProcessLeaves();
 
-  void UpdateGame(Coord c);
+  void UpdateGame(Coord c, bool is_trainable);
 
   std::unique_ptr<Model> model_;
 

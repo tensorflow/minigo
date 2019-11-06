@@ -243,30 +243,6 @@ TEST_F(MctsPlayerTest, RidiculouslyParallelTreeSearch) {
   EXPECT_EQ(0, CountPendingVirtualLosses(root));
 }
 
-TEST_F(MctsPlayerTest, LongGameTreeSearch) {
-  MctsPlayer::Options options;
-  auto player = CreateBasicPlayer(options);
-
-  auto board = TestablePosition(kTtFtwBoard, Color::kBlack);
-
-  // Pass until the Position's move count is close to the limit.
-  // Since the Position doesn't actually track what the previous move was, this
-  // won't end the game.
-  for (int i = 0; i < kMaxSearchDepth - 2; ++i) {
-    board.PlayMove(Coord::kPass);
-  }
-
-  player->InitializeGame(board);
-
-  // Test that MCTS can deduce that B wins because of TT-scoring triggered by
-  // move limit.
-  for (int i = 0; i < 10; ++i) {
-    player->TreeSearch(8, std::numeric_limits<int>::max());
-  }
-  EXPECT_EQ(0, CountPendingVirtualLosses(player->root()));
-  EXPECT_LT(0, player->root()->Q());
-}
-
 TEST_F(MctsPlayerTest, ColdStartParallelTreeSearch) {
   MctsPlayer::Options options;
   options.random_seed = 17;
@@ -380,7 +356,7 @@ TEST_F(MctsPlayerTest, SoftPickWithNoVisits) {
   Random rnd(25323, 1);
   auto player =
       absl::make_unique<TestablePlayer>(game_.get(), MctsPlayer::Options());
-  EXPECT_EQ(Coord::kPass, player->mutable_tree()->PickMove(&rnd));
+  EXPECT_EQ(Coord::kPass, player->mutable_tree()->PickMove(&rnd, true));
 }
 
 }  // namespace

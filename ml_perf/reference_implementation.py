@@ -129,28 +129,26 @@ class State:
 class ColorWinStats:
     """Win-rate stats for a single model & color."""
 
-    def __init__(self, total, both_passed, opponent_resigned,
-                 move_limit_reached):
+    def __init__(self, total, both_passed, opponent_resigned):
         self.total = total
         self.both_passed = both_passed
         self.opponent_resigned = opponent_resigned
-        self.move_limit_reached = move_limit_reached
         # Verify that the total is correct
-        assert total == both_passed + opponent_resigned + move_limit_reached
+        assert total == both_passed + opponent_resigned
 
 
 class WinStats:
     """Win-rate stats for a single model."""
 
     def __init__(self, line):
-        pattern = '\s*(\S+)' + '\s+(\d+)' * 8
+        pattern = '\s*(\S+)' + '\s+(\d+)' * 6
         match = re.search(pattern, line)
         if match is None:
             raise ValueError('Can\t parse line "{}"'.format(line))
         self.model_name = match.group(1)
         raw_stats = [float(x) for x in match.groups()[1:]]
-        self.black_wins = ColorWinStats(*raw_stats[:4])
-        self.white_wins = ColorWinStats(*raw_stats[4:])
+        self.black_wins = ColorWinStats(*raw_stats[:3])
+        self.white_wins = ColorWinStats(*raw_stats[3:])
         self.total_wins = self.black_wins.total + self.white_wins.total
 
 

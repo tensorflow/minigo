@@ -105,12 +105,13 @@ DEFINE_bool(target_pruning, false,
 DEFINE_double(policy_softmax_temp, 0.98,
               "For soft-picked moves, the probabilities are exponentiated by "
               "policy_softmax_temp to encourage diversity in early play.\n");
-DEFINE_bool(restrict_in_bensons, false,
-            "Prevent play in benson's regions after 5 passes have been "
-            "played.");
 DEFINE_bool(allow_pass, true,
             "If false, pass moves will only be read and played if there is no "
             "other legal alternative.");
+DEFINE_int32(restrict_pass_alive_play_threshold, 4,
+             "If the opponent has passed at least "
+             "restrict_pass_alive_play_threshold pass moves in a row, playing "
+             "moves in pass-alive territory of either player is disallowed.");
 
 // Threading flags.
 DEFINE_int32(selfplay_threads, 3,
@@ -129,7 +130,12 @@ DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed. "
               "This seed is used to control the moves played, not whether a "
               "game has resignation disabled or is a holdout.");
-DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
+DEFINE_double(min_resign_threshold, -1.0,
+              "Each game's resign threshold is picked randomly from the range "
+              "[min_resign_threshold, max_resign_threshold)");
+DEFINE_double(max_resign_threshold, -0.8,
+              "Each game's resign threshold is picked randomly from the range "
+              "[min_resign_threshold, max_resign_threshold)");
 DEFINE_double(disable_resign_pct, 0.1,
               "Fraction of games to disable resignation for.");
 DEFINE_int32(num_games, 0,
@@ -225,6 +231,10 @@ class SelfplayGame {
     // If false, pass is only read and played if there are no other legal
     // alternatives.
     bool allow_pass;
+
+    // Disallow playing in pass-alive territory once the number of passes played
+    // during a game is at least `restrict_pass_alive_play_threshold`.
+    int restrict_pass_alive_play_threshold;
   };
 
   SelfplayGame(int game_id, const Options& options, std::unique_ptr<Game> game,
@@ -295,6 +305,13 @@ class SelfplayGame {
   // degree on tree reuse from earlier reads but the tree is empty at the start
   // of the game.
   bool fastplay_ = false;
+
+  // Number of consecutive passes played by black and white respectively.
+  // Used to determine when to disallow playing in pass-alive territory.
+  // `num_consecutive_passes_` saturates once it reaches
+  // `restrict_pass_alive_play_threshold` is is not reset to 0 when a non-pass
+  // move is played.
+  int num_consecutive_passes_[2];
 
   const int game_id_;
 };
@@ -468,7 +485,7 @@ int SelfplayGame::SelectLeaves(InferenceCache* cache,
       break;
     }
 
-    if (leaf->game_over() || leaf->at_move_limit()) {
+    if (leaf->game_over()) {
       float value =
           leaf->position.CalculateScore(game_->options().komi) > 0 ? 1 : -1;
       tree_->IncorporateEndGameResult(leaf, value);
@@ -514,7 +531,13 @@ bool SelfplayGame::MaybePlayMove() {
   if (ShouldResign()) {
     game_->SetGameOverBecauseOfResign(OtherColor(tree_->to_play()));
   } else {
-    Coord c = tree_->PickMove(&rnd_);
+    // Hold a reference to the number of consecutive passes played because we'll
+    // update in after `PlayMove`.
+    auto& num_opponent_passes =
+        num_consecutive_passes_[tree_->to_play() == Color::kBlack ? 1 : 0];
+    bool restrict_pass_alive_moves =
+        num_opponent_passes >= options_.restrict_pass_alive_play_threshold;
+    Coord c = tree_->PickMove(&rnd_, restrict_pass_alive_moves);
     if (options_.verbose) {
       const auto& position = tree_->root()->position;
       MG_LOG(INFO) << position.ToPrettyString(use_ansi_colors_);
@@ -533,18 +556,31 @@ bool SelfplayGame::MaybePlayMove() {
       model_str = absl::StrCat("model: ", models_used_.back(), "\n");
     }
 
-    auto search_pi = tree_->CalculateSearchPi();
-    game_->AddMove(tree_->to_play(), c, tree_->root()->position,
-                   std::move(model_str), tree_->root()->Q(), search_pi);
+    if (!fastplay_ && c != Coord::kResign) {
+      auto search_pi = tree_->CalculateSearchPi();
+      game_->AddTrainableMove(tree_->to_play(), c, tree_->root()->position,
+                              std::move(model_str), tree_->root()->Q(),
+                              search_pi);
+    } else {
+      game_->AddNonTrainableMove(tree_->to_play(), c, tree_->root()->position,
+                                 std::move(model_str), tree_->root()->Q());
+    }
 
     if (options_.target_pruning && !fastplay_) {
-      tree_->ReshapeFinalVisits();
+      tree_->ReshapeFinalVisits(restrict_pass_alive_moves);
     }
 
     tree_->PlayMove(c);
 
-    if (c != Coord::kResign && !fastplay_) {
-      game_->MarkLastMoveAsTrainable();
+    // Update the number of consecutive passes.
+    // The number of consecutive passes saturates when it hits
+    // `restrict_pass_alive_play_threshold`.
+    if (num_opponent_passes < options_.restrict_pass_alive_play_threshold) {
+      if (c == Coord::kPass) {
+        num_opponent_passes += 1;
+      } else {
+        num_opponent_passes = 0;
+      }
     }
 
     // If the whole board is pass-alive, play pass moves to end the game.
@@ -556,10 +592,7 @@ bool SelfplayGame::MaybePlayMove() {
     }
 
     // TODO(tommadams): move game over logic out of MctsTree and into Game.
-    if (tree_->at_move_limit()) {
-      game_->SetGameOverBecauseMoveLimitReached(
-          tree_->CalculateScore(game_->options().komi));
-    } else if (tree_->is_game_over()) {
+    if (tree_->is_game_over()) {
       game_->SetGameOverBecauseOfPasses(
           tree_->CalculateScore(game_->options().komi));
     }
@@ -743,6 +776,8 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
     selfplay_options.target_pruning = FLAGS_target_pruning;
     selfplay_options.verbose = verbose;
     selfplay_options.allow_pass = FLAGS_allow_pass;
+    selfplay_options.restrict_pass_alive_play_threshold =
+        FLAGS_restrict_pass_alive_play_threshold;
   }
 
   auto game = absl::make_unique<Game>(player_name, player_name, game_options);
@@ -792,13 +827,13 @@ void Selfplayer::ParseFlags() {
     FLAGS_concurrent_games_per_thread = std::min(
         max_concurrent_games_per_thread, FLAGS_concurrent_games_per_thread);
   }
-
-  game_options_.resign_threshold = -std::fabs(FLAGS_resign_threshold);
+  game_options_.resign_threshold =
+      -rnd_.Uniform(std::fabs(FLAGS_min_resign_threshold),
+                    std::fabs(FLAGS_max_resign_threshold));
 
   tree_options_.value_init_penalty = FLAGS_value_init_penalty;
   tree_options_.policy_softmax_temp = FLAGS_policy_softmax_temp;
   tree_options_.soft_pick_enabled = true;
-  tree_options_.restrict_in_bensons = FLAGS_restrict_in_bensons;
   num_games_remaining_ = FLAGS_num_games;
 }
 

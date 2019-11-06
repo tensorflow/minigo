@@ -36,9 +36,6 @@ constexpr int kNumMoves = kN * kN + 1;
 // but there may be more optimal sequences of moves.
 constexpr int kMinPassAliveMoves = kN * ((kN + 2) / 3);
 
-// 722 moves for 19x19, 162 for 9x9.
-constexpr int kMaxSearchDepth = static_cast<int>(kN * kN * 2);
-
 constexpr float kDefaultKomi = 7.5;
 
 constexpr float kDirichletAlpha = 0.03f * 361 / (kN * kN);

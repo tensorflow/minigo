@@ -10,7 +10,8 @@
 --value_init_penalty=0.2
 --holdout_pct=0.025
 --disable_resign_pct=0.0
---resign_threshold=-0.98
+--min_resign_threshold=-1.0
+--max_resign_threshold=-0.8
 --virtual_losses=2
 
 --dirichlet_alpha=0.03
@@ -25,4 +26,3 @@
 --concurrent_games_per_thread=32
 
 --target_pruning=1
---restrict_in_bensons=1

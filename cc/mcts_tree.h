@@ -84,11 +84,10 @@ class MctsNode {
            (move == Coord::kPass && parent != nullptr &&
             parent->move == Coord::kPass);
   }
-  bool at_move_limit() const { return position.n() >= kMaxSearchDepth; }
 
   // Finds the best move by visit count, N. Ties are broken using the child
   // action score.
-  Coord GetMostVisitedMove(bool restrict_in_bensons = false) const;
+  Coord GetMostVisitedMove(bool restrict_pass_alive = false) const;
   std::vector<Coord> GetMostVisitedPath() const;
   std::string GetMostVisitedPathString() const;
 
@@ -201,11 +200,6 @@ class MctsTree {
     // number of softpicks.
     int soft_pick_cutoff = ((kN * kN / 12) / 2) * 2;
 
-    // If true, this will prevent play in benson's pass-alive regions after 5
-    // passes have been played (by anyone).  It will also zero out any visits
-    // the pass-alive points may have gotten.
-    bool restrict_in_bensons = false;
-
     friend std::ostream& operator<<(std::ostream& ios, const Options& options);
   };
 
@@ -215,7 +209,6 @@ class MctsTree {
 
   Color to_play() const { return root_->position.to_play(); }
   bool is_game_over() const { return root_->game_over(); }
-  bool at_move_limit() const { return root_->at_move_limit(); }
   bool is_legal_move(Coord c) const { return root_->position.legal_move(c); }
 
   // Selects the next leaf node for inference.
@@ -226,7 +219,9 @@ class MctsTree {
 
   // Performs a soft-pick using `rnd` if the number of moves played is
   // < `soft_pick_cutoff`. Picks the most visited legal move otherwise.
-  Coord PickMove(Random* rnd) const;
+  // If `restrict_pass_alive` is true, playing in pass-alive territory is
+  // disallowed.
+  Coord PickMove(Random* rnd, bool restrict_pass_alive) const;
 
   void PlayMove(Coord c);
 
@@ -248,7 +243,9 @@ class MctsTree {
   void InjectNoise(const std::array<float, kNumMoves>& noise, float mix);
 
   // Adjust the visit counts via whatever hairbrained scheme.
-  void ReshapeFinalVisits();
+  // `restrict_pass_alive` should be set to the same value as was passed to
+  // `PickMove`.
+  void ReshapeFinalVisits(bool restrict_pass_alive);
 
   // Converts child visit counts to a probability distribution, pi.
   std::array<float, kNumMoves> CalculateSearchPi() const;
@@ -273,8 +270,8 @@ class MctsTree {
   }
 
  private:
-  Coord PickMostVisitedMove() const;
-  Coord SoftPickMove(Random* rnd) const;
+  Coord PickMostVisitedMove(bool restrict_pass_alive) const;
+  Coord SoftPickMove(Random* rnd, bool restrict_pass_alive) const;
 
   MctsNode* root_;
   MctsNode game_root_;

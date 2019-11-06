@@ -23,8 +23,8 @@ namespace minigo {
 
 std::ostream& operator<<(std::ostream& os, const Game::Options& options) {
   os << "resign_threshold:" << options.resign_threshold
-     << " resign_enabled:" << options.resign_enabled << " komi:" << options.komi
-     << " ignore_repeated_moves:" << options.ignore_repeated_moves;
+     << " resign_enabled:" << options.resign_enabled << " komi:"
+     << options.komi;
   return os;
 }
 
@@ -54,17 +54,11 @@ void Game::AddComment(const std::string& comment) {
   }
 }
 
-void Game::AddMove(Color color, Coord c, const Position& position,
-                   std::string comment, float Q,
-                   const std::array<float, kNumMoves>& search_pi) {
-  if (!moves_.empty() && moves_.back()->color == color &&
-      moves_.back()->c == c) {
-    MG_CHECK(options_.ignore_repeated_moves)
-        << "Repeated call to AddMove with same (color, coord) (" << color
-        << ", " << c << ") and ignore_repeated_moves is false";
-    return;
-  }
-
+void Game::AddTrainableMove(Color color, Coord c, const Position& position,
+                            std::string comment, float Q,
+                            const std::array<float, kNumMoves>& search_pi) {
+  MG_CHECK(moves_.empty() || moves_.back()->color != color ||
+           moves_.back()->c != c);
   MG_CHECK(!game_over_);
   moves_.push_back(absl::make_unique<Move>(position));
   auto* move = moves_.back().get();
@@ -75,9 +69,17 @@ void Game::AddMove(Color color, Coord c, const Position& position,
   move->search_pi = search_pi;
 }
 
-void Game::MarkLastMoveAsTrainable() {
+void Game::AddNonTrainableMove(Color color, Coord c, const Position& position,
+                               std::string comment, float Q) {
+  MG_CHECK(moves_.empty() || moves_.back()->color != color ||
+           moves_.back()->c != c) << moves_.back()->color << " " << color << " " << c;
+  MG_CHECK(!game_over_);
+  moves_.push_back(absl::make_unique<Move>(position));
   auto* move = moves_.back().get();
-  move->trainable = true;
+  move->color = color;
+  move->c = c;
+  move->Q = Q;
+  move->comment = std::move(comment);
 }
 
 void Game::UndoMove() {
@@ -105,14 +107,6 @@ void Game::SetGameOverBecauseOfResign(Color winner) {
     result_ = -1;
     result_string_ = "W+R";
   }
-}
-
-void Game::SetGameOverBecauseMoveLimitReached(float score) {
-  MG_CHECK(!game_over_);
-  game_over_ = true;
-  game_over_reason_ = GameOverReason::kMoveLimitReached;
-  result_ = score < 0 ? -1 : score > 0 ? 1 : 0;
-  result_string_ = FormatScore(score);
 }
 
 bool Game::FindBleakestMove(int* move, float* q) const {

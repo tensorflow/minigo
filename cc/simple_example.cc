@@ -64,7 +64,7 @@ void SimpleExample() {
   MctsPlayer player(std::move(model), nullptr, &game, player_options);
 
   // Play the game.
-  while (!game.game_over() && !player.root()->at_move_limit()) {
+  while (!game.game_over()) {
     auto move = player.SuggestMove(player_options.num_readouts);
 
     const auto& position = player.root()->position;

@@ -468,9 +468,7 @@ TEST(MctsTreeTest, ReshapePrunesBensonsVisits) {
 
   auto board = TestablePosition(kSomeBensonsBoard, Color::kBlack);
   MctsTree::Options options;
-  options.restrict_in_bensons = true;
   MctsTree tree(board, options);
-  options.restrict_in_bensons = false;
   MctsTree tree2(board, options);
   for (int i = 0; i < 10; i++) {
     tree.IncorporateResults(tree.SelectLeaf(true), probs, 0);
@@ -478,12 +476,12 @@ TEST(MctsTreeTest, ReshapePrunesBensonsVisits) {
   }
 
   EXPECT_NE(tree.root()->edges.N[0], 0);  // A9 should've had visits.
-  tree.ReshapeFinalVisits();
+  tree.ReshapeFinalVisits(true);
   EXPECT_EQ(tree.root()->edges.N[0], 0);  // Reshape should've removed them.
 
   EXPECT_NE(tree2.root()->edges.N[0], 0);    // A9 should've had visits.
   auto original = tree2.root()->edges.N[0];  // Store them.
-  tree2.ReshapeFinalVisits();
+  tree2.ReshapeFinalVisits(false);
   EXPECT_NE(tree2.root()->edges.N[0], 0);  // Reshape shouldn't've removed them.
   EXPECT_EQ(original,
             tree2.root()->edges.N[0]);  // And they should be the same.
@@ -499,9 +497,7 @@ TEST(MctsTreeTest, ReshapeWhenOnlyBensons) {
 
   auto board = TestablePosition(kOnlyBensonsBoard, Color::kBlack);
   MctsTree::Options options;
-  options.restrict_in_bensons = true;
   MctsTree tree(board, options);
-  options.restrict_in_bensons = false;
   MctsTree tree2(board, options);
   for (int i = 0; i < 10; i++) {
     tree.IncorporateResults(tree.SelectLeaf(true), probs, 0);
@@ -513,11 +509,11 @@ TEST(MctsTreeTest, ReshapeWhenOnlyBensons) {
   EXPECT_EQ(tree2.root()->edges.N[Coord::kPass], 0);
 
   // Reshape with bensons restricted should add one.
-  tree.ReshapeFinalVisits();
+  tree.ReshapeFinalVisits(true);
   EXPECT_EQ(tree.root()->edges.N[Coord::kPass], 1);
 
   // Reshape with bensons not restricted should NOT add one.
-  tree2.ReshapeFinalVisits();
+  tree2.ReshapeFinalVisits(false);
   EXPECT_EQ(tree2.root()->edges.N[Coord::kPass], 0);
 }
 
@@ -594,7 +590,7 @@ class ReshapeTargetTest : public ::testing::Test {
       saved_Q[i] = root->child_Q(i);
     }
     best_ = root->GetMostVisitedMove();
-    tree_->ReshapeFinalVisits();
+    tree_->ReshapeFinalVisits(false);
 
     float U_common =
         root->U_scale() * std::sqrt(std::max<float>(1, root->N() - 1));
@@ -831,7 +827,7 @@ TEST(MctsTreeTest, PickMoveArgMax) {
 
   Random rnd(888, 1);
   for (int i = 0; i < 100; ++i) {
-    EXPECT_EQ(Coord(2, 0), tree.PickMove(&rnd));
+    EXPECT_EQ(Coord(2, 0), tree.PickMove(&rnd, true));
   }
 }
 
@@ -855,7 +851,7 @@ TEST(MctsTreeTest, PickMoveSoft) {
 
   Random rnd(888, 1);
   for (int i = 0; i < 1600; ++i) {
-    auto move = tree.PickMove(&rnd);
+    auto move = tree.PickMove(&rnd, true);
     if (move == Coord(1, 0)) {
       ++count_1_0;
     } else if (move == Coord(2, 0)) {
@@ -881,7 +877,7 @@ TEST(MctsTreeTest, CalculateChildActionScore) {
   for (int i = 0; i < 1000; ++i) {
     auto* leaf = tree.SelectLeaf(true);
     ASSERT_NE(leaf, nullptr);
-    if (leaf->game_over() || leaf->at_move_limit()) {
+    if (leaf->game_over()) {
       float value = leaf->position.CalculateScore(kDefaultKomi) > 0 ? 1 : -1;
       tree.IncorporateEndGameResult(leaf, value);
     } else {

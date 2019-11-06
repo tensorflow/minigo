@@ -29,10 +29,9 @@ struct WinStats {
   struct ColorStats {
     int both_passed = 0;
     int opponent_resigned = 0;
-    int move_limit_reached = 0;
 
     int total() const {
-      return both_passed + opponent_resigned + move_limit_reached;
+      return both_passed + opponent_resigned;
     }
   };
 
@@ -44,9 +43,6 @@ struct WinStats {
         break;
       case Game::GameOverReason::kOpponentResigned:
         stats.opponent_resigned += 1;
-        break;
-      case Game::GameOverReason::kMoveLimitReached:
-        stats.move_limit_reached += 1;
         break;
     }
   }

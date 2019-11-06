@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/types/optional.h"
 #include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/coord.h"
@@ -43,18 +44,13 @@ class Game {
 
     float komi = kDefaultKomi;
 
-    // If true, repeated calls to AddMove with the same Color and Coord will
-    // be ignored. This should be set to true when two separate MctsPlayer
-    // instances are playing (because they both make AddMove calls to the same
-    // Game object), and set to false for self-play where a single MctsPlayer
-    // plays both back and white.
-    bool ignore_repeated_moves = false;
-
     friend std::ostream& operator<<(std::ostream& os, const Options& options);
   };
 
   struct Move {
     explicit Move(const Position& position) : position(position) {}
+
+    bool is_trainable() const { return search_pi.has_value(); }
 
     Color color;
 
@@ -65,19 +61,17 @@ class Game {
     // Comments associated with the move.
     std::string comment;
 
-    std::array<float, kNumMoves> search_pi;
+    // Only set if the move is trainable.
+    absl::optional<std::array<float, kNumMoves>> search_pi;
 
     // This is used to build training features after a selfplay game has
     // finished.
     Position position;
-
-    bool trainable = false;
   };
 
   enum class GameOverReason {
     kBothPassed,
     kOpponentResigned,
-    kMoveLimitReached,
   };
 
   static std::string FormatScore(float score);
@@ -88,19 +82,17 @@ class Game {
 
   void AddComment(const std::string& comment);
 
-  void AddMove(Color color, Coord c, const Position& position,
-               std::string comment, float Q,
-               const std::array<float, kNumMoves>& search_pi);
+  void AddTrainableMove(Color color, Coord c, const Position& position,
+                        std::string comment, float Q,
+                        const std::array<float, kNumMoves>& search_pi);
+  void AddNonTrainableMove(Color color, Coord c, const Position& position,
+                           std::string comment, float Q);
 
   void UndoMove();
-
-  void MarkLastMoveAsTrainable();
 
   void SetGameOverBecauseOfPasses(float score);
 
   void SetGameOverBecauseOfResign(Color winner);
-
-  void SetGameOverBecauseMoveLimitReached(float score);
 
   // Returns up to the last `num_moves` of moves that lead up to the requested
   // `move`, including the move itself.

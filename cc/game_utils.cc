@@ -46,15 +46,15 @@ std::string FormatWinStatsTable(
     const auto& b = stats.black_wins;
     const auto& w = stats.white_wins;
     absl::StrAppendFormat(
-        &result, "\n%-*s %7d %7d %7d %7d %7d %7d %7d %7d", name_length, name,
-        b.total(), b.both_passed, b.opponent_resigned, b.move_limit_reached,
-        w.total(), w.both_passed, w.opponent_resigned, w.move_limit_reached);
+        &result, "\n%-*s %7d %7d %7d %7d %7d %7d", name_length, name,
+        b.total(), b.both_passed, b.opponent_resigned,
+        w.total(), w.both_passed, w.opponent_resigned);
   };
 
   append_header(
-      "  Black   Black   Black   Black   White   White   White   White\n");
+      "  Black   Black   Black   White   White   White\n");
   append_header(
-      "  total   passes  resign  m.lmt.  total   passes  resign  m.lmt.");
+      "  total   passes  resign  total   passes  resign");
   for (const auto& name_stats : stats) {
     append_stats(name_stats.first, name_stats.second);
   }

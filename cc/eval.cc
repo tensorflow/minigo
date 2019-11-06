@@ -95,7 +95,6 @@ void ParseOptionsFromFlags(Game::Options* game_options,
                            MctsPlayer::Options* player_options) {
   game_options->resign_enabled = FLAGS_resign_enabled;
   game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
-  game_options->ignore_repeated_moves = true;
   player_options->virtual_losses = FLAGS_virtual_losses;
   player_options->num_readouts = FLAGS_num_readouts;
   player_options->inject_noise = false;
@@ -223,12 +222,13 @@ class Evaluator {
     BatchingModelFactory::StartGame(black->model(), white->model());
     auto* curr_player = black.get();
     auto* next_player = white.get();
-    while (!game.game_over() && !curr_player->root()->at_move_limit()) {
+    while (!game.game_over()) {
       if (curr_player->root()->position.n() >= kMinPassAliveMoves &&
           curr_player->root()->position.CalculateWholeBoardPassAlive()) {
         // Play pass moves to end the game.
         while (!game.game_over()) {
           MG_CHECK(curr_player->PlayMove(Coord::kPass));
+          next_player->PlayOpponentsMove(Coord::kPass);
           std::swap(curr_player, next_player);
         }
         break;
@@ -238,10 +238,8 @@ class Evaluator {
       if (verbose) {
         std::cerr << curr_player->tree().Describe() << "\n";
       }
-      curr_player->PlayMove(move);
-      if (!game.game_over()) {
-        next_player->PlayMove(move);
-      }
+      MG_CHECK(curr_player->PlayMove(move));
+      next_player->PlayOpponentsMove(move);
       if (verbose) {
         MG_LOG(INFO) << absl::StreamFormat(
             "%d: %s by %s\nQ: %0.4f", curr_player->root()->position.n(),
