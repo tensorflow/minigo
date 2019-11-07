@@ -565,10 +565,11 @@ bool SelfplayGame::MaybePlayMove() {
       auto search_pi = tree_->CalculateSearchPi();
       game_->AddTrainableMove(tree_->to_play(), c, tree_->root()->position,
                               std::move(model_str), tree_->root()->Q(),
-                              search_pi);
+                              tree_->root()->N(), search_pi);
     } else {
       game_->AddNonTrainableMove(tree_->to_play(), c, tree_->root()->position,
-                                 std::move(model_str), tree_->root()->Q());
+                                 std::move(model_str), tree_->root()->Q(),
+                                 tree_->root()->N());
     }
 
     // Update the number of consecutive passes.

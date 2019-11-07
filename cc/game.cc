@@ -55,22 +55,14 @@ void Game::AddComment(const std::string& comment) {
 }
 
 void Game::AddTrainableMove(Color color, Coord c, const Position& position,
-                            std::string comment, float Q,
+                            std::string comment, float Q, int N,
                             const std::array<float, kNumMoves>& search_pi) {
-  MG_CHECK(moves_.empty() || moves_.back()->color != color ||
-           moves_.back()->c != c);
-  MG_CHECK(!game_over_);
-  moves_.push_back(absl::make_unique<Move>(position));
-  auto* move = moves_.back().get();
-  move->color = color;
-  move->c = c;
-  move->Q = Q;
-  move->comment = std::move(comment);
-  move->search_pi = search_pi;
+  AddNonTrainableMove(color, c, position, comment, Q, N);
+  moves_.back()->search_pi = search_pi;
 }
 
 void Game::AddNonTrainableMove(Color color, Coord c, const Position& position,
-                               std::string comment, float Q) {
+                               std::string comment, float Q, int N) {
   MG_CHECK(moves_.empty() || moves_.back()->color != color ||
            moves_.back()->c != c) << moves_.back()->color << " " << color << " " << c;
   MG_CHECK(!game_over_);
@@ -79,6 +71,7 @@ void Game::AddNonTrainableMove(Color color, Coord c, const Position& position,
   move->color = color;
   move->c = c;
   move->Q = Q;
+  move->N = N;
   move->comment = std::move(comment);
 }
 

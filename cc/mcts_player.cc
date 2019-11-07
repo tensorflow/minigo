@@ -312,10 +312,10 @@ void MctsPlayer::UpdateGame(Coord c, bool is_trainable) {
   if (is_trainable && c != Coord::kResign) {
     auto search_pi = tree_->CalculateSearchPi();
     game_->AddTrainableMove(tree_->to_play(), c, root->position,
-                            std::move(comment), root->Q(), search_pi);
+                            std::move(comment), root->Q(), root->N(), search_pi);
   } else {
     game_->AddNonTrainableMove(tree_->to_play(), c, root->position,
-                               std::move(comment), root->Q());
+                               std::move(comment), root->Q(), root->N());
   }
 }
 

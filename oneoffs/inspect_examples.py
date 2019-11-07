@@ -58,21 +58,29 @@ TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
 
 
 class ParsedExample(object):
-    def __init__(self, features, pi, value):
+    def __init__(self, features, pi, value, q, n, c):
         self.features = features
         self.pi = pi
         self.value = value
+        self.q = q;
+        self.n = n
+        self.c = c
 
 
 def ReadExamples(path):
+    records = list(tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG))
+    num_records = len(records)
+
+    # n, q, c have default_values because they're optional.
     features = {
         'x': tf.FixedLenFeature([], tf.string),
         'pi': tf.FixedLenFeature([], tf.string),
         'outcome': tf.FixedLenFeature([], tf.float32),
+        'n': tf.FixedLenFeature([], tf.int64, default_value=[-1]),
+        'q': tf.FixedLenFeature([], tf.float32, default_value=[-1]),
+        'c': tf.FixedLenFeature([], tf.int64, default_value=[-1]),
     }
 
-    records = list(tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG))
-    num_records = len(records)
     parsed = tf.parse_example(records, features)
 
     x = tf.decode_raw(parsed['x'], tf.uint8)
@@ -84,10 +92,12 @@ def ReadExamples(path):
     pi = tf.reshape(pi, [num_records, go.N * go.N + 1])
     pi = pi.eval()
 
-    outcome = parsed['outcome']
-    outcome = outcome.eval()
+    outcome = parsed['outcome'].eval()
+    n = parsed['n'].eval()
+    q = parsed['q'].eval()
+    c = parsed['c'].eval()
 
-    return [ParsedExample(*args) for args in zip(x, pi, outcome)]
+    return [ParsedExample(*args) for args in zip(x, pi, outcome, q, n, c)]
 
 
 def parse_board(example):
@@ -119,18 +129,21 @@ def parse_board(example):
     return go.Position(board=board, to_play=to_play)
 
 
-def format_pi(pi, stone, mean, mx):
-    GREEN = '\x1b[0;32m'
-    BRIGHT_YELLOW = '\x1b[0;33;1m'
-    BRIGHT_WHITE = '\x1b[0;37;1m'
-    BLUE = '\x1b[0;34m'
-    RED = '\x1b[0;31m'
+def format_pi(pi, stone, mean, mx, picked):
+    # Start of the ANSI color code for this point: gray if this point was picked
+    # as the next move, black otherwise.
+    col = '\x1b[48;5;8;' if picked else '\x1b[0;'
+
+    GREEN = '32m'
+    BRIGHT_YELLOW = '33;1m'
+    BRIGHT_WHITE = '37;1m'
+    BLUE = '34m'
+    RED = '31m'
+
     NORMAL = '\x1b[0m'
 
-    if stone == go.BLACK:
-        return '%s  X %s' % (RED, NORMAL)
-    elif stone == go.WHITE:
-        return '%s  O %s' % (RED, NORMAL)
+    if stone != go.EMPTY:
+        return '\x1b[0;31m  %s %s' % ('X' if stone == go.BLACK else 'O', NORMAL)
 
     if pi < 1:
         s = ('%.3f' % pi)[1:]
@@ -138,23 +151,27 @@ def format_pi(pi, stone, mean, mx):
         s = '%.2f' % pi
 
     if s == '.000':
-        col = BLUE
+        col += BLUE
     elif pi < mean:
-        col = GREEN
+        col += GREEN
     elif pi < mx:
-        col = BRIGHT_YELLOW
+        col += BRIGHT_YELLOW
     else:
-        col = BRIGHT_WHITE
+        col += BRIGHT_WHITE
     s = '%s%s%s' % (col, s, NORMAL)
     return s
 
 
-def print_board_and_pi(examples, i):
+def print_example(examples, i):
     example = examples[i]
     p = parse_board(example)
     print('\nExample %d of %d, %s to play, winner is %s' % (
         i + 1, len(examples), 'Black' if p.to_play == 1 else 'White',
         'Black' if example.value > 0 else 'White'))
+
+    if example.n != -1:
+        print('N:%d  Q:%.3f  picked:%s' % (
+            example.n, example.q, coords.to_gtp(coords.from_flat(example.c))))
     board_lines = str(p).split('\n')[:-2]
 
     mean = np.mean(example.pi[example.pi > 0])
@@ -166,9 +183,15 @@ def print_board_and_pi(examples, i):
         for col in range(go.N):
             stone = p.board[row, col]
             idx = row * go.N + col
-            pi.append(format_pi(example.pi[idx], stone, mean, mx))
+            if example.c != -1:
+                picked = example.c == row * go.N + col
+            else:
+                picked = False
+            pi.append(format_pi(example.pi[idx], stone, mean, mx, picked))
         pi_lines.append(' '.join(pi))
-    pi_lines.append(format_pi(example.pi[-1], go.EMPTY, mean, mx))
+
+    pi_lines.append(format_pi(example.pi[-1], go.EMPTY, mean, mx,
+                              example.c == go.N * go.N))
 
     for b, p in zip(board_lines, pi_lines):
         print('%s  |  %s' % (b, p))
@@ -181,7 +204,7 @@ def main(unused_argv):
     i = 0
     while i < len(examples):
         example = examples[i]
-        print_board_and_pi(examples, i)
+        print_example(examples, i)
         sys.stdout.write('>> ')
         sys.stdout.flush()
 

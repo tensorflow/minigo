@@ -58,6 +58,8 @@ class Game {
 
     float Q;
 
+    int N;
+
     // Comments associated with the move.
     std::string comment;
 
@@ -83,10 +85,10 @@ class Game {
   void AddComment(const std::string& comment);
 
   void AddTrainableMove(Color color, Coord c, const Position& position,
-                        std::string comment, float Q,
+                        std::string comment, float Q, int N,
                         const std::array<float, kNumMoves>& search_pi);
   void AddNonTrainableMove(Color color, Coord c, const Position& position,
-                           std::string comment, float Q);
+                           std::string comment, float Q, int N);
 
   void UndoMove();
 

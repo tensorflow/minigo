@@ -56,7 +56,7 @@ tensorflow::Feature MakeBytesFeature(const std::array<float, N>& data) {
 // example proto.
 tensorflow::Example MakeTfExample(const Tensor<uint8_t>& features,
                                   const std::array<float, kNumMoves>& pi,
-                                  float outcome) {
+                                  float Q, int N, Coord c, float outcome) {
   tensorflow::Example example;
   auto& dst_features = *example.mutable_features()->mutable_feature();
 
@@ -68,6 +68,15 @@ tensorflow::Example MakeTfExample(const Tensor<uint8_t>& features,
 
   // outcome is a single float.
   dst_features["outcome"].mutable_float_list()->add_value(outcome);
+
+  // Q is a single float.
+  dst_features["q"].mutable_float_list()->add_value(Q);
+
+  // Number of reads is a single int.
+  dst_features["n"].mutable_int64_list()->add_value(N);
+
+  // The move played is a single int.
+  dst_features["c"].mutable_int64_list()->add_value(c);
 
   return example;
 }
@@ -117,7 +126,9 @@ std::vector<tensorflow::Example> MakeExamples(
     game.GetPositionHistory(i, kMaxPositionHistory, &input.position_history);
 
     feature_desc.set_bytes({&input}, &features);
-    examples.push_back(MakeTfExample(features, move->search_pi.value(), game.result()));
+    examples.push_back(MakeTfExample(
+          features, move->search_pi.value(), move->Q, move->N, move->c,
+          game.result()));
   }
   return examples;
 }
