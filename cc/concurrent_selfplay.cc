@@ -308,7 +308,7 @@ class SelfplayGame {
 
   // Number of consecutive passes played by black and white respectively.
   // Used to determine when to disallow playing in pass-alive territory.
-  // `num_consecutive_passes_` saturates once it reaches
+  // `num_consecutive_passes_` latches once it reaches
   // `restrict_pass_alive_play_threshold` is is not reset to 0 when a non-pass
   // move is played.
   int num_consecutive_passes_[2];
@@ -531,12 +531,13 @@ bool SelfplayGame::MaybePlayMove() {
   if (ShouldResign()) {
     game_->SetGameOverBecauseOfResign(OtherColor(tree_->to_play()));
   } else {
-    // Hold a reference to the number of consecutive passes played because we'll
-    // update in after `PlayMove`.
-    auto& num_opponent_passes =
+    // Restrict playing in pass-alive territory once the opponent has passed
+    // `restrict_pass_alive_play_threshold` times in a row.
+    int num_opponent_passes =
         num_consecutive_passes_[tree_->to_play() == Color::kBlack ? 1 : 0];
     bool restrict_pass_alive_moves =
         num_opponent_passes >= options_.restrict_pass_alive_play_threshold;
+
     Coord c = tree_->PickMove(&rnd_, restrict_pass_alive_moves);
     if (options_.verbose) {
       const auto& position = tree_->root()->position;
@@ -556,6 +557,10 @@ bool SelfplayGame::MaybePlayMove() {
       model_str = absl::StrCat("model: ", models_used_.back(), "\n");
     }
 
+    if (options_.target_pruning && !fastplay_) {
+      tree_->ReshapeFinalVisits(restrict_pass_alive_moves);
+    }
+
     if (!fastplay_ && c != Coord::kResign) {
       auto search_pi = tree_->CalculateSearchPi();
       game_->AddTrainableMove(tree_->to_play(), c, tree_->root()->position,
@@ -566,22 +571,20 @@ bool SelfplayGame::MaybePlayMove() {
                                  std::move(model_str), tree_->root()->Q());
     }
 
-    if (options_.target_pruning && !fastplay_) {
-      tree_->ReshapeFinalVisits(restrict_pass_alive_moves);
+    // Update the number of consecutive passes.
+    // The number of consecutive passes latches when it hits
+    // `restrict_pass_alive_play_threshold`.
+    int& num_passes =
+        num_consecutive_passes_[tree_->to_play() == Color::kBlack ? 0 : 1];
+    if (num_passes < options_.restrict_pass_alive_play_threshold) {
+      if (c == Coord::kPass) {
+        num_passes += 1;
+      } else {
+        num_passes = 0;
+      }
     }
 
     tree_->PlayMove(c);
-
-    // Update the number of consecutive passes.
-    // The number of consecutive passes saturates when it hits
-    // `restrict_pass_alive_play_threshold`.
-    if (num_opponent_passes < options_.restrict_pass_alive_play_threshold) {
-      if (c == Coord::kPass) {
-        num_opponent_passes += 1;
-      } else {
-        num_opponent_passes = 0;
-      }
-    }
 
     // If the whole board is pass-alive, play pass moves to end the game.
     if (tree_->root()->position.n() >= kMinPassAliveMoves &&

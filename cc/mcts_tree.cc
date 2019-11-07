@@ -368,7 +368,7 @@ MctsNode* MctsTree::SelectLeaf(bool allow_pass) {
 Coord MctsTree::PickMove(Random* rnd, bool restrict_pass_alive) const {
   if (options_.soft_pick_enabled &&
       root_->position.n() < options_.soft_pick_cutoff) {
-    return SoftPickMove(rnd, restrict_pass_alive);
+    return SoftPickMove(rnd);
   } else {
     return PickMostVisitedMove(restrict_pass_alive);
   }
@@ -698,7 +698,9 @@ Coord MctsTree::PickMostVisitedMove(bool restrict_pass_alive) const {
   return c;
 }
 
-Coord MctsTree::SoftPickMove(Random* rnd, bool restrict_pass_alive) const {
+// SoftPickMove is only called for the opening moves of the game, so we don't
+// bother restricting play in pass-alive territory.
+Coord MctsTree::SoftPickMove(Random* rnd) const {
   // Select from the first kN * kN moves (instead of kNumMoves) to avoid
   // randomly choosing to pass early on in the game.
   std::array<float, kN * kN> cdf;
@@ -709,17 +711,6 @@ Coord MctsTree::SoftPickMove(Random* rnd, bool restrict_pass_alive) const {
   for (size_t i = 0; i < cdf.size(); ++i) {
     cdf[i] = std::pow(root_->child_N(i), options_.policy_softmax_temp);
   }
-
-  // Clear probabilities for moves in pass-alive territory.
-  if (restrict_pass_alive) {
-    auto out_of_bounds = root_->position.CalculatePassAliveRegions();
-    for (size_t i = 0; i < kN * kN; ++i) {
-      if (out_of_bounds[i] != Color::kEmpty) {
-        cdf[i] = 0;
-      }
-    }
-  }
-
   for (size_t i = 1; i < cdf.size(); ++i) {
     cdf[i] += cdf[i - 1];
   }

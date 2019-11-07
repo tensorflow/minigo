@@ -271,7 +271,7 @@ class MctsTree {
 
  private:
   Coord PickMostVisitedMove(bool restrict_pass_alive) const;
-  Coord SoftPickMove(Random* rnd, bool restrict_pass_alive) const;
+  Coord SoftPickMove(Random* rnd) const;
 
   MctsNode* root_;
   MctsNode game_root_;
