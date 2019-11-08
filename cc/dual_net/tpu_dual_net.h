@@ -23,7 +23,6 @@
 #include "cc/constants.h"
 #include "cc/model.h"
 #include "cc/random.h"
-#include "cc/thread_safe_queue.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/public/session.h"

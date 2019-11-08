@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_THREAD_SAFE_QUEUE_H_
-#define CC_THREAD_SAFE_QUEUE_H_
+#ifndef CC_ASYNC_THREAD_SAFE_QUEUE_H_
+#define CC_ASYNC_THREAD_SAFE_QUEUE_H_
 
 #include <queue>
 #include <utility>
@@ -83,4 +83,4 @@ class ThreadSafeQueue {
 
 }  // namespace minigo
 
-#endif  // CC_THREAD_SAFE_QUEUE_H_
+#endif  // CC_ASYNC_THREAD_SAFE_QUEUE_H_

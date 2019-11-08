@@ -59,7 +59,7 @@ minigo_cc_library(
     hdrs = ["buffered_model.h"],
     deps = [
         ":model",
-        "//cc:thread_safe_queue",
+        "//cc/async:thread_safe_queue",
     ],
 )
 

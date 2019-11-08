@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_THREAD_H_
-#define CC_THREAD_H_
+#ifndef CC_ASYNC_THREAD_H_
+#define CC_ASYNC_THREAD_H_
 
 #include <functional>
 #include <string>
@@ -94,4 +94,4 @@ class BlockingStartThread : public Thread {
 
 }  // namespace minigo
 
-#endif  // CC_THREAD_H_
+#endif  // CC_ASYNC_THREAD_H_

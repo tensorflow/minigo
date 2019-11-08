@@ -26,7 +26,6 @@
 #include "cc/constants.h"
 #include "cc/file/path.h"
 #include "cc/logging.h"
-#include "cc/thread_safe_queue.h"
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"

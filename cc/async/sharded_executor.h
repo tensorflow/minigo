@@ -21,7 +21,7 @@
 
 #include "absl/memory/memory.h"
 #include "cc/async/semaphore.h"
-#include "cc/thread.h"
+#include "cc/async/thread.h"
 
 namespace minigo {
 

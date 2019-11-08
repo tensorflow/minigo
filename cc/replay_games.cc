@@ -19,6 +19,8 @@
 #include <vector>
 
 #include "absl/memory/memory.h"
+#include "cc/async/thread.h"
+#include "cc/async/thread_safe_queue.h"
 #include "cc/color.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
@@ -26,8 +28,6 @@
 #include "cc/logging.h"
 #include "cc/position.h"
 #include "cc/sgf.h"
-#include "cc/thread.h"
-#include "cc/thread_safe_queue.h"
 #include "gflags/gflags.h"
 
 DEFINE_string(sgf_dir, "", "Directory to load SGF games from.");

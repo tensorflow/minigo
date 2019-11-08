@@ -12,6 +12,7 @@ cc_library(
         ":file",
         "//cc:logging",
         "//cc/async:poll_thread",
+        "//cc/async:thread",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

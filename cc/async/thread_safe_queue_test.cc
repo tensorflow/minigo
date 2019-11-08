@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cc/thread_safe_queue.h"
+#include "cc/async/thread_safe_queue.h"
 
 #include <map>
 #include <thread>

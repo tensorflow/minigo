@@ -30,11 +30,11 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
+#include "cc/async/thread_safe_queue.h"
 #include "cc/color.h"
 #include "cc/mcts_player.h"
 #include "cc/model/model.h"
 #include "cc/sgf.h"
-#include "cc/thread_safe_queue.h"
 
 namespace minigo {
 

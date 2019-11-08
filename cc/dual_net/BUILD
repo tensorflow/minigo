@@ -94,7 +94,6 @@ minigo_cc_library(
         "//cc:base",
         "//cc:logging",
         "//cc:random",
-        "//cc:thread_safe_queue",
         "//cc/file:path",
         "//cc/model",
         "//cc/model:buffered_model",
@@ -131,7 +130,6 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:logging",
-        "//cc:thread_safe_queue",
         "//cc/file:path",
         "//cc/model",
         "//cc/model:buffered_model",

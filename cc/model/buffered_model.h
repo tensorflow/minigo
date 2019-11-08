@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "cc/async/thread_safe_queue.h"
 #include "cc/model/model.h"
-#include "cc/thread_safe_queue.h"
 
 namespace minigo {
 

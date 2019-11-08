@@ -21,7 +21,7 @@
 
 #include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
-#include "cc/thread.h"
+#include "cc/async/thread.h"
 
 namespace minigo {
 

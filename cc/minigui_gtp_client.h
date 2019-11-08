@@ -28,12 +28,12 @@
 #include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
+#include "cc/async/thread.h"
+#include "cc/async/thread_safe_queue.h"
 #include "cc/color.h"
 #include "cc/gtp_client.h"
 #include "cc/model/batching_model.h"
 #include "cc/model/model.h"
-#include "cc/thread.h"
-#include "cc/thread_safe_queue.h"
 
 namespace minigo {
 

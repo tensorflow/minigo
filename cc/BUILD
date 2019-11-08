@@ -85,7 +85,7 @@ minigo_cc_library(
         ":logging",
         ":mcts",
         ":sgf",
-        ":thread_safe_queue",
+        "//cc/async:thread_safe_queue",
         "//cc/file",
         "//cc/model",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -138,8 +138,8 @@ minigo_cc_library(
         ":logging",
         ":mcts",
         ":sgf",
-        ":thread",
-        ":thread_safe_queue",
+        "//cc/async:thread",
+        "//cc/async:thread_safe_queue",
         "//cc/file",
         "//cc/model:batching_model",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -241,26 +241,6 @@ minigo_cc_library(
     deps = [
         ":base",
         ":logging",
-    ],
-)
-
-cc_library(
-    name = "thread",
-    srcs = ["thread.cc"],
-    hdrs = ["thread.h"],
-    deps = [
-        ":logging",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
-
-cc_library(
-    name = "thread_safe_queue",
-    hdrs = ["thread_safe_queue.h"],
-    deps = [
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/time",
     ],
 )
 
@@ -437,21 +417,6 @@ minigo_cc_test(
     ],
 )
 
-minigo_cc_test(
-    name = "thread_safe_queue_test",
-    size = "small",
-    srcs = ["thread_safe_queue_test.cc"],
-    deps = [
-        ":logging",
-        ":thread_safe_queue",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/time",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
 minigo_cc_binary(
     name = "concurrent_selfplay",
     srcs = ["concurrent_selfplay.cc"],
@@ -465,11 +430,11 @@ minigo_cc_binary(
         ":mcts",
         ":random",
         ":tf_utils",
-        ":thread",
-        ":thread_safe_queue",
         ":zobrist",
         "//cc/async:poll_thread",
         "//cc/async:sharded_executor",
+        "//cc/async:thread",
+        "//cc/async:thread_safe_queue",
         "//cc/dual_net:factory",
         "//cc/file",
         "//cc/file:directory_watcher",
@@ -540,8 +505,8 @@ minigo_cc_binary(
         ":logging",
         ":position",
         ":sgf",
-        ":thread",
-        ":thread_safe_queue",
+        "//cc/async:thread",
+        "//cc/async:thread_safe_queue",
         "//cc/file",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",
@@ -587,7 +552,7 @@ cc_binary(
         ":init",
         ":logging",
         ":random",
-        ":thread",
+        "//cc/async:thread",
         "//cc/tensorflow",
         "@com_github_gflags_gflags//:gflags",
         "@com_google_absl//absl/memory",

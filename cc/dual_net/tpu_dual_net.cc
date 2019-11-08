@@ -15,7 +15,6 @@
 #include "cc/dual_net/tpu_dual_net.h"
 
 #include <algorithm>
-#include <thread>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/match.h"
