@@ -19,6 +19,7 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
+#include "cc/async/poll_thread.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
 #include "cc/logging.h"
@@ -72,37 +73,17 @@ bool MatchBasename(const std::string& basename, const std::string& pattern,
 DirectoryWatcher::DirectoryWatcher(
     const std::string& pattern, absl::Duration poll_interval,
     std::function<void(const std::string&)> callback)
-    : poll_interval_(poll_interval), callback_(std::move(callback)) {
+    : callback_(std::move(callback)) {
   MG_CHECK(ParseModelPathPattern(pattern, &directory_, &basename_pattern_));
   basename_and_length_pattern_ = absl::StrCat(basename_pattern_, "%n");
 
-  poll_thread_ = absl::make_unique<LambdaThread>(
-      "DirWatcher", std::bind(&DirectoryWatcher::ThreadRun, this));
+  poll_thread_ = absl::make_unique<PollThread>(
+      "DirWatcher", poll_interval, std::bind(&DirectoryWatcher::Poll, this));
   poll_thread_->Start();
 }
 
 DirectoryWatcher::~DirectoryWatcher() {
-  {
-    absl::MutexLock lock(&mutex_);
-    is_joining_ = true;
-  }
   poll_thread_->Join();
-}
-
-void DirectoryWatcher::ThreadRun() {
-  absl::MutexLock lock(&mutex_);
-  for (;;) {
-    Poll();
-
-    // AwaitWithTimout blocks until either `poll_interval_` has elapsed or
-    // `is_joining_ == true`. It returns `true` if the polling loop should
-    // exit.
-    if (mutex_.AwaitWithTimeout(
-            absl::Condition(this, &DirectoryWatcher::IsJoining),
-            poll_interval_)) {
-      break;
-    }
-  }
 }
 
 void DirectoryWatcher::Poll() {
@@ -142,7 +123,5 @@ void DirectoryWatcher::Poll() {
   latest_path_ = std::move(path);
   callback_(latest_path_);
 }
-
-bool DirectoryWatcher::IsJoining() const { return is_joining_; }
 
 }  // namespace minigo

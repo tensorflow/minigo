@@ -25,10 +25,12 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "cc/async/poll_thread.h"
 #include "cc/async/sharded_executor.h"
 #include "cc/dual_net/factory.h"
 #include "cc/file/directory_watcher.h"
 #include "cc/file/path.h"
+#include "cc/file/utils.h"
 #include "cc/game.h"
 #include "cc/game_utils.h"
 #include "cc/init.h"
@@ -144,6 +146,10 @@ DEFINE_int32(num_games, 0,
 DEFINE_bool(run_forever, false,
             "Whether to run forever. Only one of run_forever and num_games "
             "must be set.");
+DEFINE_string(abort_path, "",
+              "If non-empty, specifies a path to a file whose presence is "
+              "checked for periodically when run_forever=true. If the file "
+              "exists the selfplay process will abort immediately.");
 
 // Output flags.
 DEFINE_double(holdout_pct, 0.03,
@@ -352,6 +358,7 @@ class Selfplayer {
   void ParseFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
   FeatureDescriptor InitializeModels();
   void CreateModels(const std::string& path);
+  void CheckAbortPath();
 
   mutable absl::Mutex mutex_;
   Game::Options game_options_ GUARDED_BY(&mutex_);
@@ -371,6 +378,7 @@ class Selfplayer {
   int next_game_id_ GUARDED_BY(&mutex_) = 1;
 
   std::unique_ptr<DirectoryWatcher> directory_watcher_;
+  std::unique_ptr<PollThread> abort_path_watcher_;
 };
 
 // Plays multiple games concurrently using `SelfplayGame` instances.
@@ -691,6 +699,16 @@ void Selfplayer::Run() {
     inference_cache = std::make_shared<NullInferenceCache>();
   }
 
+  if (FLAGS_run_forever) {
+    // Note that we don't ever have to worry about joining this thread because
+    // it's only ever created when selfplay runs forever and when it comes time
+    // to terminate the process, CheckAbortPath will call abort().
+    abort_path_watcher_ = absl::make_unique<PollThread>(
+        "AbortWatcher", absl::Seconds(5),
+        std::bind(&Selfplayer::CheckAbortPath, this));
+    abort_path_watcher_->Start();
+  }
+
   // Load the models.
   auto feature_descriptor = InitializeModels();
 
@@ -847,7 +865,7 @@ FeatureDescriptor Selfplayer::InitializeModels() {
   if (FLAGS_model.find("%d") != std::string::npos) {
     using namespace std::placeholders;
     directory_watcher_ = absl::make_unique<DirectoryWatcher>(
-        FLAGS_model, absl::Seconds(1),
+        FLAGS_model, absl::Seconds(5),
         std::bind(&Selfplayer::CreateModels, this, _1));
     MG_LOG(INFO) << "Waiting for model to match pattern " << FLAGS_model;
   } else {
@@ -878,6 +896,12 @@ void Selfplayer::CreateModels(const std::string& path) {
   models_.Push(std::move(model));
   for (int i = 1; i < FLAGS_parallel_inference; ++i) {
     models_.Push(model_factory_->NewModel(path));
+  }
+}
+
+void Selfplayer::CheckAbortPath() {
+  if (file::FileExists(FLAGS_abort_path)) {
+    MG_LOG(FATAL) << "Aborting because " << FLAGS_abort_path << " was found";
   }
 }
 

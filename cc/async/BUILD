@@ -1,9 +1,18 @@
-package(default_visibility = [
-    ":__pkg__",
-    "//cc:__pkg__",
-])
+package(
+    default_visibility = ["//visibility:public"],
+)
 
 licenses(["notice"])  # Apache License 2.0
+
+cc_library(
+    name = "poll_thread",
+    hdrs = ["poll_thread.h"],
+    srcs = ["poll_thread.cc"],
+    deps = [
+        "//cc:thread",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
 
 cc_library(
     name = "semaphore",

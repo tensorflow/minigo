@@ -151,5 +151,12 @@ bool ListDir(std::string directory, std::vector<std::string>* files) {
   return true;
 }
 
+bool FileExists(std::string path) {
+  path = NormalizeSlashes(path);
+  auto dwAttrib = GetFileAttributes(path.c_str());
+  return dwAttrib != INVALID_FILE_ATTRIBUTES &&
+         !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY);
+}
+
 }  // namespace file
 }  // namespace minigo

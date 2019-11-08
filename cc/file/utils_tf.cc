@@ -143,5 +143,11 @@ bool ListDir(std::string directory, std::vector<std::string>* files) {
   return true;
 }
 
+bool FileExists(std::string path) {
+  path = NormalizeSlashes(path);
+  auto* env = tensorflow::Env::Default();
+  return env->FileExists(path).ok();
+}
+
 }  // namespace file
 }  // namespace minigo

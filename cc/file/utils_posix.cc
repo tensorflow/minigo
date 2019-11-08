@@ -14,6 +14,7 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <cstdio>
 #include <string>
@@ -142,5 +143,11 @@ bool ListDir(std::string directory, std::vector<std::string>* files) {
 
   return true;
 }
+
+bool FileExists(std::string path) {
+  path = NormalizeSlashes(path);
+  return access(path.c_str(), F_OK);
+}
+
 }  // namespace file
 }  // namespace minigo

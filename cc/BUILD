@@ -468,6 +468,7 @@ minigo_cc_binary(
         ":thread",
         ":thread_safe_queue",
         ":zobrist",
+        "//cc/async:poll_thread",
         "//cc/async:sharded_executor",
         "//cc/dual_net:factory",
         "//cc/file",

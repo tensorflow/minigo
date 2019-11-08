@@ -76,8 +76,6 @@ flags.DEFINE_list('train_devices', None, '')
 flags.DEFINE_string('eval_device', None, '')
 flags.DEFINE_list('selfplay_devices', None, '')
 
-flags.DEFINE_integer('bootstrap_num_models', 8,
-                     'Number of random models to use for bootstrapping.')
 flags.DEFINE_integer('eval_num_games', 100,
                      'Number of selfplay games to play.')
 

@@ -11,7 +11,7 @@ cc_library(
     deps = [
         ":file",
         "//cc:logging",
-        "//cc:thread",
+        "//cc/async:poll_thread",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

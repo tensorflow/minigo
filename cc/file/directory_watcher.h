@@ -41,9 +41,7 @@ class DirectoryWatcher {
   ~DirectoryWatcher();
 
  private:
-  void ThreadRun() LOCKS_EXCLUDED(&mutex_);
-  void Poll() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
-  bool IsJoining() const EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
+  void Poll();
 
   // The directory we're watching for new files.
   std::string directory_;
@@ -57,13 +55,9 @@ class DirectoryWatcher {
 
   std::string latest_path_;
 
-  const absl::Duration poll_interval_;
-
-  absl::Mutex mutex_;
-  bool is_joining_ = false GUARDED_BY(&mutex_);
-  std::function<void(const std::string&)> callback_ GUARDED_BY(&mutex_);
-
   std::unique_ptr<Thread> poll_thread_;
+
+  std::function<void(const std::string&)> callback_;
 };
 
 }  // namespace minigo

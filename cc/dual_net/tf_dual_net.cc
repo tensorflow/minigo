@@ -98,6 +98,9 @@ TfDualNet::TfDualNet(const std::string& graph_path,
   callable_options.add_target("policy_output");
   callable_options.add_target("value_output");
 
+  // Timeout after 30 seconds.
+  callable_options.mutable_run_options()->set_timeout_in_ms(30 * 1000);
+
   TF_CHECK_OK(session_->MakeCallable(callable_options, &handle_));
 
   for (const auto& node : graph_def.node()) {
