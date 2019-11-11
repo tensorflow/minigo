@@ -20,6 +20,7 @@
 #    --board_size=19 \
 #    --base_dir="${OUTPUT_DIR}"
 
+
 source ml_perf/scripts/common.sh
 
 
