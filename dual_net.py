@@ -664,7 +664,11 @@ def freeze_graph(model_path, use_trt=False, trt_max_batch_size=8,
     # Write to temporary location & rename to prevent users from seeing
     # partially written files: depending on the wind, TensorFlow will sometimes
     # happily read a truncated GraphDef without reporting an error.
-    with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
+    # Construct a temp path from the model path rather than a named temp file
+    # because dst_path might be on a different filesystem than /tmp/ and files
+    # can't be renamed across filesystems.
+    tmp_path = model_path + '.tmp'
+    with tf.gfile.Open(tmp_path, 'wb') as f:
         if use_trt:
             dst_path = model_path + '.trt.pb'
             import tensorflow.contrib.tensorrt as trt

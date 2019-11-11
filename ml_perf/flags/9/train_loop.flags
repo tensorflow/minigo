@@ -1,0 +1,9 @@
+--iterations=50
+
+--window_size=5
+--train_filter=0.3
+
+--validate=1
+
+# Consider also updating num_games in bootstrap.flags if updating
+--min_games_per_iteration=4096

@@ -15,5 +15,8 @@
 
 --eval_num_games=100
 
---min_games_per_iteration=8192
 --validate=1
+
+# Consider also updating num_games in bootstrap.flags if updating
+# min_games_per_iteration.
+--min_games_per_iteration=8192

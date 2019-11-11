@@ -26,6 +26,12 @@ from absl import flags
 from utils import *
 
 
+# Flags that take multiple values.
+# For these flags, expand_cmd_str appends each value in order.
+# For all other flags, expand_cmd_str takes the last value.
+MULTI_VALUE_FLAGS = set(['--lr_boundaries', '--lr_rates'])
+
+
 flag_cache = {}
 flag_cache_lock = asyncio.Lock()
 
@@ -61,7 +67,12 @@ async def expand_cmd_str(cmd):
                 flag_args[arg] = None
             else:
                 flag, value = arg.split('=', 1)
-                flag_args[flag] = value
+                if flag in MULTI_VALUE_FLAGS:
+                    if flag not in flag_args:
+                        flag_args[flag] = []
+                    flag_args[flag].append(value)
+                else:
+                    flag_args[flag] = value
         else:
             position_args.append(arg)
 
@@ -69,6 +80,9 @@ async def expand_cmd_str(cmd):
     for flag, value in flag_args.items():
         if value is None:
             flag_list.append(flag)
+        elif type(value) == list:
+            for v in value:
+                flag_list.append('%s=%s' % (flag, v))
         else:
             flag_list.append('%s=%s' % (flag, value))
 

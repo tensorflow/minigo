@@ -146,7 +146,7 @@ DEFINE_int32(num_games, 0,
 DEFINE_bool(run_forever, false,
             "Whether to run forever. Only one of run_forever and num_games "
             "must be set.");
-DEFINE_string(abort_path, "",
+DEFINE_string(abort_file, "",
               "If non-empty, specifies a path to a file whose presence is "
               "checked for periodically when run_forever=true. If the file "
               "exists the selfplay process will abort immediately.");
@@ -358,7 +358,7 @@ class Selfplayer {
   void ParseFlags() EXCLUSIVE_LOCKS_REQUIRED(&mutex_);
   FeatureDescriptor InitializeModels();
   void CreateModels(const std::string& path);
-  void CheckAbortPath();
+  void CheckAbortFile();
 
   mutable absl::Mutex mutex_;
   Game::Options game_options_ GUARDED_BY(&mutex_);
@@ -378,7 +378,7 @@ class Selfplayer {
   int next_game_id_ GUARDED_BY(&mutex_) = 1;
 
   std::unique_ptr<DirectoryWatcher> directory_watcher_;
-  std::unique_ptr<PollThread> abort_path_watcher_;
+  std::unique_ptr<PollThread> abort_file_watcher_;
 };
 
 // Plays multiple games concurrently using `SelfplayGame` instances.
@@ -702,11 +702,11 @@ void Selfplayer::Run() {
   if (FLAGS_run_forever) {
     // Note that we don't ever have to worry about joining this thread because
     // it's only ever created when selfplay runs forever and when it comes time
-    // to terminate the process, CheckAbortPath will call abort().
-    abort_path_watcher_ = absl::make_unique<PollThread>(
+    // to terminate the process, CheckAbortFile will call abort().
+    abort_file_watcher_ = absl::make_unique<PollThread>(
         "AbortWatcher", absl::Seconds(5),
-        std::bind(&Selfplayer::CheckAbortPath, this));
-    abort_path_watcher_->Start();
+        std::bind(&Selfplayer::CheckAbortFile, this));
+    abort_file_watcher_->Start();
   }
 
   // Load the models.
@@ -899,9 +899,9 @@ void Selfplayer::CreateModels(const std::string& path) {
   }
 }
 
-void Selfplayer::CheckAbortPath() {
-  if (file::FileExists(FLAGS_abort_path)) {
-    MG_LOG(FATAL) << "Aborting because " << FLAGS_abort_path << " was found";
+void Selfplayer::CheckAbortFile() {
+  if (file::FileExists(FLAGS_abort_file)) {
+    MG_LOG(FATAL) << "Aborting because " << FLAGS_abort_file << " was found";
   }
 }
 

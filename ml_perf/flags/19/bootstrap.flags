@@ -20,3 +20,8 @@
 --allow_pass=0
 --target_pruning=0
 --restrict_in_bensons=0
+
+# Use --model=agz:0.4:0.4 if architecture.flags --use_extra_features=0
+--model=extra:0.4:0.4
+
+--num_games=8192

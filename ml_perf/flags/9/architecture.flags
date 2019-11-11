@@ -5,3 +5,6 @@
 --trunk_layers=9
 --value_cost_weight=0.5
 --summary_steps=64
+
+--bool_features=1
+--use_extra_features=1

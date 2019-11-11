@@ -83,12 +83,6 @@ flags.DEFINE_boolean('bootstrap', False, '')
 
 flags.DEFINE_boolean('validate', False, 'Run validation on holdout games')
 
-flags.DEFINE_boolean('use_extra_features', False,
-                     'Use non-Zero input features.')
-
-flags.DEFINE_boolean('use_bool_features', False,
-                     'Use boolean input features instead of float.')
-
 flags.DEFINE_integer('min_games_per_iteration', 4096,
                      'Minimum number of games to play for each training '
                      'iteration.')
@@ -351,13 +345,10 @@ async def bootstrap_selfplay(state):
     output_dir = os.path.join(fsdb.selfplay_dir(), state.train_model_name)
     holdout_dir = os.path.join(fsdb.holdout_dir(), state.train_model_name)
 
-    features = 'extra' if FLAGS.use_extra_features else 'agz'
     lines = await run(
         'bazel-bin/cc/concurrent_selfplay',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                             'bootstrap.flags')),
-        '--model={}:0.4:0.4'.format(features),
-        '--num_games={}'.format(FLAGS.min_games_per_iteration),
         '--output_dir={}/0'.format(output_dir),
         '--holdout_dir={}/0'.format(holdout_dir))
     logging.info('\n'.join(lines[-6:]))
@@ -442,8 +433,6 @@ async def train(state, selfplay_processes):
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
         '--work_dir={}'.format(fsdb.working_dir()),
         '--export_path={}'.format(model_path),
-        '--use_extra_features={}'.format(FLAGS.use_extra_features),
-        '--bool_features={}'.format(FLAGS.use_bool_features),
         '--freeze=true',
         *tf_records)
 
@@ -470,7 +459,6 @@ async def validate(state):
               '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                                   'validate.flags')),
               '--work_dir={}'.format(fsdb.working_dir()),
-              '--use_extra_features={}'.format(FLAGS.use_extra_features),
               '--expand_validation_dirs',
               *src_dirs)
 

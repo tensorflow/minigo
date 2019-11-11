@@ -1,0 +1,9 @@
+--iterations=100
+
+--window_size=5
+--train_filter=0.3
+
+--validate=1
+
+# --num_games in bootstrap.flags must be >= --min_games_per_iteration.
+--min_games_per_iteration=8192
