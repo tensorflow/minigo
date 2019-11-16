@@ -118,6 +118,10 @@ minigo_cc_library(
 minigo_cc_library(
     name = "logging",
     srcs = ["logging.cc"],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": ["ws2_32.lib"],
+        "//conditions:default": ["-lpthread"],
+    }),
     hdrs = ["logging.h"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
@@ -213,6 +217,7 @@ minigo_cc_library(
     name = "random",
     srcs = ["random.cc"],
     hdrs = ["random.h"],
+    linkopts = ["-lm"],
     deps = [
         "@com_google_absl//absl/types:span",
     ],
@@ -387,7 +392,6 @@ minigo_cc_test(
     name = "random_test",
     size = "small",
     srcs = ["random_test.cc"],
-    linkopts = ["-lm"],
     deps = [
         ":random",
         "@com_google_googletest//:gtest_main",
@@ -558,7 +562,6 @@ cc_binary(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/time",
     ],
 )
 

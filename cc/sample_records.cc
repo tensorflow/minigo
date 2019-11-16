@@ -22,7 +22,6 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
-#include "absl/time/clock.h"
 #include "cc/async/thread.h"
 #include "cc/init.h"
 #include "cc/logging.h"
@@ -181,8 +180,8 @@ std::vector<std::string> Read(std::vector<std::string> paths) {
   int num_paths = static_cast<int>(paths.size());
   int num_read_threads = std::min<int>(FLAGS_num_read_threads, num_paths);
 
-  MG_LOG(INFO) << absl::Now() << " : reading " << num_paths << " files on "
-               << num_read_threads << " threads";
+  MG_LOG(INFO) << "reading " << num_paths << " files on " << num_read_threads
+               << " threads";
 
   ReadThread::Options read_options;
   // If --sample_frac wasn't set, default to reading all records: we need to
@@ -214,8 +213,8 @@ std::vector<std::string> Read(std::vector<std::string> paths) {
   for (const auto& t : threads) {
     n += t->sampled_records().size();
   }
-  MG_LOG(INFO) << absl::Now() << " : sampled " << n << " records";
-  MG_LOG(INFO) << absl::Now() << " : concatenating";
+  MG_LOG(INFO) << "sampled " << n << " records";
+  MG_LOG(INFO) << "concatenating";
   std::vector<std::string> records;
   records.reserve(n);
   for (const auto& t : threads) {
@@ -227,12 +226,12 @@ std::vector<std::string> Read(std::vector<std::string> paths) {
 
 void Shuffle(std::vector<std::string>* records) {
   Random rnd(FLAGS_seed, Random::kUniqueStream);
-  MG_LOG(INFO) << absl::Now() << " : shuffling";
+  MG_LOG(INFO) << "shuffling";
   rnd.Shuffle(records);
 }
 
 void Write(std::vector<std::string> records, const std::string& path) {
-  MG_LOG(INFO) << absl::Now() << " : writing to " << path;
+  MG_LOG(INFO) << "writing to " << path;
 
   WriteThread::Options write_options;
   write_options.num_shards = FLAGS_num_write_threads;
@@ -299,7 +298,7 @@ void Run(std::vector<std::string> src_paths, const std::string& dst_path) {
 
   Write(std::move(records), dst_path);
 
-  MG_LOG(INFO) << absl::Now() << " : done";
+  MG_LOG(INFO) << "done";
 }
 
 }  // namespace minigo

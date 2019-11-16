@@ -21,12 +21,12 @@ import asyncio
 import itertools
 import logging
 import os
+import re
 import tensorflow as tf
 import time
 from ml_perf.utils import *
 
 from absl import app, flags
-from rl_loop import fsdb
 
 flags.DEFINE_integer('iterations', 100, 'Number of iterations of the RL loop.')
 
@@ -63,6 +63,14 @@ flags.DEFINE_integer('num_write_threads', 8,
                      'slow down training time if each shard gets much smaller '
                      'than around 100MB'.
 
+flags.DEFINE_string('golden_chunk_dir', None, 'Training example directory.')
+flags.DEFINE_string('holdout_dir', None, 'Holdout example directory.')
+flags.DEFINE_string('model_dir', None, 'Model directory.')
+flags.DEFINE_string('selfplay_dir', None, 'Selfplay example directory.')
+flags.DEFINE_string('work_dir', None, 'Training checkpoint directory.')
+
+flags.DEFINE_string('tpu_name', None, 'Name of the TPU to train on.')
+
 FLAGS = flags.FLAGS
 
 
@@ -83,7 +91,7 @@ class State:
     @property
     def selfplay_model_path(self):
         return '{}.pb'.format(
-            os.path.join(fsdb.models_dir(), self.selfplay_model_name))
+            os.path.join(FLAGS.model_dir, self.selfplay_model_name))
 
     @property
     def train_model_name(self):
@@ -92,34 +100,7 @@ class State:
     @property
     def train_model_path(self):
         return '{}.pb'.format(
-            os.path.join(fsdb.models_dir(), self.train_model_name))
-
-
-async def run(*cmd, **kwargs):
-    """Run the given subprocess command in a coroutine.
-
-    Args:
-        *cmd: the command to run and its arguments.
-
-    Returns:
-        The output that the command wrote to stdout as a list of strings, one line
-        per element (stderr output is piped to stdout).
-
-    Raises:
-        RuntimeError: if the command returns a non-zero result.
-    """
-
-    stdout = await checked_run(*cmd, **kwargs)
-
-    log_path = os.path.join(FLAGS.base_dir, get_cmd_name(cmd) + '.log')
-    with tf.gfile.Open(log_path, 'a') as f:
-        f.write(await expand_cmd_str(cmd))
-        f.write('\n')
-        f.write(stdout)
-        f.write('\n')
-
-    # Split stdout into lines.
-    return stdout.split('\n')
+            os.path.join(FLAGS.model_dir, self.train_model_name))
 
 
 def wait_for_training_examples(state, num_games):
@@ -130,7 +111,7 @@ def wait_for_training_examples(state, num_games):
         num_games: number of games to wait for.
     """
 
-    model_dir = os.path.join(fsdb.selfplay_dir(), state.selfplay_model_name)
+    model_dir = os.path.join(FLAGS.selfplay_dir, state.selfplay_model_name)
     pattern = os.path.join(model_dir, '*', '*', '*.tfrecord.zz')
     for i in itertools.count():
         try:
@@ -152,24 +133,27 @@ async def sample_training_examples(state):
         state: the RL loop State instance.
 
     Returns:
-        A list of golden chunks up to num_records in length, sorted by path.
+        A (num_examples, record_paths) tuple:
+         - num_examples : number of examples sampled.
+         - record_paths : list of golden chunks up to window_size in length,
+                          sorted by path.
     """
 
     # Training examples are written out to the following directory hierarchy:
     #   selfplay_dir/device_id/model_name/timestamp/
     # Read examples from the most recent `window_size` models.
-    model_dirs = [os.path.join(fsdb.selfplay_dir(), x)
-                  for x in tf.gfile.ListDirectory(fsdb.selfplay_dir())]
+    model_dirs = [os.path.join(FLAGS.selfplay_dir, x)
+                  for x in tf.gfile.ListDirectory(FLAGS.selfplay_dir)]
     model_dirs = sorted(model_dirs, reverse=True)[:FLAGS.window_size]
 
     src_patterns = [os.path.join(x, '*', '*', '*.tfrecord.zz')
                     for x in model_dirs]
 
-    dst_path = os.path.join(fsdb.golden_chunk_dir(),
+    dst_path = os.path.join(FLAGS.golden_chunk_dir,
                             '{}.tfrecord.zz'.format(state.train_model_name))
 
     logging.info('Writing training chunks to %s', dst_path)
-    lines = await run(
+    output = await checked_run(
         'bazel-bin/cc/sample_records',
         '--num_read_threads={}'.format(FLAGS.num_read_threads),
         '--num_write_threads={}'.format(FLAGS.num_write_threads),
@@ -178,59 +162,73 @@ async def sample_training_examples(state):
         '--shuffle=true',
         '--dst={}'.format(dst_path),
         *src_patterns)
-    logging.info('\n  '.join(['sample_records output:'] + lines))
+
+    m = re.search(r"sampled ([\d]+) records", output)
+    assert m
+    num_records = int(m.group(1))
 
     chunk_pattern = os.path.join(
-        fsdb.golden_chunk_dir(),
+        FLAGS.golden_chunk_dir,
         '{}-*-of-*.tfrecord.zz'.format(state.train_model_name))
     chunk_paths = sorted(tf.gfile.Glob(chunk_pattern))
     assert len(chunk_paths) == 8
 
-    return chunk_paths
+    return (num_records, chunk_paths)
+
+
+def append_timestamp(elapsed, model_name):
+  # Append the time elapsed from when the RL was started to when this model
+  # was trained. GCS files are immutable, so we have to do the append manually.
+  timestamps_path = os.path.join(FLAGS.model_dir, 'train_times.txt')
+  try:
+    with tf.gfile.Open(timestamps_path, 'r') as f:
+      timestamps = f.read()
+  except tf.errors.NotFoundError:
+    timestamps = ''
+  timestamps += '{:.3f} {}\n'.format(elapsed, model_name)
+  with tf.gfile.Open(timestamps_path, 'w') as f:
+    f.write(timestamps)
 
 
 async def train(state):
-    """Run training and write a new model to the fsdb models_dir.
+    """Run training and write a new model to the model_dir.
 
     Args:
         state: the RL loop State instance.
     """
 
     wait_for_training_examples(state, FLAGS.min_games_per_iteration)
-    tf_records = await sample_training_examples(state)
+    num_records, record_paths = await sample_training_examples(state)
 
-    model_path = os.path.join(fsdb.models_dir(), state.train_model_name)
+    model_path = os.path.join(FLAGS.model_dir, state.train_model_name)
 
-    await run(
+    await checked_run(
         'python3', 'train.py',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
-        '--work_dir={}'.format(fsdb.working_dir()),
+        '--work_dir={}'.format(FLAGS.work_dir),
         '--export_path={}'.format(model_path),
+        '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
+        '--tpu_name={}'.format(FLAGS.tpu_name),
+        '--num_examples={}'.format(num_records),
         '--freeze=true',
-        *tf_records)
+        *record_paths)
 
     # Append the time elapsed from when the RL was started to when this model
     # was trained.
     elapsed = time.time() - state.start_time
-    timestamps_path = os.path.join(fsdb.models_dir(), 'train_times.txt')
-    with tf.gfile.Open(timestamps_path, 'a') as f:
-        print('{:.3f} {}'.format(elapsed, state.train_model_name), file=f)
-
-    if FLAGS.validate and state.iter_num > 1:
-        try:
-            await validate(state)
-        except Exception as e:
-            logging.error(e)
+    append_timestamp(elapsed, state.train_model_name)
 
 
 async def validate(state):
-    dirs = [x.path for x in os.scandir(fsdb.holdout_dir()) if x.is_dir()]
+    dirs = [x.path for x in os.scandir(FLAGS.holdout_dir) if x.is_dir()]
     src_dirs = sorted(dirs, reverse=True)[:FLAGS.window_size]
 
-    await run('python3', 'validate.py',
+    await checked_run('python3', 'validate.py',
               '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
                                                   'validate.flags')),
-              '--work_dir={}'.format(fsdb.working_dir()),
+              '--work_dir={}'.format(FLAGS.work_dir),
+              '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
+              '--tpu_name={}'.format(FLAGS.tpu_name),
               '--expand_validation_dirs',
               *src_dirs)
 
@@ -246,10 +244,13 @@ def main(unused_argv):
         handler.setFormatter(formatter)
 
     with logged_timer('Total time'):
-        state = State()
-        while state.iter_num <= FLAGS.iterations:
-            state.iter_num += 1
-            wait(train(state))
+        try:
+            state = State()
+            while state.iter_num <= FLAGS.iterations:
+                state.iter_num += 1
+                wait(train(state))
+        finally:
+                asyncio.get_event_loop().close()
 
 
 if __name__ == '__main__':

@@ -32,6 +32,7 @@ minigo_cc_library(
         "//cc:symmetries",
         "//cc:tiny_set",
         "//cc/platform",
+        "@com_google_absl//absl/types:span",
     ],
 )
 

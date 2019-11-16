@@ -144,7 +144,7 @@ MctsNode::MctsNode(MctsNode* parent, Coord move)
 Coord MctsNode::GetMostVisitedMove(bool restrict_pass_alive) const {
   // Find the set of moves with the largest N.
   inline_vector<Coord, kNumMoves> moves;
-  // CalculatePassAlive does not include the kPass point.
+  // CalculatePassAliveRegions does not include the kPass point.
   std::array<Color, kN * kN> out_of_bounds;
 
   if (restrict_pass_alive) {

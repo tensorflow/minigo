@@ -180,7 +180,7 @@ void LiteDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
       break;
   }
 
-  Model::GetOutputs(inputs, policy, value, outputs);
+  Model::GetOutputs(inputs, policy, value, absl::MakeSpan(*outputs));
 
   if (model_name != nullptr) {
     *model_name = graph_path_;

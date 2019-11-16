@@ -317,7 +317,7 @@ class SelfplayGame {
   // `num_consecutive_passes_` latches once it reaches
   // `restrict_pass_alive_play_threshold` is is not reset to 0 when a non-pass
   // move is played.
-  int num_consecutive_passes_[2];
+  int num_consecutive_passes_[2] = {0, 0};
 
   const int game_id_;
 };
@@ -1022,15 +1022,23 @@ std::string SelfplayThread::RunInferences() {
 }
 
 void SelfplayThread::ProcessInferences(const std::string& model_name) {
-  WTF_SCOPE0("ProcessInferences");
-  for (auto& s : searches_) {
-    for (auto& inference : s.inferences) {
-      cache_->Merge(inference.cache_key, inference.leaf->canonical_symmetry,
-                    inference.input.sym, &inference.output);
+  {
+    WTF_SCOPE0("UpdateCache");
+    for (auto& s : searches_) {
+      for (auto& inference : s.inferences) {
+        cache_->Merge(inference.cache_key, inference.leaf->canonical_symmetry,
+                      inference.input.sym, &inference.output);
+      }
     }
-    for (const auto& span : s.inference_spans) {
-      span.selfplay_game->ProcessInferences(
-          model_name, absl::MakeSpan(s.inferences).subspan(span.pos, span.len));
+  }
+
+  {
+    WTF_SCOPE0("ProcessInferences");
+    for (auto& s : searches_) {
+      for (const auto& span : s.inference_spans) {
+        span.selfplay_game->ProcessInferences(
+            model_name, absl::MakeSpan(s.inferences).subspan(span.pos, span.len));
+      }
     }
   }
 }

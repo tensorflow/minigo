@@ -17,8 +17,8 @@
 
 #include <array>
 #include <utility>
-#include <vector>
 
+#include "absl/types/span.h"
 #include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/logging.h"
@@ -157,7 +157,7 @@ struct Features {
   // CHECK fails if the number of channels in the `features` doesn't match the
   // number of feature planes `kNumPlanes`.
   template <typename T>
-  static void Set(const std::vector<const ModelInput*>& inputs,
+  static void Set(absl::Span<const ModelInput* const> inputs,
                   Tensor<T>* features) {
     MG_CHECK(features->shape.is({-1, kN, kN, Impl::kNumPlanes}))
         << features->shape;
@@ -197,8 +197,7 @@ struct Features {
 // encoded as a `Features<...>` type into run-time information.
 struct FeatureDescriptor {
   template <typename T>
-  using SetFeatures = void (*)(const std::vector<const ModelInput*>&,
-                               Tensor<T>*);
+  using SetFeatures = void (*)(absl::Span<const ModelInput* const>, Tensor<T>*);
 
   template <typename FeatureType>
   static FeatureDescriptor Create() {
@@ -213,6 +212,8 @@ struct FeatureDescriptor {
 };
 
 using AgzFeatures = Features<StoneFeatures, ToPlayFeature>;
+
+// TODO(tommadams): rename ExtraFeatures to Mlperf07Features.
 using ExtraFeatures = Features<StoneFeatures, ToPlayFeature, LibertyFeatures,
                                WouldCaptureFeature>;
 

@@ -210,7 +210,9 @@ def get_input_tensors(batch_size, tf_records, num_repeats=1,
 
 
 def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
-                          filter_amount=1, random_rotation=True):
+                          shuffle_records=True, shuffle_examples=True,
+                          shuffle_buffer_size=None,
+                          filter_amount=0.05, random_rotation=True):
     # TPUs trains on sequential golden chunks to simplify preprocessing and
     # reproducibility.
     assert len(tf_records) < 101, "Use example_buffer to build a golden_chunk"
@@ -219,9 +221,9 @@ def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
         batch_size,
         tf_records,
         num_repeats=num_repeats,
-        shuffle_records=False,
-        shuffle_examples=False,
-        shuffle_buffer_size=None,
+        shuffle_records=shuffle_records,
+        shuffle_examples=shuffle_examples,
+        shuffle_buffer_size=shuffle_buffer_size,
         filter_amount=filter_amount,
         interleave=False)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))

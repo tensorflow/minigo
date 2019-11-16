@@ -90,14 +90,14 @@ async def expand_cmd_str(cmd):
     return '  '.join(process + flag_list + position_args)
 
 
-async def checked_run(*cmd, **kwargs):
+async def checked_run(*cmd):
     """Run the given subprocess command in a coroutine.
 
     Args:
         *cmd: the command to run and its arguments.
 
     Returns:
-        The output that the command wrote to stdout.
+        The output that the command wrote to stdout & stderr.
 
     Raises:
         RuntimeError: if the command returns a non-zero result.
@@ -107,26 +107,28 @@ async def checked_run(*cmd, **kwargs):
     logging.info('Running: %s', await expand_cmd_str(cmd))
     with logged_timer('{} finished'.format(get_cmd_name(cmd))):
         p = await asyncio.create_subprocess_exec(
-            *cmd, **kwargs,
+            *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT)
 
         # Stream output from the process stdout.
-        chunks = []
+        lines = []
         while True:
-            chunk = await p.stdout.read(16 * 1024)
-            if not chunk:
+            line = await p.stdout.readline()
+            if not line:
                 break
-            chunks.append(chunk)
+            line = line.decode()[:-1]
+            lines.append(line)
+            logging.info(line)
 
         # Wait for the process to finish, check it was successful & build stdout.
         await p.wait()
-        stdout = b''.join(chunks).decode()[:-1]
+        output = '\n'.join(lines)[:-1]
         if p.returncode:
             raise RuntimeError('Return code {} from process: {}\n{}'.format(
-                p.returncode, await expand_cmd_str(cmd), stdout))
+                p.returncode, await expand_cmd_str(cmd), output))
 
-        return stdout
+        return output
 
 
 def wait(aws):

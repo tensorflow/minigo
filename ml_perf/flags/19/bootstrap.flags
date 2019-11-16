@@ -15,11 +15,14 @@
 --selfplay_threads=48
 --parallel_search=1
 --parallel_inference=48
---concurrent_games_per_thread=16
+--concurrent_games_per_thread=64
+
+--min_resign_threshold=-1.00
+--max_resign_threshold=-0.99
 
 --allow_pass=0
 --target_pruning=0
---restrict_in_bensons=0
+--restrict_pass_alive_play_threshold=4
 
 # Use --model=agz:0.4:0.4 if architecture.flags --use_extra_features=0
 --model=extra:0.4:0.4

@@ -123,7 +123,8 @@ std::vector<tensorflow::Example> MakeExamples(
 
     ModelInput input;
     input.sym = symmetry::kIdentity;
-    game.GetPositionHistory(i, kMaxPositionHistory, &input.position_history);
+    game.GetPositionHistory(i, kMaxPositionHistory,
+                            &input.position_history);
 
     feature_desc.set_bytes({&input}, &features);
     examples.push_back(MakeTfExample(

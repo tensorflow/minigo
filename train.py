@@ -19,6 +19,7 @@ Usage:
 """
 
 import logging
+import math
 
 from absl import app, flags
 import numpy as np
@@ -39,6 +40,10 @@ flags.DEFINE_boolean('shuffle_examples', True,
 flags.DEFINE_integer('steps_to_train', None,
                      'Number of training steps to take. If not set, iterates '
                      'once over training data.')
+
+flags.DEFINE_integer('num_examples', None,
+                     'Total number of examples passed. Used to calculate '
+                     'steps_to_train if it isn\'t set.')
 
 flags.DEFINE_integer('window_size', 500000,
                      'Number of games to include in the window')
@@ -169,6 +174,9 @@ def train(*tf_records: "Records to train on"):
                 return preprocessing.get_tpu_input_tensors(
                     params['batch_size'],
                     tf_records,
+                    filter_amount=FLAGS.filter_amount,
+                    shuffle_examples=FLAGS.shuffle_examples,
+                    shuffle_buffer_size=FLAGS.shuffle_buffer_size,
                     random_rotation=True)
         # Hooks are broken with TPUestimator at the moment.
         hooks = []
@@ -186,6 +194,12 @@ def train(*tf_records: "Records to train on"):
                  EchoStepCounterHook(output_dir=FLAGS.work_dir)]
 
     steps = FLAGS.steps_to_train
+    if not steps and FLAGS.num_examples:
+        batch_size = FLAGS.train_batch_size
+        if FLAGS.use_tpu:
+            batch_size *= FLAGS.num_tpu_cores
+        steps = math.floor(FLAGS.num_examples / batch_size)
+
     logging.info("Training, steps = %s, batch = %s -> %s examples",
                  steps or '?', effective_batch_size,
                  (steps * effective_batch_size) if steps else '?')

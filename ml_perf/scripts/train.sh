@@ -24,9 +24,7 @@ source ml_perf/scripts/common.sh
 
 # Set up an exit handler that stops the selfplay workers.
 function stop_selfplay {
-  /ml_perf/scripts/stop_selfplay.sh \
-    --board_size="${board_size}" \
-    --base_dir="${base_dir}" \
+  ./ml_perf/scripts/stop_selfplay.sh "${script_args[@]}"
 }
 trap stop_selfplay EXIT
 
@@ -35,7 +33,13 @@ trap stop_selfplay EXIT
 BOARD_SIZE="${board_size}" \
 CUDA_VISIBLE_DEVICES="0" \
 python3 ml_perf/train_loop.py \
-  --base_dir="${base_dir}" \
-  --flags_dir="${base_dir}/flags" \
-  --flagfile="${base_dir}/flags/train_loop.flags" \
-  2>&1 | tee "${base_dir}/logs/train_loop.log"
+  --flags_dir="${flag_dir}" \
+  --golden_chunk_dir="${golden_chunk_dir}" \
+  --holdout_dir="${holdout_dir}" \
+  --log_dir="${log_dir}" \
+  --model_dir="${model_dir}" \
+  --selfplay_dir="${selfplay_dir}" \
+  --work_dir="${work_dir}" \
+  --flagfile="${flag_dir}/train_loop.flags" \
+  --tpu_name="${tpu_name}" \
+  2>&1 | tee "${log_dir}/train_loop.log"

@@ -62,7 +62,6 @@ class TfDualNet : public Model {
   std::unique_ptr<tensorflow::Session> session_;
   tensorflow::Session::CallableHandle handle_;
   std::vector<tensorflow::Tensor> inputs_;
-  std::vector<std::string> output_names_;
   std::vector<tensorflow::Tensor> outputs_;
   const std::string graph_path_;
   int batch_capacity_ = 0;
@@ -119,9 +118,6 @@ TfDualNet::TfDualNet(const std::string& graph_path,
   MG_CHECK(input_type_ == tensorflow::DT_FLOAT ||
            input_type_ == tensorflow::DT_BOOL)
       << input_type_;
-
-  output_names_.emplace_back("policy_output");
-  output_names_.emplace_back("value_output");
 }
 
 TfDualNet::~TfDualNet() {
@@ -141,13 +137,13 @@ void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
   MG_CHECK(inputs.size() == outputs->size());
 
   if (input_type_ == tensorflow::DT_FLOAT) {
-    WTF_SCOPE("Features::SetFloat: capacity", int)(batch_capacity_);
+    WTF_SCOPE("Features::SetFloat: inputs", int)(inputs.size());
     Tensor<float> features(
         {batch_capacity_, kN, kN, feature_descriptor().num_planes},
         inputs_[0].flat<float>().data());
     feature_descriptor().set_floats(inputs, &features);
   } else {
-    WTF_SCOPE("Features::SetBool: capacity", int)(batch_capacity_);
+    WTF_SCOPE("Features::SetBool: inputs", size_t)(inputs.size());
     static_assert(sizeof(bool) == sizeof(uint8_t), "bool must be 1 byte");
     Tensor<uint8_t> features(
         {batch_capacity_, kN, kN, feature_descriptor().num_planes},
@@ -166,8 +162,8 @@ void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                        outputs_[0].flat<float>().data());
   Tensor<float> value({batch_capacity_}, outputs_[1].flat<float>().data());
   {
-    WTF_SCOPE("Model::GetOutputs: capacity", int)(batch_capacity_);
-    Model::GetOutputs(inputs, policy, value, outputs);
+    WTF_SCOPE("Model::GetOutputs: outputs", size_t)(outputs->size());
+    Model::GetOutputs(inputs, policy, value, absl::MakeSpan(*outputs));
   }
 
   if (model_name != nullptr) {
@@ -199,6 +195,7 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
     const std::string& descriptor) {
   tensorflow::GraphDef graph_def;
   auto* env = tensorflow::Env::Default();
+  TF_CHECK_OK(env->FileExists(descriptor));
   TF_CHECK_OK(tensorflow::ReadBinaryProto(env, descriptor, &graph_def));
 
   // Check that we're not loading a TPU model.

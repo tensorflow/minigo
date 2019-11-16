@@ -32,21 +32,26 @@ bazel build  -c opt \
 
 
 # Initialize a clean directory structure.
-for sub_dir in flags logs work_dir models data/selfplay data/holdout data/golden_chunks; do
-  mkdir -p "${base_dir}/${sub_dir}"
-  rm -rf "${base_dir}/${sub_dir}"/*
+for var_name in flag_dir golden_chunk_dir holdout_dir log_dir model_dir \
+                selfplay_dir sgf_dir work_dir; do
+  dir="${!var_name}"
+  if [[ "${dir}" == gs://* ]]; then
+    gsutil -m rm -rf "${dir}"/*
+  else
+    mkdir -p "${dir}"
+    rm -rf "${dir}"/*
+  fi
 done
 rm -f "${abort_file}"
 
-echo "Copying flags to ${base_dir}/flags"
-cp -r "ml_perf/flags/${board_size}"/* "${base_dir}/flags/"
-
+echo "Copying flags to ${flag_dir}"
+cp -r "ml_perf/flags/${board_size}"/* "${flag_dir}/"
 
 
 # Run bootstrap selfplay.
 ./bazel-bin/cc/concurrent_selfplay \
-  --flagfile="${base_dir}/flags/bootstrap.flags" \
-  --output_dir="${base_dir}/data/selfplay/000000/0" \
-  --holdout_dir="${base_dir}/data/holdout/000000/0" \
+  --flagfile="${flag_dir}/bootstrap.flags" \
+  --output_dir="${selfplay_dir}/000000/0" \
+  --holdout_dir="${holdout_dir}/000000/0" \
   --verbose=1 \
-  | tee "${base_dir}/logs/bootstrap.log"
+  | tee "${log_dir}/bootstrap.log"

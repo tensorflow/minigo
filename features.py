@@ -157,14 +157,14 @@ AGZ_FEATURES = [
 
 AGZ_FEATURES_PLANES = sum(f.planes for f in AGZ_FEATURES)
 
-EXTRA_FEATURES = [
+MLPERF07_FEATURES = [
     stone_features,
     color_to_play_feature,
     few_liberties_feature,
     would_capture_feature,
 ]
 
-EXTRA_FEATURES_PLANES = sum(f.planes for f in EXTRA_FEATURES)
+MLPERF07_FEATURES_PLANES = sum(f.planes for f in MLPERF07_FEATURES)
 
 
 def extract_features(position, features):

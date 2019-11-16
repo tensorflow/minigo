@@ -20,8 +20,10 @@ move prediction and score estimation.
 
 from absl import flags
 import functools
+import json
 import logging
 import os.path
+import struct
 import tempfile
 import time
 import numpy as np
@@ -145,11 +147,14 @@ flags.DEFINE_bool(
     help=('Use Swish activation function inplace of ReLu. '
           'https://arxiv.org/pdf/1710.05941.pdf'))
 
-flags.DEFINE_bool('bool_features', False,
-                  help=('Use bool input features instead of float'))
+flags.DEFINE_bool(
+    'bool_features', False,
+    help='Use bool input features instead of float')
 
-flags.DEFINE_bool('use_extra_features', False,
-                  help='Use extra input features.')
+flags.DEFINE_string(
+    'input_features', 'agz',
+    help='Type of input features: "agz" or "mlperf07"')
+
 
 # TODO(seth): Verify if this is still required.
 flags.register_multi_flags_validator(
@@ -218,17 +223,23 @@ class DualNetwork():
 
 
 def get_features_planes():
-    if FLAGS.use_extra_features:
-        return features_lib.EXTRA_FEATURES_PLANES
-    else:
+    if FLAGS.input_features == 'agz':
         return features_lib.AGZ_FEATURES_PLANES
+    elif FLAGS.input_features == 'mlperf07':
+        return features_lib.MLPERF07_FEATURES_PLANES
+    else:
+        raise ValueError('unrecognized input features "%s"' %
+                         FLAGS.input_features)
 
 
 def get_features():
-    if FLAGS.use_extra_features:
-        return features_lib.EXTRA_FEATURES
-    else:
+    if FLAGS.input_features == 'agz':
         return features_lib.AGZ_FEATURES
+    elif FLAGS.input_features == 'mlperf07':
+        return features_lib.MLPERF07_FEATURES
+    else:
+        raise ValueError('unrecognized input features "%s"' %
+                         FLAGS.input_features)
 
 
 def get_inference_input():
@@ -269,6 +280,8 @@ def model_fn(features, labels, mode, params):
 
     policy_output, value_output, logits = model_inference_fn(
         features, mode == tf.estimator.ModeKeys.TRAIN, params)
+
+    tf.constant(FLAGS.input_features, name='input_features')
 
     # train ops
     policy_cost = tf.reduce_mean(
@@ -554,6 +567,8 @@ def tpu_model_inference_fn(features):
         t = int(time.time())
         epoch_time = tf.constant(t, name='epoch_time_%d' % t)
         with tf.control_dependencies([epoch_time]):
+            features = tf.reshape(features,
+                                  [-1, go.N, go.N, get_features_planes()])
             return model_inference_fn(features, False, FLAGS.flag_values_dict())
 
 
@@ -661,29 +676,21 @@ def freeze_graph(model_path, use_trt=False, trt_max_batch_size=8,
     out_graph = tf.graph_util.convert_variables_to_constants(
         n.sess, n.sess.graph.as_graph_def(), output_names)
 
-    # Write to temporary location & rename to prevent users from seeing
-    # partially written files: depending on the wind, TensorFlow will sometimes
-    # happily read a truncated GraphDef without reporting an error.
-    # Construct a temp path from the model path rather than a named temp file
-    # because dst_path might be on a different filesystem than /tmp/ and files
-    # can't be renamed across filesystems.
-    tmp_path = model_path + '.tmp'
-    with tf.gfile.Open(tmp_path, 'wb') as f:
-        if use_trt:
-            dst_path = model_path + '.trt.pb'
-            import tensorflow.contrib.tensorrt as trt
-            out_graph = trt.create_inference_graph(
-                input_graph_def=out_graph,
-                outputs=output_names,
-                max_batch_size=trt_max_batch_size,
-                max_workspace_size_bytes=1 << 29,
-                precision_mode=trt_precision)
-            f.write(out_graph.SerializeToString())
-        else:
-            dst_path = model_path + '.pb'
-            f.write(out_graph.SerializeToString())
-        tmp_path = f.name
-    tf.gfile.Rename(tmp_path, dst_path)
+    if use_trt:
+        import tensorflow.contrib.tensorrt as trt
+        out_graph = trt.create_inference_graph(
+            input_graph_def=out_graph,
+            outputs=output_names,
+            max_batch_size=trt_max_batch_size,
+            max_workspace_size_bytes=1 << 29,
+            precision_mode=trt_precision)
+
+    metadata = get_model_metadata({
+        'engine': 'tf',
+        'use_trt': bool(use_trt),
+    })
+
+    atomic_write_model(out_graph, metadata, model_path)
 
 
 def freeze_graph_tpu(model_path):
@@ -705,9 +712,9 @@ def freeze_graph_tpu(model_path):
         replicated_features = []
         feature_type = tf.bool if FLAGS.bool_features else tf.float32
         for i in range(FLAGS.num_tpu_cores):
+            name = 'pos_tensor_%d' % i
             features = tf.placeholder(
-                feature_type, [None, go.N, go.N, get_features_planes()],
-                name='pos_tensor_%d' % i)
+                feature_type, [None], name=name)
             replicated_features.append((features,))
         outputs = tf.contrib.tpu.replicate(
             tpu_model_inference_fn, replicated_features)
@@ -723,10 +730,61 @@ def freeze_graph_tpu(model_path):
 
         tf.train.Saver().restore(sess, model_path)
 
-    # Freeze the graph.
-    model_def = tf.graph_util.convert_variables_to_constants(
+    out_graph = tf.graph_util.convert_variables_to_constants(
         sess, sess.graph.as_graph_def(), output_names)
-    with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
-        f.write(model_def.SerializeToString())
-        tmp_path = f.name
-    tf.gfile.GFile.Rename(tmp_path, model_path + '.pb')
+
+    metadata = get_model_metadata({
+        'engine': 'tpu',
+    })
+
+    atomic_write_model(out_graph, metadata, model_path)
+
+
+def get_model_metadata(metadata):
+    for f in ['conv_width', 'fc_width', 'trunk_layers', 'use_SE', 'use_SE_bias',
+              'use_swish', 'bool_features', 'input_features']:
+        metadata[f] = getattr(FLAGS, f)
+    return metadata
+
+
+def atomic_write_model(graph_def, metadata, model_path):
+    # TODO(tommadams): change extension when switching to new model format
+    dst_path = model_path + '.pb'
+
+    metadata_bytes = json.dumps(metadata, sort_keys=True,
+                                separators=(',', ':')).encode()
+    graph_def_bytes = graph_def.SerializeToString()
+
+    # If the destination path is on GCS, write there directly since GCS files
+    # are immutable and a partially written file cannot be observed.
+    # Otherwise, write to a temp file and rename. The temp file is written to
+    # the same filesystem as dst_path on the assumption that the rename will be
+    # atomic.
+    if dst_path.startswith("gs://"):
+        write_path = dst_path
+    else:
+        write_path = model_path + '.tmp'
+
+    # TODO(tommadams): enable the new model format below when the TPU changes
+    # are pushed.
+    with tf.gfile.Open(write_path, 'wb') as f:
+        f.write(graph_def_bytes)
+
+    ### # File header:
+    ### #   char[8]: '<minigo>'
+    ### #   uint64: version
+    ### #   uint64: file size
+    ### #   uint64: metadata size
+    ### version = 1
+    ### header_size = 32
+    ### metadata_size = len(metadata_bytes)
+    ### graph_def_size = len(graph_def_bytes)
+    ### file_size = header_size + metadata_size + graph_def_size
+    ### with tf.gfile.Open(write_path, 'wb') as f:
+    ###     f.write('<minigo>')
+    ###     f.write(struct.pack('<QQQ', version, file_size, metadata_size))
+    ###     f.write(metadata_bytes)
+    ###     f.write(graph_def_bytes)
+
+    if write_path != dst_path:
+        tf.gfile.Rename(write_path, dst_path)

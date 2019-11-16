@@ -65,7 +65,7 @@ std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine,
 
 #ifdef MG_ENABLE_TPU_DUAL_NET
   if (engine == "tpu") {
-    return absl::make_unique<TpuDualNetFactory>(device);
+    return absl::make_unique<TpuDualNetFactory>(std::string(device));
   }
 #endif  // MG_ENABLE_TPU_DUAL_NET
 

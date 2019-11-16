@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/inline_vector.h"
@@ -28,6 +29,7 @@
 
 namespace minigo {
 
+// TODO(tommadams): replace all std::vector parameters with absl::Span.
 class Model {
  public:
   // Fills a batch of inference outputs from policy and value tensors.
@@ -39,10 +41,10 @@ class Model {
   //                  `model_outputs.size()`.
   // Models that produce quantized outputs should unquantize them into
   // `Tensor<float>` objects before calling GetOutputs.
-  static void GetOutputs(const std::vector<const ModelInput*>& inputs,
+  static void GetOutputs(absl::Span<const ModelInput* const> inputs,
                          const Tensor<float>& policy,
                          const Tensor<float>& value,
-                         std::vector<ModelOutput*>* outputs);
+                         absl::Span<ModelOutput*> outputs);
 
   static void ApplySymmetry(symmetry::Symmetry sym, const ModelOutput& src,
                             ModelOutput* dst);

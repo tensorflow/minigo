@@ -19,7 +19,6 @@ from absl import app, flags
 import numpy as np
 import tensorflow as tf
 
-import features as features_lib
 import go
 
 
@@ -33,40 +32,47 @@ TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
 
 
 class ParsedExample(object):
-    def __init__(self, features, pi, value):
+    def __init__(self, features, pi, value, q, n, c):
         self.features = features
         self.pi = pi
         self.value = value
+        self.q = q;
+        self.n = n
+        self.c = c
 
 
 def ReadExamples(path):
     print("Reading", path)
 
+    records = list(tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG))
+    num_records = len(records)
+
     features = {
         'x': tf.FixedLenFeature([], tf.string),
         'pi': tf.FixedLenFeature([], tf.string),
         'outcome': tf.FixedLenFeature([], tf.float32),
+        'n': tf.FixedLenFeature([], tf.int64, default_value=[-1]),
+        'q': tf.FixedLenFeature([], tf.float32, default_value=[-1]),
+        'c': tf.FixedLenFeature([], tf.int64, default_value=[-1]),
     }
 
-    result = []
-    for record in tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG):
-        example = tf.train.Example()
-        example.ParseFromString(record)
+    parsed = tf.parse_example(records, features)
 
-        parsed = tf.parse_example([record], features)
+    x = tf.decode_raw(parsed['x'], tf.uint8)
+    x = tf.cast(x, tf.float32)
+    x = tf.reshape(x, [num_records, go.N, go.N, -1])
+    x = x.eval()
 
-        x = tf.decode_raw(parsed['x'], tf.uint8)
-        x = tf.cast(x, tf.float32)
-        x = tf.reshape(x, [go.N, go.N, features_lib.NEW_FEATURES_PLANES])
+    pi = tf.decode_raw(parsed['pi'], tf.float32)
+    pi = tf.reshape(pi, [num_records, go.N * go.N + 1])
+    pi = pi.eval()
 
-        pi = tf.decode_raw(parsed['pi'], tf.float32)
-        pi = tf.reshape(pi, [go.N * go.N + 1])
+    outcome = parsed['outcome'].eval()
+    n = parsed['n'].eval()
+    q = parsed['q'].eval()
+    c = parsed['c'].eval()
 
-        outcome = parsed['outcome']
-        assert outcome.shape == (1,)
-
-        result.append(ParsedExample(x.eval(), pi.eval(), outcome.eval()))
-    return result
+    return [ParsedExample(*args) for args in zip(x, pi, outcome, q, n, c)]
 
 
 def main(unused_argv):
@@ -75,9 +81,10 @@ def main(unused_argv):
         examples_b = ReadExamples(FLAGS.b)
     print(len(examples_a), len(examples_b))
 
-    assert len(examples_a) == len(examples_b)
+    #assert len(examples_a) == len(examples_b)
     for i, (a, b) in enumerate(zip(examples_a, examples_b)):
-        assert a.value == b.value
+        print(i, a.value, b.value)
+        #assert a.value == b.value
         np.testing.assert_array_equal(a.features, b.features)
         np.testing.assert_array_almost_equal(a.pi, b.pi, decimal=4)
 
