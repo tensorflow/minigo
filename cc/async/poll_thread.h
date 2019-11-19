@@ -43,7 +43,7 @@ class PollThread : public Thread {
   const absl::Duration poll_interval_;
 
   absl::Mutex mutex_;
-  bool is_joining_ = false GUARDED_BY(&mutex_);
+  bool is_joining_ GUARDED_BY(&mutex_) = false;
   std::function<void()> poll_fn_ GUARDED_BY(&mutex_);
 };
 

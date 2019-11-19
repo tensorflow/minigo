@@ -19,6 +19,14 @@ if [ -z "${TF_NEED_TENSORRT}" ]; then
   esac
 fi
 
+# //org_tensorflow//:configure script must be run from the TensorFlow repository
+# root. Build the script in order to pull the repository contents from GitHub.
+# The `bazel fetch` and `bazel sync` commands that are usually used to fetch
+# external Bazel dependencies don't work correctly on the TensorFlow repository.
+bazel --bazelrc=/dev/null build @org_tensorflow//:configure
+
+pushd bazel-minigo/external/org_tensorflow
+
 CC_OPT_FLAGS="${CC_OPT_FLAGS:--march=native}" \
 CUDA_TOOLKIT_PATH=${CUDA_TOOLKIT_PATH:-/usr/local/cuda} \
 CUDNN_INSTALL_PATH=${CUDNN_INSTALL_PATH:-/usr/local/cuda} \
@@ -40,7 +48,11 @@ TF_NEED_MPI=${TF_NEED_MPI:-0} \
 TF_SET_ANDROID_WORKSPACE=${TF_SET_ANDROID_WORKSPACE:-0} \
 bazel --bazelrc=/dev/null run @org_tensorflow//:configure
 
+# Copy from the TensorFlow output_base.
 output_base=$(bazel info output_base)
+popd
+
+# Copy to the Minigo workspace.
 workspace=$(bazel info workspace)
 
 # Copy TensorFlow's bazelrc files to workspace.

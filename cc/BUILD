@@ -51,6 +51,7 @@ minigo_cc_library(
     hdrs = ["game.h"],
     deps = [
         ":base",
+        ":logging",
         ":position",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -154,12 +155,17 @@ minigo_cc_library(
     ],
 )
 
+# The http_file used for @com_github_nlohmann_json_single_header generates a
+# file named `downloaded`. Rename it to `json.h`.
+genrule(
+    name = "json_h",
+    outs = ["json.h"],
+    srcs = ["@com_github_nlohmann_json_single_header//file"],
+    cmd = "cp $< $@",
+)
 cc_library(
     name = "json",
-    hdrs = [
-        "json.h",
-        "@com_github_nlohmann_json_single_header//file",
-    ],
+    hdrs = [":json_h"],
 )
 
 minigo_cc_library(
@@ -191,6 +197,7 @@ minigo_cc_library(
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -449,6 +456,7 @@ minigo_cc_binary(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
         "@wtf",
     ],

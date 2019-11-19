@@ -80,7 +80,7 @@ Install Bazel
 ------------------
 
 ```shell
-BAZEL_VERSION=0.19.2
+BAZEL_VERSION=0.24.1
 wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 chmod 755 bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 sudo ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
@@ -96,10 +96,10 @@ pip3 install -r requirements.txt
 
 Then, you'll need to choose to install the GPU or CPU tensorflow requirements:
 
-- GPU: `pip3 install "tensorflow-gpu==1.13.1"`.
+- GPU: `pip3 install "tensorflow-gpu==1.15.0"`.
   - *Note*: You must install [CUDA 10.0](https://developer.nvidia.com/cuda-10.0-download-archive). for Tensorflow
     1.13.0+.
-- CPU: `pip3 install "tensorflow==1.13.1"`.
+- CPU: `pip3 install "tensorflow==1.15.0"`.
 
 Setting up the Environment
 --------------------------

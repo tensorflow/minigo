@@ -82,6 +82,8 @@ minigo_cc_library(
         "//cc/model",
         "//cc/platform",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -100,6 +102,7 @@ minigo_cc_library(
         "//cc/tensorflow",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
         "@wtf",
     ],
 )
@@ -119,6 +122,7 @@ minigo_cc_library(
         "//cc/tensorflow:tf_lite",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 

@@ -18,8 +18,12 @@ for sub_dir in lib include bin; do
 done
 
 rsync -a --copy-links ${src_dir}/__main__/cc/tensorflow/*.so ${dst_dir}/lib/
-rsync -a --copy-links ${src_dir}/org_tensorflow/tensorflow/*.so ${dst_dir}/lib/
-rsync -a --copy-links --exclude "*.so" ${src_dir}/org_tensorflow/ ${dst_dir}/include/
+rsync -a --copy-links ${src_dir}/org_tensorflow/tensorflow/*.so.1.15.0 ${dst_dir}/lib/
+rsync -a --copy-links --exclude "*.so.1.15.0" ${src_dir}/org_tensorflow/ ${dst_dir}/include/
 rsync -a --copy-links ${src_dir}/eigen_archive/ ${dst_dir}/include/third_party/eigen3/
-rsync -a --copy-links ${src_dir}/protobuf_archive/src/ ${dst_dir}/include/
+rsync -a --copy-links ${src_dir}/com_google_protobuf/src/ ${dst_dir}/include/
 rsync -a --copy-links ${src_dir}/org_tensorflow/tensorflow/lite/toco/toco ${dst_dir}/bin/
+
+mv ${dst_dir}/lib/libtensorflow_cc.so.1{.15.0,}
+mv ${dst_dir}/lib/libtensorflow_framework.so.1{.15.0,}
+

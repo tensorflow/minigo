@@ -173,6 +173,7 @@ class Position {
   // a position.
   class ZobristHistory {
    public:
+    virtual ~ZobristHistory() = default;
     virtual bool HasPositionBeenPlayedBefore(
         zobrist::Hash stone_hash) const = 0;
   };

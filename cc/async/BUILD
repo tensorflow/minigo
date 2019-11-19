@@ -6,11 +6,12 @@ licenses(["notice"])  # Apache License 2.0
 
 cc_library(
     name = "poll_thread",
-    hdrs = ["poll_thread.h"],
     srcs = ["poll_thread.cc"],
+    hdrs = ["poll_thread.h"],
     deps = [
         ":thread",
         "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
     ],
 )
 

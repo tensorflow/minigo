@@ -1,20 +1,29 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
-# This must be kept up to date with the io_bazel_rules_closure archive from
-# tensorflow/WORKSPACE.
+# These must be kept up to date with the rules from tensorflow/WORKSPACE.
+# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 http_archive(
     name = "io_bazel_rules_closure",
-    sha256 = "a38539c5b5c358548e75b44141b4ab637bba7c4dc02b46b1f62a96d6433f56ae",
-    strip_prefix = "rules_closure-dbb96841cc0a5fb2664c37822803b06dab20c7d1",
+    sha256 = "5b00383d08dd71f28503736db0500b6fb4dda47489ff5fc6bed42557c07c6ba9",
+    strip_prefix = "rules_closure-308b05b2419edb5c8ee0471b67a40403df940149",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_closure/archive/dbb96841cc0a5fb2664c37822803b06dab20c7d1.tar.gz",
-        "https://github.com/bazelbuild/rules_closure/archive/dbb96841cc0a5fb2664c37822803b06dab20c7d1.tar.gz",  # 2018-04-13
+        "https://storage.googleapis.com/mirror.tensorflow.org/github.com/bazelbuild/rules_closure/archive/308b05b2419edb5c8ee0471b67a40403df940149.tar.gz",
+        "https://github.com/bazelbuild/rules_closure/archive/308b05b2419edb5c8ee0471b67a40403df940149.tar.gz",  # 2019-06-13
     ],
 )
+
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "2ef429f5d7ce7111263289644d233707dba35e39696377ebab8b0bc701f7818e",
+    urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/0.8.0/bazel-skylib.0.8.0.tar.gz"],
+)
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# These must be kept up to date with the rules from tensorflow/WORKSPACE.
 
 # This should also be kept up to date with the version used by Tensorflow.
 http_file(
     name = "com_github_nlohmann_json_single_header",
+    sha256 = "63da6d1f22b2a7bb9e4ff7d6b255cf691a161ff49532dcc45d398a53e295835f",
     urls = [
         "https://github.com/nlohmann/json/releases/download/v3.4.0/json.hpp",
     ],
@@ -22,9 +31,9 @@ http_file(
 
 http_archive(
     name = "org_tensorflow",
-    sha256 = "902a6d90bb69549fe241377210aa459773459820da1333b67dcfdef37836f25f",
-    strip_prefix = "tensorflow-1.13.1",
-    urls = ["https://github.com/tensorflow/tensorflow/archive/v1.13.1.zip"],
+    sha256 = "76abfd5045d1474500754566edd54ce4c386a1fbccf22a3a91d6832c6b7e90ad",
+    strip_prefix = "tensorflow-1.15.0",
+    urls = ["https://github.com/tensorflow/tensorflow/archive/v1.15.0.zip"],
 )
 
 http_archive(

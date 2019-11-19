@@ -35,7 +35,15 @@ ShardedExecutor::~ShardedExecutor() {
   }
 }
 
-void ShardedExecutor::Execute(std::function<void(int, int)> fn) {
+// TODO(tommadams): rewrite Execute so it doesn't need
+// ABSL_NO_THREAD_SAFETY_ANALYSIS:
+//  - add a local std::atomic<int> of pending shards
+//  - give each worker thread a ThreadSafeQueue.
+//  - push (&fn, &pending_shards) onto each worker's queue.
+//  - once each thread has executed it's shard, decrement pending_shards.
+//  - busy-wait on the main thread for pending_shards to be zero.
+void ShardedExecutor::Execute(std::function<void(int, int)> fn)
+    ABSL_NO_THREAD_SAFETY_ANALYSIS {
   WTF_SCOPE0("ShardedExecutor::Execute");
   auto num_shards = threads_.size() + 1;
 

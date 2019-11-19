@@ -46,9 +46,9 @@ class PaddedArray {
   operator PaddedSpan<T>() { return {data(), size()}; }
   operator PaddedSpan<const T>() const { return {data(), size()}; }
 
-  constexpr size_t empty() { return false; }
-  constexpr size_t size() { return Size; }
-  constexpr size_t padded_size() { return kPaddedSize; }
+  constexpr size_t empty() const { return false; }
+  constexpr size_t size() const { return Size; }
+  constexpr size_t padded_size() const { return kPaddedSize; }
 
   const T* data() const { return impl_.data(); }
   T* data() { return impl_.data(); }
@@ -85,8 +85,8 @@ class PaddedSpan {
   const T* begin() const { return data_; }
   T* begin() { return data_; }
 
-  const T* end() const { return data_ + size; }
-  T* end() { return data_ + size; }
+  const T* end() const { return data_ + size_; }
+  T* end() { return data_ + size_; }
 
  private:
   template <typename U, size_t Size>
