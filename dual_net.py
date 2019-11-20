@@ -685,7 +685,7 @@ def freeze_graph(model_path, use_trt=False, trt_max_batch_size=8,
             max_workspace_size_bytes=1 << 29,
             precision_mode=trt_precision)
 
-    metadata = get_model_metadata({
+    metadata = make_model_metadata({
         'engine': 'tf',
         'use_trt': bool(use_trt),
     })
@@ -733,14 +733,14 @@ def freeze_graph_tpu(model_path):
     out_graph = tf.graph_util.convert_variables_to_constants(
         sess, sess.graph.as_graph_def(), output_names)
 
-    metadata = get_model_metadata({
+    metadata = make_model_metadata({
         'engine': 'tpu',
     })
 
     atomic_write_model(out_graph, metadata, model_path)
 
 
-def get_model_metadata(metadata):
+def make_model_metadata(metadata):
     for f in ['conv_width', 'fc_width', 'trunk_layers', 'use_SE', 'use_SE_bias',
               'use_swish', 'bool_features', 'input_features']:
         metadata[f] = getattr(FLAGS, f)

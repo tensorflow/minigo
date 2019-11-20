@@ -42,8 +42,9 @@ flags.DEFINE_integer('steps_to_train', None,
                      'once over training data.')
 
 flags.DEFINE_integer('num_examples', None,
-                     'Total number of examples passed. Used to calculate '
-                     'steps_to_train if it isn\'t set.')
+                     'Total number of input examples. This is only used if '
+                     'steps_to_train is not set. Requires that filter_amount '
+                     'is 1.0.')
 
 flags.DEFINE_integer('window_size', 500000,
                      'Number of games to include in the window')
@@ -68,6 +69,13 @@ flags.register_multi_flags_validator(
     lambda flags: flags['use_tpu'] if flags['use_bt'] else True,
     '`use_bt` flag only valid with `use_tpu` as well')
 
+@flags.multi_flags_validator(
+    ['num_examples', 'steps_to_train', 'filter_amount'],
+    '`num_examples` requires `steps_to_train==0` and `filter_amount==1.0`')
+def _example_flags_validator(flags_dict):
+    if not flags_dict['num_examples']:
+        return True
+    return not flags_dict['steps_to_train'] and flags_dict['filter_amount'] == 1.0
 
 @flags.multi_flags_validator(
     ['use_bt', 'cbt_project', 'cbt_instance', 'cbt_table'],

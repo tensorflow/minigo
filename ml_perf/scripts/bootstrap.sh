@@ -36,7 +36,11 @@ for var_name in flag_dir golden_chunk_dir holdout_dir log_dir model_dir \
                 selfplay_dir sgf_dir work_dir; do
   dir="${!var_name}"
   if [[ "${dir}" == gs://* ]]; then
+    # `gsutil rm -f` "helpfully" returns a non-zero error code if the requested file
+    # target files don't exist.
+    set +e
     gsutil -m rm -rf "${dir}"/*
+    set -e
   else
     mkdir -p "${dir}"
     rm -rf "${dir}"/*

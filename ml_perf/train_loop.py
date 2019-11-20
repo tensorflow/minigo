@@ -61,7 +61,7 @@ flags.DEFINE_integer('num_write_threads', 8,
                      'the training chunks as more threads are used to '
                      'compress the data. Using too many threads however could '
                      'slow down training time if each shard gets much smaller '
-                     'than around 100MB'.
+                     'than around 100MB.')
 
 flags.DEFINE_string('golden_chunk_dir', None, 'Training example directory.')
 flags.DEFINE_string('holdout_dir', None, 'Holdout example directory.')

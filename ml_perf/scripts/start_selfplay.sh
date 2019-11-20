@@ -33,8 +33,8 @@ for device in {0..7}; do
   CUDA_VISIBLE_DEVICES="${device}" \
   ./bazel-bin/cc/concurrent_selfplay \
     --flagfile="${flag_dir}/selfplay.flags" \
-    --output_dir="${data_dir}/selfplay/\$MODEL/${device}" \
-    --holdout_dir="${data_dir}/holdout/\$MODEL/${device}" \
+    --output_dir="${selfplay_dir}/\$MODEL/${device}" \
+    --holdout_dir="${holdout_dir}/\$MODEL/${device}" \
     --model="${model_dir}/%d.pb" \
     --run_forever=1 \
     --abort_file=${abort_file} \
