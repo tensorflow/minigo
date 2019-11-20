@@ -25,7 +25,12 @@ fi
 # external Bazel dependencies don't work correctly on the TensorFlow repository.
 bazel --bazelrc=/dev/null build @org_tensorflow//:configure
 
-pushd bazel-minigo/external/org_tensorflow
+# Get the Minigo workspace root.
+workspace=$(bazel info workspace)
+
+# External dependencies are stored in a directory named after the workspace
+# directory name.
+pushd bazel-`basename "${workspace}"`/external/org_tensorflow
 
 CC_OPT_FLAGS="${CC_OPT_FLAGS:--march=native}" \
 CUDA_TOOLKIT_PATH=${CUDA_TOOLKIT_PATH:-/usr/local/cuda} \
@@ -51,9 +56,6 @@ bazel --bazelrc=/dev/null run @org_tensorflow//:configure
 # Copy from the TensorFlow output_base.
 output_base=$(bazel info output_base)
 popd
-
-# Copy to the Minigo workspace.
-workspace=$(bazel info workspace)
 
 # Copy TensorFlow's bazelrc files to workspace.
 cp ${output_base}/external/org_tensorflow/.bazelrc ${workspace}/tensorflow.bazelrc

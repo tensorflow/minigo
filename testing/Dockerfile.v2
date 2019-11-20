@@ -42,7 +42,7 @@ COPY bootstrap_v2.sh /workspace/bootstrap_v2.sh
 COPY staging/requirements.txt /workspace/requirements.txt
 RUN pip3 install --upgrade pip setuptools
 RUN pip3 install -r /workspace/requirements.txt
-RUN pip3 install "tensorflow==1.13.1"
+RUN pip3 install "tensorflow==1.15.0"
 
 # Workaround because test-infra/scenarios/execute.py runs `/usr/bin/env python`
 # and not python2.7 explicitly.

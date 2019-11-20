@@ -1,14 +1,19 @@
 FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu16.04
 
+# Set the locale to UTF-8. If this isn't set, the Python library `choix`
+# fails to install for some reason.
+ENV LC_ALL="C.UTF-8"
+ENV LC_CTYPE="C.UTF-8"
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
-        cuda-command-line-tools-9-0 \
-        cuda-cublas-dev-9-0 \
-        cuda-cudart-dev-9-0 \
-        cuda-cufft-dev-9-0 \
-        cuda-curand-dev-9-0 \
-        cuda-cusolver-dev-9-0 \
-        cuda-cusparse-dev-9-0 \
+        cuda-command-line-tools-10-0 \
+        cuda-cublas-dev-10-0 \
+        cuda-cudart-dev-10-0 \
+        cuda-cufft-dev-10-0 \
+        cuda-curand-dev-10-0 \
+        cuda-cusolver-dev-10-0 \
+        cuda-cusparse-dev-10-0 \
         curl \
         git \
         libcurl3-dev \
@@ -38,7 +43,7 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     apt-get update -y && apt-get install google-cloud-sdk -y
 
-ENV BAZEL_VERSION 0.19.2
+ENV BAZEL_VERSION 0.24.1
 
 WORKDIR /
 RUN mkdir /bazel && \
@@ -60,6 +65,9 @@ ENV LD_LIBRARY_PATH ${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs/:$LD_LIBRARY_PAT
 ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
 
 WORKDIR /app
+
+# NVIDIA's CUDA docker image has cuDNN installed in /usr not /usr/local/cuda.
+ENV CUDNN_INSTALL_PATH /usr
 
 # For the slow stuff, copy just the needed scripts so we don't break the docker cache
 COPY staging/WORKSPACE WORKSPACE
