@@ -19,7 +19,9 @@ namespace minigo {
 namespace tf_utils {
 
 void WriteGameExamples(const std::string& output_dir,
-                       const std::string& output_name, const Game& game) {
+                       const std::string& output_name,
+                       const FeatureDescriptor& feature_desc,
+                       const Game& game) {
   MG_LOG(FATAL)
       << "Can't write TensorFlow examples without TensorFlow support enabled. "
          "Please recompile, passing --define=tf=1 to bazel build.";
