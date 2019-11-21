@@ -134,6 +134,7 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:logging",
+        "//cc:random",
         "//cc/file:path",
         "//cc/model",
         "//cc/model:buffered_model",

@@ -123,7 +123,8 @@ TpuDualNet::~TpuDualNet() {
 void TpuDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                          std::vector<ModelOutput*>* outputs,
                          std::string* model_name) {
-  auto batch_size = static_cast<int>((inputs.size() + num_replicas_ - 1) / num_replicas_);
+  auto batch_size =
+      static_cast<int>((inputs.size() + num_replicas_ - 1) / num_replicas_);
   Reserve(batch_size);
 
   WTF_SCOPE("TpuDualNet::Run: inputs, capacity", size_t, size_t)
@@ -204,8 +205,8 @@ void TpuDualNet::Reserve(size_t capacity) {
 
   // Use flattened input features because they're 35x faster to transfer to
   // the device on a v3 TPU.
-  auto size = static_cast<int>(
-      capacity * kN * kN * feature_descriptor().num_planes);
+  auto size =
+      static_cast<int>(capacity * kN * kN * feature_descriptor().num_planes);
 
   inputs_.clear();
   for (int i = 0; i < num_replicas_; ++i) {
@@ -297,8 +298,8 @@ TpuDualNetFactory::LoadedModel TpuDualNetFactory::GetModel(
   options.target = tpu_name_;
   options.config.set_allow_soft_placement(true);
   options.config.set_log_device_placement(true);
-  //options.config.set_intra_op_parallelism_threads(1);
-  //options.config.set_inter_op_parallelism_threads(-1);
+  // options.config.set_intra_op_parallelism_threads(1);
+  // options.config.set_inter_op_parallelism_threads(-1);
 
   LoadedModel model;
   model.input_type = input_type;
@@ -317,7 +318,7 @@ void TpuDualNetFactory::CloseOrphanedSessions() {
   for (const auto& kv : models_) {
     if (kv.second.session.use_count() == 1) {
       MG_LOG(INFO) << "Closing orphaned model session: " << kv.first;
-      kv.second.session->Close();
+      TF_CHECK_OK(kv.second.session->Close());
       to_erase.push_back(kv.first);
     }
   }
@@ -333,9 +334,9 @@ std::unique_ptr<Model> TpuDualNetFactory::NewModel(
   // contains model metadata.
   auto model = GetModel(descriptor);
   auto feature_desc = FeatureDescriptor::Create<ExtraFeatures>();
-  return absl::make_unique<TpuDualNet>(
-      descriptor, feature_desc, model.input_type, model.session,
-      model.num_replicas, this);
+  return absl::make_unique<TpuDualNet>(descriptor, feature_desc,
+                                       model.input_type, model.session,
+                                       model.num_replicas, this);
 }
 
 }  // namespace minigo
