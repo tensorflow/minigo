@@ -16,6 +16,8 @@
 
 from absl import app, flags
 import tensorflow as tf
+from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
+from tensorflow.contrib import tpu as contrib_tpu
 
 flags.DEFINE_string(
     'tpu_name', None,
@@ -29,14 +31,14 @@ def main(unused_argv):
     if FLAGS.tpu_name.startswith('grpc://'):
         tpu_grpc_url = FLAGS.tpu_name
     else:
-        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+        tpu_cluster_resolver = contrib_cluster_resolver.TPUClusterResolver(
             FLAGS.tpu_name, zone=None, project=None)
         tpu_grpc_url = tpu_cluster_resolver.get_master()
 
     sess = tf.Session(tpu_grpc_url)
     with sess.graph.as_default():
-      tf.contrib.tpu.initialize_system()
-      tf.contrib.tpu.shutdown_system()
+      contrib_tpu.initialize_system()
+      contrib_tpu.shutdown_system()
 
     output_names = ['ConfigureDistributedTPU', 'ShutdownDistributedTPU']
     model_def = tf.graph_util.convert_variables_to_constants(

@@ -67,11 +67,14 @@ confidence=
 # --disable=W"
 
 disable=bare-except,
+        import-error,
+        import-outside-toplevel,
         invalid-name,
         too-few-methods,
         too-few-public-methods,
         too-many-arguments,
-        too-many-locals
+        too-many-locals,
+        subprocess-run-check,
         # print-statement,
         # parameter-unpacking,
         # unpacking-in-except,

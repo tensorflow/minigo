@@ -30,10 +30,13 @@ import numpy as np
 import random
 
 import tensorflow as tf
-from tensorflow.contrib import summary
-from tensorflow.contrib.tpu.python.tpu import tpu_config
-from tensorflow.contrib.tpu.python.tpu import tpu_estimator
-from tensorflow.contrib.tpu.python.tpu import tpu_optimizer
+from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
+from tensorflow.contrib import quantize as contrib_quantize
+from tensorflow.contrib import summary as contrib_summary
+from tensorflow.contrib import tpu as contrib_tpu
+from tensorflow.contrib.tpu.python.tpu import tpu_config as contrib_tpu_python_tpu_tpu_config
+from tensorflow.contrib.tpu.python.tpu import tpu_estimator as contrib_tpu_python_tpu_tpu_estimator
+from tensorflow.contrib.tpu.python.tpu import tpu_optimizer as contrib_tpu_python_tpu_tpu_optimizer
 
 import features as features_lib
 import go
@@ -306,15 +309,15 @@ def model_fn(features, labels, mode, params):
     # Insert quantization ops if requested
     if params['quantize']:
         if mode == tf.estimator.ModeKeys.TRAIN:
-            tf.contrib.quantize.create_training_graph(
+            contrib_quantize.create_training_graph(
                 quant_delay=params['quant_delay'])
         else:
-            tf.contrib.quantize.create_eval_graph()
+            contrib_quantize.create_eval_graph()
 
     optimizer = tf.train.MomentumOptimizer(
         learning_rate, params['sgd_momentum'])
     if params['use_tpu']:
-        optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
+        optimizer = contrib_tpu_python_tpu_tpu_optimizer.CrossShardOptimizer(optimizer)
     with tf.control_dependencies(update_ops):
         train_op = optimizer.minimize(combined_cost, global_step=global_step)
 
@@ -367,12 +370,12 @@ def model_fn(features, labels, mode, params):
 
         # Create summary ops so that they show up in SUMMARIES collection
         # That way, they get logged automatically during training
-        summary_writer = summary.create_file_writer(FLAGS.work_dir)
+        summary_writer = contrib_summary.create_file_writer(FLAGS.work_dir)
         with summary_writer.as_default(), \
-                summary.record_summaries_every_n_global_steps(
+                contrib_summary.record_summaries_every_n_global_steps(
                     params['summary_steps'], eval_step):
             for metric_name, metric_op in metric_ops.items():
-                summary.scalar(metric_name, metric_op[1], step=eval_step)
+                contrib_summary.scalar(metric_name, metric_op[1], step=eval_step)
 
         # Reset metrics occasionally so that they are mean of recent batches.
         reset_op = tf.variables_initializer(tf.local_variables('metrics'))
@@ -381,7 +384,7 @@ def model_fn(features, labels, mode, params):
             lambda: reset_op,
             lambda: tf.no_op())
 
-        return summary.all_summary_ops() + [cond_reset_op]
+        return contrib_summary.all_summary_ops() + [cond_reset_op]
 
     metric_args = [
         policy_output,
@@ -405,7 +408,7 @@ def model_fn(features, labels, mode, params):
     host_call_fn = functools.partial(
         eval_metrics_host_call_fn, est_mode=tf.estimator.ModeKeys.TRAIN)
 
-    tpu_estimator_spec = tpu_estimator.TPUEstimatorSpec(
+    tpu_estimator_spec = contrib_tpu_python_tpu_tpu_estimator.TPUEstimatorSpec(
         mode=mode,
         predictions=predictions,
         loss=combined_cost,
@@ -601,11 +604,11 @@ def _get_nontpu_estimator():
 
 
 def _get_tpu_estimator():
-    tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+    tpu_cluster_resolver = contrib_cluster_resolver.TPUClusterResolver(
         FLAGS.tpu_name, zone=None, project=None)
     tpu_grpc_url = tpu_cluster_resolver.get_master()
 
-    run_config = tpu_config.RunConfig(
+    run_config = contrib_tpu_python_tpu_tpu_config.RunConfig(
         master=tpu_grpc_url,
         evaluation_master=tpu_grpc_url,
         model_dir=FLAGS.work_dir,
@@ -614,12 +617,12 @@ def _get_tpu_estimator():
         keep_checkpoint_max=FLAGS.keep_checkpoint_max,
         session_config=tf.ConfigProto(
             allow_soft_placement=True, log_device_placement=True),
-        tpu_config=tpu_config.TPUConfig(
+        tpu_config=contrib_tpu_python_tpu_tpu_config.TPUConfig(
             iterations_per_loop=FLAGS.iterations_per_loop,
             num_shards=FLAGS.num_tpu_cores,
-            per_host_input_for_training=tpu_config.InputPipelineConfig.PER_HOST_V2))
+            per_host_input_for_training=contrib_tpu_python_tpu_tpu_config.InputPipelineConfig.PER_HOST_V2))
 
-    return tpu_estimator.TPUEstimator(
+    return contrib_tpu_python_tpu_tpu_estimator.TPUEstimator(
         use_tpu=FLAGS.use_tpu,
         model_fn=model_fn,
         config=run_config,
@@ -701,7 +704,7 @@ def freeze_graph_tpu(model_path):
     if FLAGS.tpu_name.startswith('grpc://'):
         tpu_grpc_url = FLAGS.tpu_name
     else:
-        tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+        tpu_cluster_resolver = contrib_cluster_resolver.TPUClusterResolver(
             FLAGS.tpu_name, zone=None, project=None)
         tpu_grpc_url = tpu_cluster_resolver.get_master()
     sess = tf.Session(tpu_grpc_url)
@@ -716,7 +719,7 @@ def freeze_graph_tpu(model_path):
             features = tf.placeholder(
                 feature_type, [None], name=name)
             replicated_features.append((features,))
-        outputs = tf.contrib.tpu.replicate(
+        outputs = contrib_tpu.replicate(
             tpu_model_inference_fn, replicated_features)
 
         # The replicate op assigns names like output_0_shard_0 to the output

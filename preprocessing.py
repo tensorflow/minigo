@@ -132,7 +132,7 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
         # cycle_length = how many tfrecord files are read in parallel
         # The idea is to shuffle both the order of the files being read,
         # and the examples being read from the files.
-        dataset = record_list.apply(tf.contrib.data.parallel_interleave(
+        dataset = record_list.apply(tf.data.experimental.parallel_interleave(
             map_func, cycle_length=64, sloppy=True))
     else:
         dataset = record_list.flat_map(map_func)
@@ -233,13 +233,13 @@ def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
     # TODO(sethtroisi@): Unify
     if random_rotation:
         # Unbatch the dataset so we can rotate it
-        dataset = dataset.apply(tf.contrib.data.unbatch())
-        dataset = dataset.apply(tf.contrib.data.map_and_batch(
+        dataset = dataset.apply(tf.data.experimental.unbatch())
+        dataset = dataset.apply(tf.data.experimental.map_and_batch(
             _random_rotation_pure_tf,
             batch_size,
             drop_remainder=True))
 
-    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
 
@@ -256,13 +256,13 @@ def get_tpu_bt_input_tensors(games, games_nr, batch_size, num_repeats=1,
         functools.partial(batch_parse_tf_example, batch_size))
     if random_rotation:
         # Unbatch the dataset so we can rotate it
-        dataset = dataset.apply(tf.contrib.data.unbatch())
-        dataset = dataset.apply(tf.contrib.data.map_and_batch(
+        dataset = dataset.apply(tf.data.experimental.unbatch())
+        dataset = dataset.apply(tf.data.experimental.map_and_batch(
             _random_rotation_pure_tf,
             batch_size,
             drop_remainder=True))
 
-    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
 

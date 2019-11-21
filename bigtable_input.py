@@ -32,6 +32,7 @@ from google.cloud import bigtable
 from google.cloud.bigtable import row_filters as bigtable_row_filters
 from google.cloud.bigtable import column_family as bigtable_column_family
 import tensorflow as tf
+from tensorflow.contrib import cloud as contrib_cloud
 
 import utils
 
@@ -238,7 +239,7 @@ class GameQueue:
         self.bt_table = bigtable.Client(
             self.btspec.project, admin=True).instance(
                 self.btspec.instance).table(self.btspec.table)
-        self.tf_table = tf.contrib.cloud.BigtableClient(
+        self.tf_table = contrib_cloud.BigtableClient(
             self.btspec.project,
             self.btspec.instance).table(self.btspec.table)
 
@@ -737,10 +738,9 @@ def count_elements_in_dataset(ds, batch_size=1*1024, parallel_batch=8):
       The number of elements in the dataset.
     """
     with tf.Session() as sess:
-        dsc = ds.apply(tf.contrib.data.enumerate_dataset())
-        dsc = dsc.apply(
-            tf.contrib.data.map_and_batch(lambda c, v: c, batch_size,
-                                          num_parallel_batches=parallel_batch))
+        dsc = ds.apply(tf.data.experimental.enumerate_dataset())
+        dsc = dsc.apply(tf.data.experimental.map_and_batch(
+            lambda c, v: c, batch_size, num_parallel_batches=parallel_batch))
         iterator = dsc.make_initializable_iterator()
         sess.run(iterator.initializer)
         get_next = iterator.get_next()

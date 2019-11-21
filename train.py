@@ -132,6 +132,7 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
         self.global_step = None
 
     def begin(self):
+        """Called once before using the session"""
         # These calls only works because the SessionRunHook api guarantees this
         # will get called within a graph context containing our model graph.
 
@@ -140,11 +141,13 @@ class UpdateRatioSessionHook(tf.train.SessionRunHook):
         self.global_step = tf.train.get_or_create_global_step()
 
     def before_run(self, run_context):
+        """Called before each call to run()."""
         global_step = run_context.session.run(self.global_step)
         if global_step % self.every_n_steps == 0:
             self.before_weights = run_context.session.run(self.weight_tensors)
 
-    def after_run(self, run_context, run_values):
+    def after_run(self, run_context, unused_run_values):
+        """Called after each call to run()."""
         global_step = run_context.session.run(self.global_step)
         if self.before_weights is not None:
             after_weights = run_context.session.run(self.weight_tensors)
