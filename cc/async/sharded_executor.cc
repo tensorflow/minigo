@@ -35,36 +35,28 @@ ShardedExecutor::~ShardedExecutor() {
   }
 }
 
-// TODO(tommadams): rewrite Execute so it doesn't need
-// ABSL_NO_THREAD_SAFETY_ANALYSIS:
-//  - add a local std::atomic<int> of pending shards
-//  - give each worker thread a ThreadSafeQueue.
-//  - push (&fn, &pending_shards) onto each worker's queue.
-//  - once each thread has executed it's shard, decrement pending_shards.
-//  - busy-wait on the main thread for pending_shards to be zero.
-void ShardedExecutor::Execute(std::function<void(int, int)> fn)
-    ABSL_NO_THREAD_SAFETY_ANALYSIS {
+void ShardedExecutor::Execute(const std::function<void(int, int)>& fn) {
   WTF_SCOPE0("ShardedExecutor::Execute");
-  auto num_shards = threads_.size() + 1;
-
-  // Process shards 1 to num_shards - 1 on worker threads.
-  // We don't need to lock the mutex if there are no background threads.
   if (!threads_.empty()) {
-    mutex_.Lock();
-    for (auto& t : threads_) {
-      t->Execute(&fn);
-    }
-  }
+    auto num_shards = threads_.size() + 1;
 
-  // Process shard 0 on the caller's thread.
-  fn(0, num_shards);
+    // Create a blocking counter initialized to the number of threads that will
+    // do work. Each thread pops a shard of work off its queue, executes the
+    // function, then decrements this counter.
+    absl::BlockingCounter counter(threads_.size());
 
-  // Wait for the background threads to finish.
-  if (!threads_.empty()) {
+    // Push some work on to each thread's queue.
     for (auto& t : threads_) {
-      t->Wait();
+      t->Execute(&fn, &counter);
     }
-    mutex_.Unlock();
+
+    // Execute shard 0 on the caller's thread.
+    fn(0, num_shards);
+
+    // Wait for the worker threads.
+    counter.Wait();
+  } else {
+    fn(0, 1);
   }
 }
 
@@ -73,19 +65,14 @@ ShardedExecutor::WorkerThread::WorkerThread(int shard, int num_shards)
       shard_(shard),
       num_shards_(num_shards) {}
 
-void ShardedExecutor::WorkerThread::Execute(std::function<void(int, int)>* fn) {
-  fn_ = fn;
-  ready_sem_.Post();
-}
-
-void ShardedExecutor::WorkerThread::Wait() {
-  done_sem_.Wait();
-  fn_ = nullptr;
+void ShardedExecutor::WorkerThread::Execute(
+    const std::function<void(int, int)>* fn, absl::BlockingCounter* counter) {
+  work_queue_.Push({fn, counter});
 }
 
 void ShardedExecutor::WorkerThread::Join() {
-  running_ = false;
-  ready_sem_.Post();
+  // Pushing null work onto the queue tells the Run loop to stop.
+  work_queue_.Push({nullptr, nullptr});
   Thread::Join();
 }
 
@@ -93,16 +80,16 @@ void ShardedExecutor::WorkerThread::Run() {
   WTF_THREAD_ENABLE("ShardedExecutor");
 
   for (;;) {
-    ready_sem_.Wait();
-    if (!running_) {
+    auto work = work_queue_.Pop();
+    if (work.fn == nullptr) {
       break;
     }
     {
       WTF_SCOPE0("ShardedExecutor::Run");
-      (*fn_)(shard_, num_shards_);
+      (*work.fn)(shard_, num_shards_);
     }
-    done_sem_.Post();
+    work.counter->DecrementCount();
   }
 }
 
-} // namespace minigo
+}  // namespace minigo

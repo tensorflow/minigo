@@ -1037,7 +1037,8 @@ void SelfplayThread::ProcessInferences(const std::string& model_name) {
     for (auto& s : searches_) {
       for (const auto& span : s.inference_spans) {
         span.selfplay_game->ProcessInferences(
-            model_name, absl::MakeSpan(s.inferences).subspan(span.pos, span.len));
+            model_name,
+            absl::MakeSpan(s.inferences).subspan(span.pos, span.len));
       }
     }
   }

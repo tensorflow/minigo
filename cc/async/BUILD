@@ -26,8 +26,8 @@ cc_library(
     srcs = ["sharded_executor.cc"],
     hdrs = ["sharded_executor.h"],
     deps = [
-        ":semaphore",
         ":thread",
+        ":thread_safe_queue",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

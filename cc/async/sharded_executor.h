@@ -20,8 +20,9 @@
 #include <vector>
 
 #include "absl/memory/memory.h"
-#include "cc/async/semaphore.h"
+#include "absl/synchronization/blocking_counter.h"
 #include "cc/async/thread.h"
+#include "cc/async/thread_safe_queue.h"
 
 namespace minigo {
 
@@ -52,14 +53,10 @@ class ShardedExecutor {
   static Range GetShardRange(int shard_idx, int num_shards, int num_elements) {
     auto begin = shard_idx * num_elements / num_shards;
     auto end = (shard_idx + 1) * num_elements / num_shards;
-    return { begin, end };
+    return {begin, end};
   }
 
-  // If `num_shards == 1`, concurrent calls to `Execute` may be executed in
-  // parallel.
-  // If `num_shards > 1`, concurrent calls to `Execute` will be executed
-  // sequentially.
-  explicit ShardedExecutor (int num_shards);
+  explicit ShardedExecutor(int num_shards);
 
   ~ShardedExecutor();
 
@@ -70,32 +67,32 @@ class ShardedExecutor {
   // the remaining invocations happen in parallel on threads owned by the
   // `ShardedExecutor`.
   // Blocks until all shards of work are complete.
-  void Execute(std::function<void(int, int)> fn);
+  void Execute(const std::function<void(int, int)>& fn);
 
  private:
   struct WorkerThread : public Thread {
     WorkerThread(int shard, int num_shards);
 
-    void Execute(std::function<void(int, int)>* fn);
-    void Wait();
+    void Execute(const std::function<void(int, int)>* fn,
+                 absl::BlockingCounter* counter);
     void Join() override;
 
    private:
+    struct Work {
+      const std::function<void(int, int)>* fn;
+      absl::BlockingCounter* counter;
+    };
+
     void Run() override;
 
-    std::atomic<bool> running_{true};
-    std::function<void(int, int)>* fn_;
-    int shard_;
-    int num_shards_;
-    Semaphore ready_sem_;
-    Semaphore done_sem_;
+    const int shard_;
+    const int num_shards_;
+    ThreadSafeQueue<Work> work_queue_;
   };
 
-  std::function<void(int, int)> fn_;
-  absl::Mutex mutex_;
   std::vector<std::unique_ptr<WorkerThread>> threads_;
 };
 
-} // namespace minigo
+}  // namespace minigo
 
 #endif  // CC_ASYNC_WORK_SHARDED_EXECUTOR_H_

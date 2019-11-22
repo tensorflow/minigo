@@ -27,9 +27,9 @@ class Semaphore {
   }
 
   void Wait() {
-    absl::MutexLock lock(&mutex_);
-    mutex_.Await(absl::Condition(this, &Semaphore::is_non_zero));
+    mutex_.LockWhen(absl::Condition(this, &Semaphore::is_non_zero));
     --count_;
+    mutex_.Unlock();
   }
 
  private:
