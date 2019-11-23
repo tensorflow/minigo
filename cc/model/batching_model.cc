@@ -20,6 +20,7 @@
 #include "absl/time/clock.h"
 #include "cc/logging.h"
 #include "cc/model/buffered_model.h"
+#include "cc/model/loader.h"
 #include "wtf/macros.h"
 
 namespace minigo {
@@ -203,28 +204,25 @@ void BatchingModel::SetOther(BatchingModel* other) {
   }
 }
 
-BatchingModelFactory::BatchingModelFactory(
-    std::unique_ptr<ModelFactory> factory_impl,
-    int buffer_count)
-    : factory_impl_(std::move(factory_impl)),
-      buffer_count_(buffer_count) {}
+BatchingModelFactory::BatchingModelFactory(std::string device, int buffer_count)
+    : device_(std::move(device)), buffer_count_(buffer_count) {}
 
-std::unique_ptr<Model> BatchingModelFactory::NewModel(
-    const std::string& descriptor) {
+std::unique_ptr<BatchingModel> BatchingModelFactory::NewModel(
+    const std::string& path) {
   absl::MutexLock lock(&mutex_);
 
   // Find or create a service for the requested model.
-  auto it = batchers_.find(descriptor);
+  auto it = batchers_.find(path);
   if (it == batchers_.end()) {
     std::vector<std::unique_ptr<Model>> models;
-    for (int i =0 ; i < buffer_count_; ++i) {
-      models.push_back(
-          factory_impl_->NewModel(descriptor));
+    auto def = LoadModelDefinition(path);
+    auto* factory = GetModelFactory(def, device_);
+    for (int i = 0; i < buffer_count_; ++i) {
+      models.push_back(factory->NewModel(def));
     }
     auto batcher = std::make_shared<internal::ModelBatcher>(
-        absl::make_unique<BufferedModel>(std::move(models)),
-        buffer_count_);
-    it = batchers_.emplace(descriptor, std::move(batcher)).first;
+        absl::make_unique<BufferedModel>(std::move(models)), buffer_count_);
+    it = batchers_.emplace(path, std::move(batcher)).first;
   }
 
   auto model = absl::make_unique<BatchingModel>(it->second);

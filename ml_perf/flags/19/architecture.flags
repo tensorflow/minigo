@@ -7,4 +7,6 @@
 --summary_steps=128
 
 --bool_features=1
+
+# --input_features=$MODEL must match --model=random:$MODEL in bootstrap.flags.
 --input_features=mlperf07

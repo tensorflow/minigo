@@ -26,7 +26,6 @@
 #include "cc/constants.h"
 #include "cc/file/path.h"
 #include "cc/logging.h"
-#include "cc/model/buffered_model.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
@@ -236,63 +235,32 @@ TpuDualNetFactory::~TpuDualNetFactory() {
 }
 
 TpuDualNetFactory::LoadedModel TpuDualNetFactory::GetModel(
-    const std::string& path) {
+    const ModelDefinition& def) {
   absl::MutexLock lock(&mutex_);
-  auto it = models_.find(path);
+  auto it = models_.find(def.path);
   if (it != models_.end()) {
     return it->second;
   }
 
+  // Load the GraphDef.
+  tensorflow::protobuf::io::CodedInputStream coded_stream(
+      reinterpret_cast<const uint8_t*>(def.model_bytes.data()),
+      def.model_bytes.size());
+  coded_stream.SetTotalBytesLimit(1024 * 1024 * 1024);
   tensorflow::GraphDef graph_def;
-  auto* env = tensorflow::Env::Default();
-  TF_CHECK_OK(env->FileExists(path));
-  TF_CHECK_OK(tensorflow::ReadBinaryProto(env, path, &graph_def));
-
-  // Check that we're actually loading a TPU model.
-  bool found_tpu_op = false;
-  for (const auto& node : graph_def.node()) {
-    if (absl::StartsWithIgnoreCase(node.name(), "tpu")) {
-      found_tpu_op = true;
-      break;
-    }
-  }
-  MG_CHECK(found_tpu_op) << "didn't find any ops starting with \"tpu\" this "
-                            "model looks like it wasn't compiled for TPU";
-
-  // Count the number of times the model is replicated. There should be eight,
-  // one replica for each TPU core.
-  int num_replicas = 0;
-  for (const auto& node : graph_def.node()) {
-    absl::string_view name = node.name();
-    if (absl::ConsumePrefix(&name, "pos_tensor_")) {
-      int replica;
-      MG_CHECK(absl::SimpleAtoi(name, &replica));
-      num_replicas = std::max(num_replicas, replica + 1);
-    }
-  }
-  MG_LOG(INFO) << "Found " << num_replicas << " model replicas in graph "
-               << path;
-  MG_CHECK(num_replicas > 0);
+  MG_CHECK(graph_def.ParseFromCodedStream(&coded_stream) &&
+           coded_stream.ConsumedEntireMessage());
 
   // Find the data type of the input features.
-  tensorflow::DataType input_type = tensorflow::DT_INVALID;
-  for (const auto& node : graph_def.node()) {
-    if (node.name() == "pos_tensor_0") {
-      auto it = node.attr().find("dtype");
-      MG_CHECK(it != node.attr().end());
-      input_type = it->second.type();
-      break;
-    }
+  tensorflow::DataType dt;
+  const auto& input_type = def.metadata.Get<std::string>("input_type");
+  if (input_type == "bool") {
+    dt = tensorflow::DT_BOOL;
+  } else if (input_type == "float") {
+    dt = tensorflow::DT_FLOAT;
+  } else {
+    MG_LOG(FATAL) << "Unsupported input type \"" << input_type << "\"";
   }
-  MG_CHECK(input_type == tensorflow::DT_FLOAT ||
-           input_type == tensorflow::DT_BOOL)
-      << input_type;
-
-  const auto* desc =
-      google::protobuf::GetEnumDescriptor<tensorflow::DataType>();
-  const auto* value = desc->FindValueByNumber(input_type);
-  MG_CHECK(value != nullptr);
-  MG_LOG(INFO) << "Model " << path << " has input type " << value->name();
 
   tensorflow::SessionOptions options;
   options.target = tpu_name_;
@@ -302,12 +270,15 @@ TpuDualNetFactory::LoadedModel TpuDualNetFactory::GetModel(
   // options.config.set_inter_op_parallelism_threads(-1);
 
   LoadedModel model;
-  model.input_type = input_type;
-  model.num_replicas = num_replicas;
+  model.input_type = dt;
+  model.num_replicas =
+      static_cast<int>(def.metadata.Get<uint64_t>("num_replicas"));
   model.session.reset(tensorflow::NewSession(options));
+  model.feature_desc = FeatureDescriptor::Create(
+      def.metadata.Get<std::string>("input_features"));
 
   TF_CHECK_OK(model.session->Create(graph_def));
-  models_.emplace(path, model);
+  models_.emplace(def.path, model);
 
   return model;
 }
@@ -327,14 +298,10 @@ void TpuDualNetFactory::CloseOrphanedSessions() {
   }
 }
 
-std::unique_ptr<Model> TpuDualNetFactory::NewModel(
-    const std::string& descriptor) {
-  // TODO(tommadams): assume we're using MLPerf 0.7 features for now: it's
-  // going to require a fairly widespread change to support a new format that
-  // contains model metadata.
-  auto model = GetModel(descriptor);
-  auto feature_desc = FeatureDescriptor::Create<ExtraFeatures>();
-  return absl::make_unique<TpuDualNet>(descriptor, feature_desc,
+std::unique_ptr<Model> TpuDualNetFactory::NewModel(const ModelDefinition& def) {
+  MG_CHECK(def.metadata.Get<std::string>("engine") == "tpu");
+  auto model = GetModel(def);
+  return absl::make_unique<TpuDualNet>(def.path, model.feature_desc,
                                        model.input_type, model.session,
                                        model.num_replicas, this);
 }

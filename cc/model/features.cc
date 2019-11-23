@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MINIGO_CC_DUAL_NET_FACTORY_H_
-#define MINIGO_CC_DUAL_NET_FACTORY_H_
+#include "cc/model/features.h"
 
-#include <memory>
-#include <ostream>
-#include <string>
-
-#include "absl/strings/string_view.h"
-#include "cc/model/model.h"
+#include "cc/logging.h"
 
 namespace minigo {
 
-std::unique_ptr<ModelFactory> NewModelFactory(absl::string_view engine,
-                                              absl::string_view device);
+FeatureDescriptor FeatureDescriptor::Create(absl::string_view input_features) {
+  if (input_features == "agz") {
+    return FeatureDescriptor::Create<AgzFeatures>();
+  } else if (input_features == "mlperf07") {
+    return FeatureDescriptor::Create<ExtraFeatures>();
+  }
+  MG_LOG(FATAL) << "Unrecognized input features \"" << input_features << "\"";
+  return {};
+}
 
 }  // namespace minigo
-
-#endif  // MINIGO_CC_DUAL_NET_FACTORY_H_

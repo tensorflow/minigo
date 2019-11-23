@@ -19,6 +19,7 @@
 #include <string>
 
 #include "cc/model/model.h"
+#include "cc/model/factory.h"
 #include "cc/random.h"
 
 namespace minigo {
@@ -27,7 +28,7 @@ class TfDualNetFactory : public ModelFactory {
  public:
   explicit TfDualNetFactory(int device);
 
-  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
+  std::unique_ptr<Model> NewModel(const ModelDefinition& def) override;
 
  private:
   const int device_;

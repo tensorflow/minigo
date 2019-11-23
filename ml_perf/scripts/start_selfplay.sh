@@ -13,11 +13,11 @@
 # limitations under the License.
 
 # Starts selfplay processes running.
-# In this example, 8 selfplay processes are started, with each one running
-# inference on a different GPU.
-# Example usage:
+#
+# Example usage that starts 8 processes running on 8 GPUs:
 #  ./ml_perf/scripts/start_selfplay.sh \
 #    --board_size=19 \
+#    --devices=0,1,2,3,4,5,6,7 \
 #    --base_dir="${OUTPUT_DIR}"
 
 
@@ -29,13 +29,13 @@ mkdir -p "${log_dir}"
 
 
 # Run selfplay workers.
-for device in {0..7}; do
+for device in ${devices//,/ }; do
   CUDA_VISIBLE_DEVICES="${device}" \
   ./bazel-bin/cc/concurrent_selfplay \
     --flagfile="${flag_dir}/selfplay.flags" \
     --output_dir="${selfplay_dir}/\$MODEL/${device}" \
     --holdout_dir="${holdout_dir}/\$MODEL/${device}" \
-    --model="${model_dir}/%d.pb" \
+    --model="${model_dir}/%d.minigo" \
     --run_forever=1 \
     --abort_file=${abort_file} \
     > "${log_dir}/`hostname`_selfplay_${device}.log" 2>&1 &

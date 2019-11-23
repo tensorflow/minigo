@@ -25,6 +25,7 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
 #include "absl/time/time.h"
+#include "cc/model/factory.h"
 #include "cc/model/model.h"
 
 namespace minigo {
@@ -131,17 +132,11 @@ class BatchingModel : public Model {
 
 // BatchingModelFactory managers the per-model ModelBatchers and creates
 // their BatchingModel clients.
-// TODO(tommadams): Don't derive BatchingModelFactory from ModelFactory, that
-// way NewModel can return a unique_ptr<BatchingModel> and we can pass
-// BatchingModel pointers to StartGame and EndGame. That way we can get rid of
-// the dynamic_casts in those methods and have a compile-time guarantee that the
-// models are of the correct type.
-class BatchingModelFactory : public ModelFactory {
+class BatchingModelFactory {
  public:
-  BatchingModelFactory(std::unique_ptr<ModelFactory> factory_impl,
-                       int buffer_count);
+  BatchingModelFactory(std::string device, int buffer_count);
 
-  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
+  std::unique_ptr<BatchingModel> NewModel(const std::string& path);
 
   static void StartGame(Model* black, Model* white);
   static void EndGame(Model* black, Model* white);
@@ -156,6 +151,7 @@ class BatchingModelFactory : public ModelFactory {
   absl::flat_hash_map<std::string, std::shared_ptr<internal::ModelBatcher>>
       batchers_ GUARDED_BY(&mutex_);
 
+  const std::string device_;
   const int buffer_count_;
 };
 

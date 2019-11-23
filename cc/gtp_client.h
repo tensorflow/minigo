@@ -60,9 +60,9 @@ class GtpClient {
     bool tree_reuse = true;
   };
 
-  GtpClient(std::unique_ptr<ModelFactory> model_factory,
+  GtpClient(std::string device,
             std::shared_ptr<InferenceCache> inference_cache,
-            const std::string& model_descriptor,
+            const std::string& model_path,
             const Game::Options& game_options,
             const MctsPlayer::Options& player_options,
             const GtpClient::Options& client_options);
@@ -185,7 +185,6 @@ class GtpClient {
   Response ParseSgf(const std::string& sgf_str,
                     std::vector<std::unique_ptr<sgf::Node>>* trees);
 
-  std::unique_ptr<ModelFactory> model_factory_;
   std::shared_ptr<InferenceCache> inference_cache_;
   std::unique_ptr<MctsPlayer> player_;
   std::unique_ptr<Game> game_;
@@ -210,6 +209,8 @@ class GtpClient {
       cmd_handlers_;
 
   ThreadSafeQueue<std::string> stdin_queue_;
+
+  const std::string device_;
 };
 
 }  // namespace minigo

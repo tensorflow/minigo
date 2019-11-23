@@ -18,6 +18,7 @@
 #include <array>
 
 #include "absl/synchronization/mutex.h"
+#include "cc/model/factory.h"
 #include "cc/model/model.h"
 #include "cc/random.h"
 
@@ -48,14 +49,7 @@ class RandomDualNet : public Model {
 
 class RandomDualNetFactory : public ModelFactory {
  public:
-  explicit RandomDualNetFactory(uint64_t seed);
-
-  // The descriptor specifies the policy and value standard deviation as a
-  // colon-separated string, e.g. "0.4:0.4".
-  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
-
- private:
-  const uint64_t seed_;
+  std::unique_ptr<Model> NewModel(const ModelDefinition& def) override;
 };
 
 }  // namespace minigo

@@ -27,20 +27,21 @@
 #include "cc/constants.h"
 #include "cc/file/utils.h"
 #include "cc/logging.h"
+#include "cc/model/loader.h"
 #include "cc/sgf.h"
 
 namespace minigo {
 
-GtpClient::GtpClient(std::unique_ptr<ModelFactory> model_factory,
+GtpClient::GtpClient(std::string device,
                      std::shared_ptr<InferenceCache> inference_cache,
-                     const std::string& model_descriptor,
+                     const std::string& model_path,
                      const Game::Options& game_options,
                      const MctsPlayer::Options& player_options,
                      const GtpClient::Options& client_options)
-    : model_factory_(std::move(model_factory)),
-      inference_cache_(inference_cache),
-      options_(client_options) {
-  auto model = model_factory_->NewModel(model_descriptor);
+    : inference_cache_(inference_cache),
+      options_(client_options),
+      device_(std::move(device)) {
+  auto model = NewModel(model_path, device_);
   game_ = absl::make_unique<Game>(model->name(), model->name(), game_options);
 
   // Create the main player. Its model doesn't run through the batcher used for

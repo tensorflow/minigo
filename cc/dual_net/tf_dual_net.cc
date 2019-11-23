@@ -31,7 +31,6 @@
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/protobuf.h"
 #include "tensorflow/core/public/session.h"
 #include "wtf/macros.h"
@@ -192,11 +191,17 @@ void TfDualNet::Reserve(int capacity) {
 TfDualNetFactory::TfDualNetFactory(int device) : device_(device) {}
 
 std::unique_ptr<Model> TfDualNetFactory::NewModel(
-    const std::string& descriptor) {
+    const ModelDefinition& def) {
+  MG_CHECK(def.metadata.Get<std::string>("engine") == "tf");
+
+  tensorflow::protobuf::io::CodedInputStream coded_stream(
+      reinterpret_cast<const uint8_t*>(def.model_bytes.data()),
+      def.model_bytes.size());
+  coded_stream.SetTotalBytesLimit(1024 * 1024 * 1024);
+
   tensorflow::GraphDef graph_def;
-  auto* env = tensorflow::Env::Default();
-  TF_CHECK_OK(env->FileExists(descriptor));
-  TF_CHECK_OK(tensorflow::ReadBinaryProto(env, descriptor, &graph_def));
+  MG_CHECK(graph_def.ParseFromCodedStream(&coded_stream) &&
+           coded_stream.ConsumedEntireMessage());
 
   // Check that we're not loading a TPU model.
   for (const auto& node : graph_def.node()) {
@@ -205,44 +210,16 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
         << "\", this model looks like it was compiled for TPU";
   }
 
-  // Look at the shape of the feature tensor to figure out what type of model
-  // it is.
-  // TODO(tommadams): We'll need something more sophisticated if we want to
-  // support arbitrary combinations of features. This will do to start with
-  // though.
-  int num_feature_planes = 0;
-  for (const auto& node : graph_def.node()) {
-    if (node.name() == "pos_tensor") {
-      auto it = node.attr().find("shape");
-      MG_CHECK(it != node.attr().end());
-      MG_CHECK(it->second.has_shape());
-      MG_CHECK(it->second.shape().dim().size() == 4);
-      num_feature_planes = it->second.shape().dim(3).size();
-      break;
-    }
-  }
-  MG_CHECK(num_feature_planes != 0)
-      << "Couldn't determine model type from GraphDef: pos_tensor not found";
+  auto feature_desc = FeatureDescriptor::Create(
+      def.metadata.Get<std::string>("input_features"));
 
-  FeatureDescriptor feature_desc;
-  switch (num_feature_planes) {
-    case AgzFeatures::kNumPlanes:
-      feature_desc = FeatureDescriptor::Create<AgzFeatures>();
-      break;
-    case ExtraFeatures::kNumPlanes:
-      feature_desc = FeatureDescriptor::Create<ExtraFeatures>();
-      break;
-    default:
-      MG_LOG(FATAL) << "unrecognized number of features: "
-                    << num_feature_planes;
-      return nullptr;
-  }
-
-  // TODO(tommadams): support running on multiple GPUs
+  // TODO(tommadams): we handle device selection using the CUDA_VISIBLE_DEVICES
+  // environment variable these days, so device_ doesn't really make sense
+  // anymore.
   if (device_ >= 0) {
     PlaceOnDevice(&graph_def, "/gpu:0");
   }
-  return absl::make_unique<TfDualNet>(descriptor, feature_desc, graph_def,
+  return absl::make_unique<TfDualNet>(def.path, feature_desc, graph_def,
                                       device_);
 }
 

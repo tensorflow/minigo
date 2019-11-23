@@ -39,7 +39,7 @@ namespace minigo {
 
 class MiniguiGtpClient : public GtpClient {
  public:
-  MiniguiGtpClient(std::unique_ptr<ModelFactory> model_factory,
+  MiniguiGtpClient(std::string device,
                    std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
                    const std::string& model_path,
                    const Game::Options& game_options,
@@ -128,7 +128,7 @@ class MiniguiGtpClient : public GtpClient {
   class WinRateEvaluator {
    public:
     WinRateEvaluator(int num_workers, int num_eval_reads,
-                     ModelFactory* model_factory,
+                     const std::string& device,
                      std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
                      const std::string& model_path,
                      const Game::Options& game_options,
@@ -187,6 +187,7 @@ class MiniguiGtpClient : public GtpClient {
     std::deque<VariationTree::Node*> to_eval_;
     std::vector<VariationTree::Node*> variation_;
     ThreadSafeQueue<VariationTree::Node*> eval_queue_;
+    std::unique_ptr<BatchingModelFactory> batcher_;
   };
 
   void Ponder() override;

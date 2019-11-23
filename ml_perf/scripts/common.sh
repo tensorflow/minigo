@@ -26,13 +26,14 @@ while getopts “-:” opt; do
       case $arg in
         board_size | base_dir | abort_file | flag_dir | golden_chunk_dir | \
         holdout_dir | log_dir | model_dir | selfplay_dir | sgf_dir | work_dir | \
-        tpu_name)
+        tpu_name | devices)
           eval "${arg}=${val}" ;;
       esac ;;
   esac
 done
 
 # Set default values for any missing command line arguments.
+if [ -z "${devices-}" ]; then devices="0"; fi
 if [ -z "${board_size-}" ]; then board_size="19"; fi
 if [ -z "${abort_file-}" ]; then abort_file="${base_dir}/abort"; fi
 if [ -z "${flag_dir-}" ]; then flag_dir="${base_dir}/flags"; fi

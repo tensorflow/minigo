@@ -19,6 +19,7 @@
 #include "absl/strings/string_view.h"
 #include "cc/constants.h"
 #include "cc/file/path.h"
+#include "cc/file/utils.h"
 #include "cc/logging.h"
 #include "cc/platform/utils.h"
 #include "tensorflow/lite/context.h"
@@ -26,8 +27,6 @@
 #include "tensorflow/lite/kernels/register.h"
 #include "tensorflow/lite/model.h"
 
-using tflite::FlatBufferModel;
-using tflite::InterpreterBuilder;
 using tflite::ops::builtin::BuiltinOpResolver;
 
 namespace minigo {
@@ -44,7 +43,8 @@ void Unquantize(const TfLiteQuantizationParams& params,
 
 class LiteDualNet : public Model {
  public:
-  LiteDualNet(std::string graph_path, const FeatureDescriptor& feature_desc);
+  LiteDualNet(const ModelDefinition& def,
+              const FeatureDescriptor& feature_desc);
 
   void RunMany(const std::vector<const ModelInput*>& inputs,
                std::vector<ModelOutput*>* outputs,
@@ -52,6 +52,12 @@ class LiteDualNet : public Model {
 
  private:
   void Reserve(int capacity);
+
+  // The raw model bytes. These bytes must outlive the parsed model, so
+  // `model_bytes_` must be ordered in the list of members before `model_`.
+  // TODO(tommadams): share model bytes between all instances of the same
+  // model.
+  std::string model_bytes_;
 
   std::unique_ptr<tflite::FlatBufferModel> model_;
   std::unique_ptr<tflite::Interpreter> interpreter_;
@@ -65,22 +71,23 @@ class LiteDualNet : public Model {
   TfLiteTensor* value_ = nullptr;
 
   std::string graph_path_;
-  int batch_capacity_;
+  int batch_capacity_ = 0;
 
   BackedTensor<float> unquantized_policy_;
   BackedTensor<float> unquantized_value_;
 };
 
-LiteDualNet::LiteDualNet(std::string graph_path,
+LiteDualNet::LiteDualNet(const ModelDefinition& def,
                          const FeatureDescriptor& feature_desc)
-    : Model(std::string(file::Stem(graph_path)), feature_desc),
-      graph_path_(std::move(graph_path)),
-      batch_capacity_(0) {
-  model_ = FlatBufferModel::BuildFromFile(graph_path_.c_str());
+    : Model(std::string(file::Stem(def.path)), feature_desc),
+      model_bytes_(def.model_bytes),
+      graph_path_(def.path) {
+  model_ = tflite::FlatBufferModel::BuildFromBuffer(model_bytes_.data(),
+                                                    model_bytes_.size());
   MG_CHECK(model_ != nullptr);
 
-  BuiltinOpResolver resolver;
-  InterpreterBuilder(*model_, resolver)(&interpreter_);
+  tflite::ops::builtin::BuiltinOpResolver resolver;
+  tflite::InterpreterBuilder(*model_, resolver)(&interpreter_);
   MG_CHECK(interpreter_ != nullptr);
 
   // Let's just use all the processors we can.
@@ -92,7 +99,7 @@ LiteDualNet::LiteDualNet(std::string graph_path,
   MG_CHECK(input_name == "pos_tensor");
   input_idx_ = inputs[0];
 
-  // Check that the model matches the board size and feature count.
+  // Check that the model matches the board size and feature count.	
   auto* input = interpreter_->tensor(input_idx_);
   MG_CHECK(input->dims->size == 4);
   MG_CHECK(input->dims->data[1] == kN);
@@ -190,10 +197,10 @@ void LiteDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
 }  // namespace
 
 std::unique_ptr<Model> LiteDualNetFactory::NewModel(
-    const std::string& descriptor) {
-  // TODO(tommadams): support extra feature types.
-  auto feature_desc = FeatureDescriptor::Create<AgzFeatures>();
-  return absl::make_unique<LiteDualNet>(descriptor, feature_desc);
+    const ModelDefinition& def) {
+  auto feature_desc = FeatureDescriptor::Create(
+      def.metadata.Get<std::string>("input_features"));
+  return absl::make_unique<LiteDualNet>(def, feature_desc);
 }
 
 }  // namespace minigo

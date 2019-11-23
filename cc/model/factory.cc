@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,22 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CC_DUAL_NET_LITE_DUAL_NET_H_
-#define CC_DUAL_NET_LITE_DUAL_NET_H_
-
-#include <memory>
-#include <string>
-
-#include "cc/model/model.h"
 #include "cc/model/factory.h"
 
 namespace minigo {
 
-class LiteDualNetFactory : public ModelFactory {
+namespace {
+
+// Visitor class used to log a ModelProperty's value using absl::visit.
+class LogModelProperty {
  public:
-  std::unique_ptr<Model> NewModel(const ModelDefinition& def) override;
+  explicit LogModelProperty(std::ostream* os) : os_(os) {}
+
+  template <typename T>
+  void operator()(const T& value) const {
+    (*os_) << value;
+  }
+
+ private:
+  std::ostream* os_;
 };
 
-}  // namespace minigo
+}  // namespace
 
-#endif  // CC_DUAL_NET_LITE_DUAL_NET_H_
+std::ostream& operator<<(std::ostream& os, const ModelProperty& p) {
+  absl::visit(LogModelProperty(&os), p);
+  return os;
+}
+
+ModelFactory::~ModelFactory() = default;
+
+}  // namespace minigo

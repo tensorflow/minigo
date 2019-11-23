@@ -17,11 +17,11 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "cc/constants.h"
-#include "cc/dual_net/factory.h"
 #include "cc/file/path.h"
 #include "cc/gtp_client.h"
 #include "cc/init.h"
 #include "cc/minigui_gtp_client.h"
+#include "cc/model/loader.h"
 #include "cc/zobrist.h"
 #include "gflags/gflags.h"
 
@@ -63,13 +63,9 @@ DEFINE_double(decay_factor, 0.98,
               "amount of time spent thinking as the game progresses.");
 
 // Inference flags.
-DEFINE_string(engine, "tf",
-              "Name of the inference engine to use, e.g. \"tf\", \"tpu\", "
-              "\"lite\"");
 DEFINE_string(device, "",
-              "Device to run on. For inference on a machine with N GPUs, "
-              "devices have IDs in the range [0, N). For TPUs, the device ID "
-              "is the gRPC address");
+              "Optional ID of the device to run inference on. For TPUs, pass "
+              "the gRPC address.");
 DEFINE_string(model, "", "Path to a minigo model.");
 DEFINE_int32(cache_size_mb, 1024,
              "Size of the inference cache in MB. Tree reuse in GTP mode is "
@@ -102,8 +98,6 @@ void Gtp() {
 
   MG_LOG(INFO) << game_options << " " << player_options;
 
-  auto model_factory = NewModelFactory(FLAGS_engine, FLAGS_device);
-
   std::shared_ptr<ThreadSafeInferenceCache> inference_cache;
   if (FLAGS_cache_size_mb > 0) {
     auto capacity = BasicInferenceCache::CalculateCapacity(FLAGS_cache_size_mb);
@@ -119,12 +113,12 @@ void Gtp() {
   std::unique_ptr<GtpClient> client;
   if (FLAGS_minigui) {
     client = absl::make_unique<MiniguiGtpClient>(
-        std::move(model_factory), std::move(inference_cache), FLAGS_model,
-        game_options, player_options, client_options);
+        FLAGS_device, std::move(inference_cache), FLAGS_model, game_options,
+        player_options, client_options);
   } else {
     client = absl::make_unique<GtpClient>(
-        std::move(model_factory), std::move(inference_cache), FLAGS_model,
-        game_options, player_options, client_options);
+        FLAGS_device, std::move(inference_cache), FLAGS_model, game_options,
+        player_options, client_options);
   }
   client->Run();
 }
@@ -136,5 +130,6 @@ int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
   minigo::zobrist::Init(0);
   minigo::Gtp();
+  minigo::ShutdownModelFactories();
   return 0;
 }

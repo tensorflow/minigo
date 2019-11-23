@@ -13,6 +13,6 @@
 --lr_rates=0.16
 --lr_rates=0.016
 --lr_rates=0.0016
---lr_boundaries=10000
---lr_boundaries=20000
+--lr_boundaries=25000
+--lr_boundaries=37500
 --l2_strength=0.0001

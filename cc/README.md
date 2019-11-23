@@ -81,7 +81,7 @@ a single game using a fixed number of readouts.
 ```shell
 bazel build -c opt cc:simple_example
 bazel-bin/cc/simple_example \
-  --model=tf,saved_models/000990-cormorant.pb \
+  --model=saved_models/000990-cormorant.minigo \
   --num_readouts=160
 ```
 
@@ -103,7 +103,7 @@ that the simple example, including:
 ```shell
 bazel build -c opt cc:selfplay
 bazel-bin/cc/selfplay \
-  --model=tf,saved_models/000990-cormorant.pb \
+  --model=saved_models/000990-cormorant.minigo \
   --num_readouts=160 \
   --parallel_games=1 \
   --output_dir=data/selfplay \
@@ -119,8 +119,8 @@ multiple games in parallel.
 ```shell
 bazel build -c opt cc:eval
 bazel-bin/cc/eval \
-  --model=tf,saved_models/000990-cormorant.pb \
-  --model_two=tf,saved_models/000990-cormorant.pb \
+  --eval_model=saved_models/000990-cormorant.minigo \
+  --target_model=saved_models/000990-cormorant.minigo \
   --num_readouts=160 \
   --parallel_games=32 \
   --sgf_dir=sgf
@@ -134,22 +134,8 @@ backend for Minigui (see `minigui/README.md`).
 ```shell
 bazel build -c opt cc:gtp
 bazel-bin/cc/gtp \
-  --model=tf,saved_models/000990-cormorant.pb \
+  --model=saved_models/000990-cormorant.minigo \
   --num_readouts=160
-```
-
-#### cc:puzzle
-
-Loads all SGF files found in the given `sgf_dir` and tries to predict the move
-made at each position in each game. After all games are processed, prints
-summary stats to about how many moves were correctly predicted.
-
-```shell
-bazel build -c opt cc:puzzle
-bazel-bin/cc/puzzle \
-  --model=tf,saved_models/000990-cormorant.pb \
-  --num_readouts=160 \
-  --sgf_dir=puzzle_sgf
 ```
 
 ## Running the unit tests
@@ -214,15 +200,13 @@ By default, the `cc:selfplay` binary writes to the trace to
 flag.
 
 
-## Inference engines
+## File format & Inference engines
 
-C++ Minigo currently supports multiple separate engines for performing
-inference. Which engines are compiled into the C++ binaries are controlled by
-passing Bazel `--define` arguments at compile time. The inference engine to
-use is specified by the `--engine` command line argument for the `selfplay`,
- `simple_example` and `gtp` binaries, or `--eval_engine` and `--target_engine`
-for the `eval` binary. The model path is specified using the `--model`
-command line argument (or `--eval_model` and `--target_model` for `eval`):
+C++ Minigo supports a variety of inference engines, input features, layouts and
+data types. In order to determine what configuration to use, Minigo uses a
+custom `.minigo` data format that wraps the raw model data with extra metadata.
+Which engines are compiled into the C++ binaries are controlled by passing
+Bazel `--define` arguments at compile time.
 
  - **tf**: peforms inference using the TensorFlow libraries built by
    `cc/configure_tensorflow.sh`. Compiled & used as the inference by default,
@@ -239,26 +223,12 @@ command line argument (or `--eval_model` and `--target_model` for `eval`):
    `--use_tpu=true` when running `freeze_graph.py`. The TPU address must also
    be specified with `--define=$TPU_ADDRESS`, when `$TPU_ADDRESS` is the TPU's
    gRPC address (e.g. `grpc://10.240.2.10:8470`).
- - **fake**: a simple fake that is only useful in so much as you can use it to
-   test that the tree search code compiles without also having to compile a
-   full inference engine. Enabled by default. There's no way to disable the
-   fake inference engine because this guaratees that there's always an engine
-   available (even if it's a useless one).
-   Use by passing `--model=fake`.
  - **random**: a model that returns random samples from a normal distribution,
    which can be useful for bootstrapping the reinforcement learning pipeline.
    Use by passing
-   `--engine=random`, `--device=$SEED` and
-   `--model=$FEATURES:$POLICY_STD_DEV:$VALUE_STD_DEV`, where
-   `$SEED` is a random seed (set to `0` to choose one based on the operating
-   system's entropy source), `$FEATURES` is the type of model features (e.g.
-   `agz`), `$POLICY_STD_DEV` is the standard deviation of the distribution of
-   policy samples (`0.4` is a reasonable choice) and `$VALUE_STD_DEV` is the
-   standard deviation for the distribution of value samples (again, `0.4` is a
-   reasonable choice). That was a bit of a long-winded explanation, so just try
-   `--engine=random` `--device=0` `--model=agz:0.4:0.4` to start with. The
-   random model doesn't actually use any input features but it must know what
-   input features to generate when serializing training examples.
+   `--model=random:$FEATURES:$SEED`, where `$SEED` is a random seed (set to
+   `0` to choose one based on the operating system's entropy source) and
+   `$FEATURES` is the type of model features (e.g.  `agz`, `mlperf07`).
 
 ## Compiling a TensorFlow Lite model
 

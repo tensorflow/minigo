@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "absl/types/span.h"
+#include "absl/strings/string_view.h"
 #include "cc/color.h"
 #include "cc/constants.h"
 #include "cc/logging.h"
@@ -205,6 +206,8 @@ struct FeatureDescriptor {
                              &FeatureType::template Set<uint8_t>,
                              &FeatureType::template Set<float>};
   }
+
+  static FeatureDescriptor Create(absl::string_view input_features);
 
   int num_planes;
   SetFeatures<uint8_t> set_bytes;

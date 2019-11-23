@@ -20,6 +20,7 @@ namespace minigo {
 
 Model::Model(std::string name, const FeatureDescriptor& feature_desc)
     : name_(std::move(name)), feature_desc_(feature_desc) {}
+
 Model::~Model() = default;
 
 void Model::GetOutputs(absl::Span<const ModelInput* const> inputs,
@@ -50,7 +51,5 @@ void Model::ApplySymmetry(symmetry::Symmetry sym, const ModelOutput& src,
   dst->policy[Coord::kPass] = src.policy[Coord::kPass];
   dst->value = src.value;
 }
-
-ModelFactory::~ModelFactory() = default;
 
 }  // namespace minigo

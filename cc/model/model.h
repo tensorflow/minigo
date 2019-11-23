@@ -66,16 +66,6 @@ class Model {
   const FeatureDescriptor feature_desc_;
 };
 
-// Factory that creates Model instances.
-// All implementations are required to be thread safe.
-class ModelFactory {
- public:
-  virtual ~ModelFactory();
-
-  // Create a single model.
-  virtual std::unique_ptr<Model> NewModel(const std::string& descriptor) = 0;
-};
-
 }  // namespace minigo
 
 #endif  //  CC_MODEL_MODEL_H_

@@ -34,12 +34,12 @@
 namespace minigo {
 
 MiniguiGtpClient::MiniguiGtpClient(
-    std::unique_ptr<ModelFactory> model_factory,
+    std::string device,
     std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
     const std::string& model_path, const Game::Options& game_options,
     const MctsPlayer::Options& player_options,
     const GtpClient::Options& client_options)
-    : GtpClient(std::move(model_factory), inference_cache, model_path,
+    : GtpClient(std::move(device), inference_cache, model_path,
                 game_options, player_options, client_options) {
   RegisterCmd("echo", &MiniguiGtpClient::HandleEcho);
   RegisterCmd("genmove", &MiniguiGtpClient::HandleGenmove);
@@ -56,12 +56,10 @@ MiniguiGtpClient::MiniguiGtpClient(
 
   int num_workers = 16;
   int num_win_rate_evals = 8;
-  model_factory_ =
-      absl::make_unique<BatchingModelFactory>(std::move(model_factory_), 2);
   auto worker_options = player_options;
   worker_options.virtual_losses = 1;
   win_rate_evaluator_ = absl::make_unique<WinRateEvaluator>(
-      num_workers, num_win_rate_evals, model_factory_.get(), inference_cache,
+      num_workers, num_win_rate_evals, device_, inference_cache,
       model_path, game_options, worker_options);
 }
 
@@ -447,17 +445,18 @@ bool MiniguiGtpClient::VariationTree::SelectNode(const std::string& id) {
 }
 
 MiniguiGtpClient::WinRateEvaluator::WinRateEvaluator(
-    int num_workers, int num_eval_reads, ModelFactory* model_factory,
+    int num_workers, int num_eval_reads, const std::string& device,
     std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
     const std::string& model_path, const Game::Options& game_options,
     const MctsPlayer::Options& player_options)
     : num_eval_reads_(num_eval_reads) {
   MG_CHECK(inference_cache != nullptr);
 
+  batcher_ = absl::make_unique<BatchingModelFactory>(device, 2);
   for (int i = 0; i < num_workers; ++i) {
     auto game = absl::make_unique<Game>("b", "w", game_options);
     auto player = absl::make_unique<MctsPlayer>(
-        model_factory->NewModel(model_path), inference_cache, game.get(),
+        batcher_->NewModel(model_path), inference_cache, game.get(),
         player_options);
     workers_.push_back(absl::make_unique<Worker>(
         std::move(game), std::move(player), &eval_queue_));

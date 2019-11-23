@@ -31,7 +31,6 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "cc/constants.h"
-#include "cc/dual_net/factory.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
 #include "cc/game.h"
@@ -40,6 +39,7 @@
 #include "cc/logging.h"
 #include "cc/mcts_player.h"
 #include "cc/model/batching_model.h"
+#include "cc/model/loader.h"
 #include "cc/model/model.h"
 #include "cc/random.h"
 #include "cc/tf_utils.h"
@@ -67,14 +67,16 @@ DEFINE_double(value_init_penalty, 2.0,
 // Inference flags.
 DEFINE_string(eval_model, "",
               "Path to a minigo model to evaluate against a target.");
-DEFINE_string(eval_engine, "tf", "Inference engine to use for the eval model.");
-DEFINE_string(eval_device, "", "Device to run eval inference on.");
+DEFINE_string(eval_device, "",
+              "Optional ID of the device to the run inference on for the eval "
+              "model. For TPUs, pass the gRPC address.");
 
 DEFINE_string(target_model, "",
               "Path to a target minigo model that eval_model is evaluated "
               "against.");
-DEFINE_string(target_engine, "tf", "Inference engine to use for the eval model.");
-DEFINE_string(target_device, "", "Device to run target inference on.");
+DEFINE_string(target_device, "",
+              "Optional ID of the device to the run inference on for the "
+              "target model. For TPUs, pass the gRPC address.");
 
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 
@@ -96,6 +98,7 @@ void ParseOptionsFromFlags(Game::Options* game_options,
   game_options->resign_enabled = FLAGS_resign_enabled;
   game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
   player_options->virtual_losses = FLAGS_virtual_losses;
+  player_options->random_seed = FLAGS_seed;
   player_options->num_readouts = FLAGS_num_readouts;
   player_options->inject_noise = false;
   player_options->tree.value_init_penalty = FLAGS_value_init_penalty;
@@ -108,7 +111,6 @@ class Evaluator {
     EvaluatedModel(BatchingModelFactory* batcher, const std::string& path)
         : batcher_(batcher), path_(path) {}
 
-    BatchingModelFactory* batcher() { return batcher_; }
     std::string name() {
       absl::MutexLock lock(&mutex_);
       if (name_.empty()) {
@@ -153,15 +155,14 @@ class Evaluator {
  public:
   Evaluator() {
     // Create a batcher for the eval model.
-    batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-        NewModelFactory(FLAGS_eval_engine, FLAGS_eval_device), 2));
+    batchers_.push_back(
+        absl::make_unique<BatchingModelFactory>(FLAGS_eval_device, 2));
 
-    // If the target model requires a different factory, create one & a second
+    // If the target model requires a different device, create one & a second
     // batcher too.
-    if (FLAGS_target_engine != FLAGS_eval_engine ||
-        FLAGS_target_device != FLAGS_eval_device) {
-      batchers_.push_back(absl::make_unique<BatchingModelFactory>(
-          NewModelFactory(FLAGS_target_engine, FLAGS_target_device), 2));
+    if (FLAGS_target_device != FLAGS_eval_device) {
+      batchers_.push_back(
+          absl::make_unique<BatchingModelFactory>(FLAGS_target_device, 2));
     }
   }
 
@@ -176,9 +177,10 @@ class Evaluator {
     int num_games = FLAGS_parallel_games;
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
       bool swap_models = (thread_id & 1) != 0;
-      threads_.emplace_back(std::bind(&Evaluator::ThreadRun, this, thread_id,
-                                      swap_models ? &target_model : &eval_model,
-                                      swap_models ? &eval_model : &target_model));
+      threads_.emplace_back(
+          std::bind(&Evaluator::ThreadRun, this, thread_id,
+                    swap_models ? &target_model : &eval_model,
+                    swap_models ? &eval_model : &target_model));
     }
     for (auto& t : threads_) {
       t.join();
@@ -239,7 +241,9 @@ class Evaluator {
         std::cerr << curr_player->tree().Describe() << "\n";
       }
       MG_CHECK(curr_player->PlayMove(move));
-      next_player->PlayOpponentsMove(move);
+      if (move != Coord::kResign) {
+        next_player->PlayOpponentsMove(move);
+      }
       if (verbose) {
         MG_LOG(INFO) << absl::StreamFormat(
             "%d: %s by %s\nQ: %0.4f", curr_player->root()->position.n(),

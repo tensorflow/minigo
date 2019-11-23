@@ -20,6 +20,8 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
+#include "cc/model/model.h"
+#include "cc/model/loader.h"
 #include "cc/model/features.h"
 #include "cc/position.h"
 #include "cc/random.h"
@@ -206,21 +208,12 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
     return;
   }
 
-  struct Test {
-    Test(std::unique_ptr<ModelFactory> factory, std::string basename)
-        : factory(std::move(factory)), basename(std::move(basename)) {}
-    std::unique_ptr<ModelFactory> factory;
-    std::string basename;
-  };
-
-  std::map<std::string, Test> tests;
+  std::vector<std::string> model_basenames;
 #if MG_ENABLE_TF_DUAL_NET
-  tests.emplace("TfDualNet",
-                Test(absl::make_unique<TfDualNetFactory>(-1), "test_model.pb"));
+  model_basenames.push_back("test_tf.minigo");
 #endif
 #if MG_ENABLE_LITE_DUAL_NET
-  tests.emplace("LiteDualNet", Test(absl::make_unique<LiteDualNetFactory>(),
-                                    "test_model.tflite"));
+  model_basenames.push_back("test_lite.minigo");
 #endif
 
   Random rnd(Random::kUniqueSeed, Random::kUniqueStream);
@@ -243,13 +236,9 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
     return oss.str();
   };
 
-  for (const auto& kv : tests) {
-    const auto& name = kv.first;
-    auto& test = kv.second;
-    MG_LOG(INFO) << "Running " << name;
-
-    auto model =
-        test.factory->NewModel(absl::StrCat("cc/dual_net/", test.basename));
+  for (const auto& name : model_basenames) {
+    MG_LOG(INFO) << "Loading " << name;
+    auto model = NewModel(absl::StrCat("cc/dual_net/", name), "");
 
     ModelOutput output;
     std::vector<const ModelInput*> inputs = {&input};
@@ -274,6 +263,8 @@ TYPED_TEST(DualNetTest, TestBackendsEqual) {
     EXPECT_NEAR(output.value, ref_output.value, 0.0001f)
         << name << " vs " << ref_name;
   }
+
+  ShutdownModelFactories();
 }
 
 TEST(WouldCaptureTest, WouldCaptureBlack) {

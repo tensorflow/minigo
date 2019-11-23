@@ -73,3 +73,28 @@ def minigo_cc_test_19_only(name, srcs, size = "small", deps = [], copts = [], **
         copts = _board_size_copts() + copts,
         **kwargs
     )
+
+# copts that can be used to determine which inference engines are enabled.
+minigo_engine_copts = select({
+    "//cc/config:enable_tf": ["-DMG_ENABLE_TF_DUAL_NET"],
+    "//conditions:default": [],
+}) + select({
+    "//cc/config:enable_lite": ["-DMG_ENABLE_LITE_DUAL_NET"],
+    "//conditions:default": [],
+}) + select({
+    "//cc/config:enable_tpu": ["-DMG_ENABLE_TPU_DUAL_NET"],
+    "//conditions:default": [],
+})
+
+# dependencies for enabled inference engines.
+minigo_engine_deps = select({
+    "//cc/config:enable_tf": ["//cc/dual_net:tf_dual_net"],
+    "//conditions:default": [],
+}) + select({
+    "//cc/config:enable_lite": ["//cc/dual_net:lite_dual_net"],
+    "//conditions:default": [],
+}) + select({
+    "//cc/config:enable_tpu": ["//cc/dual_net:tpu_dual_net"],
+    "//conditions:default": [],
+})
+

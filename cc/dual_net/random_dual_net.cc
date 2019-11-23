@@ -32,8 +32,7 @@ RandomDualNet::RandomDualNet(std::string name,
                              float value_stddev)
     : Model(std::move(name), feature_desc),
       rnd_(seed, Random::kUniqueStream),
-      policy_stddev_(policy_stddev),
-      value_stddev_(value_stddev) {}
+      policy_stddev_(policy_stddev), value_stddev_(value_stddev) {}
 
 void RandomDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                             std::vector<ModelOutput*>* outputs,
@@ -60,29 +59,17 @@ void RandomDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
   }
 }
 
-RandomDualNetFactory::RandomDualNetFactory(uint64_t seed) : seed_(seed) {}
-
 std::unique_ptr<Model> RandomDualNetFactory::NewModel(
-    const std::string& descriptor) {
-  std::vector<absl::string_view> parts = absl::StrSplit(descriptor, ':');
-  MG_CHECK(parts.size() == 3);
+    const ModelDefinition& def) {
+  const auto& metadata = def.metadata;
+  uint64_t seed = metadata.Get<uint64_t>("seed");
+  float policy_stddev = metadata.Get<float>("policy_stddev");
+  float value_stddev = metadata.Get<float>("value_stddev");
+  auto name = absl::StrCat("rnd:", seed, ":", policy_stddev, ":", value_stddev);
 
-  FeatureDescriptor feature_desc;
-  float policy_stddev, value_stddev;
-  if (parts[0] == "agz") {
-    feature_desc = FeatureDescriptor::Create<AgzFeatures>();
-  } else if (parts[0] == "extra") {
-    feature_desc = FeatureDescriptor::Create<ExtraFeatures>();
-  } else {
-    MG_LOG(FATAL) << "unrecognized feature type \"" << parts[0] << "\"";
-    return nullptr;
-  }
-  MG_CHECK(absl::SimpleAtof(parts[1], &policy_stddev));
-  MG_CHECK(absl::SimpleAtof(parts[2], &value_stddev));
-
-  auto qualified_descriptor = absl::StrCat("rnd:", descriptor);
-  return absl::make_unique<RandomDualNet>(qualified_descriptor, feature_desc,
-                                          seed_, policy_stddev, value_stddev);
+  auto feature_desc = FeatureDescriptor::Create(metadata.Get<std::string>("input_features"));
+  return absl::make_unique<RandomDualNet>(name, feature_desc, seed,
+                                          policy_stddev, value_stddev);
 }
 
 }  // namespace minigo

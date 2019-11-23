@@ -23,6 +23,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "cc/constants.h"
+#include "cc/model/factory.h"
 #include "cc/model/model.h"
 #include "cc/random.h"
 #include "tensorflow/core/framework/graph.pb.h"
@@ -69,16 +70,17 @@ class TpuDualNetFactory : public ModelFactory {
   // instances. Called by the TpuDualNet destructor.
   void CloseOrphanedSessions();
 
-  std::unique_ptr<Model> NewModel(const std::string& descriptor) override;
+  std::unique_ptr<Model> NewModel(const ModelDefinition& def) override;
 
  private:
   struct LoadedModel {
     tensorflow::DataType input_type = tensorflow::DT_INVALID;
     int num_replicas = 0;
     std::shared_ptr<tensorflow::Session> session;
+    FeatureDescriptor feature_desc;
   };
 
-  LoadedModel GetModel(const std::string& path);
+  LoadedModel GetModel(const ModelDefinition& def);
 
   std::unique_ptr<tensorflow::Session> main_session_;
   std::string tpu_name_;

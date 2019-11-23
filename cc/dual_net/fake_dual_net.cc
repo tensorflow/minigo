@@ -46,9 +46,4 @@ void FakeDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
   }
 }
 
-std::unique_ptr<Model> FakeDualNetFactory::NewModel(
-    const std::string& descriptor) {
-  return absl::make_unique<FakeDualNet>();
-}
-
 }  // namespace minigo

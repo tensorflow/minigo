@@ -28,7 +28,7 @@ source ml_perf/scripts/common.sh
 bazel build  -c opt \
   --define=board_size="${board_size}" \
   --define=tf=1 \
-  cc:concurrent_selfplay cc:sample_records
+  cc:concurrent_selfplay cc:sample_records cc:eval
 
 
 # Initialize a clean directory structure.

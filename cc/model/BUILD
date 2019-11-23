@@ -10,11 +10,44 @@ load(
     "//cc/config:minigo.bzl",
     "minigo_cc_library",
     "minigo_cc_test",
+    "minigo_engine_copts",
+    "minigo_engine_deps",
+)
+
+minigo_cc_library(
+    name = "loader",
+    srcs = ["loader.cc"],
+    hdrs = ["loader.h"],
+    copts = minigo_engine_copts,
+    deps = [
+        ":model",
+        ":factory",
+        "//cc:logging",
+        "//cc:json",
+        "//cc/file",
+        "//cc/dual_net:random_dual_net",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+    ] + minigo_engine_deps,
+)
+
+minigo_cc_library(
+    name = "factory",
+    srcs = ["factory.cc"],
+    hdrs = ["factory.h"],
+    deps = [
+        ":model",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:variant",
+    ],
 )
 
 minigo_cc_library(
     name = "model",
     srcs = [
+        "features.cc",
         "features_internal.h",
         "model.cc",
         "types.cc",
@@ -33,6 +66,7 @@ minigo_cc_library(
         "//cc:tiny_set",
         "//cc/platform",
         "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -45,6 +79,8 @@ minigo_cc_library(
         "//cc:base",
         "//cc:logging",
         "//cc/model",
+        "//cc/model:factory",
+        "//cc/model:loader",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -82,25 +118,6 @@ minigo_cc_library(
     ],
 )
 
-minigo_cc_library(
-    name = "reloading_model",
-    srcs = ["reloading_model.cc"],
-    hdrs = ["reloading_model.h"],
-    deps = [
-        ":model",
-        "//cc:base",
-        "//cc:logging",
-        "//cc:position",
-        "//cc/file",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/time",
-    ],
-)
-
 minigo_cc_test(
     name = "types_test",
     srcs = ["types_test.cc"],
@@ -130,17 +147,5 @@ minigo_cc_test(
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest",
-    ],
-)
-
-minigo_cc_test(
-    name = "reloading_model_test",
-    size = "small",
-    srcs = ["reloading_model_test.cc"],
-    deps = [
-        ":reloading_model",
-        "//cc:logging",
-        "//cc/file",
-        "@com_google_googletest//:gtest_main",
     ],
 )

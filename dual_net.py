@@ -41,6 +41,7 @@ from tensorflow.contrib.tpu.python.tpu import tpu_optimizer as contrib_tpu_pytho
 import features as features_lib
 import go
 import symmetries
+import minigo_model
 
 
 flags.DEFINE_integer('train_batch_size', 256,
@@ -157,6 +158,10 @@ flags.DEFINE_bool(
 flags.DEFINE_string(
     'input_features', 'agz',
     help='Type of input features: "agz" or "mlperf07"')
+
+flags.DEFINE_string(
+    'input_layout', 'nhwc',
+    help='Layout of input features: "nhwc" or "nchw"')
 
 
 # TODO(seth): Verify if this is still required.
@@ -317,7 +322,8 @@ def model_fn(features, labels, mode, params):
     optimizer = tf.train.MomentumOptimizer(
         learning_rate, params['sgd_momentum'])
     if params['use_tpu']:
-        optimizer = contrib_tpu_python_tpu_tpu_optimizer.CrossShardOptimizer(optimizer)
+        optimizer = contrib_tpu_python_tpu_tpu_optimizer.CrossShardOptimizer(
+            optimizer)
     with tf.control_dependencies(update_ops):
         train_op = optimizer.minimize(combined_cost, global_step=global_step)
 
@@ -375,7 +381,8 @@ def model_fn(features, labels, mode, params):
                 contrib_summary.record_summaries_every_n_global_steps(
                     params['summary_steps'], eval_step):
             for metric_name, metric_op in metric_ops.items():
-                contrib_summary.scalar(metric_name, metric_op[1], step=eval_step)
+                contrib_summary.scalar(
+                    metric_name, metric_op[1], step=eval_step)
 
         # Reset metrics occasionally so that they are mean of recent batches.
         reset_op = tf.variables_initializer(tf.local_variables('metrics'))
@@ -693,7 +700,7 @@ def freeze_graph(model_path, use_trt=False, trt_max_batch_size=8,
         'use_trt': bool(use_trt),
     })
 
-    atomic_write_model(out_graph, metadata, model_path)
+    minigo_model.write_graph_def(out_graph, metadata, model_path + '.minigo')
 
 
 def freeze_graph_tpu(model_path):
@@ -738,56 +745,16 @@ def freeze_graph_tpu(model_path):
 
     metadata = make_model_metadata({
         'engine': 'tpu',
+        'num_replicas': FLAGS.num_tpu_cores,
     })
 
-    atomic_write_model(out_graph, metadata, model_path)
+    minigo_model.write_graph_def(out_graph, metadata, model_path + '.minigo')
 
 
 def make_model_metadata(metadata):
     for f in ['conv_width', 'fc_width', 'trunk_layers', 'use_SE', 'use_SE_bias',
-              'use_swish', 'bool_features', 'input_features']:
+              'use_swish', 'input_features', 'input_layout']:
         metadata[f] = getattr(FLAGS, f)
+    metadata['input_type'] = 'bool' if FLAGS.bool_features else 'float'
+    metadata['board_size'] = go.N
     return metadata
-
-
-def atomic_write_model(graph_def, metadata, model_path):
-    # TODO(tommadams): change extension when switching to new model format
-    dst_path = model_path + '.pb'
-
-    metadata_bytes = json.dumps(metadata, sort_keys=True,
-                                separators=(',', ':')).encode()
-    graph_def_bytes = graph_def.SerializeToString()
-
-    # If the destination path is on GCS, write there directly since GCS files
-    # are immutable and a partially written file cannot be observed.
-    # Otherwise, write to a temp file and rename. The temp file is written to
-    # the same filesystem as dst_path on the assumption that the rename will be
-    # atomic.
-    if dst_path.startswith("gs://"):
-        write_path = dst_path
-    else:
-        write_path = model_path + '.tmp'
-
-    # TODO(tommadams): enable the new model format below when the TPU changes
-    # are pushed.
-    with tf.gfile.Open(write_path, 'wb') as f:
-        f.write(graph_def_bytes)
-
-    ### # File header:
-    ### #   char[8]: '<minigo>'
-    ### #   uint64: version
-    ### #   uint64: file size
-    ### #   uint64: metadata size
-    ### version = 1
-    ### header_size = 32
-    ### metadata_size = len(metadata_bytes)
-    ### graph_def_size = len(graph_def_bytes)
-    ### file_size = header_size + metadata_size + graph_def_size
-    ### with tf.gfile.Open(write_path, 'wb') as f:
-    ###     f.write('<minigo>')
-    ###     f.write(struct.pack('<QQQ', version, file_size, metadata_size))
-    ###     f.write(metadata_bytes)
-    ###     f.write(graph_def_bytes)
-
-    if write_path != dst_path:
-        tf.gfile.Rename(write_path, dst_path)

@@ -29,7 +29,6 @@
 #include "cc/async/sharded_executor.h"
 #include "cc/async/thread.h"
 #include "cc/async/thread_safe_queue.h"
-#include "cc/dual_net/factory.h"
 #include "cc/file/directory_watcher.h"
 #include "cc/file/path.h"
 #include "cc/file/utils.h"
@@ -39,6 +38,7 @@
 #include "cc/logging.h"
 #include "cc/mcts_tree.h"
 #include "cc/model/inference_cache.h"
+#include "cc/model/loader.h"
 #include "cc/platform/utils.h"
 #include "cc/random.h"
 #include "cc/tf_utils.h"
@@ -64,14 +64,9 @@
 //    an output queue for `OutputThread` to consume.
 
 // Inference flags.
-DEFINE_string(engine, "tf",
-              "Name of the inference engine to use, e.g. \"tf\", \"tpu\", "
-              "\"lite\"");
 DEFINE_string(device, "",
-              "ID of the device to run inference on. Can be left empty for "
-              "single GPU machines. For a machine with N GPUs, a device ID "
-              "should be specified in the range [0, N). For TPUs, pass the "
-              "gRPC address for the device ID.");
+              "Optional ID of the device to run inference on. For TPUs, pass "
+              "the gRPC address.");
 DEFINE_string(model, "", "Path to a minigo model.");
 DEFINE_int32(cache_size_mb, 0, "Size of the inference cache in MB.");
 DEFINE_int32(cache_shards, 8,
@@ -369,7 +364,6 @@ class Selfplayer {
   ThreadSafeQueue<std::unique_ptr<SelfplayGame>> output_queue_;
   ShardedExecutor executor_;
 
-  std::unique_ptr<ModelFactory> model_factory_;
   ThreadSafeQueue<std::unique_ptr<Model>> models_;
 
   // The latest path that matches the model pattern.
@@ -860,8 +854,6 @@ void Selfplayer::ParseFlags() {
 }
 
 FeatureDescriptor Selfplayer::InitializeModels() {
-  model_factory_ = NewModelFactory(FLAGS_engine, FLAGS_device);
-
   if (FLAGS_model.find("%d") != std::string::npos) {
     using namespace std::placeholders;
     directory_watcher_ = absl::make_unique<DirectoryWatcher>(
@@ -886,16 +878,17 @@ FeatureDescriptor Selfplayer::InitializeModels() {
 void Selfplayer::CreateModels(const std::string& path) {
   MG_LOG(INFO) << "Loading model " << path;
 
-  // TODO(tommadams): add a method to the model factory to create multiple
-  // model instances from the same file.
-  auto model = model_factory_->NewModel(path);
+  auto def = LoadModelDefinition(path);
+  auto* factory = GetModelFactory(def, FLAGS_device);
+
+  auto model = factory->NewModel(def);
   {
     absl::MutexLock lock(&mutex_);
     latest_model_name_ = model->name();
   }
   models_.Push(std::move(model));
   for (int i = 1; i < FLAGS_parallel_inference; ++i) {
-    models_.Push(model_factory_->NewModel(path));
+    models_.Push(factory->NewModel(def));
   }
 }
 
@@ -1120,8 +1113,13 @@ void OutputThread::WriteOutputs(std::unique_ptr<SelfplayGame> selfplay_game) {
 int main(int argc, char* argv[]) {
   minigo::Init(&argc, &argv);
   minigo::zobrist::Init(FLAGS_seed);
-  minigo::Selfplayer selfplayer;
-  selfplayer.Run();
+
+  {
+    minigo::Selfplayer selfplayer;
+    selfplayer.Run();
+  }
+
+  minigo::ShutdownModelFactories();
 
 #ifdef WTF_ENABLE
   MG_LOG(INFO) << "Writing WTF trace to \"" << FLAGS_wtf_trace << "\"";

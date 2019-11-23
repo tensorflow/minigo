@@ -16,7 +16,7 @@
 
 #include <iostream>
 
-#include "cc/dual_net/factory.h"
+#include "cc/model/loader.h"
 #include "cc/game.h"
 #include "cc/init.h"
 #include "cc/logging.h"
@@ -27,13 +27,7 @@
 #include "gflags/gflags.h"
 
 // Inference flags.
-DEFINE_string(engine, "tf",
-              "Name of the inference engine to use, e.g. \"tf\", \"tpu\", "
-              "\"lite\"");
-DEFINE_string(device, "",
-              "Device to run on. For inference on a machine with N GPUs, "
-              "devices have IDs in the range [0, N). For TPUs, the device ID "
-              "is the gRPC address");
+DEFINE_string(device, "", "Device to run on (e.g. TPU address).");
 DEFINE_string(model, "", "Path to a minigo model.");
 DEFINE_int32(num_readouts, 100,
              "Number of readouts to make during tree search for each move.");
@@ -49,8 +43,7 @@ void SimpleExample() {
   const bool use_ansi_colors = FdSupportsAnsiColors(fileno(stderr));
 
   // Load the model specified by the command line arguments.
-  auto model_factory = NewModelFactory(FLAGS_engine, FLAGS_device);
-  auto model = model_factory->NewModel(FLAGS_model);
+  auto model = NewModel(FLAGS_model, FLAGS_device);
 
   // Create a game object that tracks the move history & final score.
   Game::Options game_options;
