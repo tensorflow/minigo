@@ -255,9 +255,13 @@ def get_inference_input():
 
     Returns the feature, output tensors that get passed into model_fn."""
     feature_type = tf.bool if FLAGS.bool_features else tf.float32
-    return (tf.placeholder(feature_type,
-                           [None, go.N, go.N, get_features_planes()],
-                           name='pos_tensor'),
+    if FLAGS.input_layout == 'nhwc':
+        feature_shape = [None, go.N, go.N, get_features_planes()]
+    elif FLAGS.input_layout == 'nchw':
+        feature_shape = [None, get_features_planes(), go.N, go.N]
+    else:
+        raise ValueError('invalid input_layout "%s"' % FLAGS.input_layout)
+    return (tf.placeholder(feature_type, feature_shape, name='pos_tensor'),
             {'pi_tensor': tf.placeholder(tf.float32, [None, go.N * go.N + 1]),
              'value_tensor': tf.placeholder(tf.float32, [None])})
 
@@ -267,8 +271,10 @@ def model_fn(features, labels, mode, params):
     Create the model for estimator api
 
     Args:
-        features: tensor with shape
-            [BATCH_SIZE, go.N, go.N, get_features_planes()]
+        features: if input_layout == 'nhwc', a tensor with shape:
+                [BATCH_SIZE, go.N, go.N, get_features_planes()]
+            else, a tensor with shape:
+                [BATCH_SIZE, get_features_planes(), go.N, go.N]
         labels: dict from string to tensor with shape
             'pi_tensor': [BATCH_SIZE, go.N * go.N + 1]
             'value_tensor': [BATCH_SIZE]
@@ -288,8 +294,6 @@ def model_fn(features, labels, mode, params):
 
     policy_output, value_output, logits = model_inference_fn(
         features, mode == tf.estimator.ModeKeys.TRAIN, params)
-
-    tf.constant(FLAGS.input_features, name='input_features')
 
     # train ops
     policy_cost = tf.reduce_mean(
@@ -444,9 +448,16 @@ def model_inference_fn(features, training, params):
     if FLAGS.bool_features:
         features = tf.dtypes.cast(features, dtype=tf.float32)
 
+    if FLAGS.input_layout == 'nhwc':
+        bn_axis = -1
+        data_format = 'channels_last'
+    else:
+        bn_axis = 1
+        data_format = 'channels_first'
+
     mg_batchn = functools.partial(
         tf.layers.batch_normalization,
-        axis=-1,
+        axis=bn_axis,
         momentum=.95,
         epsilon=1e-5,
         center=True,
@@ -459,15 +470,15 @@ def model_inference_fn(features, training, params):
         filters=params['conv_width'],
         kernel_size=3,
         padding='same',
-        data_format='channels_last',
-        use_bias=False)
+        use_bias=False,
+        data_format=data_format)
 
     mg_global_avgpool2d = functools.partial(
         tf.layers.average_pooling2d,
         pool_size=go.N,
         strides=1,
         padding='valid',
-        data_format='channels_last')
+        data_format=data_format)
 
     def mg_activation(inputs):
         if FLAGS.use_swish:
@@ -577,8 +588,11 @@ def tpu_model_inference_fn(features):
         t = int(time.time())
         epoch_time = tf.constant(t, name='epoch_time_%d' % t)
         with tf.control_dependencies([epoch_time]):
-            features = tf.reshape(features,
-                                  [-1, go.N, go.N, get_features_planes()])
+            if FLAGS.input_layout == 'nhwc':
+                feature_shape = [-1, go.N, go.N, get_features_planes()]
+            else:
+                feature_shape = [-1, get_features_planes(), go.N, go.N]
+            features = tf.reshape(features, feature_shape)
             return model_inference_fn(features, False, FLAGS.flag_values_dict())
 
 

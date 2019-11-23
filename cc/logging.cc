@@ -88,7 +88,8 @@ LogStream::LogStream(const char* file, int line, LogLevel level)
 LogStream::~LogStream() {
   {
     absl::MutexLock lock(mutex());
-    std::cerr << stream_.rdbuf() << '\n';
+    stream_ << '\n';
+    std::cerr << stream_.rdbuf();
     if (level_ == LogLevel::FATAL) {
       DumpStackTrace(&std::cerr);
     }

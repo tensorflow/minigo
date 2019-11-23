@@ -135,18 +135,16 @@ void TfDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
   (inputs.size(), batch_capacity_);
   MG_CHECK(inputs.size() == outputs->size());
 
+  auto shape = feature_descriptor().GetInputShape(batch_capacity_);
   if (input_type_ == tensorflow::DT_FLOAT) {
     WTF_SCOPE("Features::SetFloat: inputs", int)(inputs.size());
-    Tensor<float> features(
-        {batch_capacity_, kN, kN, feature_descriptor().num_planes},
-        inputs_[0].flat<float>().data());
+    Tensor<float> features(shape, inputs_[0].flat<float>().data());
     feature_descriptor().set_floats(inputs, &features);
   } else {
     WTF_SCOPE("Features::SetBool: inputs", size_t)(inputs.size());
     static_assert(sizeof(bool) == sizeof(uint8_t), "bool must be 1 byte");
     Tensor<uint8_t> features(
-        {batch_capacity_, kN, kN, feature_descriptor().num_planes},
-        reinterpret_cast<uint8_t*>(inputs_[0].flat<bool>().data()));
+        shape, reinterpret_cast<uint8_t*>(inputs_[0].flat<bool>().data()));
     feature_descriptor().set_bytes(inputs, &features);
   }
 
@@ -179,9 +177,10 @@ void TfDualNet::Reserve(int capacity) {
   inputs_.clear();
 
   // pos_tensor
+  auto shape = feature_descriptor().GetInputShape(capacity);
   inputs_.emplace_back(
-      input_type_, tensorflow::TensorShape(
-                       {capacity, kN, kN, feature_descriptor().num_planes}));
+      input_type_,
+      tensorflow::TensorShape({shape[0], shape[1], shape[2], shape[3]}));
 
   batch_capacity_ = capacity;
 }
@@ -190,8 +189,7 @@ void TfDualNet::Reserve(int capacity) {
 
 TfDualNetFactory::TfDualNetFactory(int device) : device_(device) {}
 
-std::unique_ptr<Model> TfDualNetFactory::NewModel(
-    const ModelDefinition& def) {
+std::unique_ptr<Model> TfDualNetFactory::NewModel(const ModelDefinition& def) {
   MG_CHECK(def.metadata.Get<std::string>("engine") == "tf");
 
   tensorflow::protobuf::io::CodedInputStream coded_stream(
@@ -210,12 +208,12 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(
         << "\", this model looks like it was compiled for TPU";
   }
 
-  auto feature_desc = FeatureDescriptor::Create(
-      def.metadata.Get<std::string>("input_features"));
+  auto feature_desc =
+      FeatureDescriptor::Create(def.metadata.Get<std::string>("input_features"),
+                                def.metadata.Get<std::string>("input_layout"));
 
   // TODO(tommadams): we handle device selection using the CUDA_VISIBLE_DEVICES
-  // environment variable these days, so device_ doesn't really make sense
-  // anymore.
+  // environment variable these days. Make device_ a string: "cpu" or "gpu".
   if (device_ >= 0) {
     PlaceOnDevice(&graph_def, "/gpu:0");
   }

@@ -8,5 +8,7 @@
 
 --bool_features=1
 
-# --input_features=$MODEL must match --model=random:$MODEL in bootstrap.flags.
+# --input_features=$FEATURES and --input_layout=$LAYOUT must match
+# --model=random:$FEATURES:$LAYOUT:0 in bootstrap.flags.
 --input_features=mlperf07
+--input_layout=nhwc

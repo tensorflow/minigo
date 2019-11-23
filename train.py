@@ -178,12 +178,14 @@ def train(*tf_records: "Records to train on"):
                     games,
                     games_nr,
                     params['batch_size'],
+                    params['input_layout'],
                     number_of_games=FLAGS.window_size,
                     random_rotation=True)
         else:
             def _input_fn(params):
                 return preprocessing.get_tpu_input_tensors(
                     params['batch_size'],
+                    params['input_layout'],
                     tf_records,
                     filter_amount=FLAGS.filter_amount,
                     shuffle_examples=FLAGS.shuffle_examples,
@@ -195,6 +197,7 @@ def train(*tf_records: "Records to train on"):
         def _input_fn():
             return preprocessing.get_input_tensors(
                 FLAGS.train_batch_size,
+                FLAGS.input_layout,
                 tf_records,
                 filter_amount=FLAGS.filter_amount,
                 shuffle_examples=FLAGS.shuffle_examples,

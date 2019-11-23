@@ -53,8 +53,6 @@ DEFINE_uint64(seed, 0,
               "Random seed. Use default value of 0 to use a time-based seed.");
 
 // Tree search flags.
-DEFINE_int32(num_readouts, 100,
-             "Number of readouts to make during tree search for each move.");
 DEFINE_int32(virtual_losses, 8,
              "Number of virtual losses when running tree search.");
 DEFINE_double(value_init_penalty, 2.0,
@@ -70,6 +68,9 @@ DEFINE_string(eval_model, "",
 DEFINE_string(eval_device, "",
               "Optional ID of the device to the run inference on for the eval "
               "model. For TPUs, pass the gRPC address.");
+DEFINE_int32(num_eval_readouts, 100,
+             "Number of readouts to make during tree search for the eval "
+             "model.)");
 
 DEFINE_string(target_model, "",
               "Path to a target minigo model that eval_model is evaluated "
@@ -77,6 +78,9 @@ DEFINE_string(target_model, "",
 DEFINE_string(target_device, "",
               "Optional ID of the device to the run inference on for the "
               "target model. For TPUs, pass the gRPC address.");
+DEFINE_int32(num_target_readouts, 100,
+             "Number of readouts to make during tree search for the eval "
+             "model.)");
 
 DEFINE_int32(parallel_games, 32, "Number of games to play in parallel.");
 
@@ -88,28 +92,18 @@ DEFINE_string(output_bigtable, "",
 DEFINE_string(sgf_dir, "",
               "SGF directory for selfplay and puzzles. If empty in selfplay "
               "mode, no SGF is written.");
-DEFINE_string(bigtable_tag, "", "Used in Bigtable metadata");
+DEFINE_string(bigtable_tag, "", "Used in Bigtable metadata.");
+DEFINE_bool(verbose, true, "Enable verbose logging.");
 
 namespace minigo {
 namespace {
 
-void ParseOptionsFromFlags(Game::Options* game_options,
-                           MctsPlayer::Options* player_options) {
-  game_options->resign_enabled = FLAGS_resign_enabled;
-  game_options->resign_threshold = -std::abs(FLAGS_resign_threshold);
-  player_options->virtual_losses = FLAGS_virtual_losses;
-  player_options->random_seed = FLAGS_seed;
-  player_options->num_readouts = FLAGS_num_readouts;
-  player_options->inject_noise = false;
-  player_options->tree.value_init_penalty = FLAGS_value_init_penalty;
-  player_options->tree.soft_pick_enabled = false;
-}
-
 class Evaluator {
   class EvaluatedModel {
    public:
-    EvaluatedModel(BatchingModelFactory* batcher, const std::string& path)
-        : batcher_(batcher), path_(path) {}
+    EvaluatedModel(BatchingModelFactory* batcher, const std::string& path,
+                   const MctsPlayer::Options& player_options)
+        : batcher_(batcher), path_(path), player_options_(player_options) {}
 
     std::string name() {
       absl::MutexLock lock(&mutex_);
@@ -136,6 +130,10 @@ class Evaluator {
       return NewModelImpl();
     }
 
+    const MctsPlayer::Options& player_options() const {
+      return player_options_;
+    }
+
    private:
     std::unique_ptr<Model> NewModelImpl() EXCLUSIVE_LOCKS_REQUIRED(&mutex_) {
       auto model = batcher_->NewModel(path_);
@@ -150,6 +148,7 @@ class Evaluator {
     const std::string path_;
     std::string name_ GUARDED_BY(&mutex_);
     WinStats win_stats_ GUARDED_BY(&mutex_);
+    MctsPlayer::Options player_options_;
   };
 
  public:
@@ -169,10 +168,23 @@ class Evaluator {
   void Run() {
     auto start_time = absl::Now();
 
-    EvaluatedModel eval_model(batchers_.front().get(), FLAGS_eval_model);
-    EvaluatedModel target_model(batchers_.back().get(), FLAGS_target_model);
+    game_options_.resign_enabled = FLAGS_resign_enabled;
+    game_options_.resign_threshold = -std::abs(FLAGS_resign_threshold);
 
-    ParseOptionsFromFlags(&game_options_, &player_options_);
+    MctsPlayer::Options player_options;
+    player_options.virtual_losses = FLAGS_virtual_losses;
+    player_options.inject_noise = false;
+    player_options.random_seed = FLAGS_seed;
+    player_options.tree.value_init_penalty = FLAGS_value_init_penalty;
+    player_options.tree.soft_pick_enabled = false;
+
+    player_options.num_readouts = FLAGS_num_eval_readouts;
+    EvaluatedModel eval_model(batchers_.front().get(), FLAGS_eval_model,
+                              player_options);
+
+    player_options.num_readouts = FLAGS_num_target_readouts;
+    EvaluatedModel target_model(batchers_.back().get(), FLAGS_target_model,
+                              player_options);
 
     int num_games = FLAGS_parallel_games;
     for (int thread_id = 0; thread_id < num_games; ++thread_id) {
@@ -215,11 +227,11 @@ class Evaluator {
 
     Game game(black_model->name(), white_model->name(), game_options_);
 
-    const bool verbose = thread_id == 0;
-    auto black = absl::make_unique<MctsPlayer>(black_model->NewModel(), nullptr,
-                                               &game, player_options_);
-    auto white = absl::make_unique<MctsPlayer>(white_model->NewModel(), nullptr,
-                                               &game, player_options_);
+    const bool verbose = FLAGS_verbose && (thread_id == 0);
+    auto black = absl::make_unique<MctsPlayer>(
+        black_model->NewModel(), nullptr, &game, black_model->player_options());
+    auto white = absl::make_unique<MctsPlayer>(
+        white_model->NewModel(), nullptr, &game, white_model->player_options());
 
     BatchingModelFactory::StartGame(black->model(), white->model());
     auto* curr_player = black.get();
@@ -236,7 +248,7 @@ class Evaluator {
         break;
       }
 
-      auto move = curr_player->SuggestMove(player_options_.num_readouts);
+      auto move = curr_player->SuggestMove(curr_player->options().num_readouts);
       if (verbose) {
         std::cerr << curr_player->tree().Describe() << "\n";
       }
@@ -290,7 +302,6 @@ class Evaluator {
   }
 
   Game::Options game_options_;
-  MctsPlayer::Options player_options_;
   std::vector<std::thread> threads_;
   std::atomic<size_t> game_id_{0};
   std::vector<std::unique_ptr<BatchingModelFactory>> batchers_;

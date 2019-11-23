@@ -274,8 +274,9 @@ TpuDualNetFactory::LoadedModel TpuDualNetFactory::GetModel(
   model.num_replicas =
       static_cast<int>(def.metadata.Get<uint64_t>("num_replicas"));
   model.session.reset(tensorflow::NewSession(options));
-  model.feature_desc = FeatureDescriptor::Create(
-      def.metadata.Get<std::string>("input_features"));
+  model.feature_desc =
+      FeatureDescriptor::Create(def.metadata.Get<std::string>("input_features"),
+                                def.metadata.Get<std::string>("input_layout"));
 
   TF_CHECK_OK(model.session->Create(graph_def));
   models_.emplace(def.path, model);

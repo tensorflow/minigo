@@ -8,6 +8,7 @@ licenses(["notice"])  # Apache License 2.0
 
 load(
     "//cc/config:minigo.bzl",
+    "minigo_cc_binary",
     "minigo_cc_library",
     "minigo_cc_test",
     "minigo_engine_copts",
@@ -65,8 +66,8 @@ minigo_cc_library(
         "//cc:symmetries",
         "//cc:tiny_set",
         "//cc/platform",
-        "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -132,6 +133,10 @@ minigo_cc_test(
     srcs = ["features_test.cc"],
     deps = [
         ":model",
+        "//cc:position",
+        "//cc:random",
+        "//cc:symmetries",
+        "//cc:test_utils",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -147,5 +152,19 @@ minigo_cc_test(
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest",
+    ],
+)
+
+minigo_cc_binary(
+    name = "features_benchmark",
+    srcs = ["features_benchmark.cc"],
+    deps = [
+        ":model",
+        "//cc:base",
+        "//cc:init",
+        "//cc:random",
+        "//cc:symmetries",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
     ],
 )

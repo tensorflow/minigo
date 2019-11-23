@@ -25,6 +25,7 @@
 #include "cc/constants.h"
 #include "cc/model/factory.h"
 #include "cc/model/model.h"
+#include "cc/model/factory.h"
 #include "cc/random.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/tensor.h"

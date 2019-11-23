@@ -26,6 +26,7 @@ source ml_perf/scripts/common.sh
 
 # Build the C++ binaries
 bazel build  -c opt \
+  --copt=-O3 \
   --define=board_size="${board_size}" \
   --define=tf=1 \
   cc:concurrent_selfplay cc:sample_records cc:eval

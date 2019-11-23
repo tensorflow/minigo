@@ -103,7 +103,7 @@ def read_model(path):
     """
 
     with tf.io.gfile.GFile(path, 'rb') as f:
-        magic = f.read(8).decode('utf-8')
+        magic = f.read(MAGIC_SIZE).decode('utf-8')
         if magic != MAGIC:
             raise RuntimeError(
                 'expected magic string %s, got %s' % (MAGIC, magic))
@@ -113,7 +113,7 @@ def read_model(path):
         if version != 1:
             raise RuntimeError('expected version == 1, got %d' % version)
 
-        metadata_bytes = f.read(metadata_size)
+        metadata_bytes = f.read(metadata_size).decode('utf-8')
         if len(metadata_bytes) != metadata_size:
             raise RuntimeError('expected %dB of metadata, read only %dB' % (
                 metadata_size, len(metadata_bytes)))

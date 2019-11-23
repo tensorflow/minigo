@@ -43,9 +43,10 @@ FLAGS = flags.FLAGS
 
 
 def freeze_graph(path):
-  utils.wait(utils.checked_run(
+  utils.wait(utils.checked_run([
       'python', 'freeze_graph.py',
-      '--model_path={}'.format(path), '--use_tpu={}'.format(FLAGS.use_tpu)))
+      '--model_path={}'.format(path),
+      '--use_tpu={}'.format(FLAGS.use_tpu)]))
 
 
 def main(unused_argv):
@@ -55,7 +56,7 @@ def main(unused_argv):
       src = os.path.join(FLAGS.src_dir, d, N)
       dst = os.path.join(FLAGS.dst_dir, d)
       utils.ensure_dir_exists(dst)
-      utils.wait(utils.checked_run('gsutil', '-m', 'cp', '-r', src, dst))
+      utils.wait(utils.checked_run(['gsutil', '-m', 'cp', '-r', src, dst]))
 
     # Freeze the target model.
     freeze_graph(os.path.join(FLAGS.dst_dir, 'target', N, 'target'))

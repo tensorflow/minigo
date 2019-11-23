@@ -44,7 +44,10 @@ TEST(SymmetryTest, TestRot90_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Rot90<4, 1>(original.data(), actual.data());
+  Rot90Interleaved<4, 1>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  Rot90Planar<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -65,12 +68,15 @@ TEST(SymmetryTest, TestRot180_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Rot180<4, 1>(original.data(), actual.data());
+  Rot180Interleaved<4, 1>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  Rot180Planar<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Rot90<4, 1>(original.data(), tmp.data());
-  Rot90<4, 1>(tmp.data(), actual.data());
+  Rot90Interleaved<4, 1>(original.data(), tmp.data());
+  Rot90Interleaved<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -91,13 +97,16 @@ TEST(SymmetryTest, TestRot270_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Rot270<4, 1>(original.data(), actual.data());
+  Rot270Interleaved<4, 1>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  Rot270Planar<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp1, tmp2;
-  Rot90<4, 1>(original.data(), tmp1.data());
-  Rot90<4, 1>(tmp1.data(), tmp2.data());
-  Rot90<4, 1>(tmp2.data(), actual.data());
+  Rot90Interleaved<4, 1>(original.data(), tmp1.data());
+  Rot90Interleaved<4, 1>(tmp1.data(), tmp2.data());
+  Rot90Interleaved<4, 1>(tmp2.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -118,7 +127,10 @@ TEST(SymmetryTest, TestFlip_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  Flip<4, 1>(original.data(), actual.data());
+  FlipInterleaved<4, 1>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  FlipPlanar<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -139,12 +151,15 @@ TEST(SymmetryTest, TestFlipRot90_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  FlipRot90<4, 1>(original.data(), actual.data());
+  FlipRot90Interleaved<4, 1>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  FlipRot90Planar<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Flip<4, 1>(original.data(), tmp.data());
-  Rot90<4, 1>(tmp.data(), actual.data());
+  FlipInterleaved<4, 1>(original.data(), tmp.data());
+  Rot90Interleaved<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -165,12 +180,15 @@ TEST(SymmetryTest, TestFlipRot180_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  FlipRot180<4, 1>(original.data(), actual.data());
+  FlipRot180Interleaved<4, 1>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  FlipRot180Planar<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Flip<4, 1>(original.data(), tmp.data());
-  Rot180<4, 1>(tmp.data(), actual.data());
+  FlipInterleaved<4, 1>(original.data(), tmp.data());
+  Rot180Interleaved<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -191,16 +209,19 @@ TEST(SymmetryTest, TestFlipRot270_1) {
   // clang-format on
 
   std::array<float, 16> actual;
-  FlipRot270<4, 1>(original.data(), actual.data());
+  FlipRot270Interleaved<4, 1>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  FlipRot270Planar<4, 1>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 16> tmp;
-  Flip<4, 1>(original.data(), tmp.data());
-  Rot270<4, 1>(tmp.data(), actual.data());
+  FlipInterleaved<4, 1>(original.data(), tmp.data());
+  Rot270Interleaved<4, 1>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetryTest, TestRot90_3) {
+TEST(SymmetryTest, TestRot90Interleaved_3) {
   // clang-format off
   const std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -217,11 +238,11 @@ TEST(SymmetryTest, TestRot90_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Rot90<4, 3>(original.data(), actual.data());
+  Rot90Interleaved<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetryTest, TestRot180_3) {
+TEST(SymmetryTest, TestRot180Interleaved_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -238,16 +259,16 @@ TEST(SymmetryTest, TestRot180_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Rot180<4, 3>(original.data(), actual.data());
+  Rot180Interleaved<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Rot90<4, 3>(original.data(), tmp.data());
-  Rot90<4, 3>(tmp.data(), actual.data());
+  Rot90Interleaved<4, 3>(original.data(), tmp.data());
+  Rot90Interleaved<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetryTest, TestRot270_3) {
+TEST(SymmetryTest, TestRot270Interleaved_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -264,17 +285,17 @@ TEST(SymmetryTest, TestRot270_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Rot270<4, 3>(original.data(), actual.data());
+  Rot270Interleaved<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp1, tmp2;
-  Rot90<4, 3>(original.data(), tmp1.data());
-  Rot90<4, 3>(tmp1.data(), tmp2.data());
-  Rot90<4, 3>(tmp2.data(), actual.data());
+  Rot90Interleaved<4, 3>(original.data(), tmp1.data());
+  Rot90Interleaved<4, 3>(tmp1.data(), tmp2.data());
+  Rot90Interleaved<4, 3>(tmp2.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetryTest, TestFlip_3) {
+TEST(SymmetryTest, TestFlipInterleaved_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -291,11 +312,11 @@ TEST(SymmetryTest, TestFlip_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  Flip<4, 3>(original.data(), actual.data());
+  FlipInterleaved<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetryTest, TestFlipRot90_3) {
+TEST(SymmetryTest, TestFlipRot90Interleaved_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -312,16 +333,16 @@ TEST(SymmetryTest, TestFlipRot90_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  FlipRot90<4, 3>(original.data(), actual.data());
+  FlipRot90Interleaved<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Flip<4, 3>(original.data(), tmp.data());
-  Rot90<4, 3>(tmp.data(), actual.data());
+  FlipInterleaved<4, 3>(original.data(), tmp.data());
+  Rot90Interleaved<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetryTest, TestFlipRot180_3) {
+TEST(SymmetryTest, TestFlipRot180Interleaved_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -338,16 +359,16 @@ TEST(SymmetryTest, TestFlipRot180_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  FlipRot180<4, 3>(original.data(), actual.data());
+  FlipRot180Interleaved<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Flip<4, 3>(original.data(), tmp.data());
-  Rot180<4, 3>(tmp.data(), actual.data());
+  FlipInterleaved<4, 3>(original.data(), tmp.data());
+  Rot180Interleaved<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
-TEST(SymmetryTest, TestFlipRot270_3) {
+TEST(SymmetryTest, TestFlipRot270Interleaved_3) {
   // clang-format off
   std::array<float, 48> original = {{
      11,  12,  13,   21,  22,  23,   31,  32,  33,   41,  42,  43,
@@ -364,12 +385,325 @@ TEST(SymmetryTest, TestFlipRot270_3) {
   // clang-format on
 
   std::array<float, 48> actual;
-  FlipRot270<4, 3>(original.data(), actual.data());
+  FlipRot270Interleaved<4, 3>(original.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 
   std::array<float, 48> tmp;
-  Flip<4, 3>(original.data(), tmp.data());
-  Rot270<4, 3>(tmp.data(), actual.data());
+  FlipInterleaved<4, 3>(original.data(), tmp.data());
+  Rot270Interleaved<4, 3>(tmp.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+}
+
+TEST(SymmetryTest, TestRot90Planar_3) {
+  // clang-format off
+  const std::array<float, 48> original = {{
+     11,  21,  31,  41,
+     51,  61,  71,  81,
+     91, 101, 111, 121,
+    131, 141, 151, 161,
+
+     12,  22,  32,  42,
+     52,  62,  72,  82,
+     92, 102, 112, 122,
+    132, 142, 152, 162,
+
+     13,  23,  33,  43,
+     53,  63,  73,  83,
+     93, 103, 113, 123,
+    133, 143, 153, 163,
+  }};
+  std::array<float, 48> expected = {{
+     41,  81, 121, 161,
+     31,  71, 111, 151,
+     21,  61, 101, 141,
+     11,  51,  91, 131,
+
+     42,  82, 122, 162,
+     32,  72, 112, 152,
+     22,  62, 102, 142,
+     12,  52,  92, 132,
+
+     43,  83, 123, 163,
+     33,  73, 113, 153,
+     23,  63, 103, 143,
+     13,  53,  93, 133,
+  }};
+  // clang-format on
+
+  std::array<float, 48> actual;
+  Rot90Planar<4, 3>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+}
+
+TEST(SymmetryTest, TestRot180Planar_3) {
+  // clang-format off
+  std::array<float, 48> original = {{
+     11,  21,  31,  41,
+     51,  61,  71,  81,
+     91, 101, 111, 121,
+    131, 141, 151, 161,
+
+     12,  22,  32,  42,
+     52,  62,  72,  82,
+     92, 102, 112, 122,
+    132, 142, 152, 162,
+
+     13,  23,  33,  43,
+     53,  63,  73,  83,
+     93, 103, 113, 123,
+    133, 143, 153, 163,
+  }};
+  std::array<float, 48> expected = {{
+    161, 151, 141, 131,
+    121, 111, 101,  91,
+     81,  71,  61,  51,
+     41,  31,  21,  11,
+
+    162, 152, 142, 132,
+    122, 112, 102,  92,
+     82,  72,  62,  52,
+     42,  32,  22,  12,
+
+    163, 153, 143, 133,
+    123, 113, 103,  93,
+     83,  73,  63,  53,
+     43,  33,  23,  13,
+  }};
+  // clang-format on
+
+  std::array<float, 48> actual;
+  Rot180Planar<4, 3>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  std::array<float, 48> tmp;
+  Rot90Planar<4, 3>(original.data(), tmp.data());
+  Rot90Planar<4, 3>(tmp.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+}
+
+TEST(SymmetryTest, TestRot270Planar_3) {
+  // clang-format off
+  std::array<float, 48> original = {{
+     11,  21,  31,  41,
+     51,  61,  71,  81,
+     91, 101, 111, 121,
+    131, 141, 151, 161,
+
+     12,  22,  32,  42,
+     52,  62,  72,  82,
+     92, 102, 112, 122,
+    132, 142, 152, 162,
+
+     13,  23,  33,  43,
+     53,  63,  73,  83,
+     93, 103, 113, 123,
+    133, 143, 153, 163,
+  }};
+  std::array<float, 48> expected = {{
+    131,  91,  51,  11,
+    141, 101,  61,  21,
+    151, 111,  71,  31,
+    161, 121,  81,  41,
+
+    132,  92,  52,  12,
+    142, 102,  62,  22,
+    152, 112,  72,  32,
+    162, 122,  82,  42,
+
+    133,  93,  53,  13,
+    143, 103,  63,  23,
+    153, 113,  73,  33,
+    163, 123,  83,  43,
+  }};
+  // clang-format on
+
+  std::array<float, 48> actual;
+  Rot270Planar<4, 3>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  std::array<float, 48> tmp1, tmp2;
+  Rot90Planar<4, 3>(original.data(), tmp1.data());
+  Rot90Planar<4, 3>(tmp1.data(), tmp2.data());
+  Rot90Planar<4, 3>(tmp2.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+}
+
+TEST(SymmetryTest, TestFlipPlanar_3) {
+  // clang-format off
+  std::array<float, 48> original = {{
+     11,  21,  31,  41,
+     51,  61,  71,  81,
+     91, 101, 111, 121,
+    131, 141, 151, 161,
+
+     12,  22,  32,  42,
+     52,  62,  72,  82,
+     92, 102, 112, 122,
+    132, 142, 152, 162,
+
+     13,  23,  33,  43,
+     53,  63,  73,  83,
+     93, 103, 113, 123,
+    133, 143, 153, 163,
+  }};
+  std::array<float, 48> expected = {{
+     11,  51,  91, 131,
+     21,  61, 101, 141,
+     31,  71, 111, 151,
+     41,  81, 121, 161,
+
+     12,  52,  92, 132,
+     22,  62, 102, 142,
+     32,  72, 112, 152,
+     42,  82, 122, 162,
+
+     13,  53,  93, 133,
+     23,  63, 103, 143,
+     33,  73, 113, 153,
+     43,  83, 123, 163,
+  }};
+  // clang-format on
+
+  std::array<float, 48> actual;
+  FlipPlanar<4, 3>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+}
+
+TEST(SymmetryTest, TestFlipRot90Planar_3) {
+  // clang-format off
+  std::array<float, 48> original = {{
+     11,  21,  31,  41,
+     51,  61,  71,  81,
+     91, 101, 111, 121,
+    131, 141, 151, 161,
+
+     12,  22,  32,  42,
+     52,  62,  72,  82,
+     92, 102, 112, 122,
+    132, 142, 152, 162,
+
+     13,  23,  33,  43,
+     53,  63,  73,  83,
+     93, 103, 113, 123,
+    133, 143, 153, 163,
+  }};
+  std::array<float, 48> expected = {{
+    131, 141, 151, 161,
+     91, 101, 111, 121,
+     51,  61,  71,  81,
+     11,  21,  31,  41,
+
+    132, 142, 152, 162,
+     92, 102, 112, 122,
+     52,  62,  72,  82,
+     12,  22,  32,  42,
+
+    133, 143, 153, 163,
+     93, 103, 113, 123,
+     53,  63,  73,  83,
+     13,  23,  33,  43,
+  }};
+  // clang-format on
+
+  std::array<float, 48> actual;
+  FlipRot90Planar<4, 3>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  std::array<float, 48> tmp;
+  FlipPlanar<4, 3>(original.data(), tmp.data());
+  Rot90Planar<4, 3>(tmp.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+}
+
+TEST(SymmetryTest, TestFlipRot180Planar_3) {
+  // clang-format off
+  std::array<float, 48> original = {{
+     11,  21,  31,  41,
+     51,  61,  71,  81,
+     91, 101, 111, 121,
+    131, 141, 151, 161,
+
+     12,  22,  32,  42,
+     52,  62,  72,  82,
+     92, 102, 112, 122,
+    132, 142, 152, 162,
+
+     13,  23,  33,  43,
+     53,  63,  73,  83,
+     93, 103, 113, 123,
+    133, 143, 153, 163,
+  }};
+  std::array<float, 48> expected = {{
+    161, 121,  81,  41,
+    151, 111,  71,  31,
+    141, 101,  61,  21,
+    131,  91,  51,  11,
+
+    162, 122,  82,  42,
+    152, 112,  72,  32,
+    142, 102,  62,  22,
+    132,  92,  52,  12,
+
+    163, 123,  83,  43,
+    153, 113,  73,  33,
+    143, 103,  63,  23,
+    133,  93,  53,  13,
+  }};
+  // clang-format on
+
+  std::array<float, 48> actual;
+  FlipRot180Planar<4, 3>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  std::array<float, 48> tmp;
+  FlipPlanar<4, 3>(original.data(), tmp.data());
+  Rot180Planar<4, 3>(tmp.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+}
+
+TEST(SymmetryTest, TestFlipRot270Planar_3) {
+  // clang-format off
+  std::array<float, 48> original = {{
+     11,  21,  31,  41,
+     51,  61,  71,  81,
+     91, 101, 111, 121,
+    131, 141, 151, 161,
+
+     12,  22,  32,  42,
+     52,  62,  72,  82,
+     92, 102, 112, 122,
+    132, 142, 152, 162,
+
+     13,  23,  33,  43,
+     53,  63,  73,  83,
+     93, 103, 113, 123,
+    133, 143, 153, 163,
+  }};
+  std::array<float, 48> expected = {{
+     41,  31,  21,   11,
+     81,  71,  61,   51,
+    121, 111, 101,   91,
+    161, 151, 141,  131,
+
+     42,  32,  22,   12,
+     82,  72,  62,   52,
+    122, 112, 102,   92,
+    162, 152, 142,  132,
+
+     43,  33,  23,   13,
+     83,  73,  63,   53,
+    123, 113, 103,   93,
+    163, 153, 143,  133,
+  }};
+  // clang-format on
+
+  std::array<float, 48> actual;
+  FlipRot270Planar<4, 3>(original.data(), actual.data());
+  EXPECT_THAT(actual, ElementsAreArray(expected));
+
+  std::array<float, 48> tmp;
+  FlipPlanar<4, 3>(original.data(), tmp.data());
+  Rot270Planar<4, 3>(tmp.data(), actual.data());
   EXPECT_THAT(actual, ElementsAreArray(expected));
 }
 
@@ -388,7 +722,12 @@ TEST(SymmetryTest, Inverses) {
     ApplySymmetry<4, 3>(sym, original.data(), transformed.data());
     ApplySymmetry<4, 3>(Inverse(sym), transformed.data(), inverse.data());
 
-    EXPECT_THAT(inverse, ElementsAreArray(original));
+    EXPECT_THAT(inverse, ElementsAreArray(original)) << sym;
+
+    ApplySymmetryPlanar<4, 3>(sym, original.data(), transformed.data());
+    ApplySymmetryPlanar<4, 3>(Inverse(sym), transformed.data(), inverse.data());
+
+    EXPECT_THAT(inverse, ElementsAreArray(original)) << sym;
   }
 }
 

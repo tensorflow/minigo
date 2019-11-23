@@ -226,9 +226,10 @@ Bazel `--define` arguments at compile time.
  - **random**: a model that returns random samples from a normal distribution,
    which can be useful for bootstrapping the reinforcement learning pipeline.
    Use by passing
-   `--model=random:$FEATURES:$SEED`, where `$SEED` is a random seed (set to
-   `0` to choose one based on the operating system's entropy source) and
-   `$FEATURES` is the type of model features (e.g.  `agz`, `mlperf07`).
+   `--model=random:$FEATURES:$LAYOUT:$SEED`, where `$FEATURES` is the type of
+   model features (e.g.  `agz`, `mlperf07`), `$LAYOUT` is the feature tensor
+   layout (either `nhwc` or `nchw`) and `$SEED` is a random seed (use `0` to
+   choose one based on the operating system's entropy source).
 
 ## Compiling a TensorFlow Lite model
 

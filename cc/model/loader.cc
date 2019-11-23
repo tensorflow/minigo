@@ -136,14 +136,15 @@ ModelDefinition CreateRandomModelDefinition(absl::string_view descriptor) {
   ModelDefinition def;
 
   std::vector<absl::string_view> parts = absl::StrSplit(descriptor, ':');
-  MG_CHECK(parts.size() == 2);
+  MG_CHECK(parts.size() == 3);
 
   uint64_t seed;
-  MG_CHECK(absl::SimpleAtoi(parts[1], &seed));
+  MG_CHECK(absl::SimpleAtoi(parts[2], &seed));
 
   def.path = std::string(descriptor);
   def.metadata.Set("engine", "random");
   def.metadata.Set("input_features", parts[0]);
+  def.metadata.Set("input_layout", parts[1]);
   def.metadata.Set("seed", seed);
   def.metadata.Set("policy_stddev", 0.4f);
   def.metadata.Set("value_stddev", 0.4f);

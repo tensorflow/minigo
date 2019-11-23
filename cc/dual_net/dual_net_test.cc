@@ -20,9 +20,9 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
-#include "cc/model/model.h"
-#include "cc/model/loader.h"
 #include "cc/model/features.h"
+#include "cc/model/loader.h"
+#include "cc/model/model.h"
 #include "cc/position.h"
 #include "cc/random.h"
 #include "cc/symmetries.h"
@@ -69,7 +69,7 @@ TYPED_TEST(DualNetTest, TestEmptyBoardBlackToPlay) {
   BoardFeatureBuffer<float> buffer;
   Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
                             buffer.data()};
-  FeatureType::Set({&input}, &features);
+  FeatureType::SetNhwc({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
     auto f = GetStoneFeatures(features, c);
@@ -95,7 +95,7 @@ TYPED_TEST(DualNetTest, TestEmptyBoardWhiteToPlay) {
   BoardFeatureBuffer<float> buffer;
   Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
                             buffer.data()};
-  FeatureType::Set({&input}, &features);
+  FeatureType::SetNhwc({&input}, &features);
 
   for (int c = 0; c < kN * kN; ++c) {
     auto f = GetStoneFeatures(features, c);
@@ -128,7 +128,7 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
   BoardFeatureBuffer<float> buffer;
   Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
                             buffer.data()};
-  FeatureType::Set({&input}, &features);
+  FeatureType::SetNhwc({&input}, &features);
 
   //                        B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7 C
   std::vector<float> b9 = {{1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1}};
@@ -188,7 +188,7 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   BoardFeatureBuffer<float> buffer;
   Tensor<float> features = {{1, kN, kN, FeatureType::kNumPlanes},
                             buffer.data()};
-  FeatureType::Set({&input}, &features);
+  FeatureType::SetNhwc({&input}, &features);
 
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> j2 = {{0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
@@ -282,7 +282,7 @@ TEST(WouldCaptureTest, WouldCaptureBlack) {
   BoardFeatureBuffer<float> buffer;
   Tensor<float> features = {{1, kN, kN, ExtraFeatures::kNumPlanes},
                             buffer.data()};
-  ExtraFeatures::Set({&input}, &features);
+  ExtraFeatures::SetNhwc({&input}, &features);
 
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
@@ -310,7 +310,7 @@ TEST(WouldCaptureTest, WouldCaptureWhite) {
   BoardFeatureBuffer<float> buffer;
   Tensor<float> features = {{1, kN, kN, ExtraFeatures::kNumPlanes},
                             buffer.data()};
-  ExtraFeatures::Set({&input}, &features);
+  ExtraFeatures::SetNhwc({&input}, &features);
 
   //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
   std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};

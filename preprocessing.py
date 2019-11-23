@@ -72,9 +72,11 @@ def write_tf_examples(filename, tf_examples, serialize=True):
                 writer.write(ex)
 
 
-def batch_parse_tf_example(batch_size, example_batch):
+def batch_parse_tf_example(batch_size, layout, example_batch):
     """
     Args:
+        batch_size: batch size
+        layout: 'nchw' or 'nhwc'
         example_batch: a batch of tf.Example
     Returns:
         A tuple (feature_tensor, dict of output tensors)
@@ -89,7 +91,13 @@ def batch_parse_tf_example(batch_size, example_batch):
     parsed = tf.parse_example(example_batch, features)
     x = tf.decode_raw(parsed['x'], tf.uint8)
     x = tf.cast(x, tf.float32)
-    x = tf.reshape(x, [batch_size, go.N, go.N, planes])
+
+    if layout == 'nhwc':
+        shape = [batch_size, go.N, go.N, planes]
+    else:
+        shape = [batch_size, planes, go.N, go.N]
+    x = tf.reshape(x, shape)
+
     pi = tf.decode_raw(parsed['pi'], tf.float32)
     pi = tf.reshape(pi, [batch_size, go.N * go.N + 1])
     outcome = parsed['outcome']
@@ -149,17 +157,20 @@ def read_tf_records(batch_size, tf_records, num_repeats=1,
     return dataset
 
 
-def _random_rotation(x_tensor, outcome_tensor):
+def _random_rotation(feature_layout, x_tensor, outcome_tensor):
     pi_tensor = outcome_tensor['pi_tensor']
-    x_rot_tensor, pi_rot_tensor = symmetries.rotate_train(
-        x_tensor,
-        pi_tensor)
+    if feature_layout == 'nhwc':
+        x_rot_tensor, pi_rot_tensor=symmetries.rotate_train_nhwc(
+            x_tensor, pi_tensor)
+    else:
+        x_rot_tensor, pi_rot_tensor=symmetries.rotate_train_nchw(
+            x_tensor, pi_tensor)
 
     outcome_tensor['pi_tensor'] = pi_rot_tensor
     return x_rot_tensor, outcome_tensor
 
 
-def get_input_tensors(batch_size, tf_records, num_repeats=1,
+def get_input_tensors(batch_size, feature_layout, tf_records, num_repeats=1,
                       shuffle_records=True, shuffle_examples=True,
                       shuffle_buffer_size=None,
                       filter_amount=0.05, random_rotation=True):
@@ -181,18 +192,18 @@ def get_input_tensors(batch_size, tf_records, num_repeats=1,
         interleave=False)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
     dataset = dataset.map(
-        functools.partial(batch_parse_tf_example, batch_size))
-
+        functools.partial(batch_parse_tf_example, batch_size, feature_layout))
     if random_rotation:
         # Unbatch the dataset so we can rotate it
         dataset = dataset.apply(tf.data.experimental.unbatch())
         dataset = dataset.apply(tf.data.experimental.map_and_batch(
-            _random_rotation, batch_size))
+            functools.partial(_random_rotation, feature_layout),
+            batch_size))
 
     return dataset.make_one_shot_iterator().get_next()
 
 
-def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
+def get_tpu_input_tensors(batch_size, feature_layout, tf_records, num_repeats=1,
                           shuffle_records=True, shuffle_examples=True,
                           shuffle_buffer_size=None,
                           filter_amount=0.05, random_rotation=True):
@@ -211,20 +222,22 @@ def get_tpu_input_tensors(batch_size, tf_records, num_repeats=1,
         interleave=False)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
     dataset = dataset.map(
-        functools.partial(batch_parse_tf_example, batch_size))
+        functools.partial(batch_parse_tf_example, batch_size, feature_layout))
 
     # TODO(sethtroisi@): Unify
     if random_rotation:
         # Unbatch the dataset so we can rotate it
         dataset = dataset.apply(tf.data.experimental.unbatch())
         dataset = dataset.apply(tf.data.experimental.map_and_batch(
-            _random_rotation, batch_size, drop_remainder=True))
+            functools.partial(_random_rotation, feature_layout),
+            batch_size, drop_remainder=True))
 
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
 
-def get_tpu_bt_input_tensors(games, games_nr, batch_size, num_repeats=1,
+def get_tpu_bt_input_tensors(games, games_nr, batch_size, feature_layout,
+                             num_repeats=1,
                              number_of_games=500e3,
                              fresh_fraction=0.05,
                              random_rotation=True):
@@ -234,12 +247,13 @@ def get_tpu_bt_input_tensors(games, games_nr, batch_size, num_repeats=1,
     dataset = dataset.batch(batch_size)
     dataset = dataset.filter(lambda t: tf.equal(tf.shape(t)[0], batch_size))
     dataset = dataset.map(
-        functools.partial(batch_parse_tf_example, batch_size))
+        functools.partial(batch_parse_tf_example, batch_size, feature_layout))
     if random_rotation:
         # Unbatch the dataset so we can rotate it
         dataset = dataset.apply(tf.data.experimental.unbatch())
         dataset = dataset.apply(tf.data.experimental.map_and_batch(
-            _random_rotation, batch_size, drop_remainder=True))
+            functools.partial(_random_rotation, feature_layout),
+            batch_size, drop_remainder=True))
 
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset

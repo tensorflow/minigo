@@ -18,14 +18,26 @@
 
 namespace minigo {
 
-FeatureDescriptor FeatureDescriptor::Create(absl::string_view input_features) {
-  if (input_features == "agz") {
-    return FeatureDescriptor::Create<AgzFeatures>();
-  } else if (input_features == "mlperf07") {
-    return FeatureDescriptor::Create<ExtraFeatures>();
+FeatureDescriptor FeatureDescriptor::Create(absl::string_view input_features,
+                                            absl::string_view input_layout) {
+  FeatureDescriptor::Layout layout;
+  if (input_layout == "nhwc") {
+    layout = FeatureDescriptor::Layout::kNhwc;
+  } else if (input_layout == "nchw") {
+    layout = FeatureDescriptor::Layout::kNchw;
+  } else {
+    MG_LOG(FATAL) << "Unrecognized input layout \"" << input_layout << "\"";
+    return {};
   }
-  MG_LOG(FATAL) << "Unrecognized input features \"" << input_features << "\"";
-  return {};
+
+  if (input_features == "agz") {
+    return FeatureDescriptor::Create<AgzFeatures>(layout);
+  } else if (input_features == "mlperf07") {
+    return FeatureDescriptor::Create<ExtraFeatures>(layout);
+  } else {
+    MG_LOG(FATAL) << "Unrecognized input features \"" << input_features << "\"";
+    return {};
+  }
 }
 
 }  // namespace minigo

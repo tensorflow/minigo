@@ -111,9 +111,9 @@ std::vector<tensorflow::Example> MakeExamples(
   std::vector<tensorflow::Example> examples;
   examples.reserve(game.num_moves());
 
+  auto shape = feature_desc.GetInputShape(1);
   BoardFeatureBuffer<uint8_t> features_buffer;
-  Tensor<uint8_t> features({1, kN, kN, feature_desc.num_planes},
-                           features_buffer.data());
+  Tensor<uint8_t> features(shape, features_buffer.data());
 
   for (size_t i = 0; i < game.moves().size(); ++i) {
     const auto* move = game.moves()[i].get();
@@ -123,13 +123,11 @@ std::vector<tensorflow::Example> MakeExamples(
 
     ModelInput input;
     input.sym = symmetry::kIdentity;
-    game.GetPositionHistory(i, kMaxPositionHistory,
-                            &input.position_history);
+    game.GetPositionHistory(i, kMaxPositionHistory, &input.position_history);
 
     feature_desc.set_bytes({&input}, &features);
-    examples.push_back(MakeTfExample(
-          features, move->search_pi.value(), move->Q, move->N, move->c,
-          game.result()));
+    examples.push_back(MakeTfExample(features, move->search_pi.value(), move->Q,
+                                     move->N, move->c, game.result()));
   }
   return examples;
 }

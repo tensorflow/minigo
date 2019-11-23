@@ -37,10 +37,17 @@ struct FeaturesImpl<First, Rest...> {
       First::kNumPlanes + FeaturesImpl<Rest...>::kNumPlanes;
 
   template <typename T>
-  static void SetAll(const ModelInput& input, int stride, T* dst) {
-    First::Set(input, stride, dst);
+  static void SetAllNhwc(const ModelInput& input, int stride, T* dst) {
+    First::SetNhwc(input, stride, dst);
     dst += First::kNumPlanes;
-    FeaturesImpl<Rest...>::SetAll(input, stride, dst);
+    FeaturesImpl<Rest...>::SetAllNhwc(input, stride, dst);
+  }
+
+  template <typename T>
+  static void SetAllNchw(const ModelInput& input, T* dst) {
+    First::SetNchw(input, dst);
+    dst += kN * kN * First::kNumPlanes;
+    FeaturesImpl<Rest...>::SetAllNchw(input, dst);
   }
 
   template <typename FeatureType>
@@ -58,7 +65,10 @@ struct FeaturesImpl<> {
   static constexpr int kNumPlanes = 0;
 
   template <typename T>
-  static void SetAll(const ModelInput& input, int stride, T* dst) {}
+  static void SetAllNhwc(const ModelInput& input, int stride, T* dst) {}
+
+  template <typename T>
+  static void SetAllNchw(const ModelInput& input, T* dst) {}
 
   template <typename T>
   static constexpr int GetPlaneIdx(int) {

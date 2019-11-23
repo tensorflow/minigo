@@ -99,7 +99,7 @@ LiteDualNet::LiteDualNet(const ModelDefinition& def,
   MG_CHECK(input_name == "pos_tensor");
   input_idx_ = inputs[0];
 
-  // Check that the model matches the board size and feature count.	
+  // Check that the model matches the board size and feature count.
   auto* input = interpreter_->tensor(input_idx_);
   MG_CHECK(input->dims->size == 4);
   MG_CHECK(input->dims->data[1] == kN);
@@ -129,9 +129,10 @@ void LiteDualNet::Reserve(int capacity) {
   }
 
   // Resize input tensor to batch size.
+  auto shape = feature_descriptor().GetInputShape(capacity);
   MG_CHECK(interpreter_->ResizeInputTensor(
-               input_idx_, {capacity, kN, kN,
-                            feature_descriptor().num_planes}) == kTfLiteOk);
+               input_idx_, {shape[0], shape[1], shape[2], shape[3]}) ==
+           kTfLiteOk);
   MG_CHECK(interpreter_->AllocateTensors() == kTfLiteOk);
 
   // Get the new inputs and outputs after AllocateTensor().
@@ -198,8 +199,9 @@ void LiteDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
 
 std::unique_ptr<Model> LiteDualNetFactory::NewModel(
     const ModelDefinition& def) {
-  auto feature_desc = FeatureDescriptor::Create(
-      def.metadata.Get<std::string>("input_features"));
+  auto feature_desc =
+      FeatureDescriptor::Create(def.metadata.Get<std::string>("input_features"),
+                                def.metadata.Get<std::string>("input_layout"));
   return absl::make_unique<LiteDualNet>(def, feature_desc);
 }
 

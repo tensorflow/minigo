@@ -23,7 +23,8 @@
 --target_pruning=0
 --restrict_pass_alive_play_threshold=4
 
-# --model=random:$MODEL:0 must match --input_features=$MODEL in architecture.flags.
---model=random:mlperf07:0
+# --model=random:$FEATURES:$LAYOUT:0 must match --input_features=$FEATURES and
+# --input_layout=$LAYOUT in architecture.flags.
+--model=random:mlperf07:nhwc:0
 
 --num_games=8192

@@ -5,3 +5,5 @@
 # --num_readouts=240
 --fastplay_frequency=0
 --resign_enabled=false
+
+--parallel_games=100

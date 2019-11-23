@@ -32,6 +32,7 @@
 
 namespace minigo {
 
+// Array of neighbor points for each point on the board.
 extern const std::array<inline_vector<Coord, 4>, kN * kN> kNeighborCoords;
 
 // A fixed-capacity stack of Coords used when traversing connected points on

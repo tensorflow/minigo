@@ -36,7 +36,7 @@ sys.path.insert(0, '.')  # nopep8
 
 # Hide the GPUs from TF. This makes startup 2x quicker on some machines.
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""  # nopep8
+os.environ['CUDA_VISIBLE_DEVICES'] = ''  # nopep8
 
 from absl import app, flags
 import numpy as np
@@ -47,14 +47,16 @@ import features as features_lib
 import go
 
 
-flags.DEFINE_string("path", "", "Path to a TF example file.")
-flags.DEFINE_integer("to_play_feature", 16,
-                     "Index of the 'to play' feature.")
+flags.DEFINE_string('path', '', 'Path to a TF example file.')
+flags.DEFINE_integer('to_play_feature', 16,
+                     'Index of the "to play" feature.')
+flags.DEFINE_string('feature_layout', 'nhwc',
+                    'Feature layout: "nhwc" or "nchw".')
 
 FLAGS = flags.FLAGS
 
-TF_RECORD_CONFIG = tf.python_io.TFRecordOptions(
-    tf.python_io.TFRecordCompressionType.ZLIB)
+TF_RECORD_CONFIG = tf.io.TFRecordOptions(
+    tf.compat.v1.io.TFRecordCompressionType.ZLIB)
 
 
 class ParsedExample(object):
@@ -73,19 +75,25 @@ def ReadExamples(path):
 
     # n, q, c have default_values because they're optional.
     features = {
-        'x': tf.FixedLenFeature([], tf.string),
-        'pi': tf.FixedLenFeature([], tf.string),
-        'outcome': tf.FixedLenFeature([], tf.float32),
-        'n': tf.FixedLenFeature([], tf.int64, default_value=[-1]),
-        'q': tf.FixedLenFeature([], tf.float32, default_value=[-1]),
-        'c': tf.FixedLenFeature([], tf.int64, default_value=[-1]),
+        'x': tf.io.FixedLenFeature([], tf.string),
+        'pi': tf.io.FixedLenFeature([], tf.string),
+        'outcome': tf.io.FixedLenFeature([], tf.float32),
+        'n': tf.io.FixedLenFeature([], tf.int64, default_value=[-1]),
+        'q': tf.io.FixedLenFeature([], tf.float32, default_value=[-1]),
+        'c': tf.io.FixedLenFeature([], tf.int64, default_value=[-1]),
     }
 
-    parsed = tf.parse_example(records, features)
+    parsed = tf.io.parse_example(records, features)
 
     x = tf.decode_raw(parsed['x'], tf.uint8)
     x = tf.cast(x, tf.float32)
-    x = tf.reshape(x, [num_records, go.N, go.N, -1])
+    if FLAGS.feature_layout == 'nhwc':
+        x = tf.reshape(x, [num_records, go.N, go.N, -1])
+    elif FLAGS.feature_layout == 'nchw':
+        x = tf.reshape(x, [num_records, -1, go.N, go.N])
+        x = tf.transpose(x, [0, 2, 3, 1])
+    else:
+        raise ValueError('invalid feature_layout "%s"' % FLAGS.feature_layout)
     x = x.eval()
 
     pi = tf.decode_raw(parsed['pi'], tf.float32)
@@ -100,7 +108,7 @@ def ReadExamples(path):
     return [ParsedExample(*args) for args in zip(x, pi, outcome, q, n, c)]
 
 
-def parse_board(example):
+def ParseBoard(example):
     """Parses a go board from a TF example.
 
     Args:
@@ -129,7 +137,7 @@ def parse_board(example):
     return go.Position(board=board, to_play=to_play)
 
 
-def format_pi(pi, stone, mean, mx, picked):
+def FormatPi(pi, stone, mean, mx, picked):
     # Start of the ANSI color code for this point: gray if this point was picked
     # as the next move, black otherwise.
     col = '\x1b[48;5;8;' if picked else '\x1b[0;'
@@ -162,9 +170,9 @@ def format_pi(pi, stone, mean, mx, picked):
     return s
 
 
-def print_example(examples, i):
+def PrintExample(examples, i):
     example = examples[i]
-    p = parse_board(example)
+    p = ParseBoard(example)
     print('\nExample %d of %d, %s to play, winner is %s' % (
         i + 1, len(examples), 'Black' if p.to_play == 1 else 'White',
         'Black' if example.value > 0 else 'White'))
@@ -187,11 +195,11 @@ def print_example(examples, i):
                 picked = example.c == row * go.N + col
             else:
                 picked = False
-            pi.append(format_pi(example.pi[idx], stone, mean, mx, picked))
+            pi.append(FormatPi(example.pi[idx], stone, mean, mx, picked))
         pi_lines.append(' '.join(pi))
 
-    pi_lines.append(format_pi(example.pi[-1], go.EMPTY, mean, mx,
-                              example.c == go.N * go.N))
+    pi_lines.append(FormatPi(example.pi[-1], go.EMPTY, mean, mx,
+                             example.c == go.N * go.N))
 
     for b, p in zip(board_lines, pi_lines):
         print('%s  |  %s' % (b, p))
@@ -204,7 +212,7 @@ def main(unused_argv):
     i = 0
     while i < len(examples):
         example = examples[i]
-        print_example(examples, i)
+        PrintExample(examples, i)
         sys.stdout.write('>> ')
         sys.stdout.flush()
 

@@ -250,7 +250,7 @@ async def run(*cmd, **kwargs):
         RuntimeError: if the command returns a non-zero result.
     """
 
-    stdout = await checked_run(*cmd, **kwargs)
+    stdout = await checked_run(cmd, **kwargs)
 
     log_path = os.path.join(FLAGS.base_dir, get_cmd_name(cmd) + '.log')
     with gfile.Open(log_path, 'a') as f:

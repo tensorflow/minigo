@@ -32,7 +32,8 @@ RandomDualNet::RandomDualNet(std::string name,
                              float value_stddev)
     : Model(std::move(name), feature_desc),
       rnd_(seed, Random::kUniqueStream),
-      policy_stddev_(policy_stddev), value_stddev_(value_stddev) {}
+      policy_stddev_(policy_stddev),
+      value_stddev_(value_stddev) {}
 
 void RandomDualNet::RunMany(const std::vector<const ModelInput*>& inputs,
                             std::vector<ModelOutput*>* outputs,
@@ -67,7 +68,9 @@ std::unique_ptr<Model> RandomDualNetFactory::NewModel(
   float value_stddev = metadata.Get<float>("value_stddev");
   auto name = absl::StrCat("rnd:", seed, ":", policy_stddev, ":", value_stddev);
 
-  auto feature_desc = FeatureDescriptor::Create(metadata.Get<std::string>("input_features"));
+  auto feature_desc =
+      FeatureDescriptor::Create(metadata.Get<std::string>("input_features"),
+                                metadata.Get<std::string>("input_layout"));
   return absl::make_unique<RandomDualNet>(name, feature_desc, seed,
                                           policy_stddev, value_stddev);
 }

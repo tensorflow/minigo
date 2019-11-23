@@ -74,6 +74,8 @@ class ModelMetadata {
     return true;
   }
 
+  std::string DebugString() const;
+
  private:
   absl::flat_hash_map<std::string, ModelProperty> impl_;
 };

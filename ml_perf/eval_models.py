@@ -20,32 +20,119 @@ sys.path.insert(0, '.')  # nopep8
 from tensorflow import gfile
 import os
 
-from absl import app
-from reference_implementation import evaluate_model, wait
-from rl_loop import fsdb
+from ml_perf.utils import *
+
+from absl import app, flags
+
+
+flags.DEFINE_integer('start', 0, 'Index of first model to evaluate.')
+flags.DEFINE_integer('num_games', 100, 'Number of games to run.')
+flags.DEFINE_string('flags_dir', None, 'Flags directory.')
+flags.DEFINE_string('model_dir', None, 'Model directory.')
+flags.DEFINE_string('target', None, 'Path of the target model.')
+flags.DEFINE_string('sgf_dir', None, 'Directory to write SGFs to.')
+flags.DEFINE_list('devices', '', 'List of devices to run on.')
+
+FLAGS = flags.FLAGS
+
+
+class ColorWinStats:
+    """Win-rate stats for a single model & color."""
+
+    def __init__(self, total, both_passed, opponent_resigned):
+        self.total = total
+        self.both_passed = both_passed
+        self.opponent_resigned = opponent_resigned
+        # Verify that the total is correct
+        assert total == both_passed + opponent_resigned
+
+
+class WinStats:
+    """Win-rate stats for a single model."""
+
+    def __init__(self, line):
+        pattern = '\s*(\S+)' + '\s+(\d+)' * 6
+        match = re.search(pattern, line)
+        if match is None:
+            raise ValueError('Can\t parse line "{}"'.format(line))
+        self.model_name = match.group(1)
+        raw_stats = [float(x) for x in match.groups()[1:]]
+        self.black_wins = ColorWinStats(*raw_stats[:3])
+        self.white_wins = ColorWinStats(*raw_stats[3:])
+        self.total_wins = self.black_wins.total + self.white_wins.total
 
 
 def load_train_times():
   models = []
-  path = os.path.join(fsdb.models_dir(), 'train_times.txt')
+  path = os.path.join(FLAGS.model_dir, 'train_times.txt')
   with gfile.Open(path, 'r') as f:
     for line in f.readlines():
       line = line.strip()
       if line:
         timestamp, name = line.split(' ')
-        path = 'tf,' + os.path.join(fsdb.models_dir(), name + '.pb')
+        path = os.path.join(FLAGS.model_dir, name + '.minigo')
         models.append((float(timestamp), name, path))
   return models
 
 
+def parse_win_stats_table(lines):
+    result = []
+    while True:
+        # Find the start of the win stats table.
+        assert len(lines) > 1
+        if 'Black' in lines[0] and 'White' in lines[0] and 'passes' in lines[1]:
+            break
+        lines = lines[1:]
+
+    # Parse the expected number of lines from the table.
+    for line in lines[2:4]:
+        result.append(WinStats(line))
+
+    return result
+
+
+def evaluate_model(eval_model_path):
+    processes = []
+    for i, device in enumerate(FLAGS.devices):
+        a = i * FLAGS.num_games // len(FLAGS.devices)
+        b = (i + 1) * FLAGS.num_games // len(FLAGS.devices)
+        num_games = b - a;
+        env = os.environ.copy()
+        env['CUDA_VISIBLE_DEVICES'] = device
+        processes.append(checked_run([
+            'bazel-bin/cc/eval',
+            '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'eval.flags')),
+            '--eval_device=0',
+            '--target_device=0',
+            '--eval_model={}'.format(eval_model_path),
+            '--target_model={}'.format(FLAGS.target),
+            '--sgf_dir={}'.format(FLAGS.sgf_dir),
+            '--parallel_games={}'.format(num_games),
+            '--verbose=false'], env))
+    all_output = wait(processes)
+
+    total_wins = 0
+    total_num_games = 0
+    for output in all_output:
+        lines = output.split('\n')
+
+        eval_stats, target_stats = parse_win_stats_table(lines[-7:])
+        num_games = eval_stats.total_wins + target_stats.total_wins
+        total_wins += eval_stats.total_wins
+        total_num_games += num_games
+
+    win_rate = total_wins / total_num_games
+    logging.info('Win rate %s vs %s: %.3f', eval_stats.model_name,
+                 target_stats.model_name, win_rate)
+    return win_rate
+
+
 def main(unused_argv):
-  sgf_dir = os.path.join(fsdb.eval_dir(), 'target')
-  target = 'tf,' + os.path.join(fsdb.models_dir(), 'target.pb')
-  models = load_train_times()
-  for i, (timestamp, name, path) in enumerate(models):
-    winrate = wait(evaluate_model(path, name, target, sgf_dir))
-    if winrate >= 0.50:
-      break
+    models = load_train_times()
+    for i, (timestamp, name, path) in enumerate(models[FLAGS.start:]):
+        winrate = evaluate_model(path)
+        if winrate >= 0.50:
+            break
 
 
 if __name__ == '__main__':

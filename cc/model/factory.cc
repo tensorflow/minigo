@@ -14,6 +14,11 @@
 
 #include "cc/model/factory.h"
 
+#include <sstream>
+
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+
 namespace minigo {
 
 namespace {
@@ -33,6 +38,17 @@ class LogModelProperty {
 };
 
 }  // namespace
+
+std::string ModelMetadata::DebugString() const {
+  std::vector<std::string> items;
+  for (const auto& kv : impl_) {
+    std::ostringstream oss;
+    oss << kv.first << ":" << kv.second;
+    items.push_back(oss.str());
+  }
+  std::sort(items.begin(), items.end());
+  return absl::StrCat("{", absl::StrJoin(items, ", "), "}");
+}
 
 std::ostream& operator<<(std::ostream& os, const ModelProperty& p) {
   absl::visit(LogModelProperty(&os), p);

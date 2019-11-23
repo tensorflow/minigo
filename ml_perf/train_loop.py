@@ -153,15 +153,14 @@ async def sample_training_examples(state):
                             '{}.tfrecord.zz'.format(state.train_model_name))
 
     logging.info('Writing training chunks to %s', dst_path)
-    output = await checked_run(
+    output = await checked_run([
         'bazel-bin/cc/sample_records',
         '--num_read_threads={}'.format(FLAGS.num_read_threads),
         '--num_write_threads={}'.format(FLAGS.num_write_threads),
         '--sample_frac={}'.format(FLAGS.train_filter),
         '--compression=1',
         '--shuffle=true',
-        '--dst={}'.format(dst_path),
-        *src_patterns)
+        '--dst={}'.format(dst_path)] + src_patterns)
 
     m = re.search(r"sampled ([\d]+) records", output)
     assert m
@@ -202,7 +201,7 @@ async def train(state):
 
     model_path = os.path.join(FLAGS.model_dir, state.train_model_name)
 
-    await checked_run(
+    await checked_run([
         'python3', 'train.py',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
         '--work_dir={}'.format(FLAGS.work_dir),
@@ -210,8 +209,7 @@ async def train(state):
         '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
         '--tpu_name={}'.format(FLAGS.tpu_name),
         '--num_examples={}'.format(num_records),
-        '--freeze=true',
-        *record_paths)
+        '--freeze=true'] + record_paths)
 
     # Append the time elapsed from when the RL was started to when this model
     # was trained.
@@ -223,14 +221,14 @@ async def validate(state):
     dirs = [x.path for x in os.scandir(FLAGS.holdout_dir) if x.is_dir()]
     src_dirs = sorted(dirs, reverse=True)[:FLAGS.window_size]
 
-    await checked_run('python3', 'validate.py',
-              '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-                                                  'validate.flags')),
-              '--work_dir={}'.format(FLAGS.work_dir),
-              '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
-              '--tpu_name={}'.format(FLAGS.tpu_name),
-              '--expand_validation_dirs',
-              *src_dirs)
+    await checked_run([
+        'python3', 'validate.py',
+        '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
+                                            'validate.flags')),
+        '--work_dir={}'.format(FLAGS.work_dir),
+        '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
+        '--tpu_name={}'.format(FLAGS.tpu_name),
+        '--expand_validation_dirs'] + src_dirs)
 
 
 def main(unused_argv):
