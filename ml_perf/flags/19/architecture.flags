@@ -2,7 +2,7 @@
 
 --conv_width=32
 --fc_width=64
---trunk_layers=6
+--trunk_layers=9
 --value_cost_weight=0.5
 --summary_steps=128
 
@@ -11,4 +11,4 @@
 # --input_features=$FEATURES and --input_layout=$LAYOUT must match
 # --model=random:$FEATURES:$LAYOUT:0 in bootstrap.flags.
 --input_features=mlperf07
---input_layout=nhwc
+--input_layout=nchw

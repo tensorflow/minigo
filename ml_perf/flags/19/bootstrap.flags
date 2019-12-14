@@ -25,6 +25,6 @@
 
 # --model=random:$FEATURES:$LAYOUT:0 must match --input_features=$FEATURES and
 # --input_layout=$LAYOUT in architecture.flags.
---model=random:mlperf07:nhwc:0
+--model=random:mlperf07:nchw:0
 
 --num_games=8192

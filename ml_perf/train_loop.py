@@ -77,9 +77,10 @@ FLAGS = flags.FLAGS
 # Training loop state.
 # TODO(tommadams): make the trainer a proper class and get rid of this.
 class State:
-    def __init__(self):
+    def __init__(self, model_num):
         self.start_time = time.time()
-        self.iter_num = 0
+        self.start_iter_num = model_num
+        self.iter_num = model_num
 
     def _model_name(self, it):
         return '%06d' % it
@@ -126,6 +127,24 @@ def wait_for_training_examples(state, num_games):
         time.sleep(1)
 
 
+def list_selfplay_dirs(base_dir):
+    """Returns a sorted list of selfplay data directories.
+
+    Training examples are written out to the following directory hierarchy:
+      base_dir/device_id/model_name/timestamp/
+
+    Args:
+      base_dir: either selfplay_dir or holdout_dir.
+
+    Returns:
+      A list of model directories sorted so the most recent directory is first.
+    """
+
+    model_dirs = [os.path.join(base_dir, x)
+                  for x in tf.io.gfile.listdir(base_dir)]
+    return sorted(model_dirs, reverse=True)
+
+
 async def sample_training_examples(state):
     """Sample training examples from recent selfplay games.
 
@@ -139,13 +158,8 @@ async def sample_training_examples(state):
                           sorted by path.
     """
 
-    # Training examples are written out to the following directory hierarchy:
-    #   selfplay_dir/device_id/model_name/timestamp/
     # Read examples from the most recent `window_size` models.
-    model_dirs = [os.path.join(FLAGS.selfplay_dir, x)
-                  for x in tf.gfile.ListDirectory(FLAGS.selfplay_dir)]
-    model_dirs = sorted(model_dirs, reverse=True)[:FLAGS.window_size]
-
+    model_dirs = list_selfplay_dirs(FLAGS.selfplay_dir)[:FLAGS.window_size]
     src_patterns = [os.path.join(x, '*', '*', '*.tfrecord.zz')
                     for x in model_dirs]
 
@@ -216,15 +230,19 @@ async def train(state):
     elapsed = time.time() - state.start_time
     append_timestamp(elapsed, state.train_model_name)
 
+    if FLAGS.validate and state.iter_num - state.start_iter_num > 1:
+        try:
+            await validate(state)
+        except Exception as e:
+            logging.error(e)
+
 
 async def validate(state):
-    dirs = [x.path for x in os.scandir(FLAGS.holdout_dir) if x.is_dir()]
-    src_dirs = sorted(dirs, reverse=True)[:FLAGS.window_size]
+    src_dirs = list_selfplay_dirs(FLAGS.holdout_dir)[:FLAGS.window_size]
 
     await checked_run([
         'python3', 'validate.py',
-        '--flagfile={}'.format(os.path.join(FLAGS.flags_dir,
-                                            'validate.flags')),
+        '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'validate.flags')),
         '--work_dir={}'.format(FLAGS.work_dir),
         '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
         '--tpu_name={}'.format(FLAGS.tpu_name),
@@ -241,9 +259,20 @@ def main(unused_argv):
     for handler in logger.handlers:
         handler.setFormatter(formatter)
 
+    # The training loop must be bootstrapped; either by running bootstrap.sh
+    # to generate training data from random games, or by running
+    # copy_checkpoint.sh to copy an already generated checkpoint.
+    model_dirs = list_selfplay_dirs(FLAGS.selfplay_dir)
+    if not model_dirs:
+        raise RuntimeError(
+            'Couldn\'t find any selfplay games under %s. Either bootstrap.sh '
+            'or copy_checkpoint.sh must be run before the train loop is '
+            'started')
+    model_num = int(os.path.basename(model_dirs[0]))
+
     with logged_timer('Total time'):
         try:
-            state = State()
+            state = State(model_num)
             while state.iter_num <= FLAGS.iterations:
                 state.iter_num += 1
                 wait(train(state))

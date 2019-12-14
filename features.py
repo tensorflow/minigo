@@ -53,6 +53,7 @@ def planes(num_planes):
     return deco
 
 
+# TODO(tommadams): make a generic stone features function.
 @planes(16)
 def stone_features(position):
     # a bit easier to calculate it with axis 0 being the 16 board states,
@@ -70,6 +71,25 @@ def stone_features(position):
 
     features[::2] = last_eight == position.to_play
     features[1::2] = last_eight == -position.to_play
+    return np.rollaxis(features, 0, 3)
+
+
+# TODO(tommadams): make a generic stone features function.
+@planes(8)
+def stone_features_4(position):
+    features = np.zeros([8, go.N, go.N], dtype=np.uint8)
+
+    num_deltas_avail = position.board_deltas.shape[0]
+    cumulative_deltas = np.cumsum(position.board_deltas, axis=0)
+    last_n = np.tile(position.board, [4, 1, 1])
+    # apply deltas to compute previous board states
+    last_n[1:num_deltas_avail + 1] -= cumulative_deltas
+    # if no more deltas are available, just repeat oldest board.
+    last_n[num_deltas_avail + 1:] = last_n[num_deltas_avail].reshape(
+        1, go.N, go.N)
+
+    features[::2] = last_n == position.to_play
+    features[1::2] = last_n == -position.to_play
     return np.rollaxis(features, 0, 3)
 
 
@@ -158,7 +178,7 @@ AGZ_FEATURES = [
 AGZ_FEATURES_PLANES = sum(f.planes for f in AGZ_FEATURES)
 
 MLPERF07_FEATURES = [
-    stone_features,
+    stone_features_4,
     color_to_play_feature,
     few_liberties_feature,
     would_capture_feature,

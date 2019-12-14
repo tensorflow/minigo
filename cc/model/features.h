@@ -338,7 +338,7 @@ struct Features {
   //   using MyFeatures = Features<StoneFeatures<8>, ToPlayFeature>;
   //
   //   // StoneFeatures is the first set of features, so trivially has index 0.
-  //   MyFeatures::GetPlaneIdx<StoneFeatures>() == 0;
+  //   MyFeatures::GetPlaneIdx<StoneFeatures<8>>() == 0;
   //
   //   // StoneFeatures has 16 planes.
   //   MyFeatures::GetPlaneIdx<ToPlayFeature>() == 16;
@@ -415,7 +415,7 @@ struct FeatureDescriptor {
 using AgzFeatures = Features<StoneFeatures<8>, ToPlayFeature>;
 
 // TODO(tommadams): rename ExtraFeatures to Mlperf07Features.
-using ExtraFeatures = Features<StoneFeatures<8>, ToPlayFeature, LibertyFeatures,
+using ExtraFeatures = Features<StoneFeatures<4>, ToPlayFeature, LibertyFeatures,
                                WouldCaptureFeature>;
 
 // Maximum number of feature planes used by these features.

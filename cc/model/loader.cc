@@ -104,11 +104,7 @@ class FactoryRegistry {
 
 #ifdef MG_ENABLE_TF_DUAL_NET
     if (engine == "tf") {
-      int id = -1;
-      if (!device.empty()) {
-        MG_CHECK(absl::SimpleAtoi(device, &id)) << "\"" << device << "\"";
-      }
-      return absl::make_unique<TfDualNetFactory>(id);
+      return absl::make_unique<TfDualNetFactory>(device);
     }
 #endif  // MG_ENABLE_TF_DUAL_NET
 

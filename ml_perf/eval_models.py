@@ -17,7 +17,7 @@
 import sys
 sys.path.insert(0, '.')  # nopep8
 
-from tensorflow import gfile
+import tensorflow as tf
 import os
 
 from ml_perf.utils import *
@@ -27,10 +27,10 @@ from absl import app, flags
 
 flags.DEFINE_integer('start', 0, 'Index of first model to evaluate.')
 flags.DEFINE_integer('num_games', 100, 'Number of games to run.')
-flags.DEFINE_string('flags_dir', None, 'Flags directory.')
-flags.DEFINE_string('model_dir', None, 'Model directory.')
-flags.DEFINE_string('target', None, 'Path of the target model.')
-flags.DEFINE_string('sgf_dir', None, 'Directory to write SGFs to.')
+flags.DEFINE_string('flags_dir', '', 'Flags directory.')
+flags.DEFINE_string('model_dir', '', 'Model directory.')
+flags.DEFINE_string('target', '', 'Path of the target model.')
+flags.DEFINE_string('sgf_dir', '', 'Directory to write SGFs to.')
 flags.DEFINE_list('devices', '', 'List of devices to run on.')
 
 FLAGS = flags.FLAGS
@@ -65,7 +65,7 @@ class WinStats:
 def load_train_times():
   models = []
   path = os.path.join(FLAGS.model_dir, 'train_times.txt')
-  with gfile.Open(path, 'r') as f:
+  with tf.io.gfile.GFile(path, 'r') as f:
     for line in f.readlines():
       line = line.strip()
       if line:
@@ -102,8 +102,6 @@ def evaluate_model(eval_model_path):
         processes.append(checked_run([
             'bazel-bin/cc/eval',
             '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'eval.flags')),
-            '--eval_device=0',
-            '--target_device=0',
             '--eval_model={}'.format(eval_model_path),
             '--target_model={}'.format(FLAGS.target),
             '--sgf_dir={}'.format(FLAGS.sgf_dir),

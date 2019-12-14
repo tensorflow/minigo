@@ -48,7 +48,7 @@ class TfDualNet : public Model {
  public:
   TfDualNet(const std::string& graph_path,
             const FeatureDescriptor& feature_desc,
-            const tensorflow::GraphDef& graph_def, int device);
+            const tensorflow::GraphDef& graph_def);
   ~TfDualNet() override;
 
   void RunMany(const std::vector<const ModelInput*>& inputs,
@@ -69,15 +69,11 @@ class TfDualNet : public Model {
 
 TfDualNet::TfDualNet(const std::string& graph_path,
                      const FeatureDescriptor& feature_desc,
-                     const tensorflow::GraphDef& graph_def, int device)
+                     const tensorflow::GraphDef& graph_def)
     : Model(std::string(file::Stem(file::Basename(graph_path))), feature_desc),
       graph_path_(graph_path) {
   tensorflow::SessionOptions session_options;
   session_options.config.mutable_gpu_options()->set_allow_growth(true);
-  if (device >= 0) {
-    session_options.config.mutable_gpu_options()->set_visible_device_list(
-        absl::StrCat(device));
-  }
 
   // session_options.config.set_inter_op_parallelism_threads(1);
   // auto* thread_pool_options =
@@ -187,7 +183,14 @@ void TfDualNet::Reserve(int capacity) {
 
 }  // namespace
 
-TfDualNetFactory::TfDualNetFactory(int device) : device_(device) {}
+TfDualNetFactory::TfDualNetFactory(absl::string_view device) {
+  // Place all models on the GPU by default, or if the user has explicitly
+  // requested it.
+  place_on_gpu_ = device.empty() || device == "gpu";
+  if (!place_on_gpu_) {
+    MG_CHECK(device == "cpu") << "Unrecognized device \"" << device << "\"";
+  }
+}
 
 std::unique_ptr<Model> TfDualNetFactory::NewModel(const ModelDefinition& def) {
   MG_CHECK(def.metadata.Get<std::string>("engine") == "tf");
@@ -212,13 +215,10 @@ std::unique_ptr<Model> TfDualNetFactory::NewModel(const ModelDefinition& def) {
       FeatureDescriptor::Create(def.metadata.Get<std::string>("input_features"),
                                 def.metadata.Get<std::string>("input_layout"));
 
-  // TODO(tommadams): we handle device selection using the CUDA_VISIBLE_DEVICES
-  // environment variable these days. Make device_ a string: "cpu" or "gpu".
-  if (device_ >= 0) {
+  if (place_on_gpu_) {
     PlaceOnDevice(&graph_def, "/gpu:0");
   }
-  return absl::make_unique<TfDualNet>(def.path, feature_desc, graph_def,
-                                      device_);
+  return absl::make_unique<TfDualNet>(def.path, feature_desc, graph_def);
 }
 
 }  // namespace minigo
