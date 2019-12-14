@@ -24,8 +24,11 @@ namespace minigo {
 // all build targets that depend on either minigo_9 or minigo_19.
 constexpr int kN = MINIGO_BOARD_SIZE;
 
-// kN * kN possible points on the board, plus pass.
-constexpr int kNumMoves = kN * kN + 1;
+// kN * kN possible points on the board.
+constexpr int kNumPoints = kN * kN;
+
+// points on the board, plus pass.
+constexpr int kNumMoves = kNumPoints + 1;
 
 // Safe lower bound of the number of moves to reach whole-board pass-alive
 // state. We use this number to skip calculating whether the whole board is
@@ -38,7 +41,7 @@ constexpr int kMinPassAliveMoves = kN * ((kN + 2) / 3);
 
 constexpr float kDefaultKomi = 7.5;
 
-constexpr float kDirichletAlpha = 0.03f * 361 / (kN * kN);
+constexpr float kDirichletAlpha = 0.03f * 361 / kNumPoints;
 
 // static constexpr float kPuct = 2.50;
 static constexpr float kUct_base = 19652;

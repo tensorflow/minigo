@@ -166,7 +166,7 @@ def rotate_train_nchw(x, pi):
 
     pi_move = tf.slice(pi, [0], [squares], name="slice_moves")
     pi_pass = tf.slice(pi, [squares], [1], name="slice_pass")
-    # Add a final dim so that x and pi have same shape: [N,N,num_features].
+    # Add a dim so that x and pi have same shape: [num_features,N,N].
     pi_n_by_n = tf.reshape(pi_move, [1, go.N, go.N])
 
     with tf.control_dependencies([assert_shape_x, assert_shape_pi]):

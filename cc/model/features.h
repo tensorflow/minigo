@@ -49,7 +49,8 @@ namespace minigo {
 //   [X_t, Y_t, X_t-1, Y_t-1, ..., X_t-7, Y_t-7].
 template <int PositionHistory>
 struct StoneFeatures {
-  static_assert(PositionHistory <= kMaxPositionHistory);
+  static_assert(PositionHistory <= kMaxPositionHistory,
+                "PositionHistory too large");
 
   static constexpr int kNumPlanes = 2 * PositionHistory;
 
@@ -65,7 +66,7 @@ struct StoneFeatures {
     int j = 0;
     for (; j < n; ++j) {
       const auto* src = input.position_history[j]->stones().data();
-      const auto* end = dst + kN * kN * num_planes;
+      const auto* end = dst + kNumPoints * num_planes;
       for (auto* d = dst + j * 2; d < end; d += num_planes) {
         auto color = src->color();
         src += 1;
@@ -76,7 +77,7 @@ struct StoneFeatures {
 
     // Pad the features with zeros if we have fewer than 8 moves of history.
     for (; j < PositionHistory; ++j) {
-      const auto* end = dst + kN * kN * num_planes;
+      const auto* end = dst + kNumPoints * num_planes;
       for (auto* d = dst + j * 2; d < end; d += num_planes) {
         d[0] = 0;
         d[1] = 0;
@@ -104,7 +105,7 @@ struct StoneFeatures {
 
     // Pad the features with zeros if we have fewer than 8 moves of history.
     for (; j < PositionHistory; ++j) {
-      for (int i = 0; i < 2 * kN * kN; ++i) {
+      for (int i = 0; i < 2 * kNumPoints; ++i) {
         *dst++ = 0;
       }
     }
@@ -127,7 +128,7 @@ struct StoneFeatures {
     __m128i their_color_mm = _mm_set1_epi8(static_cast<int>(their_color));
 
     // Write the features for the position history that we have.
-    int safe_size = (kN * kN / 16) * 16;
+    int safe_size = (kNumPoints / 16) * 16;
     int j = 0;
     for (; j < n; ++j) {
       const auto* stones = input.position_history[j]->stones().data();
@@ -148,31 +149,31 @@ struct StoneFeatures {
         __m128i col = _mm_packus_epi16(a, b);
 
         // Generate 16 input features for two planes: current player's stones
-        // and opponents stones.
+        // and opponent's stones.
         // my[i] = col[i] == my_color ? 1 : 0.
         // their[i] = col[i] == their_color ? 1 : 0.
         __m128i my = _mm_and_si128(one, _mm_cmpeq_epi8(col, my_color_mm));
         __m128i their = _mm_and_si128(one, _mm_cmpeq_epi8(col, their_color_mm));
 
-        // Store the input input features.
+        // Store the input features.
         _mm_storeu_si128(reinterpret_cast<__m128i*>(dst), my);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + kN * kN), their);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + kNumPoints), their);
         dst += 16;
       }
 
       // Finish up the last few input features.
-      for (; i < kN * kN; ++i) {
+      for (; i < kNumPoints; ++i) {
         auto color = stones[i].color();
         dst[0] = color == my_color;
-        dst[kN * kN] = color == their_color;
+        dst[kNumPoints] = color == their_color;
         dst += 1;
       }
-      dst += kN * kN;
+      dst += kNumPoints;
     }
 
     // Pad the features with zeros if we have fewer than 8 moves of history.
     for (; j < PositionHistory; ++j) {
-      for (int i = 0; i < 2 * kN * kN; ++i) {
+      for (int i = 0; i < 2 * kNumPoints; ++i) {
         *dst++ = 0;
       }
     }
@@ -187,7 +188,7 @@ struct ToPlayFeature {
   MG_ALWAYS_INLINE static void SetNhwc(const ModelInput& input, int num_planes,
                                        T* dst) {
     T f = input.position_history[0]->to_play() == Color::kBlack;
-    const auto* end = dst + kN * kN * num_planes;
+    const auto* end = dst + kNumPoints * num_planes;
     for (auto* d = dst; d < end; d += num_planes) {
       d[0] = f;
     }
@@ -196,7 +197,7 @@ struct ToPlayFeature {
   template <typename T>
   MG_ALWAYS_INLINE static void SetNchw(const ModelInput& input, T* dst) {
     T f = input.position_history[0]->to_play() == Color::kBlack;
-    for (int i = 0; i < kN * kN; ++i) {
+    for (int i = 0; i < kNumPoints; ++i) {
       *dst++ = f;
     }
   }
@@ -211,7 +212,7 @@ struct LibertyFeatures {
   MG_ALWAYS_INLINE static void SetNhwc(const ModelInput& input, int num_planes,
                                        T* dst) {
     const auto& position = *input.position_history[0];
-    for (int i = 0; i < kN * kN; ++i) {
+    for (int i = 0; i < kNumPoints; ++i) {
       auto num_liberties = position.num_chain_liberties(i);
       dst[0] = num_liberties == 1;
       dst[1] = num_liberties == 2;
@@ -224,9 +225,9 @@ struct LibertyFeatures {
   MG_ALWAYS_INLINE static void SetNchw(const ModelInput& input, T* dst) {
     const auto& position = *input.position_history[0];
     auto* dst0 = dst;
-    auto* dst1 = dst + kN * kN;
-    auto* dst2 = dst + 2 * kN * kN;
-    for (int i = 0; i < kN * kN; ++i) {
+    auto* dst1 = dst0 + kNumPoints;
+    auto* dst2 = dst1 + kNumPoints;
+    for (int i = 0; i < kNumPoints; ++i) {
       auto num_liberties = position.num_chain_liberties(i);
       *dst0++ = num_liberties == 1;
       *dst1++ = num_liberties == 2;
@@ -246,7 +247,7 @@ struct WouldCaptureFeature {
     auto their_color = OtherColor(my_color);
     const auto& stones = position.stones();
 
-    for (int i = 0; i < kN * kN; ++i) {
+    for (int i = 0; i < kNumPoints; ++i) {
       int f = 0;
       if (position.legal_move(i)) {
         for (auto nc : kNeighborCoords[i]) {
@@ -266,7 +267,7 @@ struct WouldCaptureFeature {
     auto their_color = OtherColor(my_color);
     const auto& stones = position.stones();
 
-    for (int i = 0; i < kN * kN; ++i) {
+    for (int i = 0; i < kNumPoints; ++i) {
       int f = 0;
       if (position.legal_move(i)) {
         for (auto nc : kNeighborCoords[i]) {
@@ -305,7 +306,7 @@ struct Features {
 
     int stride = features->shape[1] * features->shape[2] * features->shape[3];
     auto* data = features->data;
-    std::array<T, kN * kN * kNumPlanes> raw_features;
+    std::array<T, kNumPoints * kNumPlanes> raw_features;
     for (const auto* input : inputs) {
       Impl::SetAllNhwc(*input, Impl::kNumPlanes, raw_features.data());
       symmetry::ApplySymmetry<kN, kNumPlanes>(input->sym, raw_features.data(),
@@ -322,7 +323,7 @@ struct Features {
 
     int stride = features->shape[1] * features->shape[2] * features->shape[3];
     auto* data = features->data;
-    std::array<T, kN * kN * kNumPlanes> raw_features;
+    std::array<T, kNumPoints * kNumPlanes> raw_features;
     for (const auto* input : inputs) {
       Impl::SetAllNchw(*input, raw_features.data());
       symmetry::ApplySymmetryPlanar<kN, kNumPlanes>(input->sym,
@@ -423,7 +424,7 @@ constexpr int kMaxNumFeaturePlanes =
 
 // A buffer large enough to hold features for all input types.
 template <typename T>
-using BoardFeatureBuffer = std::array<T, kN * kN * kMaxNumFeaturePlanes>;
+using BoardFeatureBuffer = std::array<T, kNumPoints * kMaxNumFeaturePlanes>;
 
 }  // namespace minigo
 

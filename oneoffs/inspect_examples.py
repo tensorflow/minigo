@@ -64,12 +64,12 @@ class ParsedExample(object):
         self.features = features
         self.pi = pi
         self.value = value
-        self.q = q;
+        self.q = q
         self.n = n
         self.c = c
 
 
-def ReadExamples(path):
+def read_examples(path):
     records = list(tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG))
     num_records = len(records)
 
@@ -108,7 +108,7 @@ def ReadExamples(path):
     return [ParsedExample(*args) for args in zip(x, pi, outcome, q, n, c)]
 
 
-def ParseBoard(example):
+def parse_board(example):
     """Parses a go board from a TF example.
 
     Args:
@@ -137,7 +137,7 @@ def ParseBoard(example):
     return go.Position(board=board, to_play=to_play)
 
 
-def FormatPi(pi, stone, mean, mx, picked):
+def format_pi(pi, stone, mean, mx, picked):
     # Start of the ANSI color code for this point: gray if this point was picked
     # as the next move, black otherwise.
     col = '\x1b[48;5;8;' if picked else '\x1b[0;'
@@ -170,9 +170,9 @@ def FormatPi(pi, stone, mean, mx, picked):
     return s
 
 
-def PrintExample(examples, i):
+def print_example(examples, i):
     example = examples[i]
-    p = ParseBoard(example)
+    p = parse_board(example)
     print('\nExample %d of %d, %s to play, winner is %s' % (
         i + 1, len(examples), 'Black' if p.to_play == 1 else 'White',
         'Black' if example.value > 0 else 'White'))
@@ -195,11 +195,11 @@ def PrintExample(examples, i):
                 picked = example.c == row * go.N + col
             else:
                 picked = False
-            pi.append(FormatPi(example.pi[idx], stone, mean, mx, picked))
+            pi.append(format_pi(example.pi[idx], stone, mean, mx, picked))
         pi_lines.append(' '.join(pi))
 
-    pi_lines.append(FormatPi(example.pi[-1], go.EMPTY, mean, mx,
-                             example.c == go.N * go.N))
+    pi_lines.append(format_pi(example.pi[-1], go.EMPTY, mean, mx,
+                              example.c == go.N * go.N))
 
     for b, p in zip(board_lines, pi_lines):
         print('%s  |  %s' % (b, p))
@@ -207,12 +207,12 @@ def PrintExample(examples, i):
 
 def main(unused_argv):
     with tf.Session():
-        examples = ReadExamples(FLAGS.path)
+        examples = read_examples(FLAGS.path)
 
     i = 0
     while i < len(examples):
         example = examples[i]
-        PrintExample(examples, i)
+        print_example(examples, i)
         sys.stdout.write('>> ')
         sys.stdout.flush()
 
