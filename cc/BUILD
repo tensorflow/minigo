@@ -294,6 +294,20 @@ minigo_cc_library(
     ],
 )
 
+cc_library(
+    name = "wtf_saver",
+    srcs = ["wtf_saver.cc"],
+    hdrs = ["wtf_saver.h"],
+    deps = [
+        ":logging",
+        "//cc/async:poll_thread",
+        "//cc/async:thread",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/time",
+        "@wtf",
+    ],
+)
+
 minigo_cc_library(
     name = "zobrist",
     srcs = ["zobrist.cc"],
@@ -443,6 +457,7 @@ minigo_cc_binary(
         ":mcts",
         ":random",
         ":tf_utils",
+        ":wtf_saver",
         ":zobrist",
         "//cc/async:poll_thread",
         "//cc/async:sharded_executor",

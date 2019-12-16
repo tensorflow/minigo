@@ -42,6 +42,7 @@
 #include "cc/platform/utils.h"
 #include "cc/random.h"
 #include "cc/tf_utils.h"
+#include "cc/wtf_saver.h"
 #include "cc/zobrist.h"
 #include "gflags/gflags.h"
 #include "wtf/macros.h"
@@ -238,6 +239,22 @@ class SelfplayGame {
     int restrict_pass_alive_play_threshold;
   };
 
+  // Stats about the nodes visited during SelectLeaves.
+  struct SelectLeavesStats {
+    int num_leaves_queued = 0;
+    int num_nodes_selected = 0;
+    int num_cache_hits = 0;
+    int num_game_over_leaves = 0;
+
+    SelectLeavesStats& operator+=(const SelectLeavesStats& other) {
+      num_leaves_queued += other.num_leaves_queued;
+      num_nodes_selected += other.num_nodes_selected;
+      num_cache_hits += other.num_cache_hits;
+      num_game_over_leaves += other.num_game_over_leaves;
+      return *this;
+    }
+  };
+
   SelfplayGame(int game_id, const Options& options, std::unique_ptr<Game> game,
                std::unique_ptr<MctsTree> tree);
 
@@ -252,7 +269,8 @@ class SelfplayGame {
   // Selects leaves to perform inference on.
   // Returns the number of leaves selected. It is possible that no leaves will
   // be selected if all desired leaves are already in the inference cache.
-  int SelectLeaves(InferenceCache* cache, std::vector<Inference>* inferences);
+  SelectLeavesStats SelectLeaves(InferenceCache* cache,
+                                 std::vector<Inference>* inferences);
 
   // Processes the inferences selected by `SelectedLeaves` that were evaluated
   // by the SelfplayThread.
@@ -373,6 +391,8 @@ class Selfplayer {
 
   std::unique_ptr<DirectoryWatcher> directory_watcher_;
   std::unique_ptr<PollThread> abort_file_watcher_;
+
+  std::unique_ptr<WtfSaver> wtf_saver_;
 };
 
 // Plays multiple games concurrently using `SelfplayGame` instances.
@@ -469,8 +489,8 @@ SelfplayGame::SelfplayGame(int game_id, const Options& options,
   target_readouts_ = options_.num_readouts;
 }
 
-int SelfplayGame::SelectLeaves(InferenceCache* cache,
-                               std::vector<Inference>* inferences) {
+SelfplayGame::SelectLeavesStats SelfplayGame::SelectLeaves(
+    InferenceCache* cache, std::vector<Inference>* inferences) {
   // We can only inject noise if the root is expanded. If it isn't expanded
   // yet, the next call to SelectLeaf must by definition select the root (and
   // break out of the loop below). We'll then inject the noise on the subsequent
@@ -480,31 +500,41 @@ int SelfplayGame::SelectLeaves(InferenceCache* cache,
     InjectNoise();
   }
 
-  int num_queued = 0;
+  const auto* root = tree_->root();
+  SelectLeavesStats stats;
   do {
     auto* leaf = tree_->SelectLeaf(options_.allow_pass);
     if (leaf == nullptr) {
+      // TODO(tommadams): Breaking here without updating the stats will under
+      // count num_nodes_selected. To fix this, we'd have to plumb the count
+      // through MctsTree::SelectLeaf, which is probably not worth doing
+      // because MctsTree::SelectLeaf rarely returns null.
       break;
     }
+
+    stats.num_nodes_selected += leaf->position.n() - root->position.n();
 
     if (leaf->game_over()) {
       float value =
           leaf->position.CalculateScore(game_->options().komi) > 0 ? 1 : -1;
       tree_->IncorporateEndGameResult(leaf, value);
+      stats.num_game_over_leaves += 1;
       continue;
     }
     if (MaybeQueueInference(leaf, cache, inferences)) {
-      num_queued += 1;
+      stats.num_leaves_queued += 1;
+    } else {
+      stats.num_cache_hits += 1;
     }
-    if (leaf == tree_->root()) {
+    if (leaf == root) {
       if (!fastplay_) {
         inject_noise_before_next_read_ = true;
       }
       break;
     }
-  } while (num_queued < options_.num_virtual_losses &&
+  } while (stats.num_leaves_queued < options_.num_virtual_losses &&
            tree_->root()->N() < target_readouts_);
-  return num_queued;
+  return stats;
 }
 
 void SelfplayGame::ProcessInferences(const std::string& model_name,
@@ -734,6 +764,11 @@ void Selfplayer::Run() {
     t->Start();
   }
 
+#ifdef WTF_ENABLE
+  // Save WTF in the background periodically.
+  wtf_saver_ = absl::make_unique<WtfSaver>(FLAGS_wtf_trace, absl::Seconds(5));
+#endif  // WTF_ENABLE
+
   // Run the selfplay threads.
   for (auto& t : selfplay_threads) {
     t->Start();
@@ -958,40 +993,37 @@ void SelfplayThread::StartNewGames() {
 void SelfplayThread::SelectLeaves() {
   WTF_SCOPE("SelectLeaves: games", size_t)(selfplay_games_.size());
 
-  selfplayer_->ExecuteSharded([this](int shard_idx, int num_shards) {
+  std::atomic<size_t> game_idx(0);
+  selfplayer_->ExecuteSharded([this, &game_idx](int shard_idx, int num_shards) {
     WTF_SCOPE0("SelectLeaf");
     MG_CHECK(static_cast<size_t>(num_shards) == searches_.size());
+
+    SelfplayGame::SelectLeavesStats total_stats;
 
     auto& search = searches_[shard_idx];
     search.Clear();
 
-    int num_leaves_selected = 0;
-    int num_nodes_visited = 0;
-    auto range = ShardedExecutor::GetShardRange(shard_idx, num_shards,
-                                                selfplay_games_.size());
-    for (int i = range.begin; i < range.end; ++i) {
-      auto* selfplay_game = selfplay_games_[i].get();
+    for (;;) {
+      auto i = game_idx.fetch_add(1);
+      if (i >= selfplay_games_.size()) {
+        break;
+      }
 
       TreeSearch::InferenceSpan span;
       span.selfplay_game = selfplay_games_[i].get();
       span.pos = search.inferences.size();
-      span.len = selfplay_game->SelectLeaves(cache_.get(), &search.inferences);
+      auto stats = span.selfplay_game->SelectLeaves(cache_.get(),
+                                                    &search.inferences);
+      span.len = stats.num_leaves_queued;
       if (span.len > 0) {
         search.inference_spans.push_back(span);
       }
-
-      if (kWtfEnabledForNamespace) {
-        auto root_n = selfplay_game->tree()->root()->position.n();
-        for (size_t j = 0; j < span.len; ++j) {
-          const auto& position = search.inferences[span.pos + j].leaf->position;
-          num_nodes_visited += position.n() + 1 - root_n;
-        }
-        num_leaves_selected += span.len;
-      }
+      total_stats += stats;
     }
 
-    WTF_APPEND_SCOPE("leaves, nodes", int, int)
-    (num_leaves_selected, num_nodes_visited);
+    WTF_APPEND_SCOPE("leaves, nodes, cache_hits, game_over", int, int, int, int)
+    (total_stats.num_leaves_queued, total_stats.num_nodes_selected,
+     total_stats.num_cache_hits, total_stats.num_game_over_leaves);
   });
 }
 
@@ -1126,12 +1158,6 @@ int main(int argc, char* argv[]) {
   }
 
   minigo::ShutdownModelFactories();
-
-#ifdef WTF_ENABLE
-  MG_LOG(INFO) << "Writing WTF trace to \"" << FLAGS_wtf_trace << "\"";
-  MG_CHECK(wtf::Runtime::GetInstance()->SaveToFile(FLAGS_wtf_trace));
-  MG_LOG(INFO) << "Done";
-#endif
 
   return 0;
 }
