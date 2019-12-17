@@ -5,6 +5,8 @@
 --shuffle_buffer_size=0
 --shuffle_examples=false
 
+--keep_checkpoint_max=100
+
 # see --train_filter in rl_loop.flags
 # --filter_amount=1
 

@@ -63,6 +63,17 @@ flags.DEFINE_bool('use_bt', False,
 flags.DEFINE_bool('freeze', False,
                   'Whether to freeze the graph at the end of training.')
 
+flags.DEFINE_boolean(
+    'use_trt', False, 'True to write a GraphDef that uses the TRT runtime')
+flags.DEFINE_integer('trt_max_batch_size', None,
+                     'Maximum TRT batch size')
+flags.DEFINE_string('trt_precision', 'fp32',
+                    'Precision for TRT runtime: fp16, fp32 or int8')
+flags.register_multi_flags_validator(
+    ['use_trt', 'trt_max_batch_size'],
+    lambda flags: not flags['use_trt'] or flags['trt_max_batch_size'],
+    'trt_max_batch_size must be set if use_trt is true')
+
 
 flags.register_multi_flags_validator(
     ['use_bt', 'use_tpu'],
@@ -252,7 +263,8 @@ def main(argv):
         if FLAGS.use_tpu:
             dual_net.freeze_graph_tpu(FLAGS.export_path)
         else:
-            dual_net.freeze_graph(FLAGS.export_path)
+            dual_net.freeze_graph(FLAGS.export_path, FLAGS.use_trt,
+                                  FLAGS.trt_max_batch_size, FLAGS.trt_precision)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ sys.path.insert(0, '.')  # nopep8
 import asyncio
 import logging
 import os
+import tensorflow as tf
 
 import mask_flags
 from absl import flags
@@ -88,6 +89,44 @@ async def expand_cmd_str(cmd):
 
     flag_list = sorted(mask_flags.filter_flags(flag_list, valid_flags))
     return '  '.join(process + flag_list + position_args)
+
+
+def list_selfplay_dirs(base_dir):
+    """Returns a sorted list of selfplay data directories.
+
+    Training examples are written out to the following directory hierarchy:
+      base_dir/model_name/device_id/timestamp/
+
+    Args:
+      base_dir: either selfplay_dir or holdout_dir.
+
+    Returns:
+      A list of model directories sorted so the most recent directory is first.
+    """
+
+    model_dirs = [os.path.join(base_dir, x)
+                  for x in tf.io.gfile.listdir(base_dir)]
+    return sorted(model_dirs, reverse=True)
+
+
+def copy_tree(src, dst):
+    """Copies everything under src to dst."""
+
+    print('Copying {} to {}'.format(src, dst))
+    for src_dir, sub_dirs, basenames in tf.io.gfile.walk(src):
+        rel_dir = os.path.relpath(src_dir, src)
+        dst_dir = os.path.join(dst, rel_dir)
+        for sub_dir in sorted(sub_dirs):
+            path = os.path.join(dst, rel_dir, sub_dir)
+            print('Make dir {}'.format(path))
+            tf.io.gfile.makedirs(path)
+        if basenames:
+            print('Copying {} files from {} to {}'.format(
+                len(basenames), src_dir, dst_dir))
+            for basename in basenames:
+                src_path = os.path.join(src_dir, basename)
+                dst_path = os.path.join(dst_dir, basename)
+                tf.io.gfile.copy(src_path, dst_path)
 
 
 async def checked_run(cmd, env=None):

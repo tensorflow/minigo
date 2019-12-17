@@ -127,7 +127,10 @@ def evaluate_model(eval_model_path):
 
 def main(unused_argv):
     models = load_train_times()
-    for i, (timestamp, name, path) in enumerate(models[FLAGS.start:]):
+    for i, (timestamp, name, path) in enumerate(models):
+        if int(name) < FLAGS.start:
+            logging.info('Skiping %s', name)
+            continue
         winrate = evaluate_model(path)
         if winrate >= 0.50:
             break

@@ -67,7 +67,7 @@ flags.DEFINE_string('golden_chunk_dir', None, 'Training example directory.')
 flags.DEFINE_string('holdout_dir', None, 'Holdout example directory.')
 flags.DEFINE_string('model_dir', None, 'Model directory.')
 flags.DEFINE_string('selfplay_dir', None, 'Selfplay example directory.')
-flags.DEFINE_string('work_dir', None, 'Training checkpoint directory.')
+flags.DEFINE_string('work_dir', None, 'Training work directory.')
 
 flags.DEFINE_string('tpu_name', None, 'Name of the TPU to train on.')
 
@@ -266,7 +266,7 @@ def main(unused_argv):
     if not model_dirs:
         raise RuntimeError(
             'Couldn\'t find any selfplay games under %s. Either bootstrap.sh '
-            'or copy_checkpoint.sh must be run before the train loop is '
+            'or init_from_checkpoint.sh must be run before the train loop is '
             'started')
     model_num = int(os.path.basename(model_dirs[0]))
 

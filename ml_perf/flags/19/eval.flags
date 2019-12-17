@@ -2,6 +2,7 @@
 
 --flagfile=ml_perf/flags/19/selfplay.flags
 
+--value_init_penalty=0.2
 --num_readouts=100
 --fastplay_frequency=0
 --resign_enabled=false

@@ -47,6 +47,9 @@ import features as features_lib
 import go
 
 
+tf.enable_eager_execution()
+
+
 flags.DEFINE_string('path', '', 'Path to a TF example file.')
 flags.DEFINE_integer('to_play_feature', 16,
                      'Index of the "to play" feature.')
@@ -54,9 +57,6 @@ flags.DEFINE_string('feature_layout', 'nhwc',
                     'Feature layout: "nhwc" or "nchw".')
 
 FLAGS = flags.FLAGS
-
-TF_RECORD_CONFIG = tf.io.TFRecordOptions(
-    tf.compat.v1.io.TFRecordCompressionType.ZLIB)
 
 
 class ParsedExample(object):
@@ -70,7 +70,7 @@ class ParsedExample(object):
 
 
 def read_examples(path):
-    records = list(tf.python_io.tf_record_iterator(path, TF_RECORD_CONFIG))
+    records = list(tf.data.TFRecordDataset([path], 'ZLIB'))
     num_records = len(records)
 
     # n, q, c have default_values because they're optional.
@@ -94,16 +94,16 @@ def read_examples(path):
         x = tf.transpose(x, [0, 2, 3, 1])
     else:
         raise ValueError('invalid feature_layout "%s"' % FLAGS.feature_layout)
-    x = x.eval()
+    x = x.numpy()
 
     pi = tf.decode_raw(parsed['pi'], tf.float32)
     pi = tf.reshape(pi, [num_records, go.N * go.N + 1])
-    pi = pi.eval()
+    pi = pi.numpy()
 
-    outcome = parsed['outcome'].eval()
-    n = parsed['n'].eval()
-    q = parsed['q'].eval()
-    c = parsed['c'].eval()
+    outcome = parsed['outcome'].numpy()
+    n = parsed['n'].numpy()
+    q = parsed['q'].numpy()
+    c = parsed['c'].numpy()
 
     return [ParsedExample(*args) for args in zip(x, pi, outcome, q, n, c)]
 
@@ -206,8 +206,7 @@ def print_example(examples, i):
 
 
 def main(unused_argv):
-    with tf.Session():
-        examples = read_examples(FLAGS.path)
+    examples = ReadExamples(FLAGS.path)
 
     i = 0
     while i < len(examples):

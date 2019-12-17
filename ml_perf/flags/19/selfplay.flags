@@ -10,8 +10,8 @@
 --holdout_pct=0.025
 --disable_resign_pct=0.0
 --min_resign_threshold=-1.0
---max_resign_threshold=-0.85
---virtual_losses=2
+--max_resign_threshold=-0.9
+--virtual_losses=4
 
 --dirichlet_alpha=0.03
 --noise_mix=0.3

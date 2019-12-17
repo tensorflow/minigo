@@ -9,8 +9,9 @@ The model plays games against itself and uses these games to improve play.
 
 # 2. Directions
 ### Steps to configure machine
-To setup the environment on Ubuntu 16.04 (16 CPUs, one P100, 100 GB disk), you can use these
-commands. This may vary on a different operating system or graphics card.
+To setup the environment on Debian 9 Stretch with 8 GPUs, you can use the
+following commands. This may vary on a different operating system or graphics
+cards.
 
 ```
     # Clone repository
@@ -31,38 +32,108 @@ commands. This may vary on a different operating system or graphics card.
     pip3 install -r requirements.txt
 
     # Install Python Tensorflow for GPU
-    # (alternatively use "tensorflow>=1.13.1" for CPU Tensorflow)
-    pip3 install "tensorflow-gpu>=1.13.1"
+    # (alternatively use "tensorflow==1.15.0" for CPU Tensorflow)
+    pip3 install "tensorflow-gpu==1.15.0"
 
     # Install bazel
-    wget https://github.com/bazelbuild/bazel/releases/download/0.19.2/bazel-0.19.2-installer-linux-x86_64.sh
-    chmod +x bazel-0.19.2-installer-linux-x86_64.sh
-    sudo ./bazel-0.19.2-installer-linux-x86_64.sh
-    rm bazel-0.19.2-installer-linux-x86_64.sh
+    BAZEL_VERSION=0.24.1
+    wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+    chmod 755 bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+    sudo ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 
     # Compile TensorFlow C++ libraries
-    sudo sh -c "echo /usr/local/cuda/lib64 > /etc/ld.so.conf.d/cuda.conf"
-    sudo ldconfig
     ./cc/configure_tensorflow.sh
-
-    # Compile the required Minigo C++ binaries
-    bazel build  -c opt  --define=tf=1  --define=board_size=9  cc:sample_records  cc:selfplay  cc:eval
-
-    # Download required files from Google Cloud Storage
-    BOARD_SIZE=9 python ml_perf/get_data.py
 
     BASE_DIR=$(pwd)/results/$(date +%Y-%m-%d)
 
-    # Run training loop
-    BOARD_SIZE=9  python  ml_perf/reference_implementation.py \
-      --base_dir=$BASE_DIR \
-      --flagfile=ml_perf/flags/9/rl_loop.flags
+    # Bootstrap the training loop.
+    # This step builds the required C++ binaries and plays random games.
+    # Bootstrapping is not considered part of the benchmark.
+    # TODO(tommadams): This step will be replaced with a step that initializes
+    # the training loop from a checkpoint.
+    ./ml_perf/scripts/bootstrap.sh \
+        --board_size=19 \
+        --base_dir=$BASE_DIR
+
+    # Start the selfplay binaries running on the specified GPU devices.
+    # This launches one selfplay binary per GPU.
+    # This script can be run on multiple machines if desired, so long as all
+    # machines have access to the $BASE_DIR.
+    # In this particular example, the machine running the benchmark has 8 GPUs,
+    # of whice devices 1-7 are used for selfplay and device 0 is used for
+    # training.
+    # The selfplay jobs will start, and wait for the training loop (started in
+    # the next step) to produce the first model. The selfplay jobs run forever,
+    # reloading new generations of models as the training job trains them.
+    ./ml_perf/scripts/start_selfplay.sh \
+         --board_size=19 \
+         --base_dir=$BASE_DIR \
+         --devices=1,2,3,4,5,6,7
+
+    # Start the training loop. This is the point when benchmark timing starts.
+    # The training loop produces trains the first model generated from the
+    # bootstrap, then waits for selfplay to play games from the new model.
+    # When enough games have been played (see min_games_per_iteration in
+    # ml_perf/flags/19/train_loop.flags), a new model is trained using these
+    # games. This process repeats for a preset number of iterations (again,
+    # see ml_perf/flags/19/train_loop.flags).
+    # The train scripts terminates the selfplay jobs on exit by writing an
+    # "abort" file to the $BASE_DIR.
+    ./ml_perf/scripts/train.sh \
+         --board_size=19 \
+         --base_dir=$BASE_DIR
 
     # Once the training loop has finished, run model evaluation to find the
-    # first trained model that's better than the target
-    BOARD_SIZE=9  python  ml_perf/eval_models.py \
-      --base_dir=$BASE_DIR \
-      --flags_dir=ml_perf/flags/9
+    # first trained model that's better than the target.
+    # TODO(tommadams): we still need to do more testing before choosing a
+    # target model.
+    python3 ml_perf/eval_models.py \
+         --start=20 \
+         --flags_dir=ml_perf/flags/19 \
+         --model_dir=$BASE_DIR/models/ \
+         --target=$TDB \
+         --devices=0,1,2,3,4,5,6,7
+```
+
+### Selfplay threading model
+
+The selfplay C++ binary (`//cc:concurrent_selfplay`) has multiple flags that control its
+threading:
+
+- `selfplay_threads` controls the number of threads that play selfplay games.
+- `concurrent_games_per_thread` controls how many games are played on each thread. All games
+  on a selfplay thread have their inferences batched together and dispatched at the same time.
+- `parallel_search` controls the size of the thread pool shared between all selfplay threads
+  that are used to parallelise tree search. Since the selfplay thread also performs tree
+  search, the thread pool size is `parallel_search - 1` and a value of `1` disables the thread
+  pool entirely.
+
+To get a better understanding of the threading model, we recommend running a trace of the selfplay
+code as described below.
+
+### Profiling
+
+The selfplay C++ binary can output traces of the host CPU using Google's
+[Tracing Framework](https://google.github.io/tracing-framework/). Compile the
+`//cc:concurrent_selfplay` binary with tracing support by passing `--copt=-DWTF_ENABLE` to
+`bazel build`. Then run `//cc:concurrent_selfplay`, passing `--wtf_trace=$TRACE_PATH` to specify
+the trace output path. The trace is appended to peridically, so the `//cc:concurrent_selfplay`
+binary can be killed after 20 or so seconds and the trace file written so far will be valid.
+
+Install the Tracing Framework [Chrome extension](https://google.github.io/tracing-framework/) to
+view the trace.
+
+Note that the amount of CPU time spent performing tree search changes over the lifetime of the
+benchmark: initially, the models tend to read very deeply, which takes more CPU time.
+
+Here is an example of building and running selfplay with tracing enabled on a single GPU:
+
+```
+bazel build -c opt --copt=-O3 --define=tf=1 --copt=-DWTF_ENABLE cc:concurrent_selfplay
+CUDA_VISIBLE_DEVICES=0 ./bazel-bin/cc/concurrent_selfplay \
+    --flagfile=ml_perf/flags/19/selfplay.flags \
+    --wtf_trace=$HOME/mlperf07.wtf-trace \
+    --model=$BASE_DIR/models/000001.minigo
 ```
 
 ### Steps to download and verify data
@@ -84,19 +155,19 @@ implementation of the first AlphaGo paper.
 Note that Minigo is an independent effort from AlphaGo.
 
 ### Reinforcement Setup
-This benchmark includes both the environment and training for 9x9 Go. There are four primary phases
-in this benchmark, these phases are repeated in order:
+This benchmark includes both the environment and training for 19x19 Go. There are three primary
+parts to this benchmark.
 
- - Selfplay: the *current best* model plays games with itself as both black and white to produce
+ - Selfplay: the *latest trained* model plays games with itself as both black and white to produce
    board positions for training.
- - Training: train the neural networks using selfplay data from recent models. The neural network
-   weights are updated from the recent selfplay games.
- - Model Evaluation: the *current best* and the most recently trained model play a series of games.
-   In order to become the new *current best*, the most recently trained model must win 55% of the
-   games.
- - Target Evaluation: if the newly trained model has been promoted to the current best, play a series
-   of games against a target model that was previously trained via this reference benchmark. The
-   termination criteria for the benchmark is to win at least 50% of the games.
+ - Training: waits for selfplay to play a specified number of games with the latest model, then
+   trains the next model generation, updating the neural network waits. Selfplay constantly monitors
+   the training output directory and loads the new weights when as they are produced by the trainer.
+ - Target Evaluation: The training loop runs for a preset number of iterations, producing a new
+   model generation each time. Once finished, target evaluation relplays the each trained model
+   until it finds the first one that is able to beat a target model in at least 50% of the games.
+   The time from training start to when this generation was produced is taken as the benchmark
+   execution time.
 
 ### Structure
 This task has a non-trivial network structure, including a search tree. A good overview of the
@@ -126,11 +197,11 @@ roughly 0.5% improvement in quality per hour of runtime. An example of approxima
 quality progress over time:
 
 ```
-    Approx. Hours to Quality (16 CPU & 1 P100)
-     1h           x%
-     2h           x%
-     4h           x%
-     8h           x%
+    Approx. Hours to Quality
+     1h           TDB%
+     2h           TDB%
+     4h           TDB%
+     8h           TDB%
 ```
 
 Note that quality does not necessarily monotonically increase.

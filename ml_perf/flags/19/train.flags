@@ -5,8 +5,7 @@
 --shuffle_buffer_size=0
 --shuffle_examples=false
 
-# see --train_filter in rl_loop.flags
-# --filter_amount=1
+--keep_checkpoint_max=100
 
 # Device specific hyperparameters re: batch size and LR schedules.
 --train_batch_size=4096

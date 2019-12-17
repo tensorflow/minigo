@@ -18,10 +18,14 @@
 #  ./ml_perf/scripts/start_selfplay.sh \
 #    --board_size=19 \
 #    --devices=0,1,2,3,4,5,6,7 \
-#    --base_dir="${OUTPUT_DIR}"
+#    --base_dir="${BASE_DIR}"
 
 
 source ml_perf/scripts/common.sh
+
+
+# Assign default values to unset command line arguments.
+if [ -z "${devices-}" ]; then devices="0"; fi
 
 
 log_dir="${base_dir}/logs/selfplay/`hostname`"

@@ -619,12 +619,6 @@ bool SelfplayGame::MaybePlayMove() {
 
     tree_->PlayMove(c);
 
-    // if (tree_->root()->position.n() > 8) {
-    //   while (!tree_->is_game_over()) {
-    //     tree_->PlayMove(Coord::kPass);
-    //   }
-    // }
-
     // If the whole board is pass-alive, play pass moves to end the game.
     if (tree_->root()->position.n() >= kMinPassAliveMoves &&
         tree_->root()->position.CalculateWholeBoardPassAlive()) {

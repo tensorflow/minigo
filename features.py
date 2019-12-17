@@ -53,7 +53,7 @@ def planes(num_planes):
     return deco
 
 
-# TODO(tommadams): make a generic stone features function.
+# TODO(tommadams): add a generic stone_features for all N <= 8
 @planes(16)
 def stone_features(position):
     # a bit easier to calculate it with axis 0 being the 16 board states,
@@ -74,22 +74,23 @@ def stone_features(position):
     return np.rollaxis(features, 0, 3)
 
 
-# TODO(tommadams): make a generic stone features function.
+# TODO(tommadams): add a generic stone_features for all N <= 8
 @planes(8)
 def stone_features_4(position):
+    # a bit easier to calculate it with axis 0 being the 16 board states,
+    # and then roll axis 0 to the end.
     features = np.zeros([8, go.N, go.N], dtype=np.uint8)
 
     num_deltas_avail = position.board_deltas.shape[0]
     cumulative_deltas = np.cumsum(position.board_deltas, axis=0)
-    last_n = np.tile(position.board, [4, 1, 1])
+    last = np.tile(position.board, [4, 1, 1])
     # apply deltas to compute previous board states
-    last_n[1:num_deltas_avail + 1] -= cumulative_deltas
+    last[1:num_deltas_avail + 1] -= cumulative_deltas
     # if no more deltas are available, just repeat oldest board.
-    last_n[num_deltas_avail + 1:] = last_n[num_deltas_avail].reshape(
-        1, go.N, go.N)
+    last[num_deltas_avail + 1:] = last[num_deltas_avail].reshape(1, go.N, go.N)
 
-    features[::2] = last_n == position.to_play
-    features[1::2] = last_n == -position.to_play
+    features[::2] = last == position.to_play
+    features[1::2] = last == -position.to_play
     return np.rollaxis(features, 0, 3)
 
 

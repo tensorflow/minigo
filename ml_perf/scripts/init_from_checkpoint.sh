@@ -12,24 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# Plays selfplay games using a random model in order to bootstrap the
-# reinforcement learning training loop.
+# Bootstraps a reinforcement learning loop from a checkpoint generated from
+# a previous run.
+#
 # Example usage:
-#  ./ml_perf/scripts/bootstrap.sh \
+#  ./ml_perf/scripts/init_from_checkpoint.sh \
 #    --board_size=19 \
-#    --base_dir="${OUTPUT_DIR}"
+#    --base_dir="${BASE_DIR}" \
+#    --checkpoint_dir="${SOURCE_CHECKPOINT_DIR}"
 
 
 source ml_perf/scripts/common.sh
-
-
-# Build the C++ binaries
-bazel build -c opt \
-  --copt=-O3 \
-  --define=board_size="${board_size}" \
-  --define=tf=1 \
-  cc:concurrent_selfplay cc:sample_records cc:eval
 
 
 # Initialize a clean directory structure.
@@ -39,14 +32,13 @@ for var_name in flag_dir golden_chunk_dir holdout_dir log_dir model_dir \
 done
 rm -f "${abort_file}"
 
-echo "Copying flags to ${flag_dir}"
-cp -r "ml_perf/flags/${board_size}"/* "${flag_dir}/"
 
+BOARD_SIZE="${board_size}" \
+python3 ml_perf/init_from_checkpoint.py \
+  --checkpoint_dir="${checkpoint_dir}" \
+  --selfplay_dir="${selfplay_dir}" \
+  --work_dir="${work_dir}" \
+  --model_dir="${model_dir}" \
+  --flag_dir="${flag_dir}" \
+  --tpu_name="${tpu_name}"
 
-# Run bootstrap selfplay.
-./bazel-bin/cc/concurrent_selfplay \
-  --flagfile="${flag_dir}/bootstrap.flags" \
-  --output_dir="${selfplay_dir}/000000/0" \
-  --holdout_dir="${holdout_dir}/000000/0" \
-  --verbose=1 \
-  | tee "${log_dir}/bootstrap.log"
