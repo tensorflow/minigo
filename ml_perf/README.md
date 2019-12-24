@@ -95,6 +95,28 @@ cards.
          --devices=0,1,2,3,4,5,6,7
 ```
 
+### Tunable hyperparameters
+
+The following flags are allowed to be modified by entrants:
+Flags that don't directly affect convergence:
+ - _all flags related to file paths & device IDs_
+ - `bool_features`
+ - `input_layout`
+ - `summary_steps`
+ - `cache_size_mb`
+ - `num_read_threads`
+ - `num_write_threads`
+ - `output_threads`
+ - `selfplay_threads`
+ - `parallel_search`
+ - `parallel_inference`
+ - `concurrent_games_per_thread`
+
+Flags that directly affect convergence:
+ - `train_batch_size`
+ - `lr_rates`
+ - `lr_boundaries`
+
 ### Selfplay threading model
 
 The selfplay C++ binary (`//cc:concurrent_selfplay`) has multiple flags that control its
