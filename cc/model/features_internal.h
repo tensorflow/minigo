@@ -33,6 +33,8 @@ struct FeaturesImpl;
 // time.
 template <typename First, typename... Rest>
 struct FeaturesImpl<First, Rest...> {
+  static constexpr int kNumFirstPlanes = First::kNumPlanes;
+
   static constexpr int kNumPlanes =
       First::kNumPlanes + FeaturesImpl<Rest...>::kNumPlanes;
 

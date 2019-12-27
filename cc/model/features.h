@@ -287,12 +287,16 @@ struct WouldCaptureFeature {
 
 // `Features` encodes the input tensor type `T` and the list of input features
 // to be used `Fs`.
+// StoneFeatures must the first feature in Fs.
 template <typename... Fs>
 struct Features {
   using Impl = internal::FeaturesImpl<Fs...>;
 
   // Total number of input feature planes.
   static constexpr int kNumPlanes = Impl::kNumPlanes;
+
+  // Number of stone feature planes.
+  static constexpr int kNumStonePlanes = Impl::kNumFirstPlanes;
 
   // Generate the input features in `Fs` from `input` and write them to
   // the `features` tensor.
@@ -412,8 +416,10 @@ struct FeatureDescriptor {
   SetFeaturesFn<float> set_floats;
 };
 
+// StoneFeatures must be listed first.
 using AgzFeatures = Features<StoneFeatures<8>, ToPlayFeature>;
 
+// StoneFeatures must be listed first.
 // TODO(tommadams): rename ExtraFeatures to Mlperf07Features.
 using ExtraFeatures = Features<StoneFeatures<4>, ToPlayFeature, LibertyFeatures,
                                WouldCaptureFeature>;

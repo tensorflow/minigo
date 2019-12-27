@@ -51,6 +51,22 @@ std::vector<T> GetStoneFeatures(const Tensor<T>& features, Coord c) {
   return result;
 }
 
+// Helper function to make AlphaGo Zero-like features (stones and to-play
+// features) for input features that use different sizes of move history.
+template <typename T, typename F>
+std::vector<T> MakeZeroFeatures(std::initializer_list<T> stones, T to_play) {
+  // Make sure that caller has provided enough stone features.
+  MG_CHECK(stones.size() >= F::kNumStonePlanes);
+
+  // Take only the required number of stone features.
+  std::vector<T> result(stones);
+  result.resize(F::kNumStonePlanes);
+
+  // Append the to-play feature.
+  result.push_back(to_play);
+  return result;
+}
+
 template <typename F>
 class DualNetTest : public ::testing::Test {};
 
@@ -130,16 +146,17 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
                             buffer.data()};
   FeatureType::SetNhwc({&input}, &features);
 
-  //                        B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7 C
-  std::vector<float> b9 = {{1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1}};
-  std::vector<float> h9 = {{0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1}};
-  std::vector<float> a8 = {{1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1}};
-  std::vector<float> j9 = {{0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1}};
-  std::vector<float> d5 = {{1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
-  std::vector<float> a1 = {{0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
-  std::vector<float> a2 = {{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
-  std::vector<float> j1 = {{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
-  std::vector<float> b1 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  const auto& mzf = MakeZeroFeatures<float, FeatureType>;
+  //             B0 W0 B1 W1 B2 W2 B3 W3 B4 W4 B5 W5 B6 W6 B7 W7  C
+  auto b9 = mzf({1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0}, 1);
+  auto h9 = mzf({0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0}, 1);
+  auto a8 = mzf({1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0}, 1);
+  auto j9 = mzf({0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0}, 1);
+  auto d5 = mzf({1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
+  auto a1 = mzf({0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
+  auto a2 = mzf({1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
+  auto j1 = mzf({0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
+  auto b1 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
 
   if (std::is_same<FeatureType, ExtraFeatures>::value) {
     //                   L1 L2 L3 WC
@@ -190,8 +207,9 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
                             buffer.data()};
   FeatureType::SetNhwc({&input}, &features);
 
-  //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
-  std::vector<float> j2 = {{0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+  const auto& mzf = MakeZeroFeatures<float, FeatureType>;
+  //             W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7  C
+  auto j2 = mzf({0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0);
   if (std::is_same<FeatureType, ExtraFeatures>::value) {
     //                   L1 L2 L3 WC
     j2.insert(j2.end(), {0, 0, 1, 0});
@@ -284,9 +302,10 @@ TEST(WouldCaptureTest, WouldCaptureBlack) {
                             buffer.data()};
   ExtraFeatures::SetNhwc({&input}, &features);
 
-  //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
-  std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
-  std::vector<float> g8 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+  const auto& mzf = MakeZeroFeatures<float, ExtraFeatures>;
+  //             W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7  C
+  auto a7 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
+  auto g8 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
   //                   L1 L2 L3 WC
   a7.insert(a7.end(), {0, 0, 0, 1});
   g8.insert(g8.end(), {0, 0, 0, 1});
@@ -312,9 +331,10 @@ TEST(WouldCaptureTest, WouldCaptureWhite) {
                             buffer.data()};
   ExtraFeatures::SetNhwc({&input}, &features);
 
-  //                        W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7 C
-  std::vector<float> a7 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
-  std::vector<float> g8 = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+  const auto& mzf = MakeZeroFeatures<float, ExtraFeatures>;
+  //             W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7  C
+  auto a7 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0);
+  auto g8 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0);
   //                   L1 L2 L3 WC
   a7.insert(a7.end(), {0, 0, 0, 1});
   g8.insert(g8.end(), {0, 0, 0, 1});
