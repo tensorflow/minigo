@@ -26,12 +26,14 @@ from absl import app, flags
 
 
 flags.DEFINE_integer('start', 0, 'Index of first model to evaluate.')
-flags.DEFINE_integer('num_games', 100, 'Number of games to run.')
+flags.DEFINE_integer('num_games', 128, 'Number of games to run.')
 flags.DEFINE_string('flags_dir', '', 'Flags directory.')
 flags.DEFINE_string('model_dir', '', 'Model directory.')
 flags.DEFINE_string('target', '', 'Path of the target model.')
 flags.DEFINE_string('sgf_dir', '', 'Directory to write SGFs to.')
 flags.DEFINE_list('devices', '', 'List of devices to run on.')
+flags.DEFINE_float('winrate', 0.5,
+                   'Fraction of games that a model must beat the target by.')
 
 FLAGS = flags.FLAGS
 
@@ -132,7 +134,8 @@ def main(unused_argv):
             logging.info('Skiping %s', name)
             continue
         winrate = evaluate_model(path)
-        if winrate >= 0.50:
+        if winrate >= FLAGS.winrate:
+            print('Model {} beat target after {}s'.format(name, timestamp))
             break
 
 
