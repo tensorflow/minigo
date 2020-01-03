@@ -25,6 +25,14 @@
 source ml_perf/scripts/common.sh
 
 
+# Build the C++ binaries
+bazel build -c opt \
+  --copt=-O3 \
+  --define=board_size="${board_size}" \
+  --define=tf=1 \
+  cc:concurrent_selfplay cc:sample_records cc:eval
+
+
 # Initialize a clean directory structure.
 for var_name in flag_dir golden_chunk_dir holdout_dir log_dir model_dir \
                 selfplay_dir sgf_dir work_dir; do

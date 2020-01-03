@@ -64,6 +64,8 @@ FLAGS = flags.FLAGS
 
 
 def main(argv):
+    assert FLAGS.src_path != FLAGS.dst_path
+
     # Parse the model metadata from non-flag command line arguments.
     metadata = {}
     for m in FLAGS.metadata:

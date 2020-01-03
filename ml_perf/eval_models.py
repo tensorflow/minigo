@@ -25,7 +25,9 @@ from ml_perf.utils import *
 from absl import app, flags
 
 
-flags.DEFINE_integer('start', 0, 'Index of first model to evaluate.')
+flags.DEFINE_integer('start', 0, 'First model generation to evaluate.')
+flags.DEFINE_integer('step', 1,
+                     'Number of generations to advance each iteration.')
 flags.DEFINE_integer('num_games', 128, 'Number of games to run.')
 flags.DEFINE_string('flags_dir', '', 'Flags directory.')
 flags.DEFINE_string('model_dir', '', 'Model directory.')
@@ -129,10 +131,11 @@ def evaluate_model(eval_model_path):
 
 def main(unused_argv):
     models = load_train_times()
+
+    # Skip all models earlier than start and apply step.
+    models = [x for x in models if int(x[1]) >= FLAGS.start][::FLAGS.step]
+
     for i, (timestamp, name, path) in enumerate(models):
-        if int(name) < FLAGS.start:
-            logging.info('Skiping %s', name)
-            continue
         winrate = evaluate_model(path)
         if winrate >= FLAGS.winrate:
             print('Model {} beat target after {}s'.format(name, timestamp))

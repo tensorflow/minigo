@@ -206,7 +206,7 @@ def print_example(examples, i):
 
 
 def main(unused_argv):
-    examples = ReadExamples(FLAGS.path)
+    examples = read_examples(FLAGS.path)
 
     i = 0
     while i < len(examples):
