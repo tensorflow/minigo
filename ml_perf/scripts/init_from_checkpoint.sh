@@ -46,7 +46,5 @@ python3 ml_perf/init_from_checkpoint.py \
   --checkpoint_dir="${checkpoint_dir}" \
   --selfplay_dir="${selfplay_dir}" \
   --work_dir="${work_dir}" \
-  --model_dir="${model_dir}" \
   --flag_dir="${flag_dir}" \
-  --tpu_name="${tpu_name}"
 

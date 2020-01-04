@@ -14,13 +14,15 @@ following commands. This may vary on a different operating system or graphics
 cards.
 
 ```
-    # Clone repository
+    # Install dependencies
+    apt-get install -y python3 python3-pip rsync git wget pkg-config zip g++ zlib1g-dev unzip
+
+    # Clone repository.
     git clone https://github.com/tensorflow/minigo
     # Note: This will eventually change to:
     # git clone http://github.com/mlperf/training
 
-    # Install dependencies
-    apt-get install -y python3 python3-pip rsync git wget pkg-config zip g++ zlib1g-dev unzip
+    cd minigo
 
     # Create a virtualenv (this step is optional but highly recommended).
     pip3 install virtualenv
@@ -44,16 +46,25 @@ cards.
     # Compile TensorFlow C++ libraries
     ./cc/configure_tensorflow.sh
 
-    BASE_DIR=$(pwd)/results/$(date +%Y-%m-%d)
+    # Download & extract bootstrap checkpoint.
+    gsutil cp gs://minigo-pub/ml_perf/0.7/checkpoint.tar.gz .
+    tar xfz checkpoint.tar.gz -C ml_perf/
 
-    # Bootstrap the training loop.
-    # This step builds the required C++ binaries and plays random games.
+    # Download and freeze the target model.
+    mkdir -p ml_perf/target/
+    gsutil cp gs://minigo-pub/ml_perf/0.7/target.* ml_perf/target/
+    python3 freeze_graph.py --flagfile=ml_perf/flags/19/architecture.flags  --model_path=ml_perf/target/target
+
+    # Set the benchmark output base directory.
+    BASE_DIR=$(pwd)/ml_perf/results/$(date +%Y-%m-%d-%H-%M)
+
+    # Bootstrap the training loop from the checkpoint.
+    # This step also builds the required C++ binaries.
     # Bootstrapping is not considered part of the benchmark.
-    # TODO(tommadams): This step will be replaced with a step that initializes
-    # the training loop from a checkpoint.
-    ./ml_perf/scripts/bootstrap.sh \
+    ./ml_perf/scripts/init_from_checkpoint.sh \
         --board_size=19 \
-        --base_dir=$BASE_DIR
+        --base_dir=$BASE_DIR \
+        --checkpoint_dir=ml_perf/checkpoints/mlperf07
 
     # Start the selfplay binaries running on the specified GPU devices.
     # This launches one selfplay binary per GPU.
