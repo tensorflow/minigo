@@ -44,17 +44,15 @@ import tensorflow as tf
 
 import coords
 import features as features_lib
-import go
 
 
 tf.enable_eager_execution()
 
 
 flags.DEFINE_string('path', '', 'Path to a TF example file.')
-flags.DEFINE_integer('to_play_feature', 16,
-                     'Index of the "to play" feature.')
-flags.DEFINE_string('feature_layout', 'nhwc',
-                    'Feature layout: "nhwc" or "nchw".')
+flags.DEFINE_integer('to_play_feature', None, 'Index of the "to play" feature.')
+flags.DEFINE_integer('board_size', None, 'Board size.')
+flags.DEFINE_string('feature_layout', None, 'Feature layout: "nhwc" or "nchw".')
 
 FLAGS = flags.FLAGS
 
@@ -67,6 +65,59 @@ class ParsedExample(object):
         self.q = q
         self.n = n
         self.c = c
+
+
+def all_features_same(x, layout, plane, size):
+    num_records = x.shape[0]
+    stride = max(1, num_records // 32)
+    for n in range(0, num_records, stride):
+        if layout == 'nhwc':
+            s = tf.slice(x, (n, 0, 0, plane), (1, size, size, 1))
+        else:
+            s = tf.slice(x, (n, plane, 0, 0), (1, 1, size, size))
+        if np.unique(s).size != 1:
+            return False
+    return True
+
+
+def guess_to_play(x, pi, num_records, size, layout):
+    print('Testing if features are %dx%d, %s' % (size, size, layout))
+
+    if layout == 'nhwc':
+        x = tf.reshape(x, (num_records, size, size, -1))
+        num_planes = x.shape[3]
+    else:
+        x = tf.reshape(x, (num_records, -1, size, size))
+        num_planes = x.shape[1]
+
+    to_play = None
+    for plane in set(range(num_planes)):
+        if all_features_same(x, layout, plane, size):
+            if to_play is None:
+                to_play = plane
+            else:
+                raise ValueError('Couldn\'t find to-play plane')
+    if to_play is None:
+        raise ValueError('Couldn\'t find to-play plane')
+
+    return to_play
+
+
+def guess_format(x, pi, num_records):
+    formats = []
+    for board_size in [9, 19]:
+        for feature_layout in ['nhwc', 'nchw']:
+            try:
+                to_play = guess_to_play(
+                    x, pi, num_records, board_size, feature_layout)
+                formats.append((board_size, feature_layout, to_play))
+            except Exception as e:
+                print('   %s' % e)
+                continue
+            print('   Success: detected to-play plane as %d' % to_play)
+    if len(formats) != 1:
+        raise ValueError('Couldn\'t guess format')
+    return formats[0]
 
 
 def read_examples(path):
@@ -87,16 +138,33 @@ def read_examples(path):
 
     x = tf.decode_raw(parsed['x'], tf.uint8)
     x = tf.cast(x, tf.float32)
+    pi = tf.decode_raw(parsed['pi'], tf.float32)
+
+    if not (FLAGS.board_size and FLAGS.feature_layout and
+            FLAGS.to_play_feature):
+        try:
+            FLAGS.board_size, FLAGS.feature_layout, FLAGS.to_play_feature = (
+                guess_format(x, pi, num_records))
+        except:
+            print('Unable to guess feature format from examples, please set '
+            'the board_size, feature_layout and to_play_feature flags')
+            sys.exit(1)
+
+    # We must set the BOARD_SIZE environment variable before importing the go
+    # module.
+    os.environ['BOARD_SIZE'] = str(FLAGS.board_size)
+    global go
+    import go
+
     if FLAGS.feature_layout == 'nhwc':
         x = tf.reshape(x, [num_records, go.N, go.N, -1])
     elif FLAGS.feature_layout == 'nchw':
         x = tf.reshape(x, [num_records, -1, go.N, go.N])
         x = tf.transpose(x, [0, 2, 3, 1])
     else:
-        raise ValueError('invalid feature_layout "%s"' % FLAGS.feature_layout)
+        raise ValueError('Invalid feature_layout "%s"' % FLAGS.feature_layout)
     x = x.numpy()
 
-    pi = tf.decode_raw(parsed['pi'], tf.float32)
     pi = tf.reshape(pi, [num_records, go.N * go.N + 1])
     pi = pi.numpy()
 
@@ -207,6 +275,10 @@ def print_example(examples, i):
 
 def main(unused_argv):
     examples = read_examples(FLAGS.path)
+
+    avg_value = sum([x.value for x in examples]) / len(examples)
+
+    print('\nAverage value: %f' % avg_value)
 
     i = 0
     while i < len(examples):

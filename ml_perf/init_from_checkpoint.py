@@ -28,12 +28,11 @@ from ml_perf.utils import *
 from absl import app, flags
 
 
-N = os.environ.get('BOARD_SIZE', '19')
-
 flags.DEFINE_string('checkpoint_dir', None, 'Source checkpoint directory.')
 flags.DEFINE_string('selfplay_dir', None, 'Selfplay example directory.')
 flags.DEFINE_string('work_dir', None, 'Training work directory.')
 flags.DEFINE_string('flag_dir', None, 'Flag directory.')
+flags.DEFINE_string('board_size', None, 'Board size.')
 
 FLAGS = flags.FLAGS
 
@@ -43,7 +42,7 @@ def main(unused_argv):
     copy_tree(os.path.join(FLAGS.checkpoint_dir, 'data/selfplay'),
               FLAGS.selfplay_dir)
     copy_tree(os.path.join(FLAGS.checkpoint_dir, 'work_dir'), FLAGS.work_dir)
-    copy_tree(os.path.join(FLAGS.checkpoint_dir, 'flags'), FLAGS.flag_dir)
+    copy_tree(os.path.join('ml_perf/flags', FLAGS.board_size), FLAGS.flag_dir)
 
 if __name__ == '__main__':
     app.run(main)

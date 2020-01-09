@@ -1,7 +1,7 @@
 --iterations=100
 
 --window_size=5
---train_filter=0.3
+--examples_per_generation=131072
 
 --validate=1
 

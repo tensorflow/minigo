@@ -47,4 +47,5 @@ python3 ml_perf/init_from_checkpoint.py \
   --selfplay_dir="${selfplay_dir}" \
   --work_dir="${work_dir}" \
   --flag_dir="${flag_dir}" \
+  --board_size="${board_size}"
 

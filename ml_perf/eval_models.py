@@ -28,7 +28,7 @@ from absl import app, flags
 flags.DEFINE_integer('start', 0, 'First model generation to evaluate.')
 flags.DEFINE_integer('step', 1,
                      'Number of generations to advance each iteration.')
-flags.DEFINE_integer('num_games', 128, 'Number of games to run.')
+flags.DEFINE_integer('num_games', 256, 'Number of games to run.')
 flags.DEFINE_string('flags_dir', '', 'Flags directory.')
 flags.DEFINE_string('model_dir', '', 'Model directory.')
 flags.DEFINE_string('target', '', 'Path of the target model.')

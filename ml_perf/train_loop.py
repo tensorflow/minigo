@@ -21,7 +21,6 @@ import asyncio
 import itertools
 import logging
 import os
-import re
 import tensorflow as tf
 import time
 from ml_perf.utils import *
@@ -39,8 +38,9 @@ flags.DEFINE_string('flags_dir', None,
 flags.DEFINE_integer('window_size', 5,
                      'Maximum number of recent selfplay rounds to train on.')
 
-flags.DEFINE_float('train_filter', 0.3,
-                   'Fraction of selfplay games to pass to training.')
+flags.DEFINE_integer('examples_per_generation', 131072,
+                     'Number of examples use from each generation in the '
+                     'training window.')
 
 flags.DEFINE_boolean('validate', False, 'Run validation on holdout games')
 
@@ -75,7 +75,6 @@ FLAGS = flags.FLAGS
 
 
 # Training loop state.
-# TODO(tommadams): make the trainer a proper class and get rid of this.
 class State:
     def __init__(self, model_num):
         self.start_time = time.time()
@@ -145,7 +144,7 @@ def list_selfplay_dirs(base_dir):
     return sorted(model_dirs, reverse=True)
 
 
-async def sample_training_examples(state):
+def sample_training_examples(state):
     """Sample training examples from recent selfplay games.
 
     Args:
@@ -163,30 +162,29 @@ async def sample_training_examples(state):
     src_patterns = [os.path.join(x, '*', '*', '*.tfrecord.zz')
                     for x in model_dirs]
 
+    # Get the number of examples to train on.
+    num_examples = FLAGS.examples_per_generation * len(model_dirs)
+
     dst_path = os.path.join(FLAGS.golden_chunk_dir,
                             '{}.tfrecord.zz'.format(state.train_model_name))
 
     logging.info('Writing training chunks to %s', dst_path)
-    output = await checked_run([
+    output = wait(checked_run([
         'bazel-bin/cc/sample_records',
         '--num_read_threads={}'.format(FLAGS.num_read_threads),
         '--num_write_threads={}'.format(FLAGS.num_write_threads),
-        '--sample_frac={}'.format(FLAGS.train_filter),
+        '--num_records={}'.format(num_examples),
         '--compression=1',
         '--shuffle=true',
-        '--dst={}'.format(dst_path)] + src_patterns)
-
-    m = re.search(r"sampled ([\d]+) records", output)
-    assert m
-    num_records = int(m.group(1))
+        '--dst={}'.format(dst_path)] + src_patterns))
 
     chunk_pattern = os.path.join(
         FLAGS.golden_chunk_dir,
         '{}-*-of-*.tfrecord.zz'.format(state.train_model_name))
     chunk_paths = sorted(tf.gfile.Glob(chunk_pattern))
-    assert len(chunk_paths) == 8
+    assert len(chunk_paths) == FLAGS.num_write_threads
 
-    return (num_records, chunk_paths)
+    return (num_examples, chunk_paths)
 
 
 def append_timestamp(elapsed, model_name):
@@ -197,13 +195,13 @@ def append_timestamp(elapsed, model_name):
     with tf.gfile.Open(timestamps_path, 'r') as f:
       timestamps = f.read()
   except tf.errors.NotFoundError:
-    timestamps = ''
+      timestamps = ''
   timestamps += '{:.3f} {}\n'.format(elapsed, model_name)
   with tf.gfile.Open(timestamps_path, 'w') as f:
-    f.write(timestamps)
+      f.write(timestamps)
 
 
-async def train(state):
+def train(state):
     """Run training and write a new model to the model_dir.
 
     Args:
@@ -211,19 +209,19 @@ async def train(state):
     """
 
     wait_for_training_examples(state, FLAGS.min_games_per_iteration)
-    num_records, record_paths = await sample_training_examples(state)
+    num_examples, record_paths = sample_training_examples(state)
 
     model_path = os.path.join(FLAGS.model_dir, state.train_model_name)
 
-    await checked_run([
+    wait(checked_run([
         'python3', 'train.py',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'train.flags')),
         '--work_dir={}'.format(FLAGS.work_dir),
         '--export_path={}'.format(model_path),
         '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
         '--tpu_name={}'.format(FLAGS.tpu_name),
-        '--num_examples={}'.format(num_records),
-        '--freeze=true'] + record_paths)
+        '--num_examples={}'.format(num_examples),
+        '--freeze=true'] + record_paths))
 
     # Append the time elapsed from when the RL was started to when this model
     # was trained.
@@ -232,21 +230,21 @@ async def train(state):
 
     if FLAGS.validate and state.iter_num - state.start_iter_num > 1:
         try:
-            await validate(state)
+            validate(state)
         except Exception as e:
             logging.error(e)
 
 
-async def validate(state):
+def validate(state):
     src_dirs = list_selfplay_dirs(FLAGS.holdout_dir)[:FLAGS.window_size]
 
-    await checked_run([
+    wait(checked_run([
         'python3', 'validate.py',
         '--flagfile={}'.format(os.path.join(FLAGS.flags_dir, 'validate.flags')),
         '--work_dir={}'.format(FLAGS.work_dir),
         '--use_tpu={}'.format('true' if FLAGS.tpu_name else 'false'),
         '--tpu_name={}'.format(FLAGS.tpu_name),
-        '--expand_validation_dirs'] + src_dirs)
+        '--expand_validation_dirs'] + src_dirs))
 
 
 def main(unused_argv):
@@ -275,7 +273,7 @@ def main(unused_argv):
             state = State(model_num)
             while state.iter_num <= FLAGS.iterations:
                 state.iter_num += 1
-                wait(train(state))
+                train(state)
         finally:
                 asyncio.get_event_loop().close()
 

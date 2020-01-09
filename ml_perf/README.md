@@ -96,13 +96,11 @@ cards.
 
     # Once the training loop has finished, run model evaluation to find the
     # first trained model that's better than the target.
-    # TODO(tommadams): we still need to do more testing before choosing a
-    # target model.
     python3 ml_perf/eval_models.py \
-         --start=20 \
+         --start=0 \
          --flags_dir=ml_perf/flags/19 \
          --model_dir=$BASE_DIR/models/ \
-         --target=$TDB \
+         --target=ml_perf/target/target.minigo \
          --devices=0,1,2,3,4,5,6,7
 ```
 
@@ -122,6 +120,8 @@ Flags that don't directly affect convergence:
  - `parallel_search`
  - `parallel_inference`
  - `concurrent_games_per_thread`
+ - `validate`
+ - `holdout_pct`
 
 Flags that directly affect convergence:
  - `train_batch_size`

@@ -109,7 +109,7 @@ def list_selfplay_dirs(base_dir):
     return sorted(model_dirs, reverse=True)
 
 
-def copy_tree(src, dst):
+def copy_tree(src, dst, verbose=False):
     """Copies everything under src to dst."""
 
     print('Copying {} to {}'.format(src, dst))
@@ -126,6 +126,8 @@ def copy_tree(src, dst):
             for basename in basenames:
                 src_path = os.path.join(src_dir, basename)
                 dst_path = os.path.join(dst_dir, basename)
+                if verbose:
+                    print('Copying {} to {}'.format(src_path, dst_path))
                 tf.io.gfile.copy(src_path, dst_path)
 
 

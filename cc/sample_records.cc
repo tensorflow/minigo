@@ -126,12 +126,12 @@ class WriteThread : public Thread {
     if (options_.num_shards == 1) {
       path_ = path;
     } else {
+      absl::string_view expected_ext =
+          options_.compression == 0 ? ".tfrecord" : ".tfrecord.zz";
       absl::string_view stem = path;
-      // TODO(tommadams): expect the suffix .tfrecord if
-      // options_.compression == 0.
-      MG_CHECK(absl::ConsumeSuffix(&stem, ".tfrecord.zz"))
-          << "expected path to have extension '.tfrecords.zz', got '" << stem
-          << "'";
+      MG_CHECK(absl::ConsumeSuffix(&stem, expected_ext))
+          << "expected path to have extension '" << expected_ext
+          << "', got '" << stem << "'";
       path_ = absl::StrFormat("%s-%05d-of-%05d.tfrecord.zz", stem,
                               options_.shard, options_.num_shards);
     }
@@ -231,8 +231,6 @@ void Shuffle(std::vector<std::string>* records) {
 }
 
 void Write(std::vector<std::string> records, const std::string& path) {
-  MG_LOG(INFO) << "writing to " << path;
-
   WriteThread::Options write_options;
   write_options.num_shards = FLAGS_num_write_threads;
   write_options.compression = FLAGS_compression;
@@ -249,6 +247,7 @@ void Write(std::vector<std::string> records, const std::string& path) {
     num_records = static_cast<size_t>(records.size());
   }
 
+  size_t total_dst = 0;
   std::vector<std::unique_ptr<WriteThread>> threads;
   for (int shard = 0; shard < FLAGS_num_write_threads; ++shard) {
     write_options.shard = shard;
@@ -263,6 +262,8 @@ void Write(std::vector<std::string> records, const std::string& path) {
     size_t end_dst = (shard + 1) * num_records / FLAGS_num_write_threads;
     size_t num_dst = end_dst - begin_dst;
 
+    total_dst += num_dst;
+
     // Sample the records for this shard.
     std::vector<std::string> shard_records;
     shard_records.reserve(num_dst);
@@ -274,6 +275,9 @@ void Write(std::vector<std::string> records, const std::string& path) {
     threads.push_back(absl::make_unique<WriteThread>(std::move(shard_records),
                                                      path, write_options));
   }
+
+  MG_CHECK(total_dst == num_records);
+  MG_LOG(INFO) << "writing " << num_records << " records to " << path;
   for (auto& t : threads) {
     t->Start();
   }
