@@ -39,6 +39,7 @@ minigo_cc_library(
     hdrs = ["factory.h"],
     deps = [
         ":model",
+        "//cc:logging",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:variant",
@@ -162,6 +163,8 @@ minigo_cc_binary(
         ":model",
         "//cc:base",
         "//cc:init",
+        "//cc:logging",
+        "//cc:position",
         "//cc:random",
         "//cc:symmetries",
         "@com_google_absl//absl/strings",

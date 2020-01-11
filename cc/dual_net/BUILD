@@ -7,10 +7,7 @@ licenses(["notice"])  # Apache License 2.0
 
 load(
     "//cc/config:minigo.bzl",
-    "minigo_cc_binary",
     "minigo_cc_library",
-    "minigo_cc_test",
-    "minigo_cc_test_19_only",
     "minigo_cc_test_9_only",
     "minigo_engine_copts",
 )
@@ -72,8 +69,8 @@ minigo_cc_library(
     deps = [
         "//cc:base",
         "//cc:logging",
-        "//cc/file:path",
         "//cc/file",
+        "//cc/file:path",
         "//cc/model",
         "//cc/model:factory",
         "//cc/platform",

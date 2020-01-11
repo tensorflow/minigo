@@ -22,14 +22,13 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/variant.h"
+#include "cc/logging.h"
 #include "cc/model/model.h"
 
 namespace minigo {
 
 using ModelProperty =
     absl::variant<std::string, bool, int64_t, uint64_t, float>;
-
-std::ostream& operator<<(std::ostream& os, const ModelProperty& p);
 
 // Although the metadata is stored in the Minigo file as JSON, it is
 // converted on load to a simpler representation to avoid pulling an entire
@@ -57,7 +56,7 @@ class ModelMetadata {
   template <typename T>
   const T& Get(absl::string_view key) const {
     const auto& prop = impl_.at(key);
-    MG_DCHECK(absl::holds_alternative<T>(prop)) << prop;
+    MG_DCHECK(absl::holds_alternative<T>(prop)) << DebugString();
     return absl::get<T>(prop);
   }
 

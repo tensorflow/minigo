@@ -37,6 +37,11 @@ class LogModelProperty {
   std::ostream* os_;
 };
 
+std::ostream& operator<<(std::ostream& os, const ModelProperty& p) {
+  absl::visit(LogModelProperty(&os), p);
+  return os;
+}
+
 }  // namespace
 
 std::string ModelMetadata::DebugString() const {
@@ -48,11 +53,6 @@ std::string ModelMetadata::DebugString() const {
   }
   std::sort(items.begin(), items.end());
   return absl::StrCat("{", absl::StrJoin(items, ", "), "}");
-}
-
-std::ostream& operator<<(std::ostream& os, const ModelProperty& p) {
-  absl::visit(LogModelProperty(&os), p);
-  return os;
 }
 
 ModelFactory::~ModelFactory() = default;

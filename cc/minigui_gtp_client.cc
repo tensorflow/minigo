@@ -39,8 +39,8 @@ MiniguiGtpClient::MiniguiGtpClient(
     const std::string& model_path, const Game::Options& game_options,
     const MctsPlayer::Options& player_options,
     const GtpClient::Options& client_options)
-    : GtpClient(std::move(device), inference_cache, model_path,
-                game_options, player_options, client_options) {
+    : GtpClient(std::move(device), inference_cache, model_path, game_options,
+                player_options, client_options) {
   RegisterCmd("echo", &MiniguiGtpClient::HandleEcho);
   RegisterCmd("genmove", &MiniguiGtpClient::HandleGenmove);
   RegisterCmd("play", &MiniguiGtpClient::HandlePlay);
@@ -59,8 +59,8 @@ MiniguiGtpClient::MiniguiGtpClient(
   auto worker_options = player_options;
   worker_options.virtual_losses = 1;
   win_rate_evaluator_ = absl::make_unique<WinRateEvaluator>(
-      num_workers, num_win_rate_evals, device_, inference_cache,
-      model_path, game_options, worker_options);
+      num_workers, num_win_rate_evals, device_, inference_cache, model_path,
+      game_options, worker_options);
 }
 
 MiniguiGtpClient::~MiniguiGtpClient() = default;
@@ -455,9 +455,9 @@ MiniguiGtpClient::WinRateEvaluator::WinRateEvaluator(
   batcher_ = absl::make_unique<BatchingModelFactory>(device, 2);
   for (int i = 0; i < num_workers; ++i) {
     auto game = absl::make_unique<Game>("b", "w", game_options);
-    auto player = absl::make_unique<MctsPlayer>(
-        batcher_->NewModel(model_path), inference_cache, game.get(),
-        player_options);
+    auto player = absl::make_unique<MctsPlayer>(batcher_->NewModel(model_path),
+                                                inference_cache, game.get(),
+                                                player_options);
     workers_.push_back(absl::make_unique<Worker>(
         std::move(game), std::move(player), &eval_queue_));
     workers_.back()->Start();
@@ -539,6 +539,7 @@ MiniguiGtpClient::WinRateEvaluator::Worker::~Worker() {
 }
 
 void MiniguiGtpClient::WinRateEvaluator::Worker::Prepare() {
+  absl::MutexLock lock(&mutex_);
   BatchingModelFactory::StartGame(player_->model(), player_->model());
 }
 
@@ -552,8 +553,7 @@ void MiniguiGtpClient::WinRateEvaluator::Worker::EvalAsync(
 void MiniguiGtpClient::WinRateEvaluator::Worker::Run() {
   for (;;) {
     absl::MutexLock lock(&mutex_);
-    mutex_.Await(absl::Condition(
-        &pending_, &absl::optional<VariationTree::Node*>::has_value));
+    mutex_.Await(absl::Condition(this, &Worker::has_pending_value));
     auto* node = *pending_;
     pending_.reset();
     if (node == nullptr) {

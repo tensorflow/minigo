@@ -252,7 +252,7 @@ TpuDualNetFactory::LoadedModel TpuDualNetFactory::GetModel(
            coded_stream.ConsumedEntireMessage());
 
   // Find the data type of the input features.
-  tensorflow::DataType dt;
+  tensorflow::DataType dt = tensorflow::DT_INVALID;
   const auto& input_type = def.metadata.Get<std::string>("input_type");
   if (input_type == "bool") {
     dt = tensorflow::DT_BOOL;
