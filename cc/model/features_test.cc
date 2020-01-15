@@ -332,21 +332,21 @@ TEST(FeaturesTest, CompareNhwcNchw) {
   }
 
   // Generate NHWC features.
-  auto desc_nhwc = FeatureDescriptor::Create<ExtraFeatures>(
+  auto desc_nhwc = FeatureDescriptor::Create<Mlperf07Features>(
       FeatureDescriptor::Layout::kNhwc);
   auto shape_nhwc = desc_nhwc.GetInputShape(kBatchSize);
   BackedTensor<uint8_t> features_nhwc(shape_nhwc);
   desc_nhwc.set_bytes(input_ptrs, &features_nhwc.tensor());
 
   // Generate NCHW features.
-  auto desc_nchw = FeatureDescriptor::Create<ExtraFeatures>(
+  auto desc_nchw = FeatureDescriptor::Create<Mlperf07Features>(
       FeatureDescriptor::Layout::kNchw);
   auto shape_nchw = desc_nchw.GetInputShape(kBatchSize);
   BackedTensor<uint8_t> features_nchw(shape_nchw);
   desc_nchw.set_bytes(input_ptrs, &features_nchw.tensor());
 
   // Verify features are equivalent.
-  auto np = ExtraFeatures::kNumPlanes;
+  auto np = Mlperf07Features::kNumPlanes;
   for (int n = 0; n < kBatchSize; ++n) {
     for (int j = 0; j < kN; ++j) {
       for (int i = 0; i < kN; ++i) {

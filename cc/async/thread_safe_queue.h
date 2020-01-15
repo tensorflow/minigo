@@ -34,7 +34,7 @@ class ThreadSafeQueue {
 
   void Push(T&& x) {
     absl::MutexLock lock(&m_);
-    queue_.push(std::move(x));
+    queue_.push(std::forward<T>(x));
   }
 
   bool TryPop(T* x) {

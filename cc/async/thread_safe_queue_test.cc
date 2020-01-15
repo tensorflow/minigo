@@ -31,7 +31,7 @@ namespace minigo {
 namespace {
 
 // Verify that the queue is a FIFO.
-TEST(CoordTest, Ordering) {
+TEST(ThreadSafeQueueTest, Ordering) {
   ThreadSafeQueue<int> q;
 
   q.Push(1);
@@ -48,7 +48,7 @@ TEST(CoordTest, Ordering) {
 }
 
 // Verify that PopWithTimeout works whether the queue is empty or not.
-TEST(CoordTest, PopWithTimeout) {
+TEST(ThreadSafeQueueTest, PopWithTimeout) {
   ThreadSafeQueue<int> q;
   int x;
   // Pop with a 2ms delay on an empty queue should take at least 1ms.
@@ -62,7 +62,7 @@ TEST(CoordTest, PopWithTimeout) {
 }
 
 // Verify that the queue works with move-only objects.
-TEST(CoordTest, MoveOnlyObject) {
+TEST(ThreadSafeQueueTest, MoveOnlyObject) {
   // A simple move-only type.
   struct MoveOnly {
     explicit MoveOnly(int x) : x(x) {}
@@ -83,7 +83,7 @@ TEST(CoordTest, MoveOnlyObject) {
 }
 
 // Verify multithreading.
-TEST(CoordTest, Multithreading) {
+TEST(ThreadSafeQueueTest, Multithreading) {
   ThreadSafeQueue<int> q;
 
   // Push a bunch of ints onto the queue.

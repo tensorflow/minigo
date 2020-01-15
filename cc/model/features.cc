@@ -33,7 +33,7 @@ FeatureDescriptor FeatureDescriptor::Create(absl::string_view input_features,
   if (input_features == "agz") {
     return FeatureDescriptor::Create<AgzFeatures>(layout);
   } else if (input_features == "mlperf07") {
-    return FeatureDescriptor::Create<ExtraFeatures>(layout);
+    return FeatureDescriptor::Create<Mlperf07Features>(layout);
   } else {
     MG_LOG(FATAL) << "Unrecognized input features \"" << input_features << "\"";
     return {};

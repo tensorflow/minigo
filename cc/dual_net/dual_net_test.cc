@@ -70,7 +70,7 @@ std::vector<T> MakeZeroFeatures(std::initializer_list<T> stones, T to_play) {
 template <typename F>
 class DualNetTest : public ::testing::Test {};
 
-using TestFeatureTypes = ::testing::Types<AgzFeatures, ExtraFeatures>;
+using TestFeatureTypes = ::testing::Types<AgzFeatures, Mlperf07Features>;
 TYPED_TEST_CASE(DualNetTest, TestFeatureTypes);
 
 // Verifies SetFeatures an empty board with black to play.
@@ -158,7 +158,7 @@ TYPED_TEST(DualNetTest, TestSetFeatures) {
   auto j1 = mzf({0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
   auto b1 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
 
-  if (std::is_same<FeatureType, ExtraFeatures>::value) {
+  if (std::is_same<FeatureType, Mlperf07Features>::value) {
     //                   L1 L2 L3 WC
     b9.insert(b9.end(), {0, 0, 1, 0});
     h9.insert(h9.end(), {0, 0, 1, 0});
@@ -210,7 +210,7 @@ TYPED_TEST(DualNetTest, TestStoneFeaturesWithCapture) {
   const auto& mzf = MakeZeroFeatures<float, FeatureType>;
   //             W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7  C
   auto j2 = mzf({0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0);
-  if (std::is_same<FeatureType, ExtraFeatures>::value) {
+  if (std::is_same<FeatureType, Mlperf07Features>::value) {
     //                   L1 L2 L3 WC
     j2.insert(j2.end(), {0, 0, 1, 0});
   }
@@ -298,11 +298,11 @@ TEST(WouldCaptureTest, WouldCaptureBlack) {
   input.position_history.push_back(&board);
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {{1, kN, kN, ExtraFeatures::kNumPlanes},
+  Tensor<float> features = {{1, kN, kN, Mlperf07Features::kNumPlanes},
                             buffer.data()};
-  ExtraFeatures::SetNhwc({&input}, &features);
+  Mlperf07Features::SetNhwc({&input}, &features);
 
-  const auto& mzf = MakeZeroFeatures<float, ExtraFeatures>;
+  const auto& mzf = MakeZeroFeatures<float, Mlperf07Features>;
   //             W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7  C
   auto a7 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
   auto g8 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 1);
@@ -327,11 +327,11 @@ TEST(WouldCaptureTest, WouldCaptureWhite) {
   input.position_history.push_back(&board);
 
   BoardFeatureBuffer<float> buffer;
-  Tensor<float> features = {{1, kN, kN, ExtraFeatures::kNumPlanes},
+  Tensor<float> features = {{1, kN, kN, Mlperf07Features::kNumPlanes},
                             buffer.data()};
-  ExtraFeatures::SetNhwc({&input}, &features);
+  Mlperf07Features::SetNhwc({&input}, &features);
 
-  const auto& mzf = MakeZeroFeatures<float, ExtraFeatures>;
+  const auto& mzf = MakeZeroFeatures<float, Mlperf07Features>;
   //             W0 B0 W1 B1 W2 B2 W3 B3 W4 B4 W5 B5 W6 B6 W7 B7  C
   auto a7 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0);
   auto g8 = mzf({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0);

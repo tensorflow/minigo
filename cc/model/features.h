@@ -420,13 +420,12 @@ struct FeatureDescriptor {
 using AgzFeatures = Features<StoneFeatures<8>, ToPlayFeature>;
 
 // StoneFeatures must be listed first.
-// TODO(tommadams): rename ExtraFeatures to Mlperf07Features.
-using ExtraFeatures = Features<StoneFeatures<4>, ToPlayFeature, LibertyFeatures,
-                               WouldCaptureFeature>;
+using Mlperf07Features = Features<
+    StoneFeatures<4>, ToPlayFeature, LibertyFeatures, WouldCaptureFeature>;
 
 // Maximum number of feature planes used by these features.
 constexpr int kMaxNumFeaturePlanes =
-    internal::GetMaxNumFeaturePlanes<AgzFeatures, ExtraFeatures>();
+    internal::GetMaxNumFeaturePlanes<AgzFeatures, Mlperf07Features>();
 
 // A buffer large enough to hold features for all input types.
 template <typename T>

@@ -3,7 +3,7 @@
 --window_size=5
 --examples_per_generation=131072
 
---validate=1
+--validate=0
 
 # --num_games in bootstrap.flags must be >= --min_games_per_iteration.
 --min_games_per_iteration=8192
