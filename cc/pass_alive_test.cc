@@ -390,6 +390,27 @@ TEST_F(PassAliveTest, 9x9) {
           . . . . . . . . .)"},
 
       {// board state
+       R"(. X X X X X X X .
+          X O O O O O O O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O O O O O O O X
+          . X X X X X X X .)",
+       // expected result
+       R"(X X X X X X X X X
+          X O O O O O O O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O . . . . . O X
+          X O O O O O O O X
+          X X X X X X X X X)"},
+
+      {// board state
        R"(. . . . . . . . .
           . . . . . . . . .
           . . . X X . . . .
@@ -492,6 +513,27 @@ TEST_F(PassAliveTest, 9x9) {
           . . . . . . . . .
           . . . . . . . . .
           . . . . O . . . .
+          . . . . . . . . .)"},
+
+      {// board state
+       R"(. X X X X O O . .
+          X O O X . X O . .
+          X O . O X X O . .
+          X O O . O X O . .
+          X X O O O X O . .
+          O X X X X X O . .
+          O O O O O O O . .
+          . . . . . . . . .
+          . . . . . . . . .)",
+       // expected result
+       R"(X X X X X O O . .
+          X O O X X X O . .
+          X O O O X X O . .
+          X O O O O X O . .
+          X X O O O X O . .
+          O X X X X X O . .
+          O O O O O O O . .
+          . . . . . . . . .
           . . . . . . . . .)"},
 
       {// board state
@@ -896,6 +938,88 @@ TEST_F(PassAliveTest, 19x19) {
           X X X X X X X X O O O O O O O O O O O
           X X X X X X X X O O O O O O O O O O O
           X X X X X X X X O O O O O O O O O O O)"},
+
+      {// board state
+       R"(. . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . O O O . . . . . . . . . . . . . .
+          . O X X O O O O . . . . . . . . . . .
+          . O X . X X X O O . . . . . . . . . .
+          . O X X O O X X O . . . . . . . . . .
+          . O X O O . O X O . . . . . . . . . .
+          . O X O . O O X O . . . . . . . . . .
+          . O X X O O X X O . . . . . . . . . .
+          . O O X X X . X O . . . . . . . . . .
+          . . O O O O X X O . . . . . . . . . .
+          . . . . . O O O . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .)",
+       // expected result
+       R"(. . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . O O O . . . . . . . . . . . . . .
+          . O X X O O O O . . . . . . . . . . .
+          . O X X X X X O O . . . . . . . . . .
+          . O X X O O X X O . . . . . . . . . .
+          . O X O O O O X O . . . . . . . . . .
+          . O X O O O O X O . . . . . . . . . .
+          . O X X O O X X O . . . . . . . . . .
+          . O O X X X X X O . . . . . . . . . .
+          . . O O O O X X O . . . . . . . . . .
+          . . . . . O O O . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .)"},
+
+      {// board state
+       R"(. . . . . . . . . . . . . . . . . . .
+          . . . O O O O O . . . . . . . . . . .
+          . . O X X O X X O . . . . . . . . . .
+          . . O X . X . X O . . . . . . . . . .
+          . . O X X O X X O . . . . . . . . . .
+          . O X X O O O X X O . . . . . . . . .
+          . O X O . O . O X O . . . . . . . . .
+          . O X O O O O O X O . . . . . . . . .
+          . O X X X X X X X O . . . . . . . . .
+          . . O O O O O O O . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .)",
+       // expected result
+       R"(. . . . . . . . . . . . . . . . . . .
+          . . . O O O O O . . . . . . . . . . .
+          . . O X X O X X O . . . . . . . . . .
+          . . O X X X X X O . . . . . . . . . .
+          . . O X X O X X O . . . . . . . . . .
+          . O X X O O O X X O . . . . . . . . .
+          . O X O O O O O X O . . . . . . . . .
+          . O X O O O O O X O . . . . . . . . .
+          . O X X X X X X X O . . . . . . . . .
+          . . O O O O O O O . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .
+          . . . . . . . . . . . . . . . . . . .)"},
   };
 
   RunTests(tests);
