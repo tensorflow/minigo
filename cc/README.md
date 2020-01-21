@@ -5,9 +5,6 @@ of Minigo.
 
 ## Set up
 
-The C++ Minigo port requires __version 0.19.2__ of the [Bazel](https://bazel.build/)
-build system (see [README.md](../README.md) for installation instructions).
-
 Minigo++ depends on the TensorFlow C++ libraries, but we have not yet set up
 Bazel WORKSPACE and BUILD rules to automatically download and configure
 TensorFlow so (for now at least) you must perform a manual step to build the
@@ -22,9 +19,6 @@ sudo ldconfig
 ```
 
 Now, you're ready to compile TensorFlow from source:
-
-Currently this builds Tensorflow version **1.13.1** (see
-[WORKSPACE](../WORKSPACE) for details)
 
 ```shell
 sudo apt-get install zip
