@@ -128,6 +128,10 @@ Flags that directly affect convergence:
  - `lr_rates`
  - `lr_boundaries`
 
+Entrants are also free to replace the code responsible for writing, shuffling
+and sampling training examples with equivalent functionality (e.g. replacing the
+use of `sample_records` and a file system with a different storage solution).
+
 ### Selfplay threading model
 
 The selfplay C++ binary (`//cc:concurrent_selfplay`) has multiple flags that control its

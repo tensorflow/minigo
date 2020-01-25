@@ -49,12 +49,12 @@ Inferences engines section below for more details.
 
 The TensorFlow models can found on our public Google Cloud Storage bucket. A
 good model to start with is 000990-cormorant from the v15 run. The C++ engine
-requires the frozen model in a `GraphDef` proto format, which is the `.pb` file.
-You can copy it locally as follows:
+requires the frozen model in a `.minigo` format. You can copy it locally as
+follows:
 
 ```shell
 mkdir -p saved_models
-gsutil cp gs://minigo-pub/v15-19x19/models/000990-cormorant.pb saved_models/
+gsutil cp gs://minigo-pub/v15-19x19/models/000990-cormorant.minigo saved_models/
 ```
 
 Minigo can also read models directly from Google Cloud Storage but it doesn't
@@ -227,15 +227,20 @@ Bazel `--define` arguments at compile time.
 
 ## Compiling a TensorFlow Lite model
 
-First, run a frozen graph through Toco, the TensorFlow optimizing compiler:
+First, unwrap the `.minigo` model into a `.pb`, then run it through Toco, the
+TensorFlow optimizing compiler:
 
 ```
+python3 oneoffs/unwrap_model.py \
+      --src_path model.minigo \
+      --dst_path model.pb
+
 BATCH_SIZE=8
 ./cc/tensorflow/bin/toco \
-  --input_file=saved_models/000256-opossum.pb \
+  --input_file=model.pb \
   --input_format=TENSORFLOW_GRAPHDEF \
   --output_format=TFLITE \
-  --output_file=saved_models/000256-opossum.tflite \
+  --output_file=model.tflite \
   --inference_type=FLOAT \
   --input_type=FLOAT \
   --input_arrays=pos_tensor \
@@ -243,14 +248,23 @@ BATCH_SIZE=8
   --input_shapes=8,19,19,17
 ```
 
+Unwrapping the model will print its metadata. You will need to rewrap the model
+with the same metadata but setting the engine to `tflite`:
+
+```
+python3 oneoffs/wrap_model.py \
+  --src_path model.tflite \
+  --dst_path model.minifo \
+  --metadata engine=lite,input_features=agz,input_layout=nhwc,input_type=float,board_size=19
+```
+
 ## Cloud TPU
 
 Minigo supports running inference on Cloud TPU.
-Build `//cc:selfplay` with `--define=tpu=1` and run with
-`--model=tpu:$BUFFER_COUNT:$TPU_NAME,$PATH`
-(see above).
+Build `//cc:concurrent_selfplay` with `--define=tpu=1` and run with
+`--device=$TPU_NAME` (see above).
 
-To freeze a model into a GraphDef proto that can be run on Cloud TPU, use
+To freeze a model into a model that can be run on Cloud TPU, use
 `freeze_graph.py`:
 
 ```
