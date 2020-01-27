@@ -48,6 +48,9 @@ DEFINE_int32(num_write_threads, 1,
              "<basename>-NNNNN-of-NNNNN.tfrecord.zz");
 DEFINE_int32(compression, 1,
              "Compression level between 0 (disabled) and 9. Default is 1.");
+DEFINE_int32(files_per_pattern, 0,
+             "If > 0, randomly select exactly files_per_pattern input files "
+             "to sample records from, failing if fewer are found.");
 DEFINE_uint64(seed, 0, "Random seed.");
 DEFINE_bool(shuffle, false, "Whether to shuffle the sampled records.");
 DEFINE_string(dst, "",
@@ -315,6 +318,14 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> paths;
     TF_CHECK_OK(tensorflow::Env::Default()->GetMatchingPaths(pattern, &paths));
     MG_LOG(INFO) << pattern << " matched " << paths.size() << " files";
+    if (FLAGS_files_per_pattern > 0) {
+      MG_CHECK(static_cast<int>(paths.size()) >= FLAGS_files_per_pattern)
+          << "require " << FLAGS_files_per_pattern << " files per pattern, "
+          << pattern << " matched only " << paths.size();
+      minigo::Random rnd(FLAGS_seed, minigo::Random::kUniqueStream);
+      rnd.Shuffle(&paths);
+      paths.resize(FLAGS_files_per_pattern);
+    }
     for (auto& path : paths) {
       src_paths.push_back(std::move(path));
     }

@@ -21,6 +21,7 @@ import asyncio
 import itertools
 import logging
 import os
+import re
 import tensorflow as tf
 import time
 from ml_perf.utils import *
@@ -37,6 +38,9 @@ flags.DEFINE_string('flags_dir', None,
 
 flags.DEFINE_integer('window_size', 5,
                      'Maximum number of recent selfplay rounds to train on.')
+
+flags.DEFINE_float('train_filter', 0.3,
+                   'Fraction of selfplay games to pass to training.')
 
 flags.DEFINE_integer('examples_per_generation', 131072,
                      'Number of examples use from each generation in the '
@@ -162,9 +166,6 @@ def sample_training_examples(state):
     src_patterns = [os.path.join(x, '*', '*', '*.tfrecord.zz')
                     for x in model_dirs]
 
-    # Get the number of examples to train on.
-    num_examples = FLAGS.examples_per_generation * len(model_dirs)
-
     dst_path = os.path.join(FLAGS.golden_chunk_dir,
                             '{}.tfrecord.zz'.format(state.train_model_name))
 
@@ -173,10 +174,15 @@ def sample_training_examples(state):
         'bazel-bin/cc/sample_records',
         '--num_read_threads={}'.format(FLAGS.num_read_threads),
         '--num_write_threads={}'.format(FLAGS.num_write_threads),
-        '--num_records={}'.format(num_examples),
+        '--files_per_pattern={}'.format(FLAGS.min_games_per_iteration),
+        '--sample_frac={}'.format(FLAGS.train_filter),
         '--compression=1',
         '--shuffle=true',
         '--dst={}'.format(dst_path)] + src_patterns))
+
+    m = re.search(r"sampled ([\d]+) records", output)
+    assert m
+    num_examples = int(m.group(1))
 
     chunk_pattern = os.path.join(
         FLAGS.golden_chunk_dir,
