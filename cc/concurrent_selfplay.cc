@@ -374,7 +374,6 @@ class Selfplayer {
   void CheckAbortFile();
 
   mutable absl::Mutex mutex_;
-  Game::Options game_options_ GUARDED_BY(&mutex_);
   MctsTree::Options tree_options_ GUARDED_BY(&mutex_);
   int num_games_remaining_ GUARDED_BY(&mutex_) = 0;
   Random rnd_ GUARDED_BY(&mutex_);
@@ -812,7 +811,9 @@ std::unique_ptr<SelfplayGame> Selfplayer::StartNewGame(bool verbose) {
     player_name = latest_model_name_;
     game_id = next_game_id_++;
 
-    game_options = game_options_;
+    game_options.resign_threshold =
+        -rnd_.Uniform(std::fabs(FLAGS_min_resign_threshold),
+                      std::fabs(FLAGS_max_resign_threshold));
     game_options.resign_enabled = rnd_() >= FLAGS_disable_resign_pct;
 
     tree_options = tree_options_;
@@ -878,9 +879,6 @@ void Selfplayer::ParseFlags() {
     FLAGS_concurrent_games_per_thread = std::min(
         max_concurrent_games_per_thread, FLAGS_concurrent_games_per_thread);
   }
-  game_options_.resign_threshold =
-      -rnd_.Uniform(std::fabs(FLAGS_min_resign_threshold),
-                    std::fabs(FLAGS_max_resign_threshold));
 
   tree_options_.value_init_penalty = FLAGS_value_init_penalty;
   tree_options_.policy_softmax_temp = FLAGS_policy_softmax_temp;
