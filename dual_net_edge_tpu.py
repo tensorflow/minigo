@@ -24,6 +24,10 @@ import go
 from edgetpu.basic.basic_engine import BasicEngine  # pylint: disable=import-error
 
 
+def extract_agz_features(position):
+    return features_lib.extract_features(position, features_lib.AGZ_FEATURES)
+
+
 class DualNetworkEdgeTpu():
     """DualNetwork implementation for Google's EdgeTPU."""
 
@@ -53,7 +57,7 @@ class DualNetworkEdgeTpu():
 
     def run_many(self, positions):
         """Runs inference on a list of position."""
-        processed = list(map(features_lib.extract_features, positions))
+        processed = map(extract_agz_features, positions)
         probabilities = []
         values = []
         for state in processed:
