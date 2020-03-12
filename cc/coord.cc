@@ -80,19 +80,19 @@ Coord TryParseString(absl::string_view str) {
 
 Coord Coord::FromGtp(absl::string_view str, bool allow_invalid) {
   auto c = TryParseGtp(str);
-  MG_CHECK(allow_invalid || c != Coord::kInvalid);
+  MG_CHECK(allow_invalid || c != Coord::kInvalid) << "\"" << str << "\"";
   return c;
 }
 
 Coord Coord::FromSgf(absl::string_view str, bool allow_invalid) {
   auto c = TryParseSgf(str);
-  MG_CHECK(allow_invalid || c != Coord::kInvalid);
+  MG_CHECK(allow_invalid || c != Coord::kInvalid) << "\"" << str << "\"";
   return c;
 }
 
 Coord Coord::FromString(absl::string_view str, bool allow_invalid) {
   auto c = TryParseString(str);
-  MG_CHECK(allow_invalid || c != Coord::kInvalid);
+  MG_CHECK(allow_invalid || c != Coord::kInvalid) << "\"" << str << "\"";
   return c;
 }
 

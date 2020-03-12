@@ -60,10 +60,8 @@ class GtpClient {
     bool tree_reuse = true;
   };
 
-  GtpClient(std::string device,
-            std::shared_ptr<InferenceCache> inference_cache,
-            const std::string& model_path,
-            const Game::Options& game_options,
+  GtpClient(std::string device, std::shared_ptr<InferenceCache> inference_cache,
+            const std::string& model_path, const Game::Options& game_options,
             const MctsPlayer::Options& player_options,
             const GtpClient::Options& client_options);
   virtual ~GtpClient();
@@ -149,8 +147,7 @@ class GtpClient {
   // Replay a loaded SGF game.
   // Called by HandleLoadSgf after the SGF file has been loaded and parsed, and
   // a new game has been started.
-  virtual Response ReplaySgf(
-      const std::vector<std::unique_ptr<sgf::Node>>& trees);
+  virtual Response ReplaySgf(const sgf::Collection& collection);
 
   // Handles a GTP command specified by `line`.
   // Returns a (bool, string) pair containing whether the GtpPlayer should
@@ -180,10 +177,6 @@ class GtpClient {
   virtual Response HandleReadouts(CmdArgs args);
   virtual Response HandleShowboard(CmdArgs args);
   virtual Response HandleUndo(CmdArgs args);
-
-  // Utilities for processing SGF files.
-  Response ParseSgf(const std::string& sgf_str,
-                    std::vector<std::unique_ptr<sgf::Node>>* trees);
 
   std::shared_ptr<InferenceCache> inference_cache_;
   std::unique_ptr<MctsPlayer> player_;

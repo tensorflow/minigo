@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "cc/color.h"
@@ -33,47 +34,57 @@ namespace sgf {
 
 constexpr char kProgramIdentifier[] = "Minigo";
 
-// Abstract syntax tree for an SGF file.
-// The Ast class just holds the structure and contents of the tree and doesn't
-// infer any meaning from the property IDs or values.
-class Ast {
- public:
-  struct Property {
-    std::string ToString() const;
+//  Collection = GameTree { GameTree }
+//  GameTree   = "(" Sequence { GameTree } ")"
+//  Sequence   = Node { Node }
+//  Node       = ";" { Property }
+//  Property   = PropIdent PropValue { PropValue }
+//  PropIdent  = UcLetter { UcLetter }
+//  PropValue  = "[" CValueType "]"
+//  CValueType = (ValueType | Compose)
+//  ValueType  = (None | Number | Real | Double | Color | SimpleText |
+//               Text | Point  | Move | Stone)
 
-    std::string id;
-    std::vector<std::string> values;
-  };
+// An SGF node property.
+// Properties created via the minigo::sgf::Parse function are guaranteed to
+// have at least one value.
+struct Property {
+  std::string ToString() const;
 
-  struct Node {
-    std::string ToString() const;
-
-    const Property* FindProperty(absl::string_view id) const;
-
-    std::vector<Property> properties;
-  };
-
-  struct Tree {
-    std::string ToString() const;
-
-    std::vector<Node> nodes;
-    std::vector<Tree> children;
-  };
-
-  // Parses the SGF file.
-  MG_WARN_UNUSED_RESULT bool Parse(std::string contents);
-
-  // Returns a non-empty string containing error information if the most recent
-  // call to Parse returned false.
-  const std::string& error() const { return error_; }
-
-  const std::vector<Tree>& trees() const { return trees_; }
-
- private:
-  std::string error_;
-  std::vector<Tree> trees_;
-  std::string contents_;
+  std::string id;
+  std::vector<std::string> values;
 };
+
+struct Node {
+  std::string ToString() const;
+
+  const Property* FindProperty(absl::string_view id) const;
+
+  // Returns the node's comment if it has one or an empty string otherwise.
+  const std::string& GetComment() const;
+
+  Move move;
+  std::vector<Property> properties;
+};
+
+struct Tree {
+  std::string ToString() const;
+
+  std::vector<Move> ExtractMainLine() const;
+
+  std::vector<std::unique_ptr<Node>> nodes;
+  std::vector<std::unique_ptr<Tree>> sub_trees;
+};
+
+struct Collection {
+  std::string ToString() const;
+
+  std::vector<std::unique_ptr<Tree>> trees;
+};
+
+// Parses an SGF file.
+MG_WARN_UNUSED_RESULT bool Parse(absl::string_view contents,
+                                 Collection* collection, std::string* error);
 
 // TODO(tommadams): Replace sgf::MoveWithComment with sgf::Node.
 // A single move with a (possibly empty) comment.
@@ -99,19 +110,6 @@ struct MoveWithComment {
 
 std::ostream& operator<<(std::ostream& ios, const MoveWithComment& move);
 
-struct Node {
-  Node(Move move, std::string comment)
-      : move(move), comment(std::move(comment)) {}
-
-  // Returns a flattened copy of the main line moves: the chain of moves formed
-  // by this node and its left-most descendants.
-  std::vector<Move> ExtractMainLine() const;
-
-  const Move move;
-  std::string comment;
-  std::vector<std::unique_ptr<Node>> children;
-};
-
 struct CreateSgfOptions {
   std::string black_name = kProgramIdentifier;
   std::string white_name = kProgramIdentifier;
@@ -124,10 +122,6 @@ struct CreateSgfOptions {
 // Returns a valid SGF file for the given move sequence.
 std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
                             const CreateSgfOptions& options);
-
-// Extracts the complete game trees from an SGF AST.
-MG_WARN_UNUSED_RESULT bool GetTrees(const Ast& ast,
-                                    std::vector<std::unique_ptr<Node>>* trees);
 
 }  // namespace sgf
 }  // namespace minigo

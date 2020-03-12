@@ -200,8 +200,7 @@ class MiniguiGtpClient : public GtpClient {
   Response HandleCmd(const std::string& line) override;
   Response HandleGenmove(CmdArgs args) override;
   Response HandlePlay(CmdArgs args) override;
-  Response ReplaySgf(
-      const std::vector<std::unique_ptr<sgf::Node>>& trees) override;
+  Response ReplaySgf(const sgf::Collection& collection) override;
 
   Response HandleEcho(CmdArgs args);
   Response HandleReportSearchInterval(CmdArgs args);

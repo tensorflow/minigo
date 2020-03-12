@@ -58,16 +58,15 @@ GameInfo ProcessSgf(const std::string& path) {
   std::string contents;
   MG_CHECK(file::ReadFile(path, &contents));
 
-  sgf::Ast ast;
-  MG_CHECK(ast.Parse(contents));
-
-  std::vector<std::unique_ptr<sgf::Node>> trees;
-  MG_CHECK(sgf::GetTrees(ast, &trees));
+  sgf::Collection collection;
+  std::string error;
+  MG_CHECK(sgf::Parse(contents, &collection, &error)) << error;
+  MG_CHECK(!collection.trees.empty());
 
   Position position(Color::kBlack);
 
   Coord prev_move = Coord::kInvalid;
-  const auto& moves = trees[0]->ExtractMainLine();
+  const auto& moves = collection.trees[0]->ExtractMainLine();
   auto num_moves = static_cast<int>(moves.size());
   for (int i = 0; i < num_moves; ++i) {
     const auto& move = moves[i];

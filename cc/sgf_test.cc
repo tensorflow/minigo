@@ -26,64 +26,71 @@ namespace minigo {
 namespace sgf {
 namespace {
 
-class AstTest : public ::testing::Test {
+class SgfTest : public ::testing::Test {
  protected:
-  Ast ast_;
+  bool Parse(std::string contents) {
+    return minigo::sgf::Parse(contents, &collection_, &error_);
+  }
+
+  Collection collection_;
+  std::string error_;
 };
 
-TEST_F(AstTest, NoTrees) {
-  EXPECT_TRUE(ast_.Parse("")) << ast_.error();
-  EXPECT_TRUE(ast_.Parse(" \n ")) << ast_.error();
+TEST_F(SgfTest, NoTrees) {
+  EXPECT_TRUE(Parse("")) << error_;
+  EXPECT_TRUE(Parse(" \n ")) << error_;
 }
 
-TEST_F(AstTest, BadTree) { EXPECT_FALSE(ast_.Parse("   \n  x")); }
+TEST_F(SgfTest, BadTree) { EXPECT_FALSE(Parse("   \n  x")); }
 
-TEST_F(AstTest, EmptyTree) { EXPECT_FALSE(ast_.Parse("()")); }
+TEST_F(SgfTest, EmptyTree) { EXPECT_FALSE(Parse("()")); }
 
-TEST_F(AstTest, EmptyNode) {
-  EXPECT_TRUE(ast_.Parse("(;)")) << ast_.error();
-  ASSERT_EQ(1, ast_.trees().size());
-  EXPECT_EQ(1, ast_.trees()[0].nodes.size());
-  EXPECT_EQ(0, ast_.trees()[0].nodes[0].properties.size());
-  EXPECT_EQ(0, ast_.trees()[0].children.size());
-  EXPECT_EQ("(;)", ast_.trees()[0].ToString());
+TEST_F(SgfTest, EmptyNode) {
+  EXPECT_TRUE(Parse("(;)")) << error_;
+  ASSERT_EQ(1, collection_.trees.size());
+  ASSERT_EQ(1, collection_.trees[0]->nodes.size());
+
+  const auto* node = collection_.trees[0]->nodes[0].get();
+  EXPECT_EQ(Move(Color::kEmpty, Coord::kInvalid), node->move);
+  EXPECT_TRUE(node->properties.empty());
+
+  EXPECT_EQ("(;)", collection_.ToString());
 }
 
-TEST_F(AstTest, MultipleEmptyNodes) {
-  EXPECT_TRUE(ast_.Parse("(;;;)")) << ast_.error();
-  ASSERT_EQ(1, ast_.trees().size());
-  EXPECT_EQ(3, ast_.trees()[0].nodes.size());
-  EXPECT_EQ("(;\n;\n;)", ast_.trees()[0].ToString());
+TEST_F(SgfTest, MultipleEmptyNodes) {
+  EXPECT_TRUE(Parse("(;;;)")) << error_;
+  ASSERT_EQ(1, collection_.trees.size());
+  EXPECT_EQ(3, collection_.trees[0]->nodes.size());
+  EXPECT_EQ("(;\n;\n;)", collection_.trees[0]->ToString());
 }
 
-TEST_F(AstTest, OneNodeTree) {
-  EXPECT_TRUE(ast_.Parse("(;A[1][hmm])")) << ast_.error();
-  ASSERT_EQ(1, ast_.trees().size());
-  EXPECT_EQ("(;A[1][hmm])", ast_.trees()[0].ToString());
+TEST_F(SgfTest, OneNodeTree) {
+  EXPECT_TRUE(Parse("(;A[1][hmm])")) << error_;
+  ASSERT_EQ(1, collection_.trees.size());
+  EXPECT_EQ("(;A[1][hmm])", collection_.ToString());
 }
 
-TEST_F(AstTest, PropertyIdIsMissing) { EXPECT_FALSE(ast_.Parse("(;[])")); }
+TEST_F(SgfTest, PropertyIdIsMissing) { EXPECT_FALSE(Parse("(;[])")); }
 
-TEST_F(AstTest, PropertyIdIsNotUpper) { EXPECT_FALSE(ast_.Parse("(;a[])")); }
+TEST_F(SgfTest, PropertyIdIsNotUpper) { EXPECT_FALSE(Parse("(;a[])")); }
 
-TEST_F(AstTest, PropertyHasOneEmptyValue) {
-  EXPECT_TRUE(ast_.Parse("(;A[])")) << ast_.error();
+TEST_F(SgfTest, PropertyHasOneEmptyValue) {
+  EXPECT_TRUE(Parse("(;A[])")) << error_;
 }
 
-TEST_F(AstTest, PropertyHasMultipleEmptyValues) {
-  EXPECT_TRUE(ast_.Parse("(;A[][][])")) << ast_.error();
-  ASSERT_EQ(1, ast_.trees().size());
-  EXPECT_EQ(1, ast_.trees()[0].nodes.size());
-  EXPECT_EQ(1, ast_.trees()[0].nodes[0].properties.size());
-  EXPECT_EQ("A", ast_.trees()[0].nodes[0].properties[0].id);
-  EXPECT_EQ(3, ast_.trees()[0].nodes[0].properties[0].values.size());
-  EXPECT_EQ("(;A[][][])", ast_.trees()[0].ToString());
+TEST_F(SgfTest, PropertyHasMultipleEmptyValues) {
+  EXPECT_TRUE(Parse("(;A[][][])")) << error_;
+  ASSERT_EQ(1, collection_.trees.size());
+  EXPECT_EQ(1, collection_.trees[0]->nodes.size());
+  EXPECT_EQ(1, collection_.trees[0]->nodes[0]->properties.size());
+  EXPECT_EQ("A", collection_.trees[0]->nodes[0]->properties[0].id);
+  EXPECT_EQ(3, collection_.trees[0]->nodes[0]->properties[0].values.size());
+  EXPECT_EQ("(;A[][][])", collection_.trees[0]->ToString());
 }
 
-TEST_F(AstTest, NestedTrees) {
-  EXPECT_TRUE(ast_.Parse("(; (;A[b][c];D[]) (;) (;E[f];G[] (;H[i])))"))
-      << ast_.error();
-  ASSERT_EQ(1, ast_.trees().size());
+TEST_F(SgfTest, NestedTrees) {
+  EXPECT_TRUE(Parse("(; (;A[b][c];D[]) (;) (;E[f];G[] (;H[i])))")) << error_;
+  ASSERT_EQ(1, collection_.trees.size());
   EXPECT_EQ(R"((;
 (;A[b][c]
 ;D[])
@@ -91,22 +98,22 @@ TEST_F(AstTest, NestedTrees) {
 (;E[f]
 ;G[]
 (;H[i]))))",
-            ast_.trees()[0].ToString());
+            collection_.ToString());
 }
 
-TEST_F(AstTest, MultipleTrees) {
-  EXPECT_TRUE(ast_.Parse("(;A[])(;B[c]) (  ;D[e][f])")) << ast_.error();
-  ASSERT_EQ(3, ast_.trees().size());
-  EXPECT_EQ("(;A[])", ast_.trees()[0].ToString());
-  EXPECT_EQ("(;B[c])", ast_.trees()[1].ToString());
-  EXPECT_EQ("(;D[e][f])", ast_.trees()[2].ToString());
+TEST_F(SgfTest, MultipleTrees) {
+  EXPECT_TRUE(Parse("(;X[])(;Y[a]) (  ;Z[b][c])")) << error_;
+  ASSERT_EQ(3, collection_.trees.size());
+  EXPECT_EQ("(;X[])", collection_.trees[0]->ToString());
+  EXPECT_EQ("(;Y[a])", collection_.trees[1]->ToString());
+  EXPECT_EQ("(;Z[b][c])", collection_.trees[2]->ToString());
 }
 
-TEST_F(AstTest, NodesMustComeBeforeChildren) {
-  EXPECT_FALSE(ast_.Parse("(() ;A[])"));
+TEST_F(SgfTest, NodesMustComeBeforeChildren) {
+  EXPECT_FALSE(Parse("(() ;A[])"));
 }
 
-TEST(SgfTest, CreateSgfStringDefaults) {
+TEST_F(SgfTest, CreateSgfStringDefaults) {
   CreateSgfOptions options;
   options.result = "W+R";
   auto expected = absl::StrCat(
@@ -115,7 +122,7 @@ TEST(SgfTest, CreateSgfStringDefaults) {
   EXPECT_EQ(expected, CreateSgfString({}, options));
 }
 
-TEST(SgfTest, CreateSgfStringOptions) {
+TEST_F(SgfTest, CreateSgfStringOptions) {
   CreateSgfOptions options;
   options.black_name = "Alice";
   options.white_name = "Bob";
@@ -129,7 +136,7 @@ TEST(SgfTest, CreateSgfStringOptions) {
   EXPECT_EQ(expected, CreateSgfString({}, options));
 }
 
-TEST(SgfTest, CreateSgfStringMoves) {
+TEST_F(SgfTest, CreateSgfStringMoves) {
   CreateSgfOptions options;
   options.result = "B+R";
 
@@ -154,16 +161,12 @@ TEST(SgfTest, CreateSgfStringMoves) {
   EXPECT_EQ(expected, CreateSgfString(moves, options));
 }
 
-TEST(SgfTest, InvalidCoord) {
+TEST_F(SgfTest, InvalidCoord) {
   std::string sgf = "(;FF[4](;B[xx]))\n";
-
-  Ast ast;
-  ASSERT_TRUE(ast.Parse(sgf)) << ast.error();
-  std::vector<std::unique_ptr<sgf::Node>> trees;
-  EXPECT_FALSE(GetTrees(ast, &trees));
+  ASSERT_FALSE(Parse(sgf));
 }
 
-TEST(SgfTest, GetMainLineMoves) {
+TEST_F(SgfTest, GetMainLineMoves) {
   /*
      --- B[aa] - W[ab] - B[ac]
      \                 \
@@ -183,33 +186,26 @@ TEST(SgfTest, GetMainLineMoves) {
       {Color::kBlack, Coord::FromSgf("ac")},
   };
 
-  Ast ast;
-  ASSERT_TRUE(ast.Parse(sgf)) << ast.error();
+  ASSERT_TRUE(Parse(sgf)) << error_;
 
-  std::vector<std::unique_ptr<sgf::Node>> trees;
-  ASSERT_TRUE(GetTrees(ast, &trees));
-  ASSERT_EQ(2, trees.size());
-  auto actual_main_line = trees[0]->ExtractMainLine();
+  auto actual_main_line = collection_.trees[0]->ExtractMainLine();
   EXPECT_THAT(actual_main_line, ::testing::ContainerEq(expected_main_line));
 }
 
-TEST(SgfTest, CommentEscaping) {
+TEST_F(SgfTest, CommentEscaping) {
   // Fragment of an SGF that contains escaped characters.
   std::string sgf = "(;FF[4];C[test [?\\]: comment]B[aa];W[bb]C[\\]])";
 
-  Ast ast;
-  EXPECT_TRUE(ast.Parse(sgf)) << ast.error();
+  EXPECT_TRUE(Parse(sgf)) << error_;
+  ASSERT_EQ(1, collection_.trees.size());
+  const auto* tree = collection_.trees[0].get();
+  ASSERT_EQ(3, tree->nodes.size());
 
-  std::vector<std::unique_ptr<sgf::Node>> trees;
-  ASSERT_TRUE(GetTrees(ast, &trees));
-  ASSERT_EQ(1, trees.size());
+  EXPECT_EQ("aa", tree->nodes[1]->move.c.ToSgf());
+  EXPECT_EQ("test [?]: comment", tree->nodes[1]->GetComment());
 
-  EXPECT_EQ("aa", trees[0]->move.c.ToSgf());
-  EXPECT_EQ("test [?]: comment", trees[0]->comment);
-
-  ASSERT_EQ(1, trees[0]->children.size());
-  EXPECT_EQ("bb", trees[0]->children[0]->move.c.ToSgf());
-  EXPECT_EQ("]", trees[0]->children[0]->comment);
+  EXPECT_EQ("bb", tree->nodes[2]->move.c.ToSgf());
+  EXPECT_EQ("]", tree->nodes[2]->GetComment());
 }
 
 }  // namespace

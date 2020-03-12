@@ -17,7 +17,7 @@
 #include <cctype>
 #include <utility>
 
-#include "absl/memory/memory.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -35,11 +35,11 @@ class Parser {
   Parser(absl::string_view contents, std::string* error)
       : original_contents_(contents), contents_(contents), error_(error) {}
 
-  bool Parse(std::vector<Ast::Tree>* trees) {
+  bool Parse(Collection* collection) {
     *error_ = "";
     while (SkipWhitespace()) {
-      trees->emplace_back();
-      if (!ParseTree(&trees->back())) {
+      collection->trees.push_back(absl::make_unique<Tree>());
+      if (!ParseTree(collection->trees.back().get())) {
         return false;
       }
     }
@@ -50,7 +50,7 @@ class Parser {
   char peek() const { return contents_[0]; }
 
  private:
-  bool ParseTree(Ast::Tree* tree) {
+  bool ParseTree(Tree* tree) {
     if (!Read('(')) {
       return false;
     }
@@ -64,8 +64,8 @@ class Parser {
         return Error("reached EOF when parsing tree");
       }
       if (peek() == '(') {
-        tree->children.emplace_back();
-        if (!ParseTree(&tree->children.back())) {
+        tree->sub_trees.push_back(absl::make_unique<Tree>());
+        if (!ParseTree(tree->sub_trees.back().get())) {
           return false;
         }
       } else {
@@ -74,27 +74,27 @@ class Parser {
     }
   }
 
-  bool ParseSequence(Ast::Tree* tree) {
-    if (!SkipWhitespace()) {
-      return Error("reached EOF when parsing sequence");
-    }
+  bool ParseSequence(Tree* tree) {
     for (;;) {
-      if (peek() != ';') {
-        // All valid trees must contain at least one node.
-        if (tree->nodes.empty()) {
-          return Error("tree has no nodes");
-        }
-        return true;
+      if (!SkipWhitespace()) {
+        return Error("reached EOF when parsing sequence");
       }
-      Read(';');
-      tree->nodes.emplace_back();
-      if (!ParseNode(&tree->nodes.back())) {
+      if (peek() != ';') {
+        break;
+      }
+      tree->nodes.push_back(absl::make_unique<Node>());
+      if (!ParseNode(tree->nodes.back().get())) {
         return false;
       }
     }
+    if (tree->nodes.empty()) {
+      return Error("tree has no nodes");
+    }
+    return true;
   }
 
-  bool ParseNode(Ast::Node* node) {
+  bool ParseNode(Node* node) {
+    MG_CHECK(Read(';'));
     for (;;) {
       if (!SkipWhitespace()) {
         return Error("reached EOF when parsing node");
@@ -102,40 +102,54 @@ class Parser {
       if (!absl::ascii_isupper(peek())) {
         return true;
       }
-      node->properties.emplace_back();
-      if (!ParseProperty(&node->properties.back())) {
+      Property prop;
+      if (!ParseProperty(&prop)) {
         return false;
+      }
+      if (prop.id == "B" || prop.id == "W") {
+        if (node->move.color != Color::kEmpty) {
+          return Error("node already has a move");
+        }
+        node->move.color = prop.id == "B" ? Color::kBlack : Color::kWhite;
+        if (prop.values.size() != 1) {
+          return Error("expected exactly one property value, got \"",
+                       prop.ToString(), "\"");
+        }
+        node->move.c = Coord::FromSgf(prop.values[0], true);
+        if (node->move.c == Coord::kInvalid) {
+          return Error(prop.values[0], " is not a valid SGF coordinate");
+        }
+      } else {
+        node->properties.push_back(std::move(prop));
       }
     }
   }
 
-  bool ParseProperty(Ast::Property* prop) {
+  bool ParseProperty(Property* prop) {
     if (!ReadTo('[', &prop->id)) {
       return false;
     }
     if (prop->id.empty()) {
       return Error("property has an empty ID");
     }
-    bool read_value = false;
+    if (!SkipWhitespace()) {
+      return Error("reached EOF when parsing property ", prop->id);
+    }
     for (;;) {
-      if (!SkipWhitespace()) {
-        return Error("reached EOF when parsing property ", prop->id);
-      }
-      if (peek() != '[') {
-        if (!read_value) {
-          return Error("property ", prop->id, " has no values");
-        }
-        return true;
-      }
-      Read('[');
-      read_value = true;
-      std::string value;
-      if (!ReadTo(']', &value)) {
+      prop->values.emplace_back();
+      if (!ParseValue(&prop->values.back())) {
         return false;
       }
-      prop->values.push_back(std::move(value));
-      Read(']');
+      SkipWhitespace();
+      if (peek() != '[') {
+        break;
+      }
     }
+    return true;
+  }
+
+  bool ParseValue(std::string* value) {
+    return Read('[') && ReadTo(']', value) && Read(']');
   }
 
   bool Read(char c) {
@@ -206,131 +220,79 @@ class Parser {
   std::string* error_;
 };
 
-bool GetTreeImpl(const Ast::Tree& tree,
-                 std::vector<std::unique_ptr<Node>>* dst) {
-  const auto* src = &tree;
-  const Ast::Property* prop;
-  const Ast::Property* stones;
-
-  // Extract all the nodes out of this tree.
-  for (const auto& node : src->nodes) {
-    // Parse move.
-    Move move;
-    if ((prop = node.FindProperty("B")) != nullptr) {
-      move.color = Color::kBlack;
-    } else if ((prop = node.FindProperty("W")) != nullptr) {
-      move.color = Color::kWhite;
-    } else if ((prop = node.FindProperty("HA")) != nullptr) {
-      int handicap;
-      bool valid_handicap = absl::SimpleAtoi(prop->values[0], &handicap);
-      if (!valid_handicap) {
-        MG_LOG(ERROR) << "Invalid handicap property: " << prop->values[0];
-        break;
-      }
-
-      if ((handicap <= 1) || (handicap > 9)) {
-        MG_LOG(ERROR) << "Invalid handicap value:" << handicap;
-        return false;
-      }
-      stones = node.FindProperty("AB");
-      if (stones == nullptr) {
-        MG_LOG(ERROR) << "Handicap stones not specified.";
-        return false;
-      }
-
-      for (const auto& h_location : stones->values) {
-        Move m;
-        m.color = Color::kBlack;
-        m.c = Coord::FromSgf(h_location, true);
-        if (m.c == Coord::kInvalid) {
-          MG_LOG(ERROR) << "Can't parse node " << node.ToString() << ": \""
-                        << h_location
-                        << "\" isn't a valid SGF coord for a handicap stone";
-          return false;
-        }
-        dst->push_back(absl::make_unique<Node>(m, ""));
-        dst = &(dst->back()->children);
-        if (h_location != stones->values.back()) {
-          m.color = Color::kWhite;
-          m.c = Coord::kPass;
-          dst->push_back(absl::make_unique<Node>(m, ""));
-          dst = &(dst->back()->children);
-        }
-      }
-      continue;
-    } else {
-      continue;
-    }
-    if (prop->values.empty()) {
-      MG_LOG(WARNING) << "Skipping node " << node.ToString()
-                      << " because property " << prop->ToString()
-                      << " has no values";
-      continue;
-    }
-    move.c = Coord::FromSgf(prop->values[0], true);
-    if (move.c == Coord::kInvalid) {
-      MG_LOG(ERROR) << "Can't parse node " << node.ToString() << ": \""
-                    << prop->values[0] << "\" isn't a valid SGF coord";
-      return false;
-    }
-
-    // Parse comment.
-    std::string comment;
-    if ((prop = node.FindProperty("C")) != nullptr && !prop->values.empty()) {
-      comment = prop->values[0];
-    }
-
-    dst->push_back(absl::make_unique<Node>(move, std::move(comment)));
-    dst = &(dst->back()->children);
-  }
-
-  for (const auto& src_child : src->children) {
-    if (!GetTreeImpl(src_child, dst)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 }  // namespace
 
-std::string Ast::Property::ToString() const {
+std::string Property::ToString() const {
   return absl::StrCat(id, "[", absl::StrJoin(values, "]["), "]");
 }
 
-std::string Ast::Node::ToString() const {
+std::string Node::ToString() const {
   std::string str = ";";
-  for (const auto& property : properties) {
-    absl::StrAppend(&str, property.ToString());
+  if (move.color != Color::kEmpty) {
+    absl::StrAppend(&str, ColorToCode(move.color), "[", move.c.ToSgf(), "]");
+  }
+  for (const auto& prop : properties) {
+    absl::StrAppend(&str, prop.ToString());
   }
   return str;
 }
 
-const Ast::Property* Ast::Node::FindProperty(absl::string_view id) const {
-  for (const auto& property : properties) {
-    if (property.id == id) {
-      return &property;
+const Property* Node::FindProperty(absl::string_view id) const {
+  for (const auto& prop : properties) {
+    if (prop.id == id) {
+      return &prop;
     }
   }
   return nullptr;
 }
 
-std::string Ast::Tree::ToString() const {
-  std::vector<std::string> parts;
-  for (const auto& node : nodes) {
-    parts.push_back(node.ToString());
-  }
-  for (const auto& child : children) {
-    parts.push_back(child.ToString());
-  }
-  return absl::StrCat("(", absl::StrJoin(parts, "\n"), ")");
+const std::string& Node::GetComment() const {
+  static const std::string empty;
+  const auto* prop = FindProperty("C");
+  return prop != nullptr ? prop->values[0] : empty;
 }
 
-bool Ast::Parse(std::string contents) {
-  error_ = "";
-  trees_.clear();
-  contents_ = std::move(contents);
-  return Parser(contents_, &error_).Parse(&trees_);
+std::string Tree::ToString() const {
+  std::vector<std::string> lines;
+  for (const auto& node : nodes) {
+    lines.push_back(node->ToString());
+  }
+  for (const auto& sub_tree : sub_trees) {
+    lines.push_back(sub_tree->ToString());
+  }
+  return absl::StrCat("(", absl::StrJoin(lines, "\n"), ")");
+}
+
+std::vector<Move> Tree::ExtractMainLine() const {
+  std::vector<Move> result;
+  const auto* tree = this;
+  for (;;) {
+    for (const auto& node : tree->nodes) {
+      if (node->move.c != Coord::kInvalid) {
+        result.push_back(node->move);
+      }
+    }
+    if (tree->sub_trees.empty()) {
+      break;
+    }
+    tree = tree->sub_trees[0].get();
+  }
+  return result;
+}
+
+std::string Collection::ToString() const {
+  std::vector<std::string> parts;
+  for (const auto& tree : trees) {
+    parts.push_back(tree->ToString());
+  }
+  return absl::StrJoin(parts, "\n");
+}
+
+bool Parse(absl::string_view contents, Collection* collection,
+           std::string* error) {
+  *collection = {};
+  *error = "";
+  return Parser(contents, error).Parse(collection);
 }
 
 std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
@@ -357,35 +319,6 @@ std::string CreateSgfString(absl::Span<const MoveWithComment> moves,
   absl::StrAppend(&str, ")\n");
 
   return str;
-}
-
-std::vector<Move> Node::ExtractMainLine() const {
-  std::vector<Move> result;
-  const auto* node = this;
-  for (;;) {
-    result.push_back(node->move);
-    if (node->children.empty()) {
-      break;
-    }
-    node = node->children[0].get();
-  }
-  return result;
-}
-
-bool GetTrees(const Ast& ast, std::vector<std::unique_ptr<Node>>* trees) {
-  // Parse the AST into a temporary vector.
-  std::vector<std::unique_ptr<Node>> tmp;
-  for (const auto& tree : ast.trees()) {
-    if (!GetTreeImpl(tree, &tmp)) {
-      return false;
-    }
-  }
-
-  // If everything parsed ok, move the parsed trees into the output vector.
-  for (auto& tree : tmp) {
-    trees->push_back(std::move(tree));
-  }
-  return true;
 }
 
 std::ostream& operator<<(std::ostream& os, const MoveWithComment& move) {

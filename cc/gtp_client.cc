@@ -185,12 +185,9 @@ void GtpClient::Ponder() {
   ponder_read_count_ += player_->root()->N() - n;
 }
 
-GtpClient::Response GtpClient::ReplaySgf(
-    const std::vector<std::unique_ptr<sgf::Node>>& trees) {
-  if (!trees.empty()) {
-    // the SGF parser takes care of transforming an sgf into moves that the
-    // engine is able to understand, so all we do here is just play them in.
-    for (const auto& move : trees[0]->ExtractMainLine()) {
+GtpClient::Response GtpClient::ReplaySgf(const sgf::Collection& collection) {
+  if (!collection.trees.empty()) {
+    for (const auto& move : collection.trees[0]->ExtractMainLine()) {
       if (!player_->PlayMove(move.c)) {
         MG_LOG(ERROR) << "Couldn't play move " << move.c;
         return Response::Error("Cannot load file");
@@ -412,15 +409,16 @@ GtpClient::Response GtpClient::HandleLoadsgf(CmdArgs args) {
     return Response::Error("cannot load file");
   }
 
-  std::vector<std::unique_ptr<sgf::Node>> trees;
-  response = ParseSgf(contents, &trees);
-  if (!response.ok) {
-    return response;
+  sgf::Collection collection;
+  std::string error;
+  if (!sgf::Parse(contents, &collection, &error)) {
+    MG_LOG(ERROR) << "couldn't parse SGF: " << error;
+    return Response::Error("cannot load file");
   }
 
   NewGame();
 
-  return ReplaySgf(trees);
+  return ReplaySgf(collection);
 }
 
 GtpClient::Response GtpClient::HandleName(CmdArgs args) {
@@ -558,20 +556,6 @@ GtpClient::Response GtpClient::HandleUndo(CmdArgs args) {
     player_->ClearSubtrees();
   }
 
-  return Response::Ok();
-}
-
-GtpClient::Response GtpClient::ParseSgf(
-    const std::string& sgf_str,
-    std::vector<std::unique_ptr<sgf::Node>>* trees) {
-  sgf::Ast ast;
-  if (!ast.Parse(sgf_str)) {
-    MG_LOG(ERROR) << "couldn't parse SGF";
-    return Response::Error("cannot load file");
-  }
-  if (!sgf::GetTrees(ast, trees)) {
-    return Response::Error("cannot load file");
-  }
   return Response::Ok();
 }
 
