@@ -63,6 +63,7 @@ cp ${output_base}/external/org_tensorflow/.tf_configure.bazelrc ${workspace}/tf_
 
 echo "Building tensorflow package"
 bazel run -c opt \
+  --copt=-Wno-unknown-warning-option \
   --copt=-Wno-comment \
   --copt=-Wno-deprecated-declarations \
   --copt=-Wno-ignored-attributes \

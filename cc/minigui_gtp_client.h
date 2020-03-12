@@ -69,10 +69,10 @@ class MiniguiGtpClient : public GtpClient {
       // from an empty board.
       std::vector<Coord> GetVariation() const;
 
-      Node* const parent;
-      const Coord move;
-      const std::string id;
-      const int n = 0;
+      Node* parent;
+      Coord move;
+      std::string id;
+      int n = 0;
 
       // Number of times we have performed tree search for win rate evaluation
       // for this position. This is tracked separately from MctsNode.N to that

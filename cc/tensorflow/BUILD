@@ -2,10 +2,12 @@ load("@org_tensorflow//tensorflow:tensorflow.bzl", "transitive_hdrs")
 
 cc_library(
     name = "tensorflow",
-    srcs = [
-        "lib/libtensorflow_framework.so.1",
-    ] + select({
+    srcs = select({
+        "@org_tensorflow//tensorflow:macos": ["lib/libtensorflow_framework.1.dylib"],
+        "//conditions:default": ["lib/libtensorflow_framework.so.1"],
+    }) + select({
         "//cc/config:enable_tpu": ["lib/libgrpc_runtime.so"],
+        "@org_tensorflow//tensorflow:macos": ["lib/libtensorflow_cc.1.dylib"],
         "//conditions:default": ["lib/libtensorflow_cc.so.1"],
     }) + glob(["lib/libtensorrt_ops.so"]),  # glob because this is optional
     hdrs = glob(["include/tensorflow/**/*"]),

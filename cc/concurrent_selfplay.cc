@@ -441,7 +441,6 @@ class SelfplayThread : public Thread {
   };
 
   Selfplayer* selfplayer_;
-  int num_virtual_losses_ = 8;
   std::vector<std::unique_ptr<SelfplayGame>> selfplay_games_;
   std::unique_ptr<Model> model_;
   std::shared_ptr<InferenceCache> cache_;
@@ -855,7 +854,12 @@ void Selfplayer::ExecuteSharded(std::function<void(int, int)> fn) {
 std::unique_ptr<Model> Selfplayer::AcquireModel() { return models_.Pop(); }
 
 void Selfplayer::ReleaseModel(std::unique_ptr<Model> model) {
-  if (model->name() == latest_model_name_) {
+  bool keep_model;
+  {
+    absl::MutexLock lock(&mutex_);
+    keep_model = model->name() == latest_model_name_;
+  }
+  if (keep_model) {
     models_.Push(std::move(model));
   }
 }

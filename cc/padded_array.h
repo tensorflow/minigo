@@ -73,8 +73,8 @@ class PaddedArray {
 template <typename T>
 class PaddedSpan {
  public:
-  constexpr size_t empty() { return size_ == 0; }
-  constexpr size_t size() { return size_; }
+  constexpr size_t empty() const { return size_ == 0; }
+  constexpr size_t size() const { return size_; }
 
   const T* data() const { return data_; }
   T* data() { return data_; }

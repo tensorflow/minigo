@@ -14,6 +14,7 @@
 
 #include "cc/async/thread.h"
 
+#include <pthread.h>
 #include <algorithm>
 
 #include "cc/logging.h"
@@ -30,10 +31,20 @@ Thread::Thread(std::string name) : name_(std::move(name)) {
 Thread::~Thread() = default;
 
 void Thread::Start() {
-  impl_ = std::thread([this] { Run(); });
+  impl_ = std::thread([this] {
+#ifdef TARGET_OS_MAC
+    if (!name_.empty()) {
+      pthread_setname_np(name_.c_str());
+    }
+#endif
+    Run();
+  });
+
+#ifndef TARGET_OS_MAC
   if (!name_.empty()) {
     pthread_setname_np(handle(), name_.c_str());
   }
+#endif
 }
 
 void Thread::Join() {
