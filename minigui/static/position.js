@@ -111,6 +111,9 @@ define(["require", "exports", "./base", "./util"], function (require, exports, b
             return null;
         }
         update(update) {
+            if (update.comment !== undefined) {
+                this.comment = update.comment;
+            }
             if (update.n !== undefined) {
                 this.n = update.n;
             }

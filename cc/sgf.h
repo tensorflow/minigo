@@ -63,6 +63,10 @@ struct Node {
   // Returns the node's comment if it has one or an empty string otherwise.
   const std::string& GetComment() const;
 
+  // Returns the nodes game comment (GC) and comment (C) properties if any,
+  // followed by all other properties separated by newlines.
+  std::string GetCommentAndProperties() const;
+
   Move move;
   std::vector<Property> properties;
 };

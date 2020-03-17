@@ -33,6 +33,26 @@
 
 namespace minigo {
 
+namespace {
+
+// Returns the Q of the best legal child move for the node.
+// Returns the node's Q if there are no legal moves.
+float GetBestMoveQ(const MctsNode* node) {
+  float scale = node->position.to_play() == Color::kBlack ? 1 : -1;
+  float bestChildQ = node->Q();
+  for (int i = 0; i < kNumMoves; ++i) {
+    if (!node->position.legal_move(i)) {
+      continue;
+    }
+    if (node->child_Q(i) * scale > bestChildQ * scale) {
+      bestChildQ = node->child_Q(i);
+    }
+  }
+  return bestChildQ;
+}
+
+}  // namespace
+
 MiniguiGtpClient::MiniguiGtpClient(
     std::string device,
     std::shared_ptr<ThreadSafeInferenceCache> inference_cache,
@@ -167,7 +187,17 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
   // inference on the positions in batches.
   std::function<Response(const sgf::Tree&)> traverse =
       [&](const sgf::Tree& tree) {
+        const auto* original_root = player_->root();
+        // Play moves for all nodes in this tree.
         for (const auto& node : tree.nodes) {
+          if (node->move.c == Coord::kInvalid) {
+            // Skip nodes that don't contain a move, appending any comments to
+            // the current position.
+            absl::StrAppend(&variation_tree_->current_node()->comment,
+                            node->GetCommentAndProperties());
+            continue;
+          }
+
           if (node->move.color != player_->root()->position.to_play()) {
             // The move color is different than expected. Play a pass move to
             // flip the colors.
@@ -191,21 +221,24 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
             return Response::Error("cannot load file");
           }
           variation_tree_->PlayMove(node->move.c);
-          const auto& comment = node->GetComment();
-          if (!comment.empty()) {
-            variation_tree_->current_node()->comment = comment;
-          }
+          variation_tree_->current_node()->comment =
+              node->GetCommentAndProperties();
           ReportRootPosition();
         }
 
+        // Traverse all sub-trees.
         for (const auto& sub_tree : tree.sub_trees) {
           auto response = traverse(*sub_tree);
           if (!response.ok) {
             return response;
           }
         }
-        player_->UndoMove();
-        variation_tree_->GoToParent();
+
+        // Undo the moves in this tree before returning.
+        while (player_->root() != original_root) {
+          player_->UndoMove();
+          variation_tree_->GoToParent();
+        }
         return Response::Ok();
       };
 
@@ -219,6 +252,17 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
   // Play the main line.
   player_->NewGame();
   variation_tree_->GoToStart();
+
+  // The root node of the SGF is created by NewGame, before the SGF is loaded:
+  // explicitly update the root node comment.
+  if (!variation_tree_->current_node()->comment.empty()) {
+    nlohmann::json j = {
+        {"id", variation_tree_->current_node()->id},
+        {"comment", variation_tree_->current_node()->comment},
+    };
+    MG_LOG(INFO) << "mg-update: " << j.dump();
+  }
+
   if (!collection.trees.empty()) {
     for (const auto& move : collection.trees[0]->ExtractMainLine()) {
       // We already validated that all the moves could be played in traverse(),
@@ -241,7 +285,7 @@ void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
   nlohmann::json j = {
       {"id", variation_tree_->current_node()->id},
       {"n", root->N()},
-      {"q", root->Q()},
+      {"q", GetBestMoveQ(root)},
   };
 
   // TODO(tommadams): Make the number of child variations sent back
@@ -283,7 +327,7 @@ void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
       }
       j["variations"]["live"] = {
           {"n", live.front()->N()},
-          {"q", live.front()->Q()},
+          {"q", GetBestMoveQ(live.front())},
           {"moves", std::move(moves)},
       };
     }
@@ -347,7 +391,7 @@ void MiniguiGtpClient::ReportRootPosition() {
     j["parentId"] = variation_tree_->current_node()->parent->id;
     if (root->N() > 0) {
       // Only send Q if the node has been read at least once.
-      j["q"] = root->Q();
+      j["q"] = GetBestMoveQ(root);
     }
   }
   if (root->move != Coord::kInvalid) {
@@ -573,7 +617,7 @@ void MiniguiGtpClient::WinRateEvaluator::Worker::Run() {
     nlohmann::json j = {
         {"id", node->id},
         {"n", player_->root()->N()},
-        {"q", player_->root()->Q()},
+        {"q", GetBestMoveQ(player_->root())},
     };
     MG_LOG(INFO) << "mg-update:" << j.dump();
 

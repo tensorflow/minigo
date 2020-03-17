@@ -7,7 +7,7 @@ google.cloud.bigtable
 grpcio-tools
 keras
 numpy>=1.14.0
-protobuf
+protobuf>=3.8.0
 pylint
 sgf==0.5
 six

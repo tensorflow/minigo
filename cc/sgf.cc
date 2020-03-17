@@ -252,6 +252,31 @@ const std::string& Node::GetComment() const {
   return prop != nullptr ? prop->values[0] : empty;
 }
 
+std::string Node::GetCommentAndProperties() const {
+  std::vector<std::string> comments;
+  std::vector<std::string> prop_strs;
+  for (const auto& prop : properties) {
+    if (prop.id == "GC") {
+      // The game comment goes first.
+      comments.insert(comments.begin(), prop.values[0]);
+    } else if (prop.id == "C") {
+      // The node comment goes after the game comment.
+      comments.push_back(prop.values[0]);
+    } else {
+      prop_strs.push_back(prop.ToString());
+    }
+  }
+
+  // If we have both comments and properties, insert a blank line to separate
+  // them.
+  if (!comments.empty() && !prop_strs.empty()) {
+    comments.push_back("");
+  }
+
+  comments.insert(comments.end(), prop_strs.begin(), prop_strs.end());
+  return absl::StrJoin(comments, "\n");
+}
+
 std::string Tree::ToString() const {
   std::vector<std::string> lines;
   for (const auto& node : nodes) {

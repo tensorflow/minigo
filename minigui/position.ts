@@ -160,6 +160,7 @@ class Position {
   }
 
   update(update: Position.Update) {
+    if (update.comment !== undefined) { this.comment = update.comment; }
     if (update.n !== undefined) { this.n = update.n; }
     if (update.q !== undefined) { this.q = update.q; }
     if (update.childN !== undefined) { this.childN = update.childN; }
@@ -237,6 +238,7 @@ namespace Position {
 
   export interface Update {
     id: string;
+    comment?: string;
     n?: number;
     q?: number;
     childN?: number[];
