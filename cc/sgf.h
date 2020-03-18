@@ -34,6 +34,8 @@ namespace sgf {
 
 constexpr char kProgramIdentifier[] = "Minigo";
 
+// The SGF specification can be found at: https://www.red-bean.com/sgf/
+// The grammar in Backus-Naur Form is as follows:
 //  Collection = GameTree { GameTree }
 //  GameTree   = "(" Sequence { GameTree } ")"
 //  Sequence   = Node { Node }
@@ -43,7 +45,7 @@ constexpr char kProgramIdentifier[] = "Minigo";
 //  PropValue  = "[" CValueType "]"
 //  CValueType = (ValueType | Compose)
 //  ValueType  = (None | Number | Real | Double | Color | SimpleText |
-//               Text | Point  | Move | Stone)
+//                Text | Point  | Move | Stone)
 
 // An SGF node property.
 // Properties created via the minigo::sgf::Parse function are guaranteed to
