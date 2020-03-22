@@ -156,7 +156,7 @@ void Position::UndoMove(const UndoState& undo,
       }
     }
 
-    // Put any captured stones back on the board, updating their neighbouring
+    // Put any captured stones back on the board, updating their neighboring
     // groups' liberty counts.
     auto other_color = OtherColor(undo_color);
     for (auto cc : undo.captures) {
@@ -588,7 +588,7 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions() const {
 }
 
 // A _region_ is a connected set of intersections regardless of color.
-// A _black-enclosed region_ is a maximum region containig no black stones.
+// A _black-enclosed region_ is a maximum region containing no black stones.
 // A black-enclosed region is _small_ if all of its empty intersections are
 // liberties of the enclosing black stones.
 // A small black-enclosed region is _vital_ to an enclosing chain if all of its
@@ -604,7 +604,7 @@ std::array<Color, kN * kN> Position::CalculatePassAliveRegions() const {
 //
 // A set of black chains X is _unconditionally alive_ if each chain in X has at
 // least two distinct small black-enclosed regions that are vital to it.
-// A region enclosed by set of unconitionally alive black chains is an
+// A region enclosed by set of unconditionally alive black chains is an
 // unconditionally alive black region.
 //
 // Given these definitions, Benson's Algorithm finds the set of unconditionally

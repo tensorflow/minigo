@@ -184,7 +184,7 @@ class MctsPlayer {
 
     // The last move a model was used for inference.
     // This needs to be tracked separately from first_move because the common
-    // case is that the model changes change part-way through a tree search.
+    // case is that the model changes part-way through a tree search.
     int last_move = 0;
   };
 

@@ -37,7 +37,7 @@ class Random {
   // If stream == Random::kUniqueStream, a stream will be chosen from a
   // thread-safe global incrementing ID.
   // It's recommended that for reproducible results (modulo threading timing),
-  // all Random instances use a seed speficied by a flag, and
+  // all Random instances use a seed specified by a flag, and
   // Random::kUniqueStream for the stream.
   explicit Random(uint64_t seed, int stream);
 
@@ -58,7 +58,7 @@ class Random {
     return samples;
   }
 
-  // Draw a single unform random samples in the half-open range [a, b).
+  // Draw a single unform random sample in the half-open range [a, b).
   float Uniform(float a, float b);
 
   // Draw multiple unform random samples in the half-open range [a, b).
@@ -95,7 +95,7 @@ class Random {
   }
 
   // Samples the given CDF at random, returning the index of the element found.
-  // Guarantees that elements with zero probability
+  // Guarantees that elements with zero probability will not be sampled.
   int SampleCdf(absl::Span<float> cdf);
 
   uint64_t UniformUint64() {

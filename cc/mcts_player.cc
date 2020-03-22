@@ -58,7 +58,7 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
     base_time = time_limit * (1.0f - decay_factor);
     core_moves = 0;
   } else {
-    // Leave over endgame_time seconds for the end, and play at
+    // Leave at least endgame_time seconds for the end, and play at
     // seconds_per_move for as long as possible.
     base_time = seconds_per_move;
     core_moves = (time_limit - endgame_time) / seconds_per_move;

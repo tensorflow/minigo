@@ -420,7 +420,7 @@ TEST(MctsTreeTest, GetMostVisitedPath) {
   tree.IncorporateResults(leaf2, probs, 0);
 
   // Both Coord(15) and Coord(16) have visit counts of 1.
-  // Coord(16) should be selected because of it's higher action score.
+  // Coord(16) should be selected because of its higher action score.
   EXPECT_EQ(Coord(16), tree.root()->GetMostVisitedMove());
 }
 
@@ -710,7 +710,7 @@ TEST(MctsTreeTest, InjectNoise) {
   }
   EXPECT_NEAR(1, sum_P, 0.000001);
 
-  // With Dirichelet noise, majority of density should be in one node.
+  // With Dirichlet noise, majority of density should be in one node.
   int i = ArgMax(tree.root()->edges.P);
   float max_P = tree.root()->child_P(i);
   EXPECT_GT(max_P, 3.0 / kNumMoves);
@@ -777,7 +777,7 @@ TEST(MctsTreeTest, TestSuperko) {
   // clang-format on
 
   // Superko detection inserts caches into the tree at regularly spaced
-  // depths. For nodes that don't have a superko dectection cache, a linear
+  // depths. For nodes that don't have a superko detection cache, a linear
   // search up the tree, comparing the stone hashes at each node is performed
   // until a superko cache is hit. In order to verify that there isn't a bug
   // related to the linear-scan & cache-lookup pair of checks, we run the

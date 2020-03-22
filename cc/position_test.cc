@@ -613,7 +613,7 @@ TEST(PositionTest, UndoMove) {
 }
 
 // A regression test for a bug where Position::RemoveGroup didn't recycle the
-// removed group's ID. The test plays repeatedly plays a random legal move (or
+// removed group's ID. The test repeatedly plays a random legal move (or
 // passes if the player has no legal moves). Under these conditions, the game
 // will never end.
 TEST(PositionTest, PlayRandomLegalMoves) {

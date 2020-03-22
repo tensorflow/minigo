@@ -51,7 +51,7 @@ class GroupPool {
   GroupId alloc(uint16_t size, uint16_t num_liberties) {
     GroupId id;
     if (!free_ids_.empty()) {
-      // We have at least one previously acclocated then freed group, return it.
+      // We have at least one previously allocated then freed group, return it.
       id = free_ids_.back();
       free_ids_.pop_back();
       groups_[id] = {size, num_liberties};
@@ -63,7 +63,7 @@ class GroupPool {
     return id;
   }
 
-  // Free the group, returning it the pool.
+  // Free the group, returning it to the pool.
   void free(GroupId id) { free_ids_.push_back(id); }
 
   // Access the Group object by ID.

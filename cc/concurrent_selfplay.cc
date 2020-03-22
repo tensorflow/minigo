@@ -293,7 +293,7 @@ class SelfplayGame {
   // Injects noise into the root.
   void InjectNoise();
 
-  // Returns the symmetry that should be when performing inference on this
+  // Returns the symmetry that should be used when performing inference on this
   // node's position.
   symmetry::Symmetry GetInferenceSymmetry(const MctsNode* node) const;
 
@@ -337,10 +337,10 @@ class SelfplayGame {
 
 // The main application class.
 // Manages multiple SelfplayThread objects.
-// Each SelfplayThread plays multiple games concurrently, each one is
+// Each SelfplayThread plays multiple games concurrently, each of which is
 // represented by a SelfplayGame.
-// The Selfplayer also has a OutputThread, which writes the results of completed
-// games to disk.
+// The Selfplayer also has an OutputThread, which writes the results of
+// completed games to disk.
 class Selfplayer {
  public:
   Selfplayer();
@@ -413,7 +413,7 @@ class SelfplayThread : public Thread {
   void SelectLeaves();
 
   // Runs inference on the leaves selected by `SelectLeaves`.
-  // Runs the name of the model that ran the inferences.
+  // Returns the name of the model that ran the inferences.
   std::string RunInferences();
 
   // Calls `SelfplayGame::ProcessInferences` for all inferences performed.
@@ -770,7 +770,7 @@ void Selfplayer::Run() {
   }
 
   // Stop the output threads by pushing one null game onto the output queue
-  // for each thread, causing the treads to exit when the pop them off.
+  // for each thread, causing the threads to exit when they pop them off.
   for (size_t i = 0; i < output_threads.size(); ++i) {
     output_queue_.Push(nullptr);
   }
@@ -972,8 +972,8 @@ void SelfplayThread::StartNewGames() {
         // There are no more games to play remove the empty i'th slot from the
         // array. To do this without having to shuffle all the elements down,
         // we move the last element into position i and pop off the back. After
-        // doing this, go round the loop again without incrementing i (otherwise
-        // we'd skip over the newly moved element).
+        // doing this, go around the loop again without incrementing i
+        // (otherwise we'd skip over the newly moved element).
         selfplay_games_[i] = std::move(selfplay_games_.back());
         selfplay_games_.pop_back();
         continue;

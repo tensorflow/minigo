@@ -46,7 +46,7 @@ int ArgMaxSse(absl::Span<const float> span) {
   // Holds the values of the maximum elements found so far.
   __m128 val_max = _mm_loadu_ps(span.data());
 
-  // The indices of the elements we'll testing on each iteration of the loop.
+  // The indices of the elements we'll be testing on each iteration of the loop.
   __m128i idx = idx_max;
 
   // Step size: each iteration compares four elements at time.
