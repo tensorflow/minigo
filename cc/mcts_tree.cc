@@ -633,7 +633,7 @@ MctsTree::Stats MctsTree::CalculateStats() const {
 }
 
 std::string MctsTree::Describe() const {
-  auto sorted_child_info = CalculateRankedChildInfo();
+  auto sorted_move_info = CalculateRankedMoveInfo();
 
   auto result = absl::StrFormat(
       "%0.4f\n%s\n"
@@ -645,32 +645,32 @@ std::string MctsTree::Describe() const {
     child_N_sum += N;
   }
   for (int rank = 0; rank < 15; ++rank) {
-    Coord c = sorted_child_info[rank].c;
+    Coord c = sorted_move_info[rank].c;
     float soft_N = root_->child_N(c) / child_N_sum;
     float p_delta = soft_N - root_->child_P(c);
     float p_rel = p_delta / root_->child_P(c);
     absl::StrAppendFormat(
         &result,
         "\n%-5s: % 4.3f % 4.3f %0.3f %0.3f %0.3f %5d %0.4f % 6.5f % 3.2f",
-        c.ToGtp(), sorted_child_info[rank].action_score, root_->child_Q(c),
+        c.ToGtp(), sorted_move_info[rank].action_score, root_->child_Q(c),
         root_->child_U(c), root_->child_P(c), root_->child_original_P(c),
         root_->child_N(c), soft_N, p_delta, p_rel);
   }
   return result;
 }
 
-std::array<MctsTree::ChildInfo, kNumMoves> MctsTree::CalculateRankedChildInfo()
+std::array<MctsTree::MoveInfo, kNumMoves> MctsTree::CalculateRankedMoveInfo()
     const {
   auto child_action_score = root_->CalculateChildActionScore();
-  std::array<ChildInfo, kNumMoves> child_info;
+  std::array<MoveInfo, kNumMoves> move_info;
   for (int i = 0; i < kNumMoves; ++i) {
-    child_info[i].c = i;
-    child_info[i].N = root_->child_N(i);
-    child_info[i].P = root_->child_P(i);
-    child_info[i].action_score = child_action_score[i];
+    move_info[i].c = i;
+    move_info[i].N = root_->child_N(i);
+    move_info[i].P = root_->child_P(i);
+    move_info[i].action_score = child_action_score[i];
   }
-  std::sort(child_info.begin(), child_info.end(),
-            [](const ChildInfo& a, const ChildInfo& b) {
+  std::sort(move_info.begin(), move_info.end(),
+            [](const MoveInfo& a, const MoveInfo& b) {
               if (a.N != b.N) {
                 return a.N > b.N;
               }
@@ -679,7 +679,7 @@ std::array<MctsTree::ChildInfo, kNumMoves> MctsTree::CalculateRankedChildInfo()
               }
               return a.action_score > b.action_score;
             });
-  return child_info;
+  return move_info;
 }
 
 bool MctsTree::UndoMove() {

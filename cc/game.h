@@ -37,7 +37,7 @@ class Game {
     float resign_threshold = -0.95;
 
     // We use a separate resign_enabled flag instead of setting the
-    // resign_threshold to -1 for games where resignation is diabled. This
+    // resign_threshold to -1 for games where resignation is disabled. This
     // enables us to report games where the eventual winner would have
     // incorrectly resigned early, had resignations been enabled.
     bool resign_enabled = true;

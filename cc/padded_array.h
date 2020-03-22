@@ -30,7 +30,7 @@ class PaddedSpan;
 //
 // NOTE: this class does NOT guarantee that the base address of the array is
 // also aligned to 16 bytes, so vectorized code should always use unaligned
-// loads and stores. In practice these aren't significantly slows that aligned
+// loads and stores. In practice these aren't significantly slower than aligned
 // loads and stores on modern x86 architectures anyway.
 template <typename T, size_t Size>
 class PaddedArray {

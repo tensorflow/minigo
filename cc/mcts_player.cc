@@ -58,7 +58,7 @@ float TimeRecommendation(int move_num, float seconds_per_move, float time_limit,
     base_time = time_limit * (1.0f - decay_factor);
     core_moves = 0;
   } else {
-    // Leave over endgame_time seconds for the end, and play at
+    // Leave at least endgame_time seconds for the end, and play at
     // seconds_per_move for as long as possible.
     base_time = seconds_per_move;
     core_moves = (time_limit - endgame_time) / seconds_per_move;
@@ -216,6 +216,56 @@ void MctsPlayer::SelectLeaves(int num_leaves, int max_num_reads) {
   }
 }
 
+void MctsPlayer::ProcessLeaves() {
+  if (tree_search_inferences_.empty()) {
+    return;
+  }
+
+  input_ptrs_.clear();
+  output_ptrs_.clear();
+  for (auto& x : tree_search_inferences_) {
+    input_ptrs_.push_back(&x.input);
+    output_ptrs_.push_back(&x.output);
+  }
+
+  // Run inference.
+  model_->RunMany(input_ptrs_, &output_ptrs_, &inference_model_);
+
+  // Record some information about the inference.
+  if (!inference_model_.empty()) {
+    if (inferences_.empty() || inference_model_ != inferences_.back().model) {
+      inferences_.emplace_back(inference_model_, tree_->root()->position.n());
+    }
+    inferences_.back().last_move = tree_->root()->position.n();
+    inferences_.back().total_count += tree_search_inferences_.size();
+  }
+
+  // Incorporate the inference outputs back into tree search.
+  for (auto& inference : tree_search_inferences_) {
+    auto& output = inference.output;
+
+    // Merge the inference output with those in the inference cache, possibly
+    // updating the values in `output`.
+    if (inference_cache_ != nullptr) {
+      inference_cache_->Merge(inference.cache_key, inference.canonical_sym,
+                              inference.inference_sym, &output);
+    }
+
+    // Propagate the results back up the tree to the root.
+    tree_->IncorporateResults(inference.leaf, output.policy, output.value);
+    tree_->RevertVirtualLoss(inference.leaf);
+  }
+
+  if (tree_search_cb_ != nullptr) {
+    std::vector<const MctsNode*> leaves;
+    leaves.reserve(tree_search_inferences_.size());
+    for (auto& inference : tree_search_inferences_) {
+      leaves.push_back(inference.leaf);
+    }
+    tree_search_cb_(leaves);
+  }
+}
+
 bool MctsPlayer::ShouldResign() const {
   return game_->options().resign_enabled &&
          tree_->root()->Q_perspective() < game_->options().resign_threshold;
@@ -312,61 +362,11 @@ void MctsPlayer::UpdateGame(Coord c, bool is_trainable) {
   if (is_trainable && c != Coord::kResign) {
     auto search_pi = tree_->CalculateSearchPi();
     game_->AddTrainableMove(tree_->to_play(), c, root->position,
-                            std::move(comment), root->Q(), root->N(), search_pi);
+                            std::move(comment), root->Q(), root->N(),
+                            search_pi);
   } else {
     game_->AddNonTrainableMove(tree_->to_play(), c, root->position,
                                std::move(comment), root->Q(), root->N());
-  }
-}
-
-// TODO(tommadams): move this up to below SelectLeaves.
-void MctsPlayer::ProcessLeaves() {
-  if (tree_search_inferences_.empty()) {
-    return;
-  }
-
-  input_ptrs_.clear();
-  output_ptrs_.clear();
-  for (auto& x : tree_search_inferences_) {
-    input_ptrs_.push_back(&x.input);
-    output_ptrs_.push_back(&x.output);
-  }
-
-  // Run inference.
-  model_->RunMany(input_ptrs_, &output_ptrs_, &inference_model_);
-
-  // Record some information about the inference.
-  if (!inference_model_.empty()) {
-    if (inferences_.empty() || inference_model_ != inferences_.back().model) {
-      inferences_.emplace_back(inference_model_, tree_->root()->position.n());
-    }
-    inferences_.back().last_move = tree_->root()->position.n();
-    inferences_.back().total_count += tree_search_inferences_.size();
-  }
-
-  // Incorporate the inference outputs back into tree search.
-  for (auto& inference : tree_search_inferences_) {
-    auto& output = inference.output;
-
-    // Merge the inference output with those in the inference cache, possibly
-    // updating the values in `output`.
-    if (inference_cache_ != nullptr) {
-      inference_cache_->Merge(inference.cache_key, inference.canonical_sym,
-                              inference.inference_sym, &output);
-    }
-
-    // Propagate the results back up the tree to the root.
-    tree_->IncorporateResults(inference.leaf, output.policy, output.value);
-    tree_->RevertVirtualLoss(inference.leaf);
-  }
-
-  if (tree_search_cb_ != nullptr) {
-    std::vector<const MctsNode*> leaves;
-    leaves.reserve(tree_search_inferences_.size());
-    for (auto& inference : tree_search_inferences_) {
-      leaves.push_back(inference.leaf);
-    }
-    tree_search_cb_(leaves);
   }
 }
 

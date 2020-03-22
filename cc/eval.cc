@@ -108,7 +108,7 @@ class Evaluator {
     std::string name() {
       absl::MutexLock lock(&mutex_);
       if (name_.empty()) {
-        // The model's name is lazily initialized the first time we create a
+        // The model's name is lazily initialized the first time we create an
         // instance. Make sure it's valid.
         NewModelImpl();
       }

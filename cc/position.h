@@ -207,7 +207,7 @@ class Position {
   // negative.
   float CalculateScore(float komi) const;
 
-  // Calculates all pass-alive region that are enclosed by groups of `color`
+  // Calculates all pass-alive regions that are enclosed by groups of `color`
   // stones.
   // Elements in the returned array are set to `Color::kBlack` or
   // `Color::kWhite` if they belong to a pass-alive region or `Color::kEmpty`
@@ -350,7 +350,7 @@ class Position {
   PaddedArray<uint8_t, kNumMoves> legal_moves_;
 
   // Zobrist hash of the stones. It can be used for positional superko.
-  // This has does not include number of consecutive passes or ko, so should not
+  // This does not include number of consecutive passes or ko, so should not
   // be used for caching inferences.
   zobrist::Hash stone_hash_ = 0;
 };

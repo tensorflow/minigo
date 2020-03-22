@@ -69,7 +69,7 @@ class MCTSNode(object):
     selecting a move, the children dictionary is updated with a new node.
 
     position: A go.Position instance
-    fmove: A move (coordinate) that led to this position, a a flattened coord
+    fmove: A move (coordinate) that led to this position, a flattened coord
             (raw number between 0-N^2, with None a pass)
     parent: A parent MCTSNode.
     """
@@ -133,7 +133,7 @@ class MCTSNode(object):
 
     @property
     def Q_perspective(self):
-        "Return value of position, from perspective of player to play."
+        """Return value of position, from perspective of player to play."""
         return self.Q * self.position.to_play
 
     def select_leaf(self):
@@ -156,7 +156,7 @@ class MCTSNode(object):
         return current
 
     def maybe_add_child(self, fcoord):
-        """ Adds child node for fcoord if it doesn't already exist, and returns it. """
+        """Adds child node for fcoord if it doesn't already exist, and returns it."""
         if fcoord not in self.children:
             new_position = self.position.play_move(
                 coords.from_flat(fcoord))
@@ -283,7 +283,7 @@ class MCTSNode(object):
         return ''.join(output)
 
     def mvp_gg(self):
-        """ Returns most visited path in go-gui VAR format e.g. 'b r3 w c17..."""
+        """Returns most visited path in go-gui VAR format e.g. 'b r3 w c17..."""
         output = []
         for node in self.most_visited_path_nodes():
             if max(node.child_N) <= 1:

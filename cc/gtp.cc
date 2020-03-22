@@ -29,10 +29,9 @@
 DEFINE_bool(minigui, false, "Enable Minigui GTP extensions");
 
 // Game options flags.
-DEFINE_int32(
-    ponder_limit, 0,
-    "If non-zero and in GTP mode, the number times of times to perform tree "
-    "search while waiting for the opponent to play.");
+DEFINE_int32(ponder_limit, 0,
+             "If non-zero and in GTP mode, the number of times to perform tree "
+             "search while waiting for the opponent to play.");
 DEFINE_bool(courtesy_pass, false,
             "If true, always pass if the opponent passes.");
 DEFINE_double(resign_threshold, -0.999, "Resign threshold.");
@@ -43,11 +42,11 @@ DEFINE_int32(num_readouts, 100,
 DEFINE_int32(virtual_losses, 8,
              "Number of virtual losses when running tree search.");
 DEFINE_double(value_init_penalty, 0.0,
-              "New children value initialize penaly.\n"
+              "New children value initialize penalty.\n"
               "child's value = parent's value - value_init_penalty * color, "
               "clamped to [-1, 1].\n"
               "0 is init-to-parent [default], 2.0 is init-to-loss.\n"
-              "This behaves similiarly to leela's FPU \"First Play Urgency\".");
+              "This behaves similarly to leela's FPU \"First Play Urgency\".");
 
 // Time control flags.
 DEFINE_double(seconds_per_move, 0,
