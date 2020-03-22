@@ -224,7 +224,7 @@ class MctsPlayer {
   // of the tree have been cleared.
   void MaybeExpandRoot();
 
-  // Select up to `num_inferences` leaves to perform inference on, storing the
+  // Select up to `num_leaves` leaves to perform inference on, storing the
   // selected leaves in `tree_search_inferences_`. If the player has an
   // inference cache, this can cause more nodes to be added to the tree when
   // the selected leaves are already in the cache. To limit this, SelectLeaves
@@ -233,7 +233,7 @@ class MctsPlayer {
   // In some positions, the model may favor one move so heavily that it
   // overcomes the effects of virtual loss. In this case, SelectLeaves may
   // choose the same leaf multiple times.
-  void SelectLeaves(int num_inferences, int max_num_reads);
+  void SelectLeaves(int num_leaves, int max_num_reads);
 
   // Run inference on the contents of `inferences_` that was previously
   // populated by a call to SelectLeaves, and propagate the results back up the

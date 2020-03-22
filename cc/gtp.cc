@@ -29,10 +29,9 @@
 DEFINE_bool(minigui, false, "Enable Minigui GTP extensions");
 
 // Game options flags.
-DEFINE_int32(
-    ponder_limit, 0,
-    "If non-zero and in GTP mode, the number times of times to perform tree "
-    "search while waiting for the opponent to play.");
+DEFINE_int32(ponder_limit, 0,
+             "If non-zero and in GTP mode, the number of times to perform tree "
+             "search while waiting for the opponent to play.");
 DEFINE_bool(courtesy_pass, false,
             "If true, always pass if the opponent passes.");
 DEFINE_double(resign_threshold, -0.999, "Resign threshold.");

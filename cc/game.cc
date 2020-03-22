@@ -64,7 +64,8 @@ void Game::AddTrainableMove(Color color, Coord c, const Position& position,
 void Game::AddNonTrainableMove(Color color, Coord c, const Position& position,
                                std::string comment, float Q, int N) {
   MG_CHECK(moves_.empty() || moves_.back()->color != color ||
-           moves_.back()->c != c) << moves_.back()->color << " " << color << " " << c;
+           moves_.back()->c != c)
+      << moves_.back()->color << " " << color << " " << c;
   MG_CHECK(!game_over_);
   moves_.push_back(absl::make_unique<Move>(position));
   auto* move = moves_.back().get();

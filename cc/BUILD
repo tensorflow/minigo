@@ -1,9 +1,3 @@
-package(default_visibility = [
-    ":__subpackages__",
-])
-
-licenses(["notice"])  # Apache License 2.0
-
 load(
     "//cc/config:minigo.bzl",
     "minigo_cc_binary",
@@ -12,6 +6,12 @@ load(
     "minigo_cc_test_19_only",
     "minigo_cc_test_9_only",
 )
+
+package(default_visibility = [
+    ":__subpackages__",
+])
+
+licenses(["notice"])  # Apache License 2.0
 
 minigo_cc_library(
     name = "base",

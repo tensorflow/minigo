@@ -268,7 +268,7 @@ GtpClient::Response GtpClient::HandleBenchmark(CmdArgs args) {
   auto saved_options = player_->options();
   auto temp_options = saved_options;
 
-  if (args.size() > 0) {
+  if (!args.empty()) {
     temp_options.seconds_per_move = 0;
     if (!absl::SimpleAtoi(args[0], &temp_options.num_readouts)) {
       return Response::Error("bad num_readouts");

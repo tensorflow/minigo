@@ -748,6 +748,7 @@ void Selfplayer::Run() {
 
   // Start the output threads.
   std::vector<std::unique_ptr<OutputThread>> output_threads;
+  output_threads.reserve(FLAGS_output_threads);
   for (int i = 0; i < FLAGS_output_threads; ++i) {
     output_threads.push_back(
         absl::make_unique<OutputThread>(i, feature_descriptor, &output_queue_));
