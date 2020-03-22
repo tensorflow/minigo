@@ -175,9 +175,8 @@ class MctsTree {
     std::string ToString() const;
   };
 
-  // Information about a child. Returned by CalculateRankedChildInfo.
-  // TODO(tommadams): rename to MoveInfo.
-  struct ChildInfo {
+  // Information about a move. Returned by CalculateRankedMoveInfo.
+  struct MoveInfo {
     Coord c = Coord::kInvalid;
     float N;
     float P;
@@ -256,8 +255,7 @@ class MctsTree {
   std::string Describe() const;
 
   // Sorts the child nodes by visit counts, breaking ties by child action score.
-  // TODO(tommadams): rename to CalculateRankedMoveInfo.
-  std::array<ChildInfo, kNumMoves> CalculateRankedChildInfo() const;
+  std::array<MoveInfo, kNumMoves> CalculateRankedMoveInfo() const;
 
   // TODO(tommadams): remove this UndoMove. PlayMove is a destructive operation
   // and UndoMove will leave the tree in a bad state.
