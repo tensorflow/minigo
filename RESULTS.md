@@ -49,6 +49,7 @@ This ran on a Google Container Engine cluster of pre-release preemptible GPUs;
 (TODO: link) Hopefully the product was improved by our bug reports :)
 
 ### Adjustments
+
 Generations 0-165 played about 12,500 games each, and each model/checkpoint
 was trained on about 1M positions (compare to DM's 2M positions in AGZ paper).
 
@@ -63,8 +64,10 @@ Q-value](http://computer-go.org/pipermail/computer-go/2017-December/010555.html)
 led to weird ping-ponging behavior inside search, and changed to init to the
 average of the parent.
 
-Around model 148, we realized we had the learning rate decay time off by an order of
-magnitude...oops.  We also started experimenting with different values for `c_puct`, but didn't really see a difference for our range of values between 0.8 and 2.0.
+Around model 148, we realized we had the learning rate decay time off by an
+order of magnitude...oops.  We also started experimenting with different values
+for `c_puct`, but didn't really see a difference for our range of values between
+0.8 and 2.0.
 
 Around model 165, we changed how many games we tried to play per model, from
 12,500 games to 7,000 games, and also increased how many positions each
@@ -80,14 +83,15 @@ it down to about .9 (i.e., odds of winning at 5%) based on our analysis of true
 negatives.  (i.e., what was the distribution of the closest a player got to
 resigning who ended up winning)
 
-Around model 250, we started experimenting with tree reuse to gather data about its
-effect on the Dirchlet noise, and if it was affecting our position diversity.
+Around model 250, we started experimenting with tree reuse to gather data about
+its effect on the Dirichlet noise, and if it was affecting our position
+diversity.
 
 We had also been stretching the probabilities pi by raising to 8th power
 before training on them, as a compromise between training on the one-hot
 vector versus the original MCTS visit distribution.
 
-There's still ambiguity about whether or not a onehot training target for the
+There's still ambiguity about whether or not a one-hot training target for the
 policy net is good or bad, but we're leaning towards leaving pi as the softmax
 of visits for training, while using argmax as the method for actually choosing
 the move for play (after the fuseki).
@@ -108,12 +112,12 @@ distorting the rating system.
 
 Sometime between v180 and v230, our CGOS results seemed to level off.  The
 ladder weakness meant our performance on CGOS was split: either our opponents
-could ladder us correctly, or they couldn't :)  As such, it was hard to use CGOS as an
-objective measurement.  Similarly, while we were able to notch some wins against
-KGS dan players, it was hard to tell if we were still making progress.  This led
-to our continued twiddling of settings and general sense of frustration.  The
-ladder weakness continued strong all the way to the very end, around model
-v280, when our prerelease cluster expired.
+could ladder us correctly, or they couldn't :)  As such, it was hard to use CGOS
+as an objective measurement.  Similarly, while we were able to notch some wins
+against KGS dan players, it was hard to tell if we were still making progress.
+This led to our continued twiddling of settings and general sense of
+frustration.  The ladder weakness continued strong all the way to the very end,
+around model v280, when our prerelease cluster expired.
 
 On the whole, we did feel pretty good about having answered some of the
 ambiguities left by the papers:  What was a good value for `c_puct`?  Was
@@ -131,9 +135,9 @@ overcome.
 
 ## Third run, Minigo, model 250-..., Jan 20th-Feb 1st (ish)
 
-As our fiddling about after model 250 didn't seem to get us anywhere, and due to our
-reconsidering about whether or not to one-hot the policy network target ('pi'), we rolled
-back to model 250 to continue training.
+As our fiddling about after model 250 didn't seem to get us anywhere, and due to
+our reconsidering about whether or not to one-hot the policy network target
+('pi'), we rolled back to model 250 to continue training.
 
 We also completely replaced our custom class for handling training examples
 (helpfully called `Dataset`, and predating tf.data.Dataset) with a proper
@@ -156,17 +160,17 @@ The remaining differences between this run and the described paper:
     overall search -- is this broadening important to the discovery of new moves
     by the policy network, and thus the improvement of the network overall?  Who
     knows? :)
-2. Ambiguity around the training target - should we be trying to predict the MCTS
-  visit distribution pi, or the one-hot representation of the final move picked?
-  What about in the early game when softpick didn't necessarily pick the move with
-  the most visits?
+2. Ambiguity around the training target - should we be trying to predict the
+  MCTS visit distribution pi, or the one-hot representation of the final move
+  picked? What about in the early game when softpick didn't necessarily pick the
+  move with the most visits?
 3. Too few filters (128 vs 256).
 
 
 Results: After a few days a few troublesome signs appeared.
   - Value error dropped far lower than the 0.6 steady-state we had expected from
     the paper. (0.6 equates to ~85% prediction accuracy).  This suggested our
-    new dataset code was not shuffling adequately, leading to value overfitting
+    new dataset code was not shuffling adequately, leading to value overfitting.
   - This idea was supported when, upon further digging, it appeared that the
     network would judge transformations (rotation/reflection) of the *same
     board* to have wildly different value estimates.
@@ -179,7 +183,8 @@ rewrite that left it training towards what was effectively noise.  Read the gory
 details
 [here](https://github.com/tensorflow/minigo/commit/9c6e013293d415e90b92097327dfaca94a81a6da).
 
-Our [milestones](https://github.com/tensorflow/minigo/milestone/1?closed=1) to hit before running a new 19x19 pipeline:
+Our [milestones](https://github.com/tensorflow/minigo/milestone/1?closed=1) to
+hit before running a new 19x19 pipeline:
   - add random transformations to the training pipeline
   - More completely shuffle our training data.
   - Figure out an equivalent learning rate decay schedule to the one described
@@ -192,12 +197,14 @@ Since our 19x19 run seemed irrepairable, we decided to work on instrumentation
 to better understand when things were going off the rails while it would still
 be possible to make adjustments.
 
-These [improvements](https://github.com/tensorflow/minigo/milestone/2?closed=1) included:
+These [improvements](https://github.com/tensorflow/minigo/milestone/2?closed=1)
+included:
  - Logging the [magnitude of the
    updates](https://github.com/tensorflow/minigo/commit/360e056f218833938d845b454b4e24158034b58a)
    that training would make to our weights.
  - [Setting aside a
-   set of holdout positions](https://github.com/tensorflow/minigo/commit/f941f5ac72d860f1f583392cbeb69d0694373824) to use to detect overfitting.
+   set of holdout positions](https://github.com/tensorflow/minigo/commit/f941f5ac72d860f1f583392cbeb69d0694373824)
+   to use to detect overfitting.
  - Improvements to setting up clusters and setting up automated testing/CI.
 
 
@@ -209,7 +216,6 @@ here](https://console.cloud.google.com/storage/browser/minigo-pub/v3-9x9).
 
 ### V5, 19x19s, March-April
 
-
 With our newly improved cluster tools, better monitoring, etc, we were pretty
 optimistic about our next attempt at 19x19.  Our evaluation matches -- pitting
 different models against each other to get a good ratings curve -- were
@@ -220,8 +226,8 @@ during the run on the 'unofficial data site'
 Unfortunately, progress stalled shortly after cutting the learning rate, and
 seemed to never recover.  Our three most useful indicators were our value net's
 train error and validation error, our value net error on a set of professional
-games (aka "[figure 3](http://cloudygo.com/v7-19x19/figure-three)"), and our selfplay rating as measured by our evaluation
-matches.
+games (aka "[figure 3](http://cloudygo.com/v7-19x19/figure-three)"), and our
+selfplay rating as measured by our evaluation matches.
 
 For these measures, shortly after our learning rate cut, performance improved
 dramatically before reverting almost completely, with the value net eventually
@@ -252,8 +258,8 @@ During v5, we wrote a number of new features, including:
 
 #### v5 changelog:
 
-1. 3/4 of the way through 125, change squash from 0.95 => 0.98, change temp cutoff
-to move 30 (from 31, because odd number = bias against black)
+1. 3/4 of the way through 125, change squash from 0.95 => 0.98, change temp
+cutoff to move 30 (from 31, because odd number = bias against black)
 
 1. 192 -- learning rate erroneously cut to 0.001.  207 returned to 0.01.
 (206 trained with 0.001, 207 @0.01)  (this was eventually reverted and moved off
@@ -295,9 +301,9 @@ The major changes were:
 
 v7's first premature run had a couple problems:
 
- - We weren't writing our holdout data for 174-179ish, resulting in some weird tensorboard
-   artifacts as our holdout set became composed of models farther and farther
-   from the training data
+ - We weren't writing our holdout data for 174-179ish, resulting in some weird
+   tensorboard artifacts as our holdout set became composed of models farther
+   and farther from the training data
  - We also weren't writing SGFs, making analysis hard.
  - But we did have our 'figure three', so we were able to make sure we were
    moving in the right direction :)
@@ -316,12 +322,12 @@ definitely the odd one out.
 Resign disable rate is a very sensitive parameter; it has several effects:
 
 - Resigning saves compute cycles
-- Resigning removes mostly-decided late-game positions from the dataset, helping prevent
-  overfitting to a large set of very similar looking, very biased data.
+- Resigning removes mostly-decided late-game positions from the dataset, helping
+  prevent overfitting to a large set of very similar looking, very biased data.
 - We need some calibration games; otherwise we forget how to play endgame.
 - Calibration games also prevent our bot from going into a self-perpetuating
-  loop of "resign early" -> used as training data, resulting in the bot being even
-  more pessimistic and resigning earlier.
+  loop of "resign early" -> used as training data, resulting in the bot being
+  even more pessimistic and resigning earlier.
 
 This, combined with our better selfplay performance, made it a relatively
 painless decision to decide to roll back the few days progress, while changing
@@ -353,8 +359,8 @@ Our limiting factor continues to be our rate of selfplay.
 
 ### v9, TPUS #1, July 19 - August 1
 
-By mid July we were able to get a Cloud TPU implementation working for selfplay and
-TPUs were enabled in GKE, allowing us to attempt running with about 600 TPU
+By mid July we were able to get a Cloud TPU implementation working for selfplay
+and TPUs were enabled in GKE, allowing us to attempt running with about 600 TPU
 v2's.  Also, we were able to run our training job on a TPU as well, meaning that
 our training batch size could increase from 256 => 2048, which meant we could
 follow the learning rate schedule published in paper #2.
@@ -390,13 +396,15 @@ easily forumulate hypotheses and test them.
 
 Our first set of hypothesis were not ambitious.  Mostly we wanted to prove that
 our solution was 'stable' and that we could improve a few of the small things we
-knew were wrong with v9, but mostly to leave it the same.  The major differences were:
+knew were wrong with v9, but mostly to leave it the same.  The major differences
+were:
 
 1. Setting the fraction of calibration games back to 10% (from 20%)
 1. Keeping rotation in training on the whole time
 1. Playing slightly more games per model
-1. Cutting the learning rate the first time as soon as we saw `l2_cost` bottom out and start
-   rising, and letting it run at the second rate (0.001) for longer.
+1. Cutting the learning rate the first time as soon as we saw `l2_cost` bottom
+   out and start rising, and letting it run at the second rate (0.001) for
+   longer.
 1. "Slow window", [described here](https://medium.com/oracledevs/lessons-from-alpha-zero-part-6-hyperparameter-tuning-b1cfcbe4ca9a),
    a way to quickly drop the initial games from out of the `window` positions
    are drawn from.  Basically, the first games are true noise, so the quicker
@@ -418,12 +426,12 @@ through the loss landscape, and setting the calibration rate back to 10%.
 probably doesn't affect the overall skill ceiling)
 
 The theory on having the resign-disable games correctly set was based off of
-some of the [excellent results by Seth on the sensitivity of the value network to
-false-positive resigns](https://github.com/tensorflow/minigo/issues/483).  His
-analysis was to basically randomly flip the result of x% of training examples
-and measure the effects on value confidence and value error.  The observation
-was that having 5% of the data fouled was sufficient to dramatically affect
-value error.
+some of the [excellent results by Seth on the sensitivity of the value network
+to false-positive resigns](https://github.com/tensorflow/minigo/issues/483).
+His analysis was to basically randomly flip the result of x% of training
+examples and measure the effects on value confidence and value error.  The
+observation was that having 5% of the data fouled was sufficient to dramatically
+affect value error.
 
 With this amount as a good proxy for 'the amount of data needed to impact
 training significantly', we could then think about how the percent of
@@ -445,8 +453,9 @@ figure out what 'causes' wins and value error drops below 1.0)
 v10 showed that we could reach about the same level as v9, and that we'd plateau
 after a certain point.  Also, we noted that the variance in strength between
 successive networks was really high!  It seemed to expand as training continued,
-suggesting that we were in some very reliable minima.  Was this a function of the higher batch
-size, the higher number of games per model, or both, or neither?
+suggesting that we were in some very reliable minima.  Was this a function of
+the higher batch size, the higher number of games per model, or both, or
+neither?
 
 Qualitatively, v10's Go was interesting for a couple reasons.  We saw the
 familiar 'flower' joseki that was the zero-bot signature, but we also saw the
@@ -471,22 +480,23 @@ near 0.2 for most reasonable moves.  If it were white to play, picking the leaf
 with the value closest to white's goal (-1) would mean search would prefer to
 choose any unvisited leaf (i.e., leaves still with their initialized value of
 0).  This would result in search visiting all legal moves before returning to
-the 'reasonable' variaitions.  The net result would mean a huge spread of
+the 'reasonable' variations.  The net result would mean a huge spread of
 explored moves for the losing side, and a very diluted search.
 
 Conversely, if it were black to play, search would prefer to only pick visited
 leaves, as unvisited leaves would have a value of 0, while any reasonable first
 move would have a value presumably close to 0.2, which is closer to black's goal
-(+1).  The result here is that search would basically only explore a single move for the
-winning side.
+(+1).  The result here is that search would basically only explore a single move
+for the winning side.
 
-The results would be policy examples that are very flat or diffuse for the side that
-loses more, and very sharp for the side that wins more.
+The results would be policy examples that are very flat or diffuse for the side
+that loses more, and very sharp for the side that wins more.
 
 We had run all of our previous versions assuming that instead of Q=0, we should
-initialize leaves to the Q of their parent, aka 'Q=parent'.  This seems reasonable:  both sides
-would look for moves that represented improvements from a given position, and
-the UCB algorithm could widen or narrow the search as needed.
+initialize leaves to the Q of their parent, aka 'Q=parent'.  This seems
+reasonable: both sides would look for moves that represented improvements from a
+given position, and the UCB algorithm could widen or narrow the search as
+needed.
 
 But what if we were wrong?  What if exhaustively checking all moves for the
 losing side and essentially one-hot focusing on the moves for the winning side
@@ -508,14 +518,14 @@ to greatly favor its policy, and the losing side was basically always left with
 a handicap of having a massive number of its moves 'diluted.'  Continuing from
 our previous example... black would be able to spread out its reads quicker than
 white would be able to focus on a single useful line, essentially leaving one
-side at a disadvantage.  
+side at a disadvantage.
 
 Compounding the problem, our pipeline architecture meant that the
-'false-positive' resign rate appeared as a lagging indicator: a new model would be
-released, the TPU workers would all start playing with it immediately, and the
-90% of games with resign enabled would finish before the 10% of holdout games
-that could be measured to set the threshold... So we were right that this failed
-quickly.
+'false-positive' resign rate appeared as a lagging indicator: a new model would
+be released, the TPU workers would all start playing with it immediately, and
+the 90% of games with resign enabled would finish before the 10% of holdout
+games that could be measured to set the threshold... So we were right that this
+failed quickly.
 
 Where we were wrong was that this would put the theory to bed.  Arguing against
 Q=0 was the fact that it was clearly unstable, has problems with the AZ method,
@@ -566,7 +576,10 @@ v10, while reaching professional strength, would still struggle with ladders.
 In a ladder sequence, only one node in the MCTS tree would read the ladder,
 while the rest of the batch would need to pick non-ladder moves.  It's
 conceivable that the averaging done by MCTS would essentially encourage the
-models to avoid sharp, narrow paths with high expected value in favor of flatter paths with a less dramatic outcome.  We figured we'd test this by setting batch size to 2, doubling the number of games played at once (to achieve roughly the same throughput), and run again.
+models to avoid sharp, narrow paths with high expected value in favor of flatter
+paths with a less dramatic outcome.  We figured we'd test this by setting batch
+size to 2, doubling the number of games played at once (to achieve roughly the
+same throughput), and run again.
 
 Early results are not dramatically stronger.  Qualitatively, we have not seen
 the model explore the knight's move approach to the 4-4 hardly at all, instead
@@ -576,7 +589,7 @@ invasion of the 3-3 point.
 Having learned from our previous runs, we postponed our final rate cut until
 step 800k or so, and with it we also increased our window size to 1M (assuming
 that the lower rate of change between models would lead to a smaller diversity
-of of selfplay game examples).
+of selfplay game examples).
 
 One other minor tweak was to stop training on moves after move #400 after we had
 reached a reasonable strength.  The "logic" here is similar to v10's explanation
@@ -587,7 +600,7 @@ examples from the first 400 moves should mostly rid us of those pointless
 examples without dramatically distorting the ratio of opening/middle/endgame
 examples seen by the network.
 
-This run ended up not really having fixed anything. On our cross-evaluation 
+This run ended up not really having fixed anything. On our cross-evaluation
 matches, v12 ended up slightly stronger than the other runs, but it was well
 within the natural variability of the other runs. V12 still had ladder issues
 and it still could not beat LeelaZero or ELF, even with increased playouts.
@@ -614,17 +627,18 @@ a BigTable shuffler.
 
 A minor change - we started logging the average depth of search.
 
-Previously, we'd write out tiny TFRecords containing ~200
-TFExamples each, and another Python process would rsync the records to one
-machine, read them into memory, and maintain a large moving window of positions
-in memory that would be periodically be spit out as training chunks. This shuffler
-had all sorts of hacks in it:
+Previously, we'd write out tiny TFRecords containing ~200 TFExamples each, and
+another Python process would rsync the records to one machine, read them into
+memory, and maintain a large moving window of positions in memory that would be
+periodically be spit out as training chunks. This shuffler had all sorts of
+hacks in it:
 
   - we'd entirely ignore any games with < 30 moves
-  - at the end of v12, we tried ignoring moves > 400 to remove post-endgame noise
+  - at the end of v12, we tried ignoring moves > 400 to remove post-endgame
+    noise
   - we'd draw a fixed number (4) of moves from each game (which oversampled
     short games). This hacky fixed-number sampling was because exactly 10% of
-    our games were calibration games, but those calibration games were much 
+    our games were calibration games, but those calibration games were much
     longer than the other games, meaning that an even sampling by move would
     oversample the calibration games. A fixed-number sampling would at least
     guarantee a 10% representation of calibration games.
@@ -654,16 +668,16 @@ The many benefits of BT replacement included:
   was due to the trainer not having to wait for the shuffler at all. We actually
   ended up adding waiting logic to the timer to ensure enough games had been
   completed before starting training again. This was probably an improvement on
-  our previous logic, which output a golden chunk as soon as the trainer completed
-  training a new generation.
+  our previous logic, which output a golden chunk as soon as the trainer
+  completed training a new generation.
   - The ratio of sampled positions from calibration games and normal games was
   precisely set at 90:10, instead of implicitly depending on the ratio of game
   lengths for calibration games / normal games. (The AGZ paper reported setting
   aside 10% of games, which could lead to anywhere from 10~20% of moves being
   from calibration games.
 
-The run was uneventful and was a bit better than previous runs; it escaped random
-play much more quickly, probably because the up-to-date resign thresholds
+The run was uneventful and was a bit better than previous runs; it escaped
+random play much more quickly, probably because the up-to-date resign thresholds
 meant that our training data was appropriately pruned of 'easy' positions.
 So all in all, the rewrite didn't create any new pipeline issues and improved
 many aspects.
@@ -677,9 +691,9 @@ LZ started mixing in game data from the much stronger ELF.
 
 ### v15, clean run with init to loss
 
-This run beat v14 pretty early on, producing a model that was stronger than v14's
-best at model 330. v15 ended up slightly stronger than v14 but was otherwise
-similar.
+This run beat v14 pretty early on, producing a model that was stronger than
+v14's best at model 330. v15 ended up slightly stronger than v14 but was
+otherwise similar.
 
 Qualitatively, we noticed that V14/V15's models were much sharper,
 meaning that they had more concentrated policy network output and the value
@@ -698,7 +712,8 @@ able to consistently read ladders. One funny side effect was that
 it was actually not clear whether v14 was actually stronger than v12, or whether
 v14 was just bullying v12 around by reading ladders that v12 couldn't read, and
 winning easy rating points. But since we had achieved success against external
-reference points, we concluded that v14/v15 were in fact really stronger than v12.
+reference points, we concluded that v14/v15 were in fact really stronger than
+v12.
 
 During v15's run, we realized that our evaluation cluster infrastructure was in
 need of some upgrades, primarily for two reasons:
