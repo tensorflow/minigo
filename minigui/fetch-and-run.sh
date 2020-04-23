@@ -40,7 +40,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   echo "MINIGUI_BOARD_SIZE:  ${MINIGUI_BOARD_SIZE}"
   echo "MINIGUI_PORT:        ${MINIGUI_PORT}"
   echo "MINIGUI_HOST:        ${MINIGUI_HOST}"
-  echo "MINIGUI_CONV_WIDTH:  ${MINIGUI_CONV_WIDTH}"
   echo "MINIGUI_NUM_READS:   ${MINIGUI_NUM_READS}"
 
   pyversion=$($MINIGUI_PYTHON --version)
@@ -74,7 +73,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     echo "--------------------------------------------------"
 
     BOARD_SIZE=$MINIGUI_BOARD_SIZE $MINIGUI_PYTHON freeze_graph.py \
-        --model_path=${model_path} --conv_width=$MINIGUI_CONV_WIDTH
+        --model_path=${model_path}
   fi
 
   echo
@@ -93,7 +92,6 @@ players = {
                        " --load_file=${model_path}"
                        " --minigui_mode=true"
                        " --num_readouts=${MINIGUI_NUM_READS}"
-                       " --conv_width=${MINIGUI_CONV_WIDTH}"
                        " --resign_threshold=-0.8"
                        " --verbose=2",
                        startup_gtp_commands=[],

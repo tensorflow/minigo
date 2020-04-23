@@ -279,7 +279,7 @@ GtpClient::Response MiniguiGtpClient::ReplaySgf(
 
 void MiniguiGtpClient::ReportSearchStatus(const MctsNode* leaf,
                                           bool include_tree_stats) {
-  auto sorted_child_info = player_->tree().CalculateRankedChildInfo();
+  auto sorted_child_info = player_->tree().CalculateRankedMoveInfo();
   auto* root = player_->root();
 
   nlohmann::json j = {
