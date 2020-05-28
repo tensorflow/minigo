@@ -22,7 +22,7 @@
 
 set -o errexit
 
-git clone https://github.com/kubernetes/test-infra
+git clone --depth 1 https://github.com/kubernetes/test-infra
 
 python2.7 ./test-infra/jenkins/bootstrap.py \
     --job=${JOB_NAME} \

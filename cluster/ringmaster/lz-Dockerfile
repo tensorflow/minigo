@@ -10,7 +10,7 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
 
 # Install Leela.
 RUN mkdir /app && cd /app && \
-    git clone https://github.com/leela-zero/leela-zero.git --branch next . && \
+    git clone --depth 1 https://github.com/leela-zero/leela-zero.git --branch next . && \
     git submodule update --init --recursive && \
     sed -i 's!//#define USE_TUNER!#define USE_TUNER!' src/config.h && \
     mkdir build && cd build && \

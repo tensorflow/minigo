@@ -39,7 +39,7 @@ enables you to poke around if something's failing.
 ```shell
 export PATH=$HOME/go/bin:$PATH
 cd $HOME  # Or somewhere else outside the minigo repo
-git clone git@github.com:kubernetes/test-infra.git
+git clone --depth 1 git@github.com:kubernetes/test-infra.git
 cd test-infra/config
 ./pj-on-kind.sh pull-tf-minigo-cc
 ```

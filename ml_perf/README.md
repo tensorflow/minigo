@@ -18,9 +18,9 @@ cards.
     apt-get install -y python3 python3-pip rsync git wget pkg-config zip g++ zlib1g-dev unzip
 
     # Clone repository.
-    git clone https://github.com/tensorflow/minigo
+    git clone --depth 1 https://github.com/tensorflow/minigo
     # Note: This will eventually change to:
-    # git clone http://github.com/mlperf/training
+    # git clone --depth 1 http://github.com/mlperf/training
 
     cd minigo
 

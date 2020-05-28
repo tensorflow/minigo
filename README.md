@@ -456,7 +456,7 @@ GCE_VM_NAME=minigo-etpu-test
 GCE_ZONE=us-central1-f
 
 # Clone the Minigo Github repository:
-git clone https://github.com/tensorflow/minigo
+git clone --depth 1 https://github.com/tensorflow/minigo
 cd minigo
 
 # Install virtualenv.
